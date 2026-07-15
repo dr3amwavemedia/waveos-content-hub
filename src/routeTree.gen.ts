@@ -9,12 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
@@ -27,7 +30,14 @@ import { Route as AuthenticatedBrandVoiceRouteImport } from './routes/_authentic
 import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
+import { Route as ApiPublicHooksAyrshareRouteImport } from './routes/api/public/hooks/ayrshare'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
@@ -36,6 +46,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -57,6 +72,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SocialConnectionsCallbackRoute =
+  SocialConnectionsCallbackRouteImport.update({
+    id: '/social-connections/callback',
+    path: '/social-connections/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedSocialAccountsRoute =
   AuthenticatedSocialAccountsRouteImport.update({
     id: '/social-accounts',
@@ -118,13 +139,26 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicHooksPublishDueRoute =
+  ApiPublicHooksPublishDueRouteImport.update({
+    id: '/api/public/hooks/publish-due',
+    path: '/api/public/hooks/publish-due',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksAyrshareRoute = ApiPublicHooksAyrshareRouteImport.update({
+  id: '/api/public/hooks/ayrshare',
+  path: '/api/public/hooks/ayrshare',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
   '/auth': typeof AuthRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/approvals': typeof AuthenticatedApprovalsRoute
@@ -137,13 +171,18 @@ export interface FileRoutesByFullPath {
   '/home': typeof AuthenticatedHomeRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/social-connections/callback': typeof SocialConnectionsCallbackRoute
+  '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
+  '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/accept-invite': typeof AcceptInviteRoute
   '/auth': typeof AuthRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/approvals': typeof AuthenticatedApprovalsRoute
@@ -156,6 +195,9 @@ export interface FileRoutesByTo {
   '/home': typeof AuthenticatedHomeRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/social-connections/callback': typeof SocialConnectionsCallbackRoute
+  '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
+  '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -163,8 +205,10 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/accept-invite': typeof AcceptInviteRoute
   '/auth': typeof AuthRoute
+  '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/approvals': typeof AuthenticatedApprovalsRoute
@@ -177,6 +221,9 @@ export interface FileRoutesById {
   '/_authenticated/home': typeof AuthenticatedHomeRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/social-connections/callback': typeof SocialConnectionsCallbackRoute
+  '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
+  '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -184,8 +231,10 @@ export interface FileRouteTypes {
     | '/'
     | '/accept-invite'
     | '/auth'
+    | '/privacy'
     | '/reset-password'
     | '/sitemap.xml'
+    | '/terms'
     | '/admin'
     | '/analytics'
     | '/approvals'
@@ -198,13 +247,18 @@ export interface FileRouteTypes {
     | '/home'
     | '/settings'
     | '/social-accounts'
+    | '/social-connections/callback'
+    | '/api/public/hooks/ayrshare'
+    | '/api/public/hooks/publish-due'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/accept-invite'
     | '/auth'
+    | '/privacy'
     | '/reset-password'
     | '/sitemap.xml'
+    | '/terms'
     | '/admin'
     | '/analytics'
     | '/approvals'
@@ -217,14 +271,19 @@ export interface FileRouteTypes {
     | '/home'
     | '/settings'
     | '/social-accounts'
+    | '/social-connections/callback'
+    | '/api/public/hooks/ayrshare'
+    | '/api/public/hooks/publish-due'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/accept-invite'
     | '/auth'
+    | '/privacy'
     | '/reset-password'
     | '/sitemap.xml'
+    | '/terms'
     | '/_authenticated/admin'
     | '/_authenticated/analytics'
     | '/_authenticated/approvals'
@@ -237,6 +296,9 @@ export interface FileRouteTypes {
     | '/_authenticated/home'
     | '/_authenticated/settings'
     | '/_authenticated/social-accounts'
+    | '/social-connections/callback'
+    | '/api/public/hooks/ayrshare'
+    | '/api/public/hooks/publish-due'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -244,12 +306,24 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AcceptInviteRoute: typeof AcceptInviteRoute
   AuthRoute: typeof AuthRoute
+  PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TermsRoute: typeof TermsRoute
+  SocialConnectionsCallbackRoute: typeof SocialConnectionsCallbackRoute
+  ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
+  ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sitemap.xml': {
       id: '/sitemap.xml'
       path: '/sitemap.xml'
@@ -262,6 +336,13 @@ declare module '@tanstack/react-router' {
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -290,6 +371,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/social-connections/callback': {
+      id: '/social-connections/callback'
+      path: '/social-connections/callback'
+      fullPath: '/social-connections/callback'
+      preLoaderRoute: typeof SocialConnectionsCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/social-accounts': {
@@ -376,6 +464,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/publish-due': {
+      id: '/api/public/hooks/publish-due'
+      path: '/api/public/hooks/publish-due'
+      fullPath: '/api/public/hooks/publish-due'
+      preLoaderRoute: typeof ApiPublicHooksPublishDueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/ayrshare': {
+      id: '/api/public/hooks/ayrshare'
+      path: '/api/public/hooks/ayrshare'
+      fullPath: '/api/public/hooks/ayrshare'
+      preLoaderRoute: typeof ApiPublicHooksAyrshareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -417,8 +519,13 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AcceptInviteRoute: AcceptInviteRoute,
   AuthRoute: AuthRoute,
+  PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TermsRoute: TermsRoute,
+  SocialConnectionsCallbackRoute: SocialConnectionsCallbackRoute,
+  ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,
+  ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

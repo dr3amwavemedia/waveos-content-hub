@@ -21,6 +21,7 @@ import {
   Check,
 } from "lucide-react";
 import { toast } from "sonner";
+import { NotificationsBell } from "./notifications-bell";
 
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -101,13 +102,16 @@ function Shell({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/80 px-4 py-3 backdrop-blur lg:hidden">
         <WaveLogo compact />
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="rounded-lg border border-border bg-elevated p-2 text-foreground"
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationsBell />
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="rounded-lg border border-border bg-elevated p-2 text-foreground"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {/* Mobile drawer */}
@@ -304,6 +308,7 @@ function UserFooter() {
             {user?.email}
           </div>
         </div>
+        <NotificationsBell />
         <button
           onClick={signOut}
           className="rounded-md p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground"

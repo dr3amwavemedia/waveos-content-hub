@@ -55,6 +55,95 @@ export type Database = {
           },
         ]
       }
+      approvals: {
+        Row: {
+          content_item_id: string
+          created_at: string
+          decided_at: string | null
+          decision: Database["public"]["Enums"]["approval_decision"]
+          id: string
+          note: string | null
+          reviewer_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          content_item_id: string
+          created_at?: string
+          decided_at?: string | null
+          decision?: Database["public"]["Enums"]["approval_decision"]
+          id?: string
+          note?: string | null
+          reviewer_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          content_item_id?: string
+          created_at?: string
+          decided_at?: string | null
+          decision?: Database["public"]["Enums"]["approval_decision"]
+          id?: string
+          note?: string | null
+          reviewer_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approvals_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approvals_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ayrshare_profiles: {
+        Row: {
+          created_at: string
+          id: string
+          profile_key: string
+          profile_title: string | null
+          ref_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          profile_key: string
+          profile_title?: string | null
+          ref_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          profile_key?: string
+          profile_title?: string | null
+          ref_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ayrshare_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_profiles: {
         Row: {
           brand_summary: string | null
@@ -133,6 +222,119 @@ export type Database = {
             foreignKeyName: "brand_profiles_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comments: {
+        Row: {
+          author_id: string | null
+          body: string
+          content_item_id: string
+          created_at: string
+          id: string
+          workspace_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          content_item_id: string
+          created_at?: string
+          id?: string
+          workspace_id: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          content_item_id?: string
+          created_at?: string
+          id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      content_items: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          first_published_url: string | null
+          hashtags: string[]
+          id: string
+          internal_notes: string | null
+          media_asset_ids: string[]
+          metadata: Json
+          primary_caption: string | null
+          published_at: string | null
+          scheduled_at: string | null
+          status: Database["public"]["Enums"]["content_status"]
+          timezone: string
+          title: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          first_published_url?: string | null
+          hashtags?: string[]
+          id?: string
+          internal_notes?: string | null
+          media_asset_ids?: string[]
+          metadata?: Json
+          primary_caption?: string | null
+          published_at?: string | null
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["content_status"]
+          timezone?: string
+          title?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          first_published_url?: string | null
+          hashtags?: string[]
+          id?: string
+          internal_notes?: string | null
+          media_asset_ids?: string[]
+          metadata?: Json
+          primary_caption?: string | null
+          published_at?: string | null
+          scheduled_at?: string | null
+          status?: Database["public"]["Enums"]["content_status"]
+          timezone?: string
+          title?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -341,6 +543,104 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          link: string | null
+          read_at: string | null
+          title: string
+          user_id: string
+          workspace_id: string | null
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["notification_kind"]
+          link?: string | null
+          read_at?: string | null
+          title: string
+          user_id: string
+          workspace_id?: string | null
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["notification_kind"]
+          link?: string | null
+          read_at?: string | null
+          title?: string
+          user_id?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      post_variants: {
+        Row: {
+          caption: string
+          content_item_id: string
+          created_at: string
+          enabled: boolean
+          hashtags: string[]
+          id: string
+          platform: Database["public"]["Enums"]["social_platform"]
+          platform_options: Json
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          caption?: string
+          content_item_id: string
+          created_at?: string
+          enabled?: boolean
+          hashtags?: string[]
+          id?: string
+          platform: Database["public"]["Enums"]["social_platform"]
+          platform_options?: Json
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          caption?: string
+          content_item_id?: string
+          created_at?: string
+          enabled?: boolean
+          hashtags?: string[]
+          id?: string
+          platform?: Database["public"]["Enums"]["social_platform"]
+          platform_options?: Json
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_variants_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "post_variants_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -368,6 +668,128 @@ export type Database = {
         }
         Relationships: []
       }
+      publish_attempts: {
+        Row: {
+          attempted_at: string
+          ayrshare_post_id: string | null
+          completed_at: string | null
+          content_item_id: string
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          id: string
+          idempotency_key: string
+          platform: Database["public"]["Enums"]["social_platform"]
+          post_url: string | null
+          request_snapshot: Json
+          response_snapshot: Json
+          status: Database["public"]["Enums"]["publish_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attempted_at?: string
+          ayrshare_post_id?: string | null
+          completed_at?: string | null
+          content_item_id: string
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          idempotency_key: string
+          platform: Database["public"]["Enums"]["social_platform"]
+          post_url?: string | null
+          request_snapshot?: Json
+          response_snapshot?: Json
+          status?: Database["public"]["Enums"]["publish_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          attempted_at?: string
+          ayrshare_post_id?: string | null
+          completed_at?: string | null
+          content_item_id?: string
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          id?: string
+          idempotency_key?: string
+          platform?: Database["public"]["Enums"]["social_platform"]
+          post_url?: string | null
+          request_snapshot?: Json
+          response_snapshot?: Json
+          status?: Database["public"]["Enums"]["publish_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publish_attempts_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "publish_attempts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_connections: {
+        Row: {
+          avatar_url: string | null
+          connected: boolean
+          created_at: string
+          display_name: string | null
+          id: string
+          last_synced_at: string | null
+          platform: Database["public"]["Enums"]["social_platform"]
+          raw: Json
+          updated_at: string
+          username: string | null
+          workspace_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          connected?: boolean
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          last_synced_at?: string | null
+          platform: Database["public"]["Enums"]["social_platform"]
+          raw?: Json
+          updated_at?: string
+          username?: string | null
+          workspace_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          connected?: boolean
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          last_synced_at?: string | null
+          platform?: Database["public"]["Enums"]["social_platform"]
+          raw?: Json
+          updated_at?: string
+          username?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -388,6 +810,57 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      webhook_events: {
+        Row: {
+          content_item_id: string | null
+          created_at: string
+          event_type: string | null
+          external_id: string | null
+          id: string
+          payload: Json
+          processed_at: string | null
+          source: string
+          workspace_id: string | null
+        }
+        Insert: {
+          content_item_id?: string | null
+          created_at?: string
+          event_type?: string | null
+          external_id?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          source: string
+          workspace_id?: string | null
+        }
+        Update: {
+          content_item_id?: string | null
+          created_at?: string
+          event_type?: string | null
+          external_id?: string | null
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          source?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_events_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workspace_members: {
         Row: {
@@ -497,6 +970,17 @@ export type Database = {
           raw_token: string
         }[]
       }
+      create_notification: {
+        Args: {
+          _body?: string
+          _kind: Database["public"]["Enums"]["notification_kind"]
+          _link?: string
+          _title: string
+          _user_id: string
+          _workspace_id: string
+        }
+        Returns: string
+      }
       get_invite_public: {
         Args: { _token: string }
         Returns: {
@@ -563,6 +1047,21 @@ export type Database = {
         | "client_owner"
         | "client_approver"
         | "client_viewer"
+      approval_decision:
+        | "pending"
+        | "approved"
+        | "changes_requested"
+        | "rejected"
+      content_status:
+        | "draft"
+        | "in_review"
+        | "changes_requested"
+        | "approved"
+        | "scheduled"
+        | "publishing"
+        | "published"
+        | "failed"
+        | "archived"
       invite_status: "pending" | "accepted" | "expired" | "revoked"
       media_publishing_status:
         | "none"
@@ -570,6 +1069,37 @@ export type Database = {
         | "ready"
         | "expired"
         | "failed"
+      notification_kind:
+        | "invite_accepted"
+        | "content_submitted"
+        | "content_approved"
+        | "content_changes_requested"
+        | "content_rejected"
+        | "content_published"
+        | "content_failed"
+        | "comment_added"
+        | "account_connected"
+        | "account_disconnected"
+        | "generic"
+      publish_status:
+        | "queued"
+        | "sending"
+        | "success"
+        | "partial"
+        | "failed"
+        | "skipped"
+      social_platform:
+        | "instagram"
+        | "facebook"
+        | "tiktok"
+        | "youtube"
+        | "linkedin"
+        | "x"
+        | "pinterest"
+        | "threads"
+        | "bluesky"
+        | "gmb"
+        | "snapchat"
       workspace_member_role: "owner" | "approver" | "viewer"
       workspace_status: "onboarding" | "active" | "paused" | "archived"
     }
@@ -706,6 +1236,23 @@ export const Constants = {
         "client_approver",
         "client_viewer",
       ],
+      approval_decision: [
+        "pending",
+        "approved",
+        "changes_requested",
+        "rejected",
+      ],
+      content_status: [
+        "draft",
+        "in_review",
+        "changes_requested",
+        "approved",
+        "scheduled",
+        "publishing",
+        "published",
+        "failed",
+        "archived",
+      ],
       invite_status: ["pending", "accepted", "expired", "revoked"],
       media_publishing_status: [
         "none",
@@ -713,6 +1260,40 @@ export const Constants = {
         "ready",
         "expired",
         "failed",
+      ],
+      notification_kind: [
+        "invite_accepted",
+        "content_submitted",
+        "content_approved",
+        "content_changes_requested",
+        "content_rejected",
+        "content_published",
+        "content_failed",
+        "comment_added",
+        "account_connected",
+        "account_disconnected",
+        "generic",
+      ],
+      publish_status: [
+        "queued",
+        "sending",
+        "success",
+        "partial",
+        "failed",
+        "skipped",
+      ],
+      social_platform: [
+        "instagram",
+        "facebook",
+        "tiktok",
+        "youtube",
+        "linkedin",
+        "x",
+        "pinterest",
+        "threads",
+        "bluesky",
+        "gmb",
+        "snapchat",
       ],
       workspace_member_role: ["owner", "approver", "viewer"],
       workspace_status: ["onboarding", "active", "paused", "archived"],

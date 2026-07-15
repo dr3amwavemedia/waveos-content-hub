@@ -28,7 +28,7 @@ function HomeDashboard() {
     queryKey: ["home-stats", wsId],
     enabled: !!wsId,
     queryFn: async () => {
-      const [assets, folders, members, brand] = await Promise.all([
+      const [assets, folders, members, brand, scheduled, awaiting, published] = await Promise.all([
         supabase.from("media_assets").select("id,created_at", { count: "exact", head: false })
           .eq("workspace_id", wsId!).is("archived_at", null),
         supabase.from("media_folders").select("id", { count: "exact", head: true })
@@ -36,15 +36,21 @@ function HomeDashboard() {
         supabase.from("workspace_members").select("user_id", { count: "exact", head: true })
           .eq("workspace_id", wsId!),
         supabase.from("brand_profiles").select("onboarding_status").eq("workspace_id", wsId!).maybeSingle(),
+        supabase.from("content_items").select("id", { count: "exact", head: true })
+          .eq("workspace_id", wsId!).in("status", ["scheduled", "approved"]),
+        supabase.from("content_items").select("id", { count: "exact", head: true })
+          .eq("workspace_id", wsId!).in("status", ["in_review", "changes_requested"]),
+        supabase.from("content_items").select("id", { count: "exact", head: true })
+          .eq("workspace_id", wsId!).eq("status", "published"),
       ]);
       return {
         mediaCount: assets.count ?? (assets.data?.length ?? 0),
         folderCount: folders.count ?? 0,
         memberCount: members.count ?? 0,
         brandComplete: brand.data?.onboarding_status === "complete",
-        recentUploads: (assets.data ?? [])
-          .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
-          .slice(0, 5).length,
+        scheduledCount: scheduled.count ?? 0,
+        awaitingCount: awaiting.count ?? 0,
+        publishedCount: published.count ?? 0,
       };
     },
   });
@@ -79,9 +85,9 @@ function HomeDashboard() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         <StatCard icon={FolderOpen} label="Media assets" value={String(stats?.mediaCount ?? "—")} tone="primary" />
         <StatCard icon={Users} label="Members" value={String(stats?.memberCount ?? "—")} />
-        <StatCard icon={CalendarDays} label="Scheduled" value="0" />
-        <StatCard icon={CheckCircle2} label="Awaiting approval" value="0" tone="warning" />
-        <StatCard icon={Cloud} label="Published" value="0" />
+        <StatCard icon={CalendarDays} label="Scheduled" value={String(stats?.scheduledCount ?? "—")} />
+        <StatCard icon={CheckCircle2} label="Awaiting approval" value={String(stats?.awaitingCount ?? "—")} tone="warning" />
+        <StatCard icon={Cloud} label="Published" value={String(stats?.publishedCount ?? "—")} />
       </div>
 
       <Section title="Upcoming content" subtitle="The next few posts scheduled for your brand.">
