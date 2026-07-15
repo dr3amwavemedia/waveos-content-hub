@@ -22,7 +22,7 @@ function CalendarPage() {
   });
 
   const byDate = useMemo(() => {
-    const map = new Map<string, typeof (items.data ?? [])>();
+    const map = new Map<string, NonNullable<typeof items.data>>();
     (items.data ?? []).forEach((it) => {
       if (!it.scheduled_at) return;
       const key = new Date(it.scheduled_at).toISOString().slice(0, 10);
