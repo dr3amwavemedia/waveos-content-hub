@@ -199,6 +199,44 @@ function AdminPage() {
           </ul>
         )}
       </div>
+
+      <div className="surface-card p-5">
+        <h2 className="text-sm font-semibold text-foreground">Integration status</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Booleans only — actual secret values are never exposed to the UI.
+        </p>
+        {statusQ.isLoading ? (
+          <div className="mt-4 flex items-center text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking…
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <StatusRow label="Ayrshare API key" ok={!!statusQ.data?.ayrshare.api_key} />
+            <StatusRow label="Ayrshare white-label domain" ok={!!statusQ.data?.ayrshare.domain} />
+            <StatusRow label="Ayrshare webhook secret" ok={!!statusQ.data?.ayrshare.webhook_secret} />
+            <StatusRow label="Ayrshare private key (white-label)" ok={!!statusQ.data?.ayrshare.white_label_private_key} />
+            <StatusRow label="App base URL" ok={!!statusQ.data?.app.base_url} />
+            <StatusRow label="Lovable AI Gateway" ok={!!statusQ.data?.lovable.ai_gateway} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatusRow({ label, ok }: { label: string; ok: boolean }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-border bg-elevated/40 px-3 py-2 text-sm">
+      <span className="text-foreground">{label}</span>
+      {ok ? (
+        <span className="inline-flex items-center gap-1 text-emerald-300">
+          <CheckCircle2 className="h-4 w-4" /> Configured
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1 text-muted-foreground">
+          <XCircle className="h-4 w-4" /> Missing
+        </span>
+      )}
     </div>
   );
 }
