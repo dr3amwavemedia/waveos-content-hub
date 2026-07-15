@@ -212,7 +212,7 @@ export const refreshSocialConnections = createServerFn({ method: "POST" })
         avatar_url: map.get(p)?.avatar ?? null,
         connected: true,
         last_synced_at: new Date().toISOString(),
-        raw: (map.get(p) ?? {}) as Record<string, unknown>,
+        raw: JSON.parse(JSON.stringify(map.get(p) ?? {})),
       }));
 
     if (rows.length) {
