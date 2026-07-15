@@ -14,6 +14,130 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_logs: {
+        Row: {
+          action: string
+          actor_user_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          safe_metadata: Json
+          workspace_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          safe_metadata?: Json
+          workspace_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          safe_metadata?: Json
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_logs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      brand_profiles: {
+        Row: {
+          brand_summary: string | null
+          business_name: string | null
+          created_at: string
+          default_ctas: string[]
+          default_hashtags: string[]
+          emoji_preference: string
+          id: string
+          industry: string | null
+          onboarding_status: string
+          preferred_caption_length: string
+          preferred_phrases: string | null
+          primary_language: string
+          primary_services: string | null
+          secondary_language: string | null
+          service_area: string | null
+          target_audience: string | null
+          timezone: string | null
+          tone_traits: string[]
+          updated_at: string
+          website: string | null
+          words_to_avoid: string | null
+          workspace_id: string
+        }
+        Insert: {
+          brand_summary?: string | null
+          business_name?: string | null
+          created_at?: string
+          default_ctas?: string[]
+          default_hashtags?: string[]
+          emoji_preference?: string
+          id?: string
+          industry?: string | null
+          onboarding_status?: string
+          preferred_caption_length?: string
+          preferred_phrases?: string | null
+          primary_language?: string
+          primary_services?: string | null
+          secondary_language?: string | null
+          service_area?: string | null
+          target_audience?: string | null
+          timezone?: string | null
+          tone_traits?: string[]
+          updated_at?: string
+          website?: string | null
+          words_to_avoid?: string | null
+          workspace_id: string
+        }
+        Update: {
+          brand_summary?: string | null
+          business_name?: string | null
+          created_at?: string
+          default_ctas?: string[]
+          default_hashtags?: string[]
+          emoji_preference?: string
+          id?: string
+          industry?: string | null
+          onboarding_status?: string
+          preferred_caption_length?: string
+          preferred_phrases?: string | null
+          primary_language?: string
+          primary_services?: string | null
+          secondary_language?: string | null
+          service_area?: string | null
+          target_audience?: string | null
+          timezone?: string | null
+          tone_traits?: string[]
+          updated_at?: string
+          website?: string | null
+          words_to_avoid?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "brand_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           accepted_at: string | null
@@ -23,7 +147,14 @@ export type Database = {
           expires_at: string
           id: string
           invited_by: string | null
+          last_sent_at: string
+          resend_count: number
+          revoked_at: string | null
+          revoked_by: string | null
+          status: Database["public"]["Enums"]["invite_status"]
           token: string
+          token_hash: string | null
+          updated_at: string
           workspace_id: string | null
           workspace_role: Database["public"]["Enums"]["workspace_member_role"]
         }
@@ -35,7 +166,14 @@ export type Database = {
           expires_at?: string
           id?: string
           invited_by?: string | null
+          last_sent_at?: string
+          resend_count?: number
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: Database["public"]["Enums"]["invite_status"]
           token: string
+          token_hash?: string | null
+          updated_at?: string
           workspace_id?: string | null
           workspace_role?: Database["public"]["Enums"]["workspace_member_role"]
         }
@@ -47,7 +185,14 @@ export type Database = {
           expires_at?: string
           id?: string
           invited_by?: string | null
+          last_sent_at?: string
+          resend_count?: number
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: Database["public"]["Enums"]["invite_status"]
           token?: string
+          token_hash?: string | null
+          updated_at?: string
           workspace_id?: string | null
           workspace_role?: Database["public"]["Enums"]["workspace_member_role"]
         }
@@ -63,13 +208,21 @@ export type Database = {
       }
       media_assets: {
         Row: {
+          archived_at: string | null
           created_at: string
           duration_seconds: number | null
           folder_id: string | null
           height: number | null
           id: string
+          last_accessibility_check: string | null
           mime_type: string
           name: string
+          private_storage_path: string | null
+          publishing_status: Database["public"]["Enums"]["media_publishing_status"]
+          publishing_storage_path: string | null
+          publishing_url: string | null
+          publishing_url_created_at: string | null
+          publishing_url_expires_at: string | null
           size_bytes: number
           storage_path: string
           tags: string[]
@@ -79,13 +232,21 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           duration_seconds?: number | null
           folder_id?: string | null
           height?: number | null
           id?: string
+          last_accessibility_check?: string | null
           mime_type: string
           name: string
+          private_storage_path?: string | null
+          publishing_status?: Database["public"]["Enums"]["media_publishing_status"]
+          publishing_storage_path?: string | null
+          publishing_url?: string | null
+          publishing_url_created_at?: string | null
+          publishing_url_expires_at?: string | null
           size_bytes?: number
           storage_path: string
           tags?: string[]
@@ -95,13 +256,21 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           duration_seconds?: number | null
           folder_id?: string | null
           height?: number | null
           id?: string
+          last_accessibility_check?: string | null
           mime_type?: string
           name?: string
+          private_storage_path?: string | null
+          publishing_status?: Database["public"]["Enums"]["media_publishing_status"]
+          publishing_storage_path?: string | null
+          publishing_url?: string | null
+          publishing_url_created_at?: string | null
+          publishing_url_expires_at?: string | null
           size_bytes?: number
           storage_path?: string
           tags?: string[]
@@ -254,43 +423,55 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          account_manager_id: string | null
           created_at: string
           created_by: string | null
           id: string
           industry: string | null
           is_archived: boolean
           is_demo: boolean
+          last_activity_at: string | null
           name: string
           service_area: string | null
+          service_tier: string | null
           slug: string
+          status: Database["public"]["Enums"]["workspace_status"]
           timezone: string
           updated_at: string
           website: string | null
         }
         Insert: {
+          account_manager_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           industry?: string | null
           is_archived?: boolean
           is_demo?: boolean
+          last_activity_at?: string | null
           name: string
           service_area?: string | null
+          service_tier?: string | null
           slug: string
+          status?: Database["public"]["Enums"]["workspace_status"]
           timezone?: string
           updated_at?: string
           website?: string | null
         }
         Update: {
+          account_manager_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
           industry?: string | null
           is_archived?: boolean
           is_demo?: boolean
+          last_activity_at?: string | null
           name?: string
           service_area?: string | null
+          service_tier?: string | null
           slug?: string
+          status?: Database["public"]["Enums"]["workspace_status"]
           timezone?: string
           updated_at?: string
           website?: string | null
@@ -303,6 +484,37 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { _token: string }; Returns: string }
+      create_invite: {
+        Args: {
+          _app_role: Database["public"]["Enums"]["app_role"]
+          _email: string
+          _expires_days?: number
+          _workspace_id: string
+          _workspace_role: Database["public"]["Enums"]["workspace_member_role"]
+        }
+        Returns: {
+          invite_id: string
+          raw_token: string
+        }[]
+      }
+      get_invite_public: {
+        Args: { _token: string }
+        Returns: {
+          email: string
+          expires_at: string
+          status: Database["public"]["Enums"]["invite_status"]
+          workspace_id: string
+          workspace_name: string
+          workspace_role: Database["public"]["Enums"]["workspace_member_role"]
+        }[]
+      }
+      grant_staff_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _target_user: string
+        }
+        Returns: undefined
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -314,6 +526,30 @@ export type Database = {
       is_workspace_member: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
+      }
+      log_activity: {
+        Args: {
+          _action: string
+          _entity_id?: string
+          _entity_type?: string
+          _metadata?: Json
+          _workspace_id: string
+        }
+        Returns: undefined
+      }
+      resend_invite: {
+        Args: { _extend_days?: number; _invite_id: string }
+        Returns: {
+          raw_token: string
+        }[]
+      }
+      revoke_invite: { Args: { _invite_id: string }; Returns: undefined }
+      revoke_staff_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _target_user: string
+        }
+        Returns: undefined
       }
       workspace_role: {
         Args: { _user_id: string; _workspace_id: string }
@@ -327,7 +563,15 @@ export type Database = {
         | "client_owner"
         | "client_approver"
         | "client_viewer"
+      invite_status: "pending" | "accepted" | "expired" | "revoked"
+      media_publishing_status:
+        | "none"
+        | "preparing"
+        | "ready"
+        | "expired"
+        | "failed"
       workspace_member_role: "owner" | "approver" | "viewer"
+      workspace_status: "onboarding" | "active" | "paused" | "archived"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -462,7 +706,16 @@ export const Constants = {
         "client_approver",
         "client_viewer",
       ],
+      invite_status: ["pending", "accepted", "expired", "revoked"],
+      media_publishing_status: [
+        "none",
+        "preparing",
+        "ready",
+        "expired",
+        "failed",
+      ],
       workspace_member_role: ["owner", "approver", "viewer"],
+      workspace_status: ["onboarding", "active", "paused", "archived"],
     },
   },
 } as const
