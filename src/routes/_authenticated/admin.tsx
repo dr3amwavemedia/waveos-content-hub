@@ -1,11 +1,13 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { Loader2, ShieldCheck, UserMinus, UserPlus } from "lucide-react";
+import { CheckCircle2, Loader2, ShieldCheck, UserMinus, UserPlus, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/app/empty-state";
+import { getIntegrationStatus } from "@/lib/ayrshare.functions";
 import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
