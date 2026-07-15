@@ -39,7 +39,7 @@ function SocialAccountsPage() {
   const status = useQuery({
     queryKey: ["integration-status"],
     queryFn: () => statusFn(),
-    enabled: !!user?.isStaff,
+    enabled: !!user,
     staleTime: 60_000,
   });
 
