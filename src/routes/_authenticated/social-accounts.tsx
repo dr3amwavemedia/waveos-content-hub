@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import { CheckCircle2, ExternalLink, Loader2, RefreshCcw, Share2, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, ExternalLink, Loader2, RefreshCcw, Share2, ShieldCheck, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -14,7 +14,9 @@ import {
   createAyrshareConnectUrl,
   ensureAyrshareProfile,
   getIntegrationStatus,
+  getWorkspaceAyrshareStatus,
   refreshSocialConnections,
+  setRequireFreshSocialLogin,
 } from "@/lib/ayrshare.functions";
 
 export const Route = createFileRoute("/_authenticated/social-accounts")({
@@ -43,26 +45,53 @@ function SocialAccountsPage() {
     staleTime: 60_000,
   });
 
+  const wsStatusFn = useServerFn(getWorkspaceAyrshareStatus);
+  const wsStatus = useQuery({
+    queryKey: ["workspace-ayrshare-status", workspaceId],
+    enabled: !!workspaceId,
+    queryFn: () => wsStatusFn({ data: { workspaceId: workspaceId! } }),
+  });
+
   const ensureFn = useServerFn(ensureAyrshareProfile);
   const connectFn = useServerFn(createAyrshareConnectUrl);
   const refreshFn = useServerFn(refreshSocialConnections);
+  const toggleFn = useServerFn(setRequireFreshSocialLogin);
   const [busy, setBusy] = useState<"connect" | "refresh" | null>(null);
 
-  if (!activeWorkspace) {
+  // Ensure the connections list shown is the current workspace's — never a
+  // cached list from a previously active workspace.
+  useEffect(() => {
+    if (workspaceId) qc.invalidateQueries({ queryKey: ["social-connections", workspaceId] });
+  }, [workspaceId, qc]);
+
+  const toggleMutation = useMutation({
+    mutationFn: (enabled: boolean) => toggleFn({ data: { workspaceId: workspaceId!, enabled } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["workspace-ayrshare-status", workspaceId] });
+      toast.success("Preference saved");
+    },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  if (!activeWorkspace || !workspaceId) {
     return <EmptyState icon={Share2} title="No workspace" body="Select a workspace to manage its social accounts." />;
   }
 
   const ayrshareReady = status.data?.ayrshare.api_key ?? false;
+  const fingerprint = wsStatus.data?.profileFingerprint;
 
   async function handleConnect() {
     if (!workspaceId) return;
     setBusy("connect");
     try {
       await ensureFn({ data: { workspaceId } });
-      const { url } = await connectFn({ data: { workspaceId } });
+      const { url, diagnostics } = await connectFn({ data: { workspaceId } });
       if (!url) throw new Error("No connect URL returned");
-      window.open(url, "waveos-connect", "width=760,height=780");
-      toast.success("Opening secure connect window…");
+      if (!diagnostics.urlHostOk) throw new Error("Unexpected connect URL host");
+      // Open in a FRESH popup with noopener so no prior tab context is inherited.
+      const popup = window.open(url, `waveos-connect-${workspaceId}`, "width=760,height=780,noopener");
+      if (!popup) toast.error("Popup blocked — allow pop-ups and try again");
+      else toast.success(diagnostics.logout ? "Opening fresh Ayrshare session…" : "Opening secure connect window…");
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -76,7 +105,9 @@ function SocialAccountsPage() {
     try {
       const r = await refreshFn({ data: { workspaceId } });
       toast.success(`Synced ${r.updated} account${r.updated === 1 ? "" : "s"}`);
-      qc.invalidateQueries({ queryKey: ["social-connections"] });
+      // Scope invalidation to this workspace only.
+      qc.invalidateQueries({ queryKey: ["social-connections", workspaceId] });
+      qc.invalidateQueries({ queryKey: ["workspace-ayrshare-status", workspaceId] });
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -85,6 +116,7 @@ function SocialAccountsPage() {
   }
 
   const connectionByPlatform = new Map((conns.data ?? []).map((c) => [c.platform, c]));
+  const requireFresh = wsStatus.data?.requireFreshLogin ?? false;
 
   return (
     <div className="space-y-6">
@@ -125,6 +157,32 @@ function SocialAccountsPage() {
         </div>
       )}
 
+      {ayrshareReady && (
+        <div className="surface-card flex flex-wrap items-center justify-between gap-3 p-4 text-sm">
+          <div className="flex items-center gap-3">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <div>
+              <div className="font-semibold text-foreground">Workspace isolation</div>
+              <div className="text-xs text-muted-foreground">
+                {fingerprint
+                  ? <>Ayrshare profile <span className="font-mono">•{fingerprint}</span> is dedicated to this workspace.</>
+                  : "No Ayrshare profile yet — one will be created on first connect."}
+              </div>
+            </div>
+          </div>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={requireFresh}
+              disabled={toggleMutation.isPending}
+              onChange={(e) => toggleMutation.mutate(e.target.checked)}
+              className="h-4 w-4 rounded border-border"
+            />
+            Always require fresh social-account login
+          </label>
+        </div>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {SUPPORTED.map((p) => {
           const c = connectionByPlatform.get(p);
@@ -159,3 +217,4 @@ function SocialAccountsPage() {
     </div>
   );
 }
+
