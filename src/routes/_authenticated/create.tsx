@@ -97,49 +97,98 @@ function CreatePost() {
     );
   }
 
+  const publishFn = useServerFn(publishContentItem);
+  const [publishing, setPublishing] = useState<null | "now" | "schedule">(null);
+
+  async function ensureSaved(): Promise<string | null> {
+    if (!workspaceId) return null;
+    if (savedId) {
+      await update.mutateAsync({
+        id: savedId,
+        patch: {
+          title: title || null,
+          primary_caption: caption || null,
+          media_asset_ids: pickedMedia,
+          scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        },
+      });
+      return savedId;
+    }
+    const item = await create.mutateAsync({
+      title,
+      primary_caption: caption,
+      media_asset_ids: pickedMedia,
+      platforms,
+      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+    });
+    setSavedId(item.id);
+    return item.id;
+  }
+
   async function handleSaveDraft() {
     if (!workspaceId) return;
     try {
-      if (savedId) {
-        await update.mutateAsync({
-          id: savedId,
-          patch: {
-            title: title || null,
-            primary_caption: caption || null,
-            media_asset_ids: pickedMedia,
-            scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-          },
-        });
-        toast.success("Draft saved");
-      } else {
-        const item = await create.mutateAsync({
-          title,
-          primary_caption: caption,
-          media_asset_ids: pickedMedia,
-          platforms,
-          scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-        });
-        setSavedId(item.id);
-        toast.success("Draft created");
-        navigate({ to: "/create", search: { id: item.id }, replace: true });
-      }
+      const id = await ensureSaved();
+      if (!id) return;
+      if (id && !savedId) navigate({ to: "/create", search: { id }, replace: true });
+      toast.success("Draft saved");
+      navigate({ to: "/content" });
     } catch (e) {
       toast.error((e as Error).message);
     }
   }
 
-  async function handleSubmit() {
-    if (!savedId) {
-      toast.error("Save the draft first");
-      return;
+  async function handleScheduleLater() {
+    if (!workspaceId) return;
+    if (!caption.trim()) return toast.error("Add a caption before scheduling");
+    if (!platforms.length) return toast.error("Pick at least one platform");
+    if (!scheduledAt) return toast.error("Choose a publish date and time");
+    const when = new Date(scheduledAt);
+    if (Number.isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
+      return toast.error("Schedule time must be in the future");
     }
+    setPublishing("schedule");
     try {
-      await handleSaveDraft();
-      await submit.mutateAsync(savedId);
-      toast.success("Sent for approval");
+      const id = await ensureSaved();
+      if (!id) return;
+      await update.mutateAsync({
+        id,
+        patch: { status: "scheduled", scheduled_at: when.toISOString() },
+      });
+      qc.invalidateQueries({ queryKey: ["content-items"] });
+      toast.success(`Scheduled for ${when.toLocaleString()}`);
+      navigate({ to: "/calendar" });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setPublishing(null);
+    }
+  }
+
+  async function handlePublishNow() {
+    if (!workspaceId) return;
+    if (!caption.trim()) return toast.error("Add a caption before publishing");
+    if (!platforms.length) return toast.error("Pick at least one platform");
+    if (!confirm("Publish this post to the selected channels right now?")) return;
+    setPublishing("now");
+    try {
+      const id = await ensureSaved();
+      if (!id) return;
+      // Self-service: mark approved so the publisher accepts it.
+      await update.mutateAsync({
+        id,
+        patch: { status: "approved", scheduled_at: null },
+      });
+      const res = await publishFn({ data: { contentId: id } });
+      qc.invalidateQueries({ queryKey: ["content-items"] });
+      qc.invalidateQueries({ queryKey: ["content-item", id] });
+      if (res.failed === 0) toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
+      else toast.warning(`Published to ${res.success}, ${res.failed} failed — see Content for details`);
       navigate({ to: "/content" });
     } catch (e) {
       toast.error((e as Error).message);
+    } finally {
+      setPublishing(null);
     }
   }
 
@@ -153,6 +202,7 @@ function CreatePost() {
     toast.success("Draft deleted");
     navigate({ to: "/content" });
   }
+
 
   return (
     <div className="space-y-6">
