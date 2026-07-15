@@ -362,7 +362,7 @@ function WorkspaceDrawer({
                   <div className="flex gap-1.5">
                     {inv.status === "pending" && (
                       <button
-                        onClick={() => revoke.mutate(inv.id)}
+                        onClick={() => inv.id && revoke.mutate(inv.id)}
                         className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
                         title="Revoke"
                       >
