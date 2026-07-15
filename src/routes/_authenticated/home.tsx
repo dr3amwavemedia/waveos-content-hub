@@ -85,9 +85,9 @@ function HomeDashboard() {
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-5">
         <StatCard icon={FolderOpen} label="Media assets" value={String(stats?.mediaCount ?? "—")} tone="primary" />
         <StatCard icon={Users} label="Members" value={String(stats?.memberCount ?? "—")} />
-        <StatCard icon={CalendarDays} label="Scheduled" value="0" />
-        <StatCard icon={CheckCircle2} label="Awaiting approval" value="0" tone="warning" />
-        <StatCard icon={Cloud} label="Published" value="0" />
+        <StatCard icon={CalendarDays} label="Scheduled" value={String(stats?.scheduledCount ?? "—")} />
+        <StatCard icon={CheckCircle2} label="Awaiting approval" value={String(stats?.awaitingCount ?? "—")} tone="warning" />
+        <StatCard icon={Cloud} label="Published" value={String(stats?.publishedCount ?? "—")} />
       </div>
 
       <Section title="Upcoming content" subtitle="The next few posts scheduled for your brand.">
