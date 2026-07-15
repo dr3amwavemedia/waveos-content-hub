@@ -19,6 +19,7 @@ import {
   Menu,
   X,
   Check,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
@@ -224,11 +225,23 @@ function MobileNavLink({ item }: { item: NavItem }) {
 function WorkspaceSwitcher() {
   const { workspaces, activeWorkspace, setActiveWorkspaceId } = useWorkspace();
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
 
   if (!workspaces.length) {
     return (
-      <div className="mx-3 mt-2 rounded-lg border border-dashed border-border bg-surface/60 p-3 text-xs text-muted-foreground">
-        No workspace yet. Dream Wave Media will set one up for you.
+      <div className="mx-3 mt-2">
+        <button
+          onClick={() => navigate({ to: "/onboarding" })}
+          className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border bg-surface/60 p-3 text-left text-sm text-foreground transition-colors hover:bg-elevated"
+        >
+          <Plus className="h-4 w-4 text-primary" />
+          <span className="flex-1">
+            <span className="block font-medium">Create workspace</span>
+            <span className="block text-[11px] text-muted-foreground">
+              Start your own Brand Workspace
+            </span>
+          </span>
+        </button>
       </div>
     );
   }
@@ -270,6 +283,16 @@ function WorkspaceSwitcher() {
               )}
             </button>
           ))}
+          <button
+            onClick={() => {
+              setOpen(false);
+              navigate({ to: "/onboarding" });
+            }}
+            className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-sm font-medium text-primary hover:bg-elevated"
+          >
+            <Plus className="h-4 w-4" />
+            Create new workspace
+          </button>
         </div>
       )}
     </div>

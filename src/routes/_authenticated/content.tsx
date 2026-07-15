@@ -71,8 +71,9 @@ function ContentLibrary() {
         <Header title="Content library" />
         <EmptyState
           icon={Images}
-          title="No workspace selected"
-          body="Ask Dream Wave Media to add you to a workspace to start uploading."
+          title="No workspace yet"
+          body="Create your Brand Workspace to start uploading photos and videos."
+          action={{ label: "Create workspace", to: "/onboarding" }}
         />
       </div>
     );
