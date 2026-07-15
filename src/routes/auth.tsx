@@ -61,6 +61,25 @@ function AuthPage() {
     toast.success("Welcome back.");
   }
 
+  async function handleSignUp(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth`,
+        data: { full_name: fullName },
+      },
+    });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Account created — let's set up your workspace.");
+  }
+
   async function handleReset(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
