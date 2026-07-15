@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useWorkspaces, type WorkspaceSummary } from "@/hooks/use-waveos";
 
 const STORAGE_KEY = "waveos.active-workspace";
@@ -12,23 +13,42 @@ interface WorkspaceContextValue {
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
 
+// Query keys that are scoped to a specific workspace and MUST be cleared when
+// the active workspace changes so stale rows from the previous workspace can
+// never flash on screen.
+const WORKSPACE_SCOPED_KEYS = [
+  "media", "media-folders", "media-assets",
+  "brand-profile", "activity-logs", "home-stats",
+];
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { data: workspaces = [], isLoading } = useWorkspaces();
   const [activeId, setActiveId] = useState<string | null>(null);
+  const qc = useQueryClient();
+  const prev = useRef<string | null>(null);
 
-  // hydrate from localStorage on client
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
     if (stored) setActiveId(stored);
   }, []);
 
-  // ensure activeId is valid; default to first
   useEffect(() => {
     if (!workspaces.length) return;
     if (!activeId || !workspaces.find((w) => w.id === activeId)) {
       setActiveId(workspaces[0].id);
     }
   }, [workspaces, activeId]);
+
+  // Clear workspace-scoped caches when the active workspace changes so stale
+  // rows from the previous workspace can never briefly appear.
+  useEffect(() => {
+    if (prev.current && prev.current !== activeId) {
+      for (const key of WORKSPACE_SCOPED_KEYS) {
+        qc.removeQueries({ queryKey: [key] });
+      }
+    }
+    prev.current = activeId;
+  }, [activeId, qc]);
 
   const value = useMemo<WorkspaceContextValue>(() => {
     const active = workspaces.find((w) => w.id === activeId) ?? null;
