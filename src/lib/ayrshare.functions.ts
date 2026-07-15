@@ -3,6 +3,25 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const AYRSHARE_BASE = "https://api.ayrshare.com/api";
 
+function normalizePrivateKey(raw?: string, b64?: string): string | undefined {
+  let key = raw?.trim();
+  if ((!key || key.length < 40) && b64) {
+    try { key = Buffer.from(b64, "base64").toString("utf8").trim(); } catch { /* ignore */ }
+  }
+  if (!key) return undefined;
+  // Convert escaped "\n" sequences to real newlines
+  if (key.includes("\\n")) key = key.replace(/\\n/g, "\n");
+  // If pasted without headers, wrap it
+  if (!key.includes("-----BEGIN")) {
+    const body = key.replace(/\s+/g, "");
+    const lines = body.match(/.{1,64}/g)?.join("\n") ?? body;
+    key = `-----BEGIN RSA PRIVATE KEY-----\n${lines}\n-----END RSA PRIVATE KEY-----`;
+  }
+  // Ensure trailing newline
+  if (!key.endsWith("\n")) key += "\n";
+  return key;
+}
+
 function envReady() {
   return {
     apiKey: process.env.AYRSHARE_API_KEY ?? "",
@@ -152,7 +171,7 @@ export const createAyrshareConnectUrl = createServerFn({ method: "POST" })
       method: "POST",
       body: {
         domain: cfg.domain || undefined,
-        privateKey: process.env.AYRSHARE_PRIVATE_KEY,
+        privateKey: normalizePrivateKey(process.env.AYRSHARE_PRIVATE_KEY, process.env.AYRSHARE_PRIVATE_KEY_BASE64),
         profileKey: prof.profile_key,
       },
     }).catch((e) => { throw new Error(`Connect URL failed: ${(e as Error).message}`); });
