@@ -50,7 +50,7 @@ function HomeDashboard() {
   });
 
   const stats = statsQ.data;
-  const isDemo = activeWorkspace?.isDemo ?? false;
+  const isDemo = activeWorkspace?.is_demo ?? false;
   const isEmpty = !stats || (stats.mediaCount === 0 && stats.memberCount <= 1);
 
   return (
