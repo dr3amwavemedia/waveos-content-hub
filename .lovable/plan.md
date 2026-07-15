@@ -1,61 +1,62 @@
+# WaveOS — Build Status
 
-# WaveOS — Phased MVP Build Plan
+## Phase status
 
-Full platform will ship across ~6 focused phases. Each phase is a complete, shippable slice. This turn = **Phase 1**. Later phases run in follow-up turns.
+- ✅ **Phase 1** — Foundation, auth, workspace shell, dark design system.
+- ✅ **Phase 2** — Media library, brand voice onboarding, client invites.
+- ✅ **Phase 2.5** — Security hardening, invite hashing, last-owner protection, activity log redaction.
+- ✅ **Phase 3** — Content items, per-platform variants, approvals, comments.
+- ✅ **Phase 4** — Ayrshare integration (server fns, connect flow, publishing, webhook).
+- ✅ **Phase 5** — Calendar, Wave Assistant AI, analytics scaffold pulling from social_connections.
+- ✅ **Phase 6** — Notifications bell, Privacy/Terms pages, integration diagnostics.
 
-## Phase 1 (this turn) — Foundation
-- Enable Lovable Cloud (Postgres + Auth + Storage + server functions).
-- Dark cinematic WaveOS design system in `src/styles.css` (near-black bg, deep navy panels, electric-blue accents, Inter font, thin translucent borders, generous spacing).
-- Branded auth page (`/auth`): email/password + Google sign-in, invite-only messaging, "A Dream Wave Media platform" footer. No public signup CTA — form supports login + accept-invite via URL token.
-- DB schema (with RLS + GRANTs):
-  - `workspaces`, `workspace_members`, `profiles`, `invites`
-  - `user_roles` (app_role enum: `dream_wave_owner`, `dream_wave_team`, `client_owner`, `client_approver`, `client_viewer`) + `has_role()` security-definer fn
-  - `workspace_role()` helper for per-workspace role checks
-- Protected app shell under `_authenticated/`:
-  - Left sidebar (desktop) + bottom nav (mobile): Home, Content, Calendar, Create, Analytics, Social Accounts, Brand Voice, Feedback, Settings (staff see Clients/Approvals/Admin).
-  - Workspace switcher in header.
-  - Home dashboard with 5 summary cards, upcoming content, needs-attention, recent performance, quick actions — all wired to real (empty) data + polished empty states.
-- Sitemap.xml, robots.txt, real head metadata.
+## What is live in the app
 
-## Phase 2 — Media Library + Brand Voice + Onboarding
-- Storage bucket `media` with per-workspace RLS.
-- Media library: upload (drag-drop), grid, folders, tags, filters, preview.
-- Brand profile table + 5-step onboarding wizard.
-- Public direct media URLs (for Ayrshare later).
+- Create posts with per-platform captions, media picker, scheduling, and submit-for-approval workflow.
+- Approvals inbox for staff with approve / request changes / reject decisions and a comments thread.
+- Calendar month view showing all scheduled/published content, click-through to editor.
+- Social Accounts page with Ayrshare connect flow (opens white-label window) and per-channel status.
+- Analytics scaffold ready for per-platform metrics once first publish completes.
+- Notifications bell in the header with unread count and mark-as-read.
+- Admin → Integration Status panel (booleans only, secrets never exposed).
+- Legal pages at `/privacy` and `/terms`.
+- Scheduled cron job (`waveos-publish-due`, every 5 min) that publishes due content via Ayrshare.
+- Ayrshare webhook receiver at `/api/public/hooks/ayrshare` with HMAC verification.
+- Wave Assistant server function (`waveAssist`) using Lovable AI Gateway (Gemini 2.5 Flash) for caption / hashtag / tone / translate suggestions — always suggestion-only.
 
-## Phase 3 — Post Creation + Approvals
-- `content_items`, `post_variants` (per-platform captions), `approvals`, `comments`.
-- Guided create-post workflow with per-platform caption tabs (independent editing, confirmation before overwrite).
-- Approval workflow with all statuses; client review UI.
+## Manual steps required
 
-## Phase 4 — Ayrshare Integration
-- Secrets: AYRSHARE_API_KEY, AYRSHARE_DOMAIN, AYRSHARE_PRIVATE_KEY, AYRSHARE_PRIVATE_KEY_BASE64, APP_BASE_URL, APP_ENVIRONMENT, AYRSHARE_WEBHOOK_SECRET.
-- `ayrshare_profiles` table (server-only key).
-- Server fns: `ensureAyrshareProfile`, `createAyrshareConnectUrl`, `publishPost`.
-- Social Accounts page + popup connect flow + `/social-connections/callback`.
-- White-label Ayrshare where plan supports; admin notice otherwise.
-- `publish_attempts` with partial-success handling, idempotency, UTC conversion.
+1. **Publish the app** so cron and Ayrshare webhooks can reach the endpoints at
+   `https://project--5e51f033-dba6-4b7a-acb2-008cdd739997.lovable.app/api/public/hooks/*`.
+2. In Ayrshare's dashboard set the **webhook URL** to
+   `https://project--5e51f033-dba6-4b7a-acb2-008cdd739997.lovable.app/api/public/hooks/ayrshare`
+   using the `AYRSHARE_WEBHOOK_SECRET` you just stored.
+3. In Ayrshare's white-label settings set the **redirect URL** to
+   `https://project--5e51f033-dba6-4b7a-acb2-008cdd739997.lovable.app/social-connections/callback`.
+4. Sign in for the first time — the first sign-up is auto-promoted to Dream Wave Owner and added to the seeded "Dream Wave Media" workspace.
+5. In **Clients → New workspace**, onboard a real client and share the copy-only invite link.
+6. In the client workspace → **Social Accounts**, click **Connect a channel** to open the Ayrshare white-label window and link the first social account.
 
-## Phase 5 — Calendar + Wave Assistant + Analytics
-- Calendar (month/week/agenda) with drag-to-reschedule.
-- Wave Assistant panel using Lovable AI Gateway (`openai/gpt-5.5`) for captions/hashtags/tone/translate — suggestions only, never auto-publish.
-- Analytics page pulling from Ayrshare analytics endpoints; "Not available from this platform" fallback.
+## Tested end-to-end
 
-## Phase 6 — Notifications, Legal, Admin Diagnostics, Polish
-- In-app notifications table + bell UI.
-- Privacy Policy + Terms pages.
-- Admin-only integration status page (booleans only, no secret values).
-- Demo workspace seed (dev only).
-- Final acceptance test pass + implementation report.
+- Sign-up → auto-owner bootstrap → Dream Wave Media workspace seeded.
+- Media upload → workspace-scoped storage RLS → signed URLs for preview.
+- Client invite create → hashed token, email match on acceptance, single-use.
+- Content item create → per-platform variants → submit for approval → approve → status transitions.
+- Comments thread on approval detail.
+- Notifications bell polling + mark-read.
+- Admin integration diagnostics reflects secret presence booleans correctly.
 
-## Technical notes
-- Stack: TanStack Start + Lovable Cloud (Supabase under the hood — never mentioned to users). Auth via managed `_authenticated` gate.
-- Roles stored in `user_roles` (separate table, security-definer helpers) to prevent privilege escalation.
-- Every table gets explicit GRANTs + RLS. Ayrshare Profile Keys granted only to `service_role`, loaded via `supabaseAdmin` inside server-fn handlers.
-- All UI uses semantic tokens in `styles.css` — no hardcoded colors in components.
-- Google OAuth via `lovable.auth.signInWithOAuth("google", ...)` + `supabase--configure_social_auth`.
+## Not tested (requires the manual steps above)
 
-## Phase 1 deliverable
-After this turn you'll have a signed-in, workspace-scoped WaveOS shell with the full design system and navigation, ready for staff to invite clients. Phases 2–6 layer on features without redesigning anything.
+- Ayrshare profile creation for a client workspace (needs real Ayrshare account + a client workspace member trying to connect).
+- Actual publish attempt to a live social platform.
+- Cron-driven publish-due (needs published deployment).
+- Ayrshare webhook signature verification against a real event.
 
-Reply "approve" (or edit any phase) and I'll start Phase 1.
+## Follow-ups worth doing later
+
+- Drag-to-reschedule in calendar (currently click-to-open only).
+- Assistant panel UI inside the Create Post page (server function exists; wire a "Suggest caption" button).
+- Per-platform analytics dashboard once Ayrshare returns first metrics.
+- Demo workspace seeding script (deferred; Dream Wave Media internal workspace already covers empty-state demo needs).
