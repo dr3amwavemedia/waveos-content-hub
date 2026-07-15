@@ -30,6 +30,7 @@ import { Route as AuthenticatedBrandVoiceRouteImport } from './routes/_authentic
 import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 import { Route as ApiPublicHooksAyrshareRouteImport } from './routes/api/public/hooks/ayrshare'
 
 const TermsRoute = TermsRouteImport.update({
@@ -138,6 +139,12 @@ const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicHooksPublishDueRoute =
+  ApiPublicHooksPublishDueRouteImport.update({
+    id: '/api/public/hooks/publish-due',
+    path: '/api/public/hooks/publish-due',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksAyrshareRoute = ApiPublicHooksAyrshareRouteImport.update({
   id: '/api/public/hooks/ayrshare',
   path: '/api/public/hooks/ayrshare',
@@ -166,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
+  '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -189,6 +197,7 @@ export interface FileRoutesByTo {
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
+  '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -214,6 +223,7 @@ export interface FileRoutesById {
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
+  '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -239,6 +249,7 @@ export interface FileRouteTypes {
     | '/social-accounts'
     | '/social-connections/callback'
     | '/api/public/hooks/ayrshare'
+    | '/api/public/hooks/publish-due'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -262,6 +273,7 @@ export interface FileRouteTypes {
     | '/social-accounts'
     | '/social-connections/callback'
     | '/api/public/hooks/ayrshare'
+    | '/api/public/hooks/publish-due'
   id:
     | '__root__'
     | '/'
@@ -286,6 +298,7 @@ export interface FileRouteTypes {
     | '/_authenticated/social-accounts'
     | '/social-connections/callback'
     | '/api/public/hooks/ayrshare'
+    | '/api/public/hooks/publish-due'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -299,6 +312,7 @@ export interface RootRouteChildren {
   TermsRoute: typeof TermsRoute
   SocialConnectionsCallbackRoute: typeof SocialConnectionsCallbackRoute
   ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
+  ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -450,6 +464,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/publish-due': {
+      id: '/api/public/hooks/publish-due'
+      path: '/api/public/hooks/publish-due'
+      fullPath: '/api/public/hooks/publish-due'
+      preLoaderRoute: typeof ApiPublicHooksPublishDueRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/ayrshare': {
       id: '/api/public/hooks/ayrshare'
       path: '/api/public/hooks/ayrshare'
@@ -504,6 +525,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsRoute: TermsRoute,
   SocialConnectionsCallbackRoute: SocialConnectionsCallbackRoute,
   ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,
+  ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
