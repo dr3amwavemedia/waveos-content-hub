@@ -152,7 +152,7 @@ export const createAyrshareConnectUrl = createServerFn({ method: "POST" })
       method: "POST",
       body: {
         domain: cfg.domain || undefined,
-        privateKey: process.env.AYRSHARE_PRIVATE_KEY,
+        privateKey: normalizePrivateKey(process.env.AYRSHARE_PRIVATE_KEY, process.env.AYRSHARE_PRIVATE_KEY_BASE64),
         profileKey: prof.profile_key,
       },
     }).catch((e) => { throw new Error(`Connect URL failed: ${(e as Error).message}`); });
