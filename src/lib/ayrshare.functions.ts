@@ -1,64 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const AYRSHARE_BASE = "https://api.ayrshare.com/api";
-
-function normalizePrivateKey(raw?: string, b64?: string): string | undefined {
-  let key = raw?.trim();
-  if ((!key || key.length < 40) && b64) {
-    try { key = Buffer.from(b64, "base64").toString("utf8").trim(); } catch { /* ignore */ }
-  }
-  if (!key) return undefined;
-  // Convert escaped "\n" sequences to real newlines
-  if (key.includes("\\n")) key = key.replace(/\\n/g, "\n");
-  // If pasted without headers, wrap it
-  if (!key.includes("-----BEGIN")) {
-    const body = key.replace(/\s+/g, "");
-    const lines = body.match(/.{1,64}/g)?.join("\n") ?? body;
-    key = `-----BEGIN RSA PRIVATE KEY-----\n${lines}\n-----END RSA PRIVATE KEY-----`;
-  }
-  // Ensure trailing newline
-  if (!key.endsWith("\n")) key += "\n";
-  return key;
-}
-
-function envReady() {
-  return {
-    apiKey: process.env.AYRSHARE_API_KEY ?? "",
-    domain: process.env.AYRSHARE_DOMAIN ?? "",
-    appBaseUrl: process.env.APP_BASE_URL ?? "",
-    ready: Boolean(process.env.AYRSHARE_API_KEY),
-  };
-}
-
-async function ayrshare(
-  path: string,
-  init: Omit<RequestInit, "body"> & { profileKey?: string; body?: unknown } = {},
-) {
-  const { apiKey } = envReady();
-  const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${apiKey}`);
-  if (init.profileKey) headers.set("Profile-Key", init.profileKey);
-  if (init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  const res = await fetch(`${AYRSHARE_BASE}${path}`, {
-    ...init,
-    headers,
-    body: init.body ? (typeof init.body === "string" ? init.body : JSON.stringify(init.body)) : undefined,
-  });
-  const text = await res.text();
-  let json: unknown = null;
-  try { json = text ? JSON.parse(text) : null; } catch { /* text response */ }
-  if (!res.ok) {
-    const message = (json as { message?: string } | null)?.message ?? text ?? `Ayrshare ${res.status}`;
-    throw new Error(message);
-  }
-  return json as Record<string, unknown>;
-}
-
 /** Diagnostic — checks whether Ayrshare secrets are configured. Safe for staff to call. */
 export const getIntegrationStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { envReady } = await import("./ayrshare.server");
     const { supabase, userId } = context;
     const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
     const isStaff = (roles ?? []).some((r) => r.role === "dream_wave_owner" || r.role === "dream_wave_team");
@@ -87,6 +34,7 @@ export const ensureAyrshareProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { workspaceId: string }) => d)
   .handler(async ({ data, context }) => {
+    const { ayrshare, envReady } = await import("./ayrshare.server");
     const { supabase, userId } = context;
     const cfg = envReady();
     if (!cfg.ready) throw new Error("Ayrshare is not configured yet. Add AYRSHARE_API_KEY to enable social publishing.");
@@ -143,6 +91,7 @@ export const createAyrshareConnectUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { workspaceId: string }) => d)
   .handler(async ({ data, context }) => {
+    const { ayrshare, buildAyrshareJwtBody, envReady } = await import("./ayrshare.server");
     const { supabase, userId } = context;
     const cfg = envReady();
     if (!cfg.ready) throw new Error("Ayrshare is not configured yet.");
@@ -169,11 +118,12 @@ export const createAyrshareConnectUrl = createServerFn({ method: "POST" })
 
     const res = await ayrshare("/profiles/generateJWT", {
       method: "POST",
-      body: {
+      body: buildAyrshareJwtBody({
         domain: cfg.domain || undefined,
-        privateKey: normalizePrivateKey(process.env.AYRSHARE_PRIVATE_KEY, process.env.AYRSHARE_PRIVATE_KEY_BASE64),
+        privateKey: process.env.AYRSHARE_PRIVATE_KEY,
+        privateKeyBase64: process.env.AYRSHARE_PRIVATE_KEY_BASE64,
         profileKey: prof.profile_key,
-      },
+      }),
     }).catch((e) => { throw new Error(`Connect URL failed: ${(e as Error).message}`); });
 
     return { url: String((res as Record<string, unknown>).url ?? "") };
@@ -184,6 +134,7 @@ export const refreshSocialConnections = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { workspaceId: string }) => d)
   .handler(async ({ data, context }) => {
+    const { ayrshare, envReady } = await import("./ayrshare.server");
     const { supabase, userId } = context;
     const cfg = envReady();
     if (!cfg.ready) return { updated: 0, ayrshareConfigured: false };
