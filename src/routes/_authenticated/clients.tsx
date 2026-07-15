@@ -75,7 +75,7 @@ function ClientsPage() {
       if (error) throw error;
       const [{ data: members }, { data: invites }, { data: media }] = await Promise.all([
         supabase.from("workspace_members").select("workspace_id"),
-        supabase.from("invites").select("workspace_id").eq("status", "pending"),
+        supabase.from("invites_admin").select("workspace_id").eq("status", "pending"),
         supabase.from("media_assets").select("workspace_id").is("archived_at", null),
       ]);
       const bump = (m: Map<string, number>, k: string | null) => {
@@ -261,7 +261,7 @@ function WorkspaceDrawer({
     queryKey: ["clients", "invites", workspace.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("invites")
+        .from("invites_admin")
         .select("id,email,workspace_role,app_role,status,expires_at,created_at,resend_count")
         .eq("workspace_id", workspace.id)
         .order("created_at", { ascending: false });
@@ -355,14 +355,14 @@ function WorkspaceDrawer({
                     <div className="truncate text-sm text-foreground">{inv.email}</div>
                     <div className="text-xs text-muted-foreground">
                       {inv.workspace_role} · {inv.status}
-                      {inv.status === "pending" &&
+                      {inv.status === "pending" && inv.expires_at &&
                         ` · expires ${new Date(inv.expires_at).toLocaleDateString()}`}
                     </div>
                   </div>
                   <div className="flex gap-1.5">
                     {inv.status === "pending" && (
                       <button
-                        onClick={() => revoke.mutate(inv.id)}
+                        onClick={() => inv.id && revoke.mutate(inv.id)}
                         className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
                         title="Revoke"
                       >
@@ -371,7 +371,7 @@ function WorkspaceDrawer({
                     )}
                     {(inv.status === "pending" || inv.status === "expired" || inv.status === "revoked") && (
                       <button
-                        onClick={() => resend.mutate(inv.id)}
+                        onClick={() => inv.id && resend.mutate(inv.id)}
                         className="rounded-md p-1.5 text-primary hover:bg-primary/15"
                         title="Regenerate & resend"
                       >

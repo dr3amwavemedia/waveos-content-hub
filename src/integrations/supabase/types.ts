@@ -953,7 +953,71 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      invites_admin: {
+        Row: {
+          accepted_at: string | null
+          app_role: Database["public"]["Enums"]["app_role"] | null
+          created_at: string | null
+          email: string | null
+          expires_at: string | null
+          id: string | null
+          invited_by: string | null
+          last_sent_at: string | null
+          resend_count: number | null
+          revoked_at: string | null
+          revoked_by: string | null
+          status: Database["public"]["Enums"]["invite_status"] | null
+          workspace_id: string | null
+          workspace_role:
+            | Database["public"]["Enums"]["workspace_member_role"]
+            | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          app_role?: Database["public"]["Enums"]["app_role"] | null
+          created_at?: string | null
+          email?: string | null
+          expires_at?: string | null
+          id?: string | null
+          invited_by?: string | null
+          last_sent_at?: string | null
+          resend_count?: number | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: Database["public"]["Enums"]["invite_status"] | null
+          workspace_id?: string | null
+          workspace_role?:
+            | Database["public"]["Enums"]["workspace_member_role"]
+            | null
+        }
+        Update: {
+          accepted_at?: string | null
+          app_role?: Database["public"]["Enums"]["app_role"] | null
+          created_at?: string | null
+          email?: string | null
+          expires_at?: string | null
+          id?: string | null
+          invited_by?: string | null
+          last_sent_at?: string | null
+          resend_count?: number | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+          status?: Database["public"]["Enums"]["invite_status"] | null
+          workspace_id?: string | null
+          workspace_role?:
+            | Database["public"]["Enums"]["workspace_member_role"]
+            | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       accept_invite: { Args: { _token: string }; Returns: string }
