@@ -98,6 +98,13 @@ function AdminPage() {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
+  const statusFn = useServerFn(getIntegrationStatus);
+  const statusQ = useQuery({
+    queryKey: ["integration-status"],
+    queryFn: () => statusFn(),
+    staleTime: 60_000,
+  });
+
   return (
     <div className="space-y-6">
       <header>
