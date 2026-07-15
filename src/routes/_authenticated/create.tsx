@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
+  CalendarClock,
   Check,
+  FileText,
   ImagePlus,
   Loader2,
   Send,
@@ -13,6 +15,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { publishContentItem } from "@/lib/publish.functions";
+
 
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/app/empty-state";
