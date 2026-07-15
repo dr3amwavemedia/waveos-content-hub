@@ -75,7 +75,7 @@ function ClientsPage() {
       if (error) throw error;
       const [{ data: members }, { data: invites }, { data: media }] = await Promise.all([
         supabase.from("workspace_members").select("workspace_id"),
-        supabase.from("invites").select("workspace_id").eq("status", "pending"),
+        supabase.from("invites_admin").select("workspace_id").eq("status", "pending"),
         supabase.from("media_assets").select("workspace_id").is("archived_at", null),
       ]);
       const bump = (m: Map<string, number>, k: string | null) => {
