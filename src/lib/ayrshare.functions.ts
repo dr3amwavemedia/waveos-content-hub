@@ -14,7 +14,7 @@ function envReady() {
 
 async function ayrshare(
   path: string,
-  init: RequestInit & { profileKey?: string; body?: unknown } = {},
+  init: Omit<RequestInit, "body"> & { profileKey?: string; body?: unknown } = {},
 ) {
   const { apiKey } = envReady();
   const headers = new Headers(init.headers);
