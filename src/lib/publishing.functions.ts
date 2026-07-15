@@ -71,7 +71,7 @@ export const prepareMediaForPublishing = createServerFn({ method: "POST" })
     const ALLOWED = /^(image\/(jpeg|png|webp|gif)|video\/(mp4|quicktime|webm))$/;
     for (const a of assets) {
       if (a.archived_at) throw new Error(`asset_archived:${a.id}`);
-      if (a.file_size && a.file_size > MAX_BYTES) throw new Error(`asset_too_large:${a.id}`);
+      if (a.size_bytes && a.size_bytes > MAX_BYTES) throw new Error(`asset_too_large:${a.id}`);
       if (a.mime_type && !ALLOWED.test(a.mime_type))
         throw new Error(`asset_unsupported_type:${a.id}`);
     }
