@@ -3,7 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
+  CalendarClock,
   Check,
+  FileText,
   ImagePlus,
   Loader2,
   Send,
@@ -13,6 +15,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { publishContentItem } from "@/lib/publish.functions";
+
 
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/app/empty-state";
@@ -92,49 +97,98 @@ function CreatePost() {
     );
   }
 
+  const publishFn = useServerFn(publishContentItem);
+  const [publishing, setPublishing] = useState<null | "now" | "schedule">(null);
+
+  async function ensureSaved(): Promise<string | null> {
+    if (!workspaceId) return null;
+    if (savedId) {
+      await update.mutateAsync({
+        id: savedId,
+        patch: {
+          title: title || null,
+          primary_caption: caption || null,
+          media_asset_ids: pickedMedia,
+          scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        },
+      });
+      return savedId;
+    }
+    const item = await create.mutateAsync({
+      title,
+      primary_caption: caption,
+      media_asset_ids: pickedMedia,
+      platforms,
+      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+    });
+    setSavedId(item.id);
+    return item.id;
+  }
+
   async function handleSaveDraft() {
     if (!workspaceId) return;
     try {
-      if (savedId) {
-        await update.mutateAsync({
-          id: savedId,
-          patch: {
-            title: title || null,
-            primary_caption: caption || null,
-            media_asset_ids: pickedMedia,
-            scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-          },
-        });
-        toast.success("Draft saved");
-      } else {
-        const item = await create.mutateAsync({
-          title,
-          primary_caption: caption,
-          media_asset_ids: pickedMedia,
-          platforms,
-          scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-        });
-        setSavedId(item.id);
-        toast.success("Draft created");
-        navigate({ to: "/create", search: { id: item.id }, replace: true });
-      }
+      const id = await ensureSaved();
+      if (!id) return;
+      if (id && !savedId) navigate({ to: "/create", search: { id }, replace: true });
+      toast.success("Draft saved");
+      navigate({ to: "/content" });
     } catch (e) {
       toast.error((e as Error).message);
     }
   }
 
-  async function handleSubmit() {
-    if (!savedId) {
-      toast.error("Save the draft first");
-      return;
+  async function handleScheduleLater() {
+    if (!workspaceId) return;
+    if (!caption.trim()) return toast.error("Add a caption before scheduling");
+    if (!platforms.length) return toast.error("Pick at least one platform");
+    if (!scheduledAt) return toast.error("Choose a publish date and time");
+    const when = new Date(scheduledAt);
+    if (Number.isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
+      return toast.error("Schedule time must be in the future");
     }
+    setPublishing("schedule");
     try {
-      await handleSaveDraft();
-      await submit.mutateAsync(savedId);
-      toast.success("Sent for approval");
+      const id = await ensureSaved();
+      if (!id) return;
+      await update.mutateAsync({
+        id,
+        patch: { status: "scheduled", scheduled_at: when.toISOString() },
+      });
+      qc.invalidateQueries({ queryKey: ["content-items"] });
+      toast.success(`Scheduled for ${when.toLocaleString()}`);
+      navigate({ to: "/calendar" });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setPublishing(null);
+    }
+  }
+
+  async function handlePublishNow() {
+    if (!workspaceId) return;
+    if (!caption.trim()) return toast.error("Add a caption before publishing");
+    if (!platforms.length) return toast.error("Pick at least one platform");
+    if (!confirm("Publish this post to the selected channels right now?")) return;
+    setPublishing("now");
+    try {
+      const id = await ensureSaved();
+      if (!id) return;
+      // Self-service: mark approved so the publisher accepts it.
+      await update.mutateAsync({
+        id,
+        patch: { status: "approved", scheduled_at: null },
+      });
+      const res = await publishFn({ data: { contentId: id } });
+      qc.invalidateQueries({ queryKey: ["content-items"] });
+      qc.invalidateQueries({ queryKey: ["content-item", id] });
+      if (res.failed === 0) toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
+      else toast.warning(`Published to ${res.success}, ${res.failed} failed — see Content for details`);
       navigate({ to: "/content" });
     } catch (e) {
       toast.error((e as Error).message);
+    } finally {
+      setPublishing(null);
     }
   }
 
@@ -148,6 +202,7 @@ function CreatePost() {
     toast.success("Draft deleted");
     navigate({ to: "/content" });
   }
+
 
   return (
     <div className="space-y-6">
@@ -179,22 +234,34 @@ function CreatePost() {
             </button>
           )}
           <button
-            disabled={locked || create.isPending || update.isPending}
+            disabled={locked || create.isPending || update.isPending || publishing !== null}
             onClick={handleSaveDraft}
-            className="rounded-full border border-border bg-elevated px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-elevated px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2 disabled:opacity-50"
           >
-            {create.isPending || update.isPending ? (
-              <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-            ) : null}
+            {(create.isPending || update.isPending) && publishing === null ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
             Save draft
           </button>
           <button
-            disabled={locked || submit.isPending || !caption.trim()}
-            onClick={handleSubmit}
+            disabled={locked || publishing !== null || !caption.trim() || !scheduledAt}
+            onClick={handleScheduleLater}
+            className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+          >
+            {publishing === "schedule" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
+            Schedule later
+          </button>
+          <button
+            disabled={locked || publishing !== null || !caption.trim() || !platforms.length}
+            onClick={handlePublishNow}
             className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
           >
-            <Send className="h-4 w-4" /> Submit for approval
+            {publishing === "now" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Publish now
           </button>
+
         </div>
       </div>
 
