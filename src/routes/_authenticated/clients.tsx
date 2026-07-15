@@ -371,7 +371,7 @@ function WorkspaceDrawer({
                     )}
                     {(inv.status === "pending" || inv.status === "expired" || inv.status === "revoked") && (
                       <button
-                        onClick={() => resend.mutate(inv.id)}
+                        onClick={() => inv.id && resend.mutate(inv.id)}
                         className="rounded-md p-1.5 text-primary hover:bg-primary/15"
                         title="Regenerate & resend"
                       >
