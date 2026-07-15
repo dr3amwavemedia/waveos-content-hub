@@ -19,7 +19,6 @@ import {
   Menu,
   X,
   Check,
-  Bell,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
