@@ -309,6 +309,7 @@ function UserFooter() {
             {user?.email}
           </div>
         </div>
+        <NotificationsBell />
         <button
           onClick={signOut}
           className="rounded-md p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
