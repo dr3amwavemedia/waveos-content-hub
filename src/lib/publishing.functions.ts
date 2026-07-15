@@ -56,7 +56,7 @@ export const prepareMediaForPublishing = createServerFn({ method: "POST" })
     const { data: assets, error: assetsErr } = await supabase
       .from("media_assets")
       .select(
-        "id, workspace_id, storage_path, private_storage_path, publishing_url, publishing_url_expires_at, publishing_status, mime_type, file_size, filename, archived_at",
+        "id, workspace_id, storage_path, private_storage_path, publishing_url, publishing_url_expires_at, publishing_status, mime_type, size_bytes, name, archived_at",
       )
       .in("id", data.media_asset_ids)
       .eq("workspace_id", data.workspace_id);
