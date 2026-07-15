@@ -103,13 +103,16 @@ function Shell({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/80 px-4 py-3 backdrop-blur lg:hidden">
         <WaveLogo compact />
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="rounded-lg border border-border bg-elevated p-2 text-foreground"
-          aria-label="Open menu"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          <NotificationsBell />
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="rounded-lg border border-border bg-elevated p-2 text-foreground"
+            aria-label="Open menu"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
       {/* Mobile drawer */}
