@@ -77,11 +77,12 @@ function AuthPage() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    const nextQ = nextPath !== "/home" ? `?next=${encodeURIComponent(nextPath)}` : "";
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth`,
+        emailRedirectTo: `${window.location.origin}/auth${nextQ}`,
         data: { full_name: fullName },
       },
     });
@@ -107,8 +108,9 @@ function AuthPage() {
 
   async function handleGoogle() {
     setBusy(true);
+    const nextQ = nextPath !== "/home" ? `?next=${encodeURIComponent(nextPath)}` : "";
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/auth",
+      redirect_uri: window.location.origin + "/auth" + nextQ,
     });
     if (result.error) {
       setBusy(false);
@@ -118,7 +120,8 @@ function AuthPage() {
     if (result.redirected) return;
     // popup path: session set
     setBusy(false);
-    navigate({ to: "/home", replace: true });
+    if (nextPath !== "/home") window.location.replace(nextPath);
+    else navigate({ to: "/home", replace: true });
   }
 
   return (
