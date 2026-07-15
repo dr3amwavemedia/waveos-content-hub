@@ -313,10 +313,10 @@ function CreatePost() {
 
           <div className="surface-card space-y-3 p-5">
             <div className="text-sm font-semibold text-foreground">Publishing checklist</div>
-            <Check line={caption.trim().length > 0} label="Caption written" />
-            <Check line={pickedMedia.length > 0} label="Media attached" />
-            <Check line={platforms.length > 0} label="Platform selected" />
-            <Check line={!!savedId} label="Draft saved" />
+            <CheckRow line={caption.trim().length > 0} label="Caption written" />
+            <CheckRow line={pickedMedia.length > 0} label="Media attached" />
+            <CheckRow line={platforms.length > 0} label="Platform selected" />
+            <CheckRow line={!!savedId} label="Draft saved" />
           </div>
         </aside>
       </div>
@@ -336,7 +336,7 @@ function CreatePost() {
   );
 }
 
-function Check({ line, label }: { line: boolean; label: string }) {
+function CheckRow({ line, label }: { line: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2 text-sm">
       <span
