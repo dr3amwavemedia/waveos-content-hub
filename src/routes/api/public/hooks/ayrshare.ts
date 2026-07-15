@@ -30,7 +30,7 @@ export const Route = createFileRoute("/api/public/hooks/ayrshare")({
           source: "ayrshare",
           event_type: String(payload.action ?? payload.type ?? "unknown"),
           external_id: String(payload.id ?? payload.postId ?? ""),
-          payload,
+          payload: payload as never,
           processed_at: new Date().toISOString(),
         });
 
@@ -43,7 +43,7 @@ export const Route = createFileRoute("/api/public/hooks/ayrshare")({
             .from("publish_attempts")
             .update({
               status: success ? "success" : "failed",
-              response_snapshot: payload,
+              response_snapshot: payload as never,
               completed_at: new Date().toISOString(),
               post_url: (payload.postUrl as string) ?? null,
             })
