@@ -905,6 +905,7 @@ export type Database = {
           is_demo: boolean
           last_activity_at: string | null
           name: string
+          require_fresh_social_login: boolean
           service_area: string | null
           service_tier: string | null
           slug: string
@@ -923,6 +924,7 @@ export type Database = {
           is_demo?: boolean
           last_activity_at?: string | null
           name: string
+          require_fresh_social_login?: boolean
           service_area?: string | null
           service_tier?: string | null
           slug: string
@@ -941,6 +943,7 @@ export type Database = {
           is_demo?: boolean
           last_activity_at?: string | null
           name?: string
+          require_fresh_social_login?: boolean
           service_area?: string | null
           service_tier?: string | null
           slug?: string
