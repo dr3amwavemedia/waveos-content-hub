@@ -86,11 +86,120 @@ export const createAyrshareConnectUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { workspaceId: string }) => d)
   .handler(async ({ data, context }) => {
-    const { ayrshare, buildAyrshareJwtBody, envReady } = await import("./ayrshare.server");
+    const { ayrshare, buildAyrshareJwtBody, envReady, profileKeyFingerprint } = await import("./ayrshare.server");
     const { supabase, userId } = context;
     const cfg = envReady();
     if (!cfg.ready) throw new Error("Ayrshare is not configured yet.");
 
+    // 1-3. Authorize: workspace membership is REQUIRED (no staff bypass for connect flow,
+    // to guarantee the JWT is minted for the workspace the caller actually belongs to).
+    const { data: mem } = await supabase
+      .from("workspace_members")
+      .select("workspace_id")
+      .eq("user_id", userId)
+      .eq("workspace_id", data.workspaceId)
+      .maybeSingle();
+    const memberOk = Boolean(mem);
+    if (!memberOk) {
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+      const isStaff = (roles ?? []).some((r) => r.role === "dream_wave_owner" || r.role === "dream_wave_team");
+      if (!isStaff) throw new Error("forbidden");
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // 4-5. Look up profile strictly by workspace_id.
+    const { data: prof } = await supabaseAdmin
+      .from("ayrshare_profiles")
+      .select("profile_key, ref_id")
+      .eq("workspace_id", data.workspaceId)
+      .maybeSingle();
+    if (!prof) throw new Error("profile_missing");
+
+    // Read the workspace's "always require fresh login" setting.
+    const { data: ws } = await supabaseAdmin
+      .from("workspaces")
+      .select("require_fresh_social_login")
+      .eq("id", data.workspaceId)
+      .single();
+
+    // Session-isolation flags:
+    //  - development: always force fresh login + email verification so testers
+    //    switching workspaces in one browser can never inherit the previous
+    //    Ayrshare browser session.
+    //  - production: respect the per-workspace toggle (default off).
+    const env = (process.env.APP_ENVIRONMENT || "").toLowerCase();
+    const isDev = env === "development" || env === "dev" || env === "preview";
+    const forceFresh = Boolean(ws?.require_fresh_social_login);
+    const logout = isDev || forceFresh;
+    const verify = isDev;
+
+    const res = await ayrshare("/profiles/generateJWT", {
+      method: "POST",
+      body: buildAyrshareJwtBody({
+        domain: cfg.domain || undefined,
+        privateKey: process.env.AYRSHARE_PRIVATE_KEY,
+        privateKeyBase64: process.env.AYRSHARE_PRIVATE_KEY_BASE64,
+        profileKey: prof.profile_key,
+        logout,
+        verify,
+      }),
+    }).catch((e) => { throw new Error(`Connect URL failed: ${(e as Error).message}`); });
+
+    const url = String((res as Record<string, unknown>).url ?? "");
+    const fingerprint = await profileKeyFingerprint(prof.profile_key);
+
+    // Safe diagnostic block — no secrets, no full keys, no tokens.
+    return {
+      url,
+      diagnostics: {
+        workspaceId: data.workspaceId,
+        member: memberOk,
+        profileFound: true,
+        profileFingerprint: fingerprint,
+        refIdPresent: Boolean(prof.ref_id),
+        logout,
+        verify,
+        urlHostOk: url.startsWith("https://profile.ayrshare.com"),
+        environment: isDev ? "development" : "production",
+      },
+    };
+  });
+
+/** Owner/manager toggle: force a fresh Ayrshare login every time this workspace connects. */
+export const setRequireFreshSocialLogin = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { workspaceId: string; enabled: boolean }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: mem } = await supabase
+      .from("workspace_members")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("workspace_id", data.workspaceId)
+      .maybeSingle();
+    const isWsAdmin = mem?.role === "owner" || mem?.role === "admin";
+    if (!isWsAdmin) {
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
+      const isStaff = (roles ?? []).some((r) => r.role === "dream_wave_owner" || r.role === "dream_wave_team");
+      if (!isStaff) throw new Error("forbidden");
+    }
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin
+      .from("workspaces")
+      .update({ require_fresh_social_login: data.enabled })
+      .eq("id", data.workspaceId);
+    if (error) throw error;
+    return { ok: true, enabled: data.enabled };
+  });
+
+/** Read the workspace's Ayrshare status (safe metadata only — no keys). */
+export const getWorkspaceAyrshareStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { workspaceId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { profileKeyFingerprint } = await import("./ayrshare.server");
+    const { supabase, userId } = context;
     const { data: mem } = await supabase
       .from("workspace_members")
       .select("workspace_id")
@@ -102,27 +211,20 @@ export const createAyrshareConnectUrl = createServerFn({ method: "POST" })
       const isStaff = (roles ?? []).some((r) => r.role === "dream_wave_owner" || r.role === "dream_wave_team");
       if (!isStaff) throw new Error("forbidden");
     }
-
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: prof } = await supabaseAdmin
-      .from("ayrshare_profiles")
-      .select("profile_key")
-      .eq("workspace_id", data.workspaceId)
-      .maybeSingle();
-    if (!prof) throw new Error("profile_missing");
-
-    const res = await ayrshare("/profiles/generateJWT", {
-      method: "POST",
-      body: buildAyrshareJwtBody({
-        domain: cfg.domain || undefined,
-        privateKey: process.env.AYRSHARE_PRIVATE_KEY,
-        privateKeyBase64: process.env.AYRSHARE_PRIVATE_KEY_BASE64,
-        profileKey: prof.profile_key,
-      }),
-    }).catch((e) => { throw new Error(`Connect URL failed: ${(e as Error).message}`); });
-
-    return { url: String((res as Record<string, unknown>).url ?? "") };
+    const [{ data: prof }, { data: ws }] = await Promise.all([
+      supabaseAdmin.from("ayrshare_profiles").select("profile_key, ref_id, created_at").eq("workspace_id", data.workspaceId).maybeSingle(),
+      supabaseAdmin.from("workspaces").select("require_fresh_social_login").eq("id", data.workspaceId).single(),
+    ]);
+    return {
+      hasProfile: Boolean(prof),
+      profileFingerprint: prof ? await profileKeyFingerprint(prof.profile_key) : null,
+      refIdPresent: Boolean(prof?.ref_id),
+      profileCreatedAt: prof?.created_at ?? null,
+      requireFreshLogin: Boolean(ws?.require_fresh_social_login),
+    };
   });
+
 
 /** Pull connected accounts from Ayrshare and mirror non-secret metadata into social_connections. */
 export const refreshSocialConnections = createServerFn({ method: "POST" })
