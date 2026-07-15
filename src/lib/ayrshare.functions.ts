@@ -178,7 +178,7 @@ export const setRequireFreshSocialLogin = createServerFn({ method: "POST" })
       .eq("user_id", userId)
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
-    const isWsAdmin = mem?.role === "owner" || mem?.role === "manager";
+    const isWsAdmin = mem?.role === "owner" || mem?.role === "admin";
     if (!isWsAdmin) {
       const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
       const isStaff = (roles ?? []).some((r) => r.role === "dream_wave_owner" || r.role === "dream_wave_team");
