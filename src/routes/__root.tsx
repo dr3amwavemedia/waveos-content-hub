@@ -82,22 +82,26 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "WaveOS — The content operating system for Dream Wave Media clients" },
+      { title: "WaveOS" },
       {
         name: "description",
         content:
-          "Create, approve, schedule, and grow. WaveOS is the private content platform Dream Wave Media clients use to manage their social presence.",
+          "DWM",
       },
       { name: "author", content: "Dream Wave Media" },
       { name: "theme-color", content: "#05080F" },
-      { property: "og:title", content: "WaveOS — A Dream Wave Media platform" },
+      { property: "og:title", content: "WaveOS" },
       {
         property: "og:description",
         content:
-          "Your content, social accounts, analytics, and brand voice — organized in one place.",
+          "DWM",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "WaveOS" },
+      { name: "twitter:description", content: "DWM" },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d2459a2-580c-4295-ac1f-0ad8e3709d7f/id-preview-f652ad5c--5e51f033-dba6-4b7a-acb2-008cdd739997.lovable.app-1784095202192.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d2459a2-580c-4295-ac1f-0ad8e3709d7f/id-preview-f652ad5c--5e51f033-dba6-4b7a-acb2-008cdd739997.lovable.app-1784095202192.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },

@@ -9,12 +9,12 @@ export const Route = createFileRoute("/")({
     meta: [
       {
         title:
-          "WaveOS — Create. Approve. Schedule. Grow. | A Dream Wave Media platform",
+          "WaveOS",
       },
       {
         name: "description",
         content:
-          "WaveOS is the private content operating system Dream Wave Media clients use to review, approve, schedule, and grow their social presence.",
+          "DWM",
       },
     ],
   }),
