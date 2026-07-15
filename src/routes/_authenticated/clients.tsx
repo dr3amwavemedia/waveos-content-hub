@@ -355,7 +355,7 @@ function WorkspaceDrawer({
                     <div className="truncate text-sm text-foreground">{inv.email}</div>
                     <div className="text-xs text-muted-foreground">
                       {inv.workspace_role} · {inv.status}
-                      {inv.status === "pending" &&
+                      {inv.status === "pending" && inv.expires_at &&
                         ` · expires ${new Date(inv.expires_at).toLocaleDateString()}`}
                     </div>
                   </div>
