@@ -17,6 +17,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
@@ -70,6 +71,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SocialConnectionsCallbackRoute =
+  SocialConnectionsCallbackRouteImport.update({
+    id: '/social-connections/callback',
+    path: '/social-connections/callback',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthenticatedSocialAccountsRoute =
   AuthenticatedSocialAccountsRouteImport.update({
     id: '/social-accounts',
@@ -157,6 +164,7 @@ export interface FileRoutesByFullPath {
   '/home': typeof AuthenticatedHomeRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
 }
 export interface FileRoutesByTo {
@@ -179,6 +187,7 @@ export interface FileRoutesByTo {
   '/home': typeof AuthenticatedHomeRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
 }
 export interface FileRoutesById {
@@ -203,6 +212,7 @@ export interface FileRoutesById {
   '/_authenticated/home': typeof AuthenticatedHomeRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
 }
 export interface FileRouteTypes {
@@ -227,6 +237,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/settings'
     | '/social-accounts'
+    | '/social-connections/callback'
     | '/api/public/hooks/ayrshare'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -249,6 +260,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/settings'
     | '/social-accounts'
+    | '/social-connections/callback'
     | '/api/public/hooks/ayrshare'
   id:
     | '__root__'
@@ -272,6 +284,7 @@ export interface FileRouteTypes {
     | '/_authenticated/home'
     | '/_authenticated/settings'
     | '/_authenticated/social-accounts'
+    | '/social-connections/callback'
     | '/api/public/hooks/ayrshare'
   fileRoutesById: FileRoutesById
 }
@@ -284,6 +297,7 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TermsRoute: typeof TermsRoute
+  SocialConnectionsCallbackRoute: typeof SocialConnectionsCallbackRoute
   ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
 }
 
@@ -343,6 +357,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/social-connections/callback': {
+      id: '/social-connections/callback'
+      path: '/social-connections/callback'
+      fullPath: '/social-connections/callback'
+      preLoaderRoute: typeof SocialConnectionsCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/social-accounts': {
@@ -481,6 +502,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TermsRoute: TermsRoute,
+  SocialConnectionsCallbackRoute: SocialConnectionsCallbackRoute,
   ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,
 }
 export const routeTree = rootRouteImport
