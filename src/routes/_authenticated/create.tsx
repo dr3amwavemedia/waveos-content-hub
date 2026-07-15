@@ -234,22 +234,34 @@ function CreatePost() {
             </button>
           )}
           <button
-            disabled={locked || create.isPending || update.isPending}
+            disabled={locked || create.isPending || update.isPending || publishing !== null}
             onClick={handleSaveDraft}
-            className="rounded-full border border-border bg-elevated px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-elevated px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2 disabled:opacity-50"
           >
-            {create.isPending || update.isPending ? (
-              <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
-            ) : null}
+            {(create.isPending || update.isPending) && publishing === null ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileText className="h-4 w-4" />
+            )}
             Save draft
           </button>
           <button
-            disabled={locked || submit.isPending || !caption.trim()}
-            onClick={handleSubmit}
+            disabled={locked || publishing !== null || !caption.trim() || !scheduledAt}
+            onClick={handleScheduleLater}
+            className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+          >
+            {publishing === "schedule" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
+            Schedule later
+          </button>
+          <button
+            disabled={locked || publishing !== null || !caption.trim() || !platforms.length}
+            onClick={handlePublishNow}
             className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
           >
-            <Send className="h-4 w-4" /> Submit for approval
+            {publishing === "now" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Publish now
           </button>
+
         </div>
       </div>
 
