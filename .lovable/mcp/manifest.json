@@ -1,0 +1,187 @@
+{
+  "version": 1,
+  "sdk_version": "0.22.0",
+  "path": "/mcp",
+  "auth": {
+    "type": "oauth",
+    "issuer": "https://clsuecactijyjecxwuxp.supabase.co/auth/v1",
+    "accepted_audiences": [
+      "authenticated"
+    ]
+  },
+  "mcp": {
+    "server": {
+      "name": "waveos-mcp",
+      "version": "0.1.0",
+      "title": "WaveOS"
+    },
+    "tools": [
+      {
+        "name": "list_workspaces",
+        "title": "List workspaces",
+        "description": "List every Brand Workspace the signed-in user belongs to, with their role in each.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_content",
+        "title": "List content",
+        "description": "List content items in a workspace. Filter by status (draft, in_review, changes_requested, approved, scheduled, published) and limit.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "workspace_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Workspace id to list content from."
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "draft",
+                "in_review",
+                "changes_requested",
+                "approved",
+                "scheduled",
+                "published"
+              ],
+              "description": "Optional status filter."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25,
+              "description": "Max rows to return (1-100)."
+            }
+          },
+          "required": [
+            "workspace_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "create_content_draft",
+        "title": "Create content draft",
+        "description": "Create a new draft content item in the given workspace with a title and body. Returns the created row.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": false,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "workspace_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Workspace to create the draft in."
+            },
+            "title": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "Content title."
+            },
+            "body": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Content body (Markdown or plain text)."
+            }
+          },
+          "required": [
+            "workspace_id",
+            "title",
+            "body"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "list_media_assets",
+        "title": "List media assets",
+        "description": "List media assets in a workspace's library, most recent first.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "workspace_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Workspace id."
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          "required": [
+            "workspace_id"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "schedule_content",
+        "title": "Schedule content",
+        "description": "Move a content item to 'scheduled' at the given ISO 8601 UTC timestamp. Caller must have permission in the item's workspace.",
+        "annotations": {
+          "readOnlyHint": false,
+          "destructiveHint": false,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "content_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Content item id to schedule."
+            },
+            "scheduled_at": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Publish time as ISO 8601 timestamp (e.g. 2026-08-01T14:00:00Z)."
+            }
+          },
+          "required": [
+            "content_id",
+            "scheduled_at"
+          ],
+          "additionalProperties": false,
+          "$schema": "http://json-schema.org/draft-07/schema#"
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

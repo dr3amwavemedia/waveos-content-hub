@@ -9,43 +9,56 @@ import { WaveLogo } from "@/components/branding/wave-logo";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
+  validateSearch: (s: Record<string, unknown>) => ({
+    next: typeof s.next === "string" ? s.next : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Sign in — WaveOS" },
-      {
-        name: "description",
-        content: "Sign in to your Dream Wave Media WaveOS workspace.",
-      },
+      { name: "description", content: "Sign in to your WaveOS workspace." },
       { name: "robots", content: "noindex" },
     ],
   }),
 });
 
+// Only accept same-origin relative paths as post-signin destinations.
+function safeNext(next: string | undefined): string {
+  if (!next) return "/home";
+  if (!next.startsWith("/") || next.startsWith("//")) return "/home";
+  return next;
+}
+
 function AuthPage() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
+  const nextPath = safeNext(search.next);
   const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
 
-  // Redirect signed-in users into the app
+  // Redirect signed-in users to the intended destination (or /home).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (!cancelled && data.session) {
-        navigate({ to: "/home", replace: true });
+        if (nextPath.startsWith("/")) window.location.replace(nextPath);
+        else navigate({ to: "/home", replace: true });
       }
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN") navigate({ to: "/home", replace: true });
+      if (event === "SIGNED_IN") {
+        if (nextPath !== "/home") window.location.replace(nextPath);
+        else navigate({ to: "/home", replace: true });
+      }
     });
     return () => {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, nextPath]);
 
   async function handleEmailSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -64,11 +77,12 @@ function AuthPage() {
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    const nextQ = nextPath !== "/home" ? `?next=${encodeURIComponent(nextPath)}` : "";
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth`,
+        emailRedirectTo: `${window.location.origin}/auth${nextQ}`,
         data: { full_name: fullName },
       },
     });
@@ -94,8 +108,9 @@ function AuthPage() {
 
   async function handleGoogle() {
     setBusy(true);
+    const nextQ = nextPath !== "/home" ? `?next=${encodeURIComponent(nextPath)}` : "";
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/auth",
+      redirect_uri: window.location.origin + "/auth" + nextQ,
     });
     if (result.error) {
       setBusy(false);
@@ -105,7 +120,8 @@ function AuthPage() {
     if (result.redirected) return;
     // popup path: session set
     setBusy(false);
-    navigate({ to: "/home", replace: true });
+    if (nextPath !== "/home") window.location.replace(nextPath);
+    else navigate({ to: "/home", replace: true });
   }
 
   return (
