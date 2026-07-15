@@ -261,7 +261,7 @@ function WorkspaceDrawer({
     queryKey: ["clients", "invites", workspace.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("invites")
+        .from("invites_admin")
         .select("id,email,workspace_role,app_role,status,expires_at,created_at,resend_count")
         .eq("workspace_id", workspace.id)
         .order("created_at", { ascending: false });
