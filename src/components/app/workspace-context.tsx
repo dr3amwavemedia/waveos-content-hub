@@ -20,7 +20,9 @@ const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefi
 const WORKSPACE_SCOPED_KEYS = [
   "media", "media-folders", "media-assets",
   "brand-profile", "activity-logs", "home-stats",
+  "social-connections", "workspace-ayrshare-status",
 ];
+
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { data: workspaces = [], isLoading } = useWorkspaces();

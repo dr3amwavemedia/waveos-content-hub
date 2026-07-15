@@ -97,30 +97,45 @@ export function buildAyrshareJwtBody(params: {
   privateKey?: string;
   privateKeyBase64?: string;
   profileKey: string;
+  logout?: boolean;
+  verify?: boolean;
 }) {
   const raw = params.privateKey ? unwrapSecret(params.privateKey) : "";
   const explicitBase64 = params.privateKeyBase64 ? cleanBase64(unwrapSecret(params.privateKeyBase64)) : "";
+  const extras: Record<string, boolean> = {};
+  if (params.logout) extras.logout = true;
+  if (params.verify) extras.verify = true;
 
   if (raw) {
     const pem = canonicalPem(raw);
     if (pem) {
-      return { domain: params.domain || undefined, privateKey: pem, profileKey: params.profileKey };
+      return { domain: params.domain || undefined, privateKey: pem, profileKey: params.profileKey, ...extras };
     }
 
     const decodedPem = maybeDecodeBase64(raw);
     if (decodedPem) {
-      return { domain: params.domain || undefined, privateKey: cleanBase64(raw), profileKey: params.profileKey, base64: true };
+      return { domain: params.domain || undefined, privateKey: cleanBase64(raw), profileKey: params.profileKey, base64: true, ...extras };
     }
 
     const bodyPem = pemFromBody(raw);
     if (bodyPem) {
-      return { domain: params.domain || undefined, privateKey: bodyPem, profileKey: params.profileKey };
+      return { domain: params.domain || undefined, privateKey: bodyPem, profileKey: params.profileKey, ...extras };
     }
   }
 
   if (explicitBase64) {
-    return { domain: params.domain || undefined, privateKey: explicitBase64, profileKey: params.profileKey, base64: true };
+    return { domain: params.domain || undefined, privateKey: explicitBase64, profileKey: params.profileKey, base64: true, ...extras };
   }
 
   throw new Error("Ayrshare private key is missing. Re-save the complete private.key file or a base64-encoded private.key value.");
+}
+
+/** One-way, non-reversible short fingerprint of the profile key. Safe to log/return. */
+export async function profileKeyFingerprint(profileKey: string): Promise<string> {
+  const buf = new TextEncoder().encode(profileKey);
+  const digest = await crypto.subtle.digest("SHA-256", buf);
+  const bytes = new Uint8Array(digest);
+  let hex = "";
+  for (let i = 0; i < 6; i++) hex += bytes[i].toString(16).padStart(2, "0");
+  return hex;
 }
