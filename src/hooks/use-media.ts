@@ -165,7 +165,7 @@ export function useUpdateAssetTags(workspaceId: string | null | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: { id: string; tags: string[]; folderId?: string | null }) => {
-      const patch: Record<string, unknown> = { tags: input.tags };
+      const patch: { tags: string[]; folder_id?: string | null } = { tags: input.tags };
       if (input.folderId !== undefined) patch.folder_id = input.folderId;
       const { error } = await supabase.from("media_assets").update(patch).eq("id", input.id);
       if (error) throw error;
