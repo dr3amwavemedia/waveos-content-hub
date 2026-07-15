@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useWorkspaces, type WorkspaceSummary } from "@/hooks/use-waveos";
 
 const STORAGE_KEY = "waveos.active-workspace";
@@ -26,6 +27,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const qc = useQueryClient();
   const prev = useRef<string | null>(null);
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (r) => r.location.pathname });
 
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
@@ -38,6 +41,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       setActiveId(workspaces[0].id);
     }
   }, [workspaces, activeId]);
+
+  // Auto-launch onboarding for authenticated users with no workspace.
+  useEffect(() => {
+    if (isLoading) return;
+    if (workspaces.length > 0) return;
+    if (pathname === "/onboarding") return;
+    if (pathname.startsWith("/accept-invite")) return;
+    navigate({ to: "/onboarding", replace: true });
+  }, [isLoading, workspaces.length, pathname, navigate]);
 
   // Clear workspace-scoped caches when the active workspace changes so stale
   // rows from the previous workspace can never briefly appear.

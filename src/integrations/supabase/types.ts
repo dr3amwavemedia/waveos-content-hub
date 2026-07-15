@@ -1021,6 +1021,23 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { _token: string }; Returns: string }
+      create_brand_workspace: {
+        Args: {
+          _business_name?: string
+          _industry?: string
+          _name: string
+          _primary_language?: string
+          _service_area?: string
+          _target_audience?: string
+          _timezone?: string
+          _website?: string
+        }
+        Returns: {
+          id: string
+          name: string
+          slug: string
+        }[]
+      }
       create_invite: {
         Args: {
           _app_role: Database["public"]["Enums"]["app_role"]
@@ -1164,7 +1181,12 @@ export type Database = {
         | "bluesky"
         | "gmb"
         | "snapchat"
-      workspace_member_role: "owner" | "approver" | "viewer"
+      workspace_member_role:
+        | "owner"
+        | "approver"
+        | "viewer"
+        | "admin"
+        | "editor"
       workspace_status: "onboarding" | "active" | "paused" | "archived"
     }
     CompositeTypes: {
@@ -1359,7 +1381,7 @@ export const Constants = {
         "gmb",
         "snapchat",
       ],
-      workspace_member_role: ["owner", "approver", "viewer"],
+      workspace_member_role: ["owner", "approver", "viewer", "admin", "editor"],
       workspace_status: ["onboarding", "active", "paused", "archived"],
     },
   },
