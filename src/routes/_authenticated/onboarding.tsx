@@ -68,13 +68,13 @@ function OnboardingPage() {
     try {
       const { data, error } = await supabase.rpc("create_brand_workspace", {
         _name: name.trim(),
-        _business_name: businessName.trim() || null,
-        _industry: industry || null,
-        _website: website.trim() || null,
+        _business_name: businessName.trim() || undefined,
+        _industry: industry || undefined,
+        _website: website.trim() || undefined,
         _timezone: timezone,
         _primary_language: language,
-        _service_area: serviceArea.trim() || null,
-        _target_audience: audience.trim() || null,
+        _service_area: serviceArea.trim() || undefined,
+        _target_audience: audience.trim() || undefined,
       });
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : data;
