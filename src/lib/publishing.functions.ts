@@ -168,7 +168,7 @@ export const prepareMediaForPublishing = createServerFn({ method: "POST" })
           expires_at: r.expires_at,
           refreshed: r.refreshed,
           mime_type: a.mime_type,
-          filename: a.filename,
+          filename: a.name,
         };
       }),
     };
