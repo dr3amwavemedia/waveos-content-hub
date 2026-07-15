@@ -1,16 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-/** Diagnostic — checks whether Ayrshare secrets are configured. Safe for staff to call. */
+/** Diagnostic — booleans only, no secret values. Any authenticated user may check readiness. */
 export const getIntegrationStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async () => {
     const { envReady } = await import("./ayrshare.server");
-    const { supabase, userId } = context;
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", userId);
-    const isStaff = (roles ?? []).some((r) => r.role === "dream_wave_owner" || r.role === "dream_wave_team");
-    if (!isStaff) throw new Error("forbidden");
-
     const cfg = envReady();
     return {
       ayrshare: {
