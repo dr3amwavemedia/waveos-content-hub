@@ -92,7 +92,7 @@ function SocialAccountsPage() {
         <div>
           <h1 className="text-xl font-semibold text-foreground">Social accounts</h1>
           <p className="text-sm text-muted-foreground">
-            Connect each channel Dream Wave Media will publish for {activeWorkspace.name}.
+            Connect the channels you want to publish to from {activeWorkspace.name}.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -119,8 +119,8 @@ function SocialAccountsPage() {
         <div className="surface-card p-5 text-sm text-muted-foreground">
           <p className="font-semibold text-foreground">Social publishing is not configured yet.</p>
           <p className="mt-1">
-            Dream Wave Media staff need to add the Ayrshare API credentials before channels can be connected.
-            Once configured, this page will show a "Connect" button that opens a secure white-label flow.
+            Social publishing credentials aren't set up on this environment yet. Once configured, you'll be able to
+            connect Instagram, Facebook, TikTok, YouTube, LinkedIn, X, Pinterest, Threads, and Bluesky from here.
           </p>
         </div>
       )}
