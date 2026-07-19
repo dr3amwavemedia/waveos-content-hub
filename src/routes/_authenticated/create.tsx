@@ -194,7 +194,43 @@ function CreatePost() {
     return item.id;
   }
 
-  async function handleSaveDraft() {
+ async function handleSaveDraft() {
+  if (!workspaceId) return;
+
+  setSaveStatus("saving");
+
+  try {
+    const wasNewDraft = !savedId;
+    const id = await ensureSaved();
+
+    if (!id) {
+      setSaveStatus("error");
+      return;
+    }
+
+    if (wasNewDraft) {
+      navigate({
+        to: "/create",
+        search: { id },
+        replace: true,
+      });
+    }
+
+    await qc.invalidateQueries({
+      queryKey: ["content-item", id],
+    });
+
+    if (draftStorageKey) {
+      window.localStorage.removeItem(draftStorageKey);
+    }
+
+    setSaveStatus("saved");
+    toast.success("Draft saved. You can now edit each platform caption.");
+  } catch (e) {
+    setSaveStatus("error");
+    toast.error((e as Error).message);
+  }
+}
     if (!workspaceId) return;
 
     try {
