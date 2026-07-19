@@ -1,17 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
-import {
-  Folder,
-  FolderPlus,
-  Images,
-  Loader2,
-  Search,
-  Tag,
-  Trash2,
-  Upload,
-  Video,
-  X,
-} from "lucide-react";
+import { Folder, FolderPlus, Images, Loader2, Search, Tag, Trash2, Upload, Video, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -48,8 +37,7 @@ function ContentLibrary() {
 
   const foldersQ = useMediaFolders(workspaceId);
   const assetsQ = useMediaAssets(workspaceId, {
-    folderId:
-      folderFilter === "all" ? undefined : folderFilter === "root" ? null : folderFilter,
+    folderId: folderFilter === "all" ? undefined : folderFilter === "root" ? null : folderFilter,
     search: search || undefined,
     tag,
     kind,
@@ -79,12 +67,11 @@ function ContentLibrary() {
     );
   }
 
-  const fileInputRef = { current: null as HTMLInputElement | null };
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function handleFiles(files: FileList | null) {
     if (!files || !files.length) return;
-    const folderId =
-      folderFilter === "all" || folderFilter === "root" ? null : folderFilter;
+    const folderId = folderFilter === "all" || folderFilter === "root" ? null : folderFilter;
     let ok = 0;
     for (const file of Array.from(files)) {
       try {
@@ -108,11 +95,7 @@ function ContentLibrary() {
             <FolderPlus className="h-4 w-4" /> New folder
           </button>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110">
-            {upload.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4" />
-            )}
+            {upload.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
             Upload
             <input
               type="file"
@@ -217,9 +200,7 @@ function ContentLibrary() {
                   <Upload className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-base font-semibold text-foreground">
-                    Drop photos or videos here
-                  </p>
+                  <p className="text-base font-semibold text-foreground">Drop photos or videos here</p>
                   <p className="mt-1 text-sm text-muted-foreground">
                     Or use the Upload button above. Images and videos up to your plan limit.
                   </p>
@@ -228,11 +209,7 @@ function ContentLibrary() {
             ) : (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {(assetsQ.data ?? []).map((asset) => (
-                  <AssetCard
-                    key={asset.id}
-                    asset={asset}
-                    onClick={() => setSelected(asset)}
-                  />
+                  <AssetCard key={asset.id} asset={asset} onClick={() => setSelected(asset)} />
                 ))}
               </div>
             )}
@@ -286,15 +263,9 @@ function Header({ title, children }: { title: string; children?: React.ReactNode
   return (
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          Content
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-          {title}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Every photo and video in your brand's world.
-        </p>
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Content</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">{title}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Every photo and video in your brand's world.</p>
       </div>
       {children}
     </header>
@@ -345,9 +316,7 @@ function SegmentedFilter({
           onClick={() => onChange(o.value)}
           className={cn(
             "px-3 py-2 text-xs font-medium transition-colors",
-            value === o.value
-              ? "bg-primary/15 text-foreground"
-              : "text-muted-foreground hover:text-foreground",
+            value === o.value ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >
           {o.label}
@@ -402,7 +371,9 @@ function AssetCard({ asset, onClick }: { asset: MediaAsset; onClick: () => void 
   const started = useRef(false);
   if (!started.current) {
     started.current = true;
-    getSignedMediaUrl(asset.storage_path, 3600).then(setUrl).catch(() => setUrl(null));
+    getSignedMediaUrl(asset.storage_path, 3600)
+      .then(setUrl)
+      .catch(() => setUrl(null));
   }
   const isVideo = asset.mime_type.startsWith("video/");
   return (
@@ -412,13 +383,7 @@ function AssetCard({ asset, onClick }: { asset: MediaAsset; onClick: () => void 
     >
       {url ? (
         isVideo ? (
-          <video
-            src={url}
-            className="h-full w-full object-cover"
-            muted
-            playsInline
-            preload="metadata"
-          />
+          <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
         ) : (
           <img src={url} alt={asset.name} className="h-full w-full object-cover" />
         )
@@ -516,7 +481,9 @@ function AssetPreview({
   const started = useRef(false);
   if (!started.current) {
     started.current = true;
-    getSignedMediaUrl(asset.storage_path, 3600).then(setUrl).catch(() => setUrl(null));
+    getSignedMediaUrl(asset.storage_path, 3600)
+      .then(setUrl)
+      .catch(() => setUrl(null));
   }
   const isVideo = asset.mime_type.startsWith("video/");
 
@@ -533,17 +500,9 @@ function AssetPreview({
         <div className="flex items-center justify-center rounded-xl bg-black/60 p-2">
           {url ? (
             isVideo ? (
-              <video
-                src={url}
-                className="max-h-[60vh] w-full rounded-lg object-contain"
-                controls
-              />
+              <video src={url} className="max-h-[60vh] w-full rounded-lg object-contain" controls />
             ) : (
-              <img
-                src={url}
-                alt={asset.name}
-                className="max-h-[60vh] w-full rounded-lg object-contain"
-              />
+              <img src={url} alt={asset.name} className="max-h-[60vh] w-full rounded-lg object-contain" />
             )
           ) : (
             <div className="flex h-64 w-full items-center justify-center text-muted-foreground">
@@ -555,21 +514,14 @@ function AssetPreview({
         <div className="space-y-4">
           <MetaRow label="Type" value={asset.mime_type} />
           <MetaRow label="Size" value={formatBytes(asset.size_bytes)} />
-          {asset.width && asset.height && (
-            <MetaRow label="Dimensions" value={`${asset.width}×${asset.height}`} />
-          )}
+          {asset.width && asset.height && <MetaRow label="Dimensions" value={`${asset.width}×${asset.height}`} />}
           {asset.duration_seconds != null && (
-            <MetaRow
-              label="Duration"
-              value={`${asset.duration_seconds.toFixed(1)}s`}
-            />
+            <MetaRow label="Duration" value={`${asset.duration_seconds.toFixed(1)}s`} />
           )}
           <MetaRow label="Uploaded" value={new Date(asset.created_at).toLocaleString()} />
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Folder
-            </label>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Folder</label>
             <select
               value={folderId ?? ""}
               onChange={(e) => setFolderId(e.target.value || null)}
@@ -585,9 +537,7 @@ function AssetPreview({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-              Tags
-            </label>
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Tags</label>
             <div className="mb-2 flex flex-wrap gap-1.5">
               {tags.map((t) => (
                 <span
@@ -680,12 +630,7 @@ function ModalShell({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8" role="dialog">
       <div className="absolute inset-0 bg-background/70 backdrop-blur" onClick={onClose} />
-      <div
-        className={cn(
-          "surface-card relative w-full overflow-hidden p-6",
-          wide ? "max-w-4xl" : "max-w-md",
-        )}
-      >
+      <div className={cn("surface-card relative w-full overflow-hidden p-6", wide ? "max-w-4xl" : "max-w-md")}>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="truncate text-base font-semibold text-foreground">{title}</h2>
           <button
