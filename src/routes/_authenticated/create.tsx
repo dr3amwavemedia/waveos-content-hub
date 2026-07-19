@@ -152,6 +152,10 @@ function CreatePost() {
     setSavedId(it.id);
   }, [existing.data?.item?.id]);
 
+  const publishFn = useServerFn(publishContentItem);
+
+  const [publishing, setPublishing] = useState<null | "now" | "schedule">(null);
+
   const status = existing.data?.item?.status ?? "draft";
   const locked = status === "published" || status === "publishing";
 
@@ -164,9 +168,6 @@ function CreatePost() {
       />
     );
   }
-
-  const publishFn = useServerFn(publishContentItem);
-  const [publishing, setPublishing] = useState<null | "now" | "schedule">(null);
 
   async function ensureSaved(): Promise<string | null> {
     if (!workspaceId) return null;
