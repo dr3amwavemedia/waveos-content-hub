@@ -29,7 +29,6 @@ import {
   useContentItem,
   useCreateContentItem,
   useDeleteContentItem,
-  const submit = useSubmitForApproval();
   useUpdateContentItem,
   useUpdateVariant,
   type PostVariant,
