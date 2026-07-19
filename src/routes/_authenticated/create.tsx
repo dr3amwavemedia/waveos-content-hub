@@ -631,10 +631,15 @@ function VariantEditor({
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
+        autoCapitalize="sentences"
+        autoCorrect="on"
+        spellCheck
+        enterKeyHint="done"
         disabled={locked}
         rows={6}
         className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60"
       />
+
       <div className="flex items-center justify-between text-xs">
         <span className="text-muted-foreground">{text.length} chars</span>
         <div className="flex items-center gap-2">
