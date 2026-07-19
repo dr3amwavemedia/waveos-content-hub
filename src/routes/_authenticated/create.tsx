@@ -152,6 +152,8 @@ function CreatePost() {
 
   const publishFn = useServerFn(publishContentItem);
 
+  const [publishing, setPublishing] = useState<null | "now" | "schedule">(null);
+
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   const status = existing.data?.item?.status ?? "draft";
