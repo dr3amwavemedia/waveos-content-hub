@@ -57,7 +57,7 @@ function CreatePost() {
   const update = useUpdateContentItem();
   const updateVariant = useUpdateVariant();
   const del = useDeleteContentItem();
-  const submit = useSubmitForApproval();
+  
 
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
