@@ -8,9 +8,16 @@ export const Route = createFileRoute("/api/public/hooks/publish-due")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const anon = process.env.SUPABASE_PUBLISHABLE_KEY;
-        const apiKey = request.headers.get("apikey");
-        if (!anon || apiKey !== anon) return new Response("unauthorized", { status: 401 });
+        const cronSecret = process.env.CRON_SECRET;
+        if (!cronSecret) return new Response("cron_not_configured", { status: 503 });
+        const provided =
+          request.headers.get("x-cron-secret") ??
+          (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+        const a = Buffer.from(provided, "utf8");
+        const b = Buffer.from(cronSecret, "utf8");
+        if (a.length !== b.length) return new Response("unauthorized", { status: 401 });
+        const { timingSafeEqual } = await import("crypto");
+        if (!timingSafeEqual(a, b)) return new Response("unauthorized", { status: 401 });
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const nowIso = new Date().toISOString();
