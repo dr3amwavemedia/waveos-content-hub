@@ -231,34 +231,6 @@ function CreatePost() {
     toast.error((e as Error).message);
   }
 }
-    if (!workspaceId) return;
-
-    try {
-      const wasNewDraft = !savedId;
-      const id = await ensureSaved();
-
-      if (!id) return;
-
-      if (wasNewDraft) {
-        navigate({
-          to: "/create",
-          search: { id },
-          replace: true,
-        });
-      }
-
-      await qc.invalidateQueries({
-        queryKey: ["content-item", id],
-      });
-
-      if (draftStorageKey) {
-        window.localStorage.removeItem(draftStorageKey);
-      }
-      toast.success("Draft saved. You can now edit each platform caption.");
-    } catch (e) {
-      toast.error((e as Error).message);
-    }
-  }
 
   async function handleScheduleLater() {
     if (!workspaceId) return;
