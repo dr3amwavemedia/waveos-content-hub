@@ -18,7 +18,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { publishContentItem } from "@/lib/publish.functions";
 
-
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/app/empty-state";
 import { useWorkspace } from "@/components/app/workspace-context";
@@ -127,12 +126,26 @@ function CreatePost() {
 
   async function handleSaveDraft() {
     if (!workspaceId) return;
+
     try {
+      const wasNewDraft = !savedId;
       const id = await ensureSaved();
+
       if (!id) return;
-      if (id && !savedId) navigate({ to: "/create", search: { id }, replace: true });
-      toast.success("Draft saved");
-      navigate({ to: "/content" });
+
+      if (wasNewDraft) {
+        navigate({
+          to: "/create",
+          search: { id },
+          replace: true,
+        });
+      }
+
+      await qc.invalidateQueries({
+        queryKey: ["content-item", id],
+      });
+
+      toast.success("Draft saved. You can now edit each platform caption.");
     } catch (e) {
       toast.error((e as Error).message);
     }
@@ -203,7 +216,6 @@ function CreatePost() {
     navigate({ to: "/content" });
   }
 
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -216,9 +228,7 @@ function CreatePost() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <h1 className="text-xl font-semibold text-foreground">
-              {savedId ? "Edit post" : "Create post"}
-            </h1>
+            <h1 className="text-xl font-semibold text-foreground">{savedId ? "Edit post" : "Create post"}</h1>
             <p className="text-xs uppercase tracking-widest text-muted-foreground">
               {activeWorkspace.name} · Status: {status.replace("_", " ")}
             </p>
@@ -250,7 +260,11 @@ function CreatePost() {
             onClick={handleScheduleLater}
             className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
           >
-            {publishing === "schedule" ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarClock className="h-4 w-4" />}
+            {publishing === "schedule" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CalendarClock className="h-4 w-4" />
+            )}
             Schedule later
           </button>
           <button
@@ -261,7 +275,6 @@ function CreatePost() {
             {publishing === "now" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Publish now
           </button>
-
         </div>
       </div>
 
@@ -332,9 +345,7 @@ function CreatePost() {
               active={activePlatform}
               onActive={setActivePlatform}
               onTogglePlatform={(p) => {
-                setPlatforms((cur) =>
-                  cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p],
-                );
+                setPlatforms((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
               }}
               locked={locked}
             />
@@ -373,9 +384,7 @@ function CreatePost() {
                 className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60"
               />
             </div>
-            <p className="text-[11px] text-muted-foreground">
-              Leave empty to publish immediately after approval.
-            </p>
+            <p className="text-[11px] text-muted-foreground">Leave empty to publish immediately after approval.</p>
           </div>
 
           <div className="surface-card space-y-3 p-5">
@@ -462,9 +471,7 @@ function PlatformTabs({
               onClick={() => onActive(p)}
               className={cn(
                 "rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors",
-                active === p
-                  ? "bg-foreground text-background"
-                  : "text-muted-foreground hover:text-foreground",
+                active === p ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
               )}
             >
               {PLATFORM_LABEL[p]}
@@ -599,9 +606,7 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
       ) : url && asset.mime_type.startsWith("video/") ? (
         <video src={url} className="h-full w-full object-cover" muted />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-          {asset.name}
-        </div>
+        <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">{asset.name}</div>
       )}
       <button
         onClick={onRemove}
@@ -646,9 +651,7 @@ function MediaPicker({
         <div className="flex items-center justify-between border-b border-border p-4">
           <div>
             <div className="text-base font-semibold text-foreground">Pick from library</div>
-            <div className="text-xs text-muted-foreground">
-              {selected.length} selected
-            </div>
+            <div className="text-xs text-muted-foreground">{selected.length} selected</div>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:text-foreground">
             <X className="h-4 w-4" />
@@ -678,11 +681,7 @@ function MediaPicker({
                 return (
                   <button
                     key={a.id}
-                    onClick={() =>
-                      setSelected((s) =>
-                        isSel ? s.filter((x) => x !== a.id) : [...s, a.id],
-                      )
-                    }
+                    onClick={() => setSelected((s) => (isSel ? s.filter((x) => x !== a.id) : [...s, a.id]))}
                     className={cn(
                       "group relative aspect-square overflow-hidden rounded-lg border bg-elevated",
                       isSel ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/40",
