@@ -1,0 +1,1 @@
+DROP POLICY IF EXISTS "Workspace members can view ayrshare profiles" ON public.ayrshare_profiles;
