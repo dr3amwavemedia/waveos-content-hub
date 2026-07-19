@@ -156,6 +156,11 @@ function CreatePost() {
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
+  useEffect(() => {
+    if (saveStatus === "saved") {
+      setSaveStatus("idle");
+    }
+  }, [title, caption, platforms, pickedMedia, scheduledAt]);
   const status = existing.data?.item?.status ?? "draft";
   const locked = status === "published" || status === "publishing";
 
