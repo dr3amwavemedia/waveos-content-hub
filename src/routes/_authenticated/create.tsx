@@ -344,7 +344,21 @@ function CreatePost() {
               active={activePlatform}
               onActive={setActivePlatform}
               onTogglePlatform={(p) => {
-                setPlatforms((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : [...cur, p]));
+                setPlatforms((current) => {
+                  const isEnabled = current.includes(p);
+
+                  const nextPlatforms = isEnabled ? current.filter((platform) => platform !== p) : [...current, p];
+
+                  if (activePlatform === p && isEnabled) {
+                    setActivePlatform(nextPlatforms[0] ?? "instagram");
+                  }
+
+                  if (!isEnabled) {
+                    setActivePlatform(p);
+                  }
+
+                  return nextPlatforms;
+                });
               }}
               locked={locked}
             />
