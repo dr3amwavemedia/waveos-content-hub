@@ -56,10 +56,11 @@ const STAFF_NAV: NavItem[] = [
 ];
 
 const MOBILE_NAV: NavItem[] = [
+  const MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
-  { to: "/content", label: "Content", icon: Images },
-  { to: "/create", label: "Create", icon: PenSquare },
   { to: "/calendar", label: "Calendar", icon: Calendar },
+  { to: "/create", label: "Create", icon: PenSquare },
+  { to: "/content", label: "Content", icon: Images },
   { to: "/settings", label: "More", icon: Settings },
 ];
 
