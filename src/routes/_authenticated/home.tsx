@@ -207,14 +207,14 @@ function HomeDashboard() {
   )}
 </Section>
 
-        <Section title="Recent performance" subtitle="A quick pulse on how your content is doing.">
-          <EmptyState
-            icon={TrendingUp}
-            title="No data yet."
-            body="Analytics will appear after publishing begins."
-          />
-        </Section>
-      </div>
+      <Section title="Recent performance" subtitle="A quick pulse on how your content is doing.">
+        <EmptyState
+          icon={TrendingUp}
+          title="No data yet."
+          body="Analytics will appear after publishing begins."
+        />
+      </Section>
+
 
       <Section title="Quick actions" subtitle="Common things you can do right now.">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
