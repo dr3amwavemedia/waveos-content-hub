@@ -194,43 +194,43 @@ function CreatePost() {
     return item.id;
   }
 
- async function handleSaveDraft() {
-  if (!workspaceId) return;
+  async function handleSaveDraft() {
+    if (!workspaceId) return;
 
-  setSaveStatus("saving");
+    setSaveStatus("saving");
 
-  try {
-    const wasNewDraft = !savedId;
-    const id = await ensureSaved();
+    try {
+      const wasNewDraft = !savedId;
+      const id = await ensureSaved();
 
-    if (!id) {
-      setSaveStatus("error");
-      return;
-    }
+      if (!id) {
+        setSaveStatus("error");
+        return;
+      }
 
-    if (wasNewDraft) {
-      navigate({
-        to: "/create",
-        search: { id },
-        replace: true,
+      if (wasNewDraft) {
+        navigate({
+          to: "/create",
+          search: { id },
+          replace: true,
+        });
+      }
+
+      await qc.invalidateQueries({
+        queryKey: ["content-item", id],
       });
+
+      if (draftStorageKey) {
+        window.localStorage.removeItem(draftStorageKey);
+      }
+
+      setSaveStatus("saved");
+      toast.success("Draft saved. You can now edit each platform caption.");
+    } catch (e) {
+      setSaveStatus("error");
+      toast.error((e as Error).message);
     }
-
-    await qc.invalidateQueries({
-      queryKey: ["content-item", id],
-    });
-
-    if (draftStorageKey) {
-      window.localStorage.removeItem(draftStorageKey);
-    }
-
-    setSaveStatus("saved");
-    toast.success("Draft saved. You can now edit each platform caption.");
-  } catch (e) {
-    setSaveStatus("error");
-    toast.error((e as Error).message);
   }
-}
 
   async function handleScheduleLater() {
     if (!workspaceId) return;
@@ -337,19 +337,12 @@ function CreatePost() {
             Save draft
           </button>
 
-          <span
-  className="min-w-[90px] text-xs text-muted-foreground"
-  aria-live="polite"
->
-  {saveStatus === "saving" && "Saving…"}
-  {saveStatus === "saved" && (
-    <span className="text-primary">Saved</span>
-  )}
-  {saveStatus === "error" && (
-    <span className="text-destructive">Save failed</span>
-  )}
-</span>
-          
+          <span className="min-w-[90px] text-xs text-muted-foreground" aria-live="polite">
+            {saveStatus === "saving" && "Saving…"}
+            {saveStatus === "saved" && <span className="text-primary">Saved</span>}
+            {saveStatus === "error" && <span className="text-destructive">Save failed</span>}
+          </span>
+
           <button
             disabled={locked || publishing !== null || !caption.trim() || !scheduledAt}
             onClick={handleScheduleLater}
@@ -392,6 +385,10 @@ function CreatePost() {
             <textarea
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
+              autoCapitalize="sentences"
+              autoCorrect="on"
+              spellCheck
+              enterKeyHint="done"
               rows={5}
               placeholder="Write the base caption. You can tailor per platform below."
               className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60"
