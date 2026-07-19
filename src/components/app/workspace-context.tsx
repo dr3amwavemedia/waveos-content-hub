@@ -18,11 +18,20 @@ const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefi
 // the active workspace changes so stale rows from the previous workspace can
 // never flash on screen.
 const WORKSPACE_SCOPED_KEYS = [
-  "media", "media-folders", "media-assets",
-  "brand-profile", "activity-logs", "home-stats",
-  "social-connections", "workspace-ayrshare-status",
+  "media",
+  "media-folders",
+  "media-assets",
+  "brand-profile",
+  "activity-logs",
+  "home-stats",
+  "social-connections",
+  "workspace-ayrshare-status",
+  "content-items",
+  "content-item",
+  "comments",
+  "approvals",
+  "notifications",
 ];
-
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { data: workspaces = [], isLoading } = useWorkspaces();
