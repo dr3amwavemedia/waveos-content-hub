@@ -52,6 +52,8 @@ function CreatePost() {
   const qc = useQueryClient();
 
   const workspaceId = activeWorkspace?.id ?? null;
+  const workspaceId = activeWorkspace?.id ?? null;
+  const [savedId, setSavedId] = useState<string | null>(search.id ?? null);
   const existing = useContentItem(search.id ?? savedId ?? null);
   const create = useCreateContentItem(workspaceId);
   const update = useUpdateContentItem();
@@ -66,8 +68,6 @@ function CreatePost() {
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [activePlatform, setActivePlatform] = useState<SocialPlatform>("instagram");
   const [showLibrary, setShowLibrary] = useState(false);
-  const [savedId, setSavedId] = useState<string | null>(search.id ?? null);
-
   useEffect(() => {
     if (!existing.data?.item) return;
     const it = existing.data.item;
