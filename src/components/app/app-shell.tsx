@@ -56,7 +56,6 @@ const STAFF_NAV: NavItem[] = [
 ];
 
 const MOBILE_NAV: NavItem[] = [
-  const MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
   { to: "/calendar", label: "Calendar", icon: Calendar },
   { to: "/create", label: "Create", icon: PenSquare },
