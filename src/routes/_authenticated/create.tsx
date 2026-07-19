@@ -52,7 +52,7 @@ function CreatePost() {
   const qc = useQueryClient();
 
   const workspaceId = activeWorkspace?.id ?? null;
-  const existing = useContentItem(search.id ?? null);
+  const existing = useContentItem(search.id ?? savedId ?? null);
   const create = useCreateContentItem(workspaceId);
   const update = useUpdateContentItem();
   const updateVariant = useUpdateVariant();
