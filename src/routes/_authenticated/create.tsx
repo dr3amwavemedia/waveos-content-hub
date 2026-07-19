@@ -202,6 +202,11 @@ function CreatePost() {
   async function handleSaveDraft() {
     if (!workspaceId) return;
 
+    if (!platforms.length) {
+      setSaveStatus("error");
+      toast.error("Select at least one platform before saving.");
+      return;
+    }
     setSaveStatus("saving");
 
     try {
