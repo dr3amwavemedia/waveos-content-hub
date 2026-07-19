@@ -52,7 +52,6 @@ function CreatePost() {
   const qc = useQueryClient();
 
   const workspaceId = activeWorkspace?.id ?? null;
-  const workspaceId = activeWorkspace?.id ?? null;
   const [savedId, setSavedId] = useState<string | null>(search.id ?? null);
   const existing = useContentItem(search.id ?? savedId ?? null);
   const create = useCreateContentItem(workspaceId);
