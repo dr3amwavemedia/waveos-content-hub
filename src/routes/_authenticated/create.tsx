@@ -364,6 +364,20 @@ function CreatePost() {
             )}
             Save draft
           </button>
+
+          <span
+  className="min-w-[90px] text-xs text-muted-foreground"
+  aria-live="polite"
+>
+  {saveStatus === "saving" && "Saving…"}
+  {saveStatus === "saved" && (
+    <span className="text-primary">Saved</span>
+  )}
+  {saveStatus === "error" && (
+    <span className="text-destructive">Save failed</span>
+  )}
+</span>
+          
           <button
             disabled={locked || publishing !== null || !caption.trim() || !scheduledAt}
             onClick={handleScheduleLater}
