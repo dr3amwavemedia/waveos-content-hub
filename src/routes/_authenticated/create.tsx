@@ -67,6 +67,76 @@ function CreatePost() {
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [activePlatform, setActivePlatform] = useState<SocialPlatform>("instagram");
   const [showLibrary, setShowLibrary] = useState(false);
+
+  const draftStorageKey = workspaceId ? `waveos-create-draft-${workspaceId}` : null;
+
+  useEffect(() => {
+    if (!draftStorageKey || savedId) return;
+
+    const storedDraft = window.localStorage.getItem(draftStorageKey);
+
+    if (!storedDraft) return;
+
+    try {
+      const parsed = JSON.parse(storedDraft);
+
+      if (typeof parsed.title === "string") {
+        setTitle(parsed.title);
+      }
+
+      if (typeof parsed.caption === "string") {
+        setCaption(parsed.caption);
+      }
+
+      if (Array.isArray(parsed.platforms)) {
+        const validPlatforms = parsed.platforms.filter(
+          (platform: unknown): platform is SocialPlatform =>
+            typeof platform === "string" && ALL_PLATFORMS.includes(platform as SocialPlatform),
+        );
+
+        if (validPlatforms.length > 0) {
+          setPlatforms(validPlatforms);
+          setActivePlatform(validPlatforms[0]);
+        }
+      }
+
+      if (Array.isArray(parsed.pickedMedia)) {
+        setPickedMedia(parsed.pickedMedia.filter((mediaId: unknown): mediaId is string => typeof mediaId === "string"));
+      }
+
+      if (typeof parsed.scheduledAt === "string") {
+        setScheduledAt(parsed.scheduledAt);
+      }
+    } catch {
+      window.localStorage.removeItem(draftStorageKey);
+    }
+  }, [draftStorageKey, savedId]);
+  useEffect(() => {
+    if (!draftStorageKey || savedId) return;
+
+    const timeout = window.setTimeout(() => {
+      const hasDraftContent =
+        title.trim().length > 0 || caption.trim().length > 0 || pickedMedia.length > 0 || scheduledAt.length > 0;
+
+      if (!hasDraftContent) {
+        window.localStorage.removeItem(draftStorageKey);
+        return;
+      }
+
+      window.localStorage.setItem(
+        draftStorageKey,
+        JSON.stringify({
+          title,
+          caption,
+          platforms,
+          pickedMedia,
+          scheduledAt,
+        }),
+      );
+    }, 600);
+
+    return () => window.clearTimeout(timeout);
+  }, [draftStorageKey, savedId, title, caption, platforms, pickedMedia, scheduledAt]);
   useEffect(() => {
     if (!existing.data?.item) return;
     const it = existing.data.item;
@@ -144,6 +214,9 @@ function CreatePost() {
         queryKey: ["content-item", id],
       });
 
+      if (draftStorageKey) {
+        window.localStorage.removeItem(draftStorageKey);
+      }
       toast.success("Draft saved. You can now edit each platform caption.");
     } catch (e) {
       toast.error((e as Error).message);
