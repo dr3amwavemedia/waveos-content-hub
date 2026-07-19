@@ -450,10 +450,15 @@ function CreatePost() {
                 setPlatforms((current) => {
                   const isEnabled = current.includes(p);
 
+                  if (isEnabled && current.length === 1) {
+                    toast.error("At least one platform must remain selected.");
+                    return current;
+                  }
+
                   const nextPlatforms = isEnabled ? current.filter((platform) => platform !== p) : [...current, p];
 
                   if (activePlatform === p && isEnabled) {
-                    setActivePlatform(nextPlatforms[0] ?? "instagram");
+                    setActivePlatform(nextPlatforms[0]);
                   }
 
                   if (!isEnabled) {
