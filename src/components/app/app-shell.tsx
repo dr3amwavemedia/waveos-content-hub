@@ -38,7 +38,7 @@ interface NavItem {
 }
 
 const CLIENT_NAV: NavItem[] = [
-  { to: "/home", label: "Home", icon: Home },
+  { to: "/home", label: "Overview", icon: Home },
   { to: "/content", label: "Content", icon: Images },
   { to: "/calendar", label: "Calendar", icon: Calendar },
   { to: "/create", label: "Create Post", icon: PenSquare },
@@ -56,7 +56,7 @@ const STAFF_NAV: NavItem[] = [
 ];
 
 const MOBILE_NAV: NavItem[] = [
-  { to: "/home", label: "Home", icon: Home },
+  { to: "/home", label: "Overview", icon: Home },
   { to: "/content", label: "Content", icon: Images },
   { to: "/create", label: "Create", icon: PenSquare },
   { to: "/calendar", label: "Calendar", icon: Calendar },
@@ -118,10 +118,7 @@ function Shell({ children }: { children: ReactNode }) {
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog">
-          <div
-            className="absolute inset-0 bg-background/70 backdrop-blur"
-            onClick={() => setMobileOpen(false)}
-          />
+          <div className="absolute inset-0 bg-background/70 backdrop-blur" onClick={() => setMobileOpen(false)} />
           <div className="absolute inset-y-0 left-0 w-72 border-r border-border bg-sidebar p-4">
             <div className="flex items-center justify-between">
               <WaveLogo />
@@ -146,9 +143,7 @@ function Shell({ children }: { children: ReactNode }) {
 
       {/* Main */}
       <main className="min-h-screen lg:pl-64">
-        <div className="mx-auto max-w-7xl px-4 pb-24 pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
-          {children}
-        </div>
+        <div className="mx-auto max-w-7xl px-4 pb-24 pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">{children}</div>
       </main>
 
       {/* Mobile bottom nav */}
@@ -161,19 +156,12 @@ function Shell({ children }: { children: ReactNode }) {
   );
 }
 
-function NavGroup({
-  items,
-  className,
-}: {
-  items: NavItem[];
-  className?: string;
-}) {
+function NavGroup({ items, className }: { items: NavItem[]; className?: string }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   return (
     <ul className={cn("space-y-0.5", className)}>
       {items.map((item) => {
-        const active =
-          pathname === item.to || pathname.startsWith(item.to + "/");
+        const active = pathname === item.to || pathname.startsWith(item.to + "/");
         const Icon = item.icon;
         return (
           <li key={item.to}>
@@ -237,9 +225,7 @@ function WorkspaceSwitcher() {
           <Plus className="h-4 w-4 text-primary" />
           <span className="flex-1">
             <span className="block font-medium">Create workspace</span>
-            <span className="block text-[11px] text-muted-foreground">
-              Start your own Brand Workspace
-            </span>
+            <span className="block text-[11px] text-muted-foreground">Start your own Brand Workspace</span>
           </span>
         </button>
       </div>
@@ -278,9 +264,7 @@ function WorkspaceSwitcher() {
               className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-foreground hover:bg-elevated"
             >
               <span className="truncate">{w.name}</span>
-              {w.id === activeWorkspace?.id && (
-                <Check className="ml-auto h-4 w-4 text-primary" />
-              )}
+              {w.id === activeWorkspace?.id && <Check className="ml-auto h-4 w-4 text-primary" />}
             </button>
           ))}
           <button
@@ -312,10 +296,7 @@ function UserFooter() {
     navigate({ to: "/auth", replace: true });
   }
 
-  const displayName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-    user?.email ||
-    "You";
+  const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "You";
 
   return (
     <div className="border-t border-border/80 p-3">
@@ -324,12 +305,8 @@ function UserFooter() {
           {(user?.firstName?.[0] ?? user?.email?.[0] ?? "?").toUpperCase()}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="truncate text-xs font-medium text-foreground">
-            {displayName}
-          </div>
-          <div className="truncate text-[10px] text-muted-foreground">
-            {user?.email}
-          </div>
+          <div className="truncate text-xs font-medium text-foreground">{displayName}</div>
+          <div className="truncate text-[10px] text-muted-foreground">{user?.email}</div>
         </div>
         <NotificationsBell />
         <button
