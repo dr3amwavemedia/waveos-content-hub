@@ -26,8 +26,16 @@ export const PLATFORM_LABEL: Record<SocialPlatform, string> = {
 };
 
 export const ALL_PLATFORMS: SocialPlatform[] = [
-  "instagram", "facebook", "tiktok", "youtube", "linkedin",
-  "x", "pinterest", "threads", "bluesky",
+  "instagram",
+  "facebook",
+  "gmb",
+  "tiktok",
+  "youtube",
+  "linkedin",
+  "x",
+  "pinterest",
+  "threads",
+  "bluesky",
 ];
 
 export function useContentItems(workspaceId: string | null, status?: ContentStatus[]) {
@@ -149,10 +157,7 @@ export function useSubmitForApproval() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (contentId: string) => {
-      const { error } = await supabase
-        .from("content_items")
-        .update({ status: "in_review" })
-        .eq("id", contentId);
+      const { error } = await supabase.from("content_items").update({ status: "in_review" }).eq("id", contentId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -173,10 +178,13 @@ export function useDecideApproval() {
     }) => {
       const { data: user } = await supabase.auth.getUser();
       const nextStatus: ContentStatus =
-        input.decision === "approved" ? "approved"
-        : input.decision === "changes_requested" ? "changes_requested"
-        : input.decision === "rejected" ? "draft"
-        : "in_review";
+        input.decision === "approved"
+          ? "approved"
+          : input.decision === "changes_requested"
+            ? "changes_requested"
+            : input.decision === "rejected"
+              ? "draft"
+              : "in_review";
       const { error } = await supabase.from("approvals").insert({
         content_item_id: input.contentId,
         workspace_id: input.workspaceId,
@@ -191,10 +199,7 @@ export function useDecideApproval() {
         patch.approved_by = user.user?.id ?? null;
         patch.approved_at = new Date().toISOString();
       }
-      const { error: e2 } = await supabase
-        .from("content_items")
-        .update(patch)
-        .eq("id", input.contentId);
+      const { error: e2 } = await supabase.from("content_items").update(patch).eq("id", input.contentId);
       if (e2) throw e2;
     },
     onSuccess: () => {
@@ -274,10 +279,7 @@ export function useMarkNotificationRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("notifications")
-        .update({ read_at: new Date().toISOString() })
-        .eq("id", id);
+      const { error } = await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),
