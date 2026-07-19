@@ -12,14 +12,17 @@ export const Route = createFileRoute("/api/public/hooks/ayrshare")({
         const raw = await request.text();
         const secret = process.env.AYRSHARE_WEBHOOK_SECRET;
 
-        if (secret) {
-          const sig = request.headers.get("x-ayrshare-signature") ?? request.headers.get("x-hub-signature-256") ?? "";
-          const expected = createHmac("sha256", secret).update(raw).digest("hex");
-          const a = Buffer.from(sig.replace(/^sha256=/, ""), "utf8");
-          const b = Buffer.from(expected, "utf8");
-          if (a.length !== b.length || !timingSafeEqual(a, b)) {
-            return new Response("invalid_signature", { status: 401 });
-          }
+        if (!secret) {
+          console.error("[ayrshare webhook] AYRSHARE_WEBHOOK_SECRET is not configured; rejecting.");
+          return new Response("webhook_not_configured", { status: 503 });
+        }
+
+        const sig = request.headers.get("x-ayrshare-signature") ?? request.headers.get("x-hub-signature-256") ?? "";
+        const expected = createHmac("sha256", secret).update(raw).digest("hex");
+        const a = Buffer.from(sig.replace(/^sha256=/, ""), "utf8");
+        const b = Buffer.from(expected, "utf8");
+        if (a.length !== b.length || !timingSafeEqual(a, b)) {
+          return new Response("invalid_signature", { status: 401 });
         }
 
         let payload: Record<string, unknown> = {};
