@@ -33,7 +33,7 @@ type DeliveryKind = Database["public"]["Enums"]["delivery_kind"];
 const DREAM_WAVE_CONTACT = {
   name: "Dream Wave Media",
   role: "Your creative team",
-  email: "hello@dreamwavemedia.co",
+  email: "dr3amwavemedia@outlook.com",
   phone: null as string | null,
 };
 
@@ -132,11 +132,7 @@ export function Layer1Overview() {
     enabled: !!wsId,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data } = await supabase
-        .from("workspaces")
-        .select("account_status")
-        .eq("id", wsId!)
-        .maybeSingle();
+      const { data } = await supabase.from("workspaces").select("account_status").eq("id", wsId!).maybeSingle();
       return data;
     },
   });
@@ -178,8 +174,7 @@ export function Layer1Overview() {
     const items = invoicesQ.data ?? [];
     const now = Date.now();
     const overdue = items.find(
-      (i) => i.status === "overdue" ||
-        (i.status === "sent" && i.due_at && new Date(i.due_at).getTime() < now),
+      (i) => i.status === "overdue" || (i.status === "sent" && i.due_at && new Date(i.due_at).getTime() < now),
     );
     if (overdue) return overdue;
     const sent = items.find((i) => i.status === "sent");
@@ -192,14 +187,9 @@ export function Layer1Overview() {
     return items[0] ?? null;
   }, [deliveriesQ.data]);
 
-  const projectName =
-    brandQ.data?.business_name?.trim() ||
-    activeWorkspace?.name ||
-    "Your project";
+  const projectName = brandQ.data?.business_name?.trim() || activeWorkspace?.name || "Your project";
 
-  const statusLabel = wsMetaQ.data?.account_status
-    ? STATUS_LABELS[wsMetaQ.data.account_status]
-    : null;
+  const statusLabel = wsMetaQ.data?.account_status ? STATUS_LABELS[wsMetaQ.data.account_status] : null;
 
   const primaryAction = derivePrimaryAction(primaryInvoice, primaryDelivery);
 
@@ -207,9 +197,7 @@ export function Layer1Overview() {
     <div className="space-y-8">
       {/* Welcome */}
       <header className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          {projectName}
-        </p>
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{projectName}</p>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
           {firstName ? `Welcome back, ${firstName}.` : "Welcome back."}
         </h1>
@@ -233,10 +221,7 @@ export function Layer1Overview() {
         {primaryInvoice ? (
           <InvoiceCard invoice={primaryInvoice} />
         ) : (
-          <PolishedEmpty
-            icon={FileText}
-            body="You currently have no invoices requiring action."
-          />
+          <PolishedEmpty icon={FileText} body="You currently have no invoices requiring action." />
         )}
       </section>
 
@@ -270,15 +255,11 @@ type PrimaryAction =
   | { kind: "contact" }
   | { kind: "none" };
 
-function derivePrimaryAction(
-  inv: Invoice | null,
-  del: Delivery | null,
-): PrimaryAction {
+function derivePrimaryAction(inv: Invoice | null, del: Delivery | null): PrimaryAction {
   const now = Date.now();
   if (inv) {
     const isOverdue =
-      inv.status === "overdue" ||
-      (inv.status === "sent" && inv.due_at && new Date(inv.due_at).getTime() < now);
+      inv.status === "overdue" || (inv.status === "sent" && inv.due_at && new Date(inv.due_at).getTime() < now);
     if (isOverdue && isValidHttpsUrl(inv.hosted_url)) return { kind: "overdue", invoice: inv };
     if (inv.status === "sent" && isValidHttpsUrl(inv.hosted_url)) return { kind: "pay", invoice: inv };
   }
@@ -304,10 +285,9 @@ function PrimaryActionBanner({ action }: { action: PrimaryAction }) {
       tone = "warning";
       Icon = AlertCircle;
       title = "You have an overdue invoice";
-      body =
-        action.invoice.number
-          ? `Invoice ${action.invoice.number} is past due. Please complete payment to keep your project on track.`
-          : "One of your invoices is past due. Please complete payment to keep your project on track.";
+      body = action.invoice.number
+        ? `Invoice ${action.invoice.number} is past due. Please complete payment to keep your project on track.`
+        : "One of your invoices is past due. Please complete payment to keep your project on track.";
       cta = { label: "Make Payment", href: action.invoice.hosted_url! };
       break;
     case "pay":
@@ -415,7 +395,11 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
   const issued = formatDate(invoice.issued_at);
   const paid = formatDate(invoice.paid_at);
   const isPaid = invoice.status === "paid";
-  const ctaLabel = isPaid ? "View Receipt" : invoice.status === "sent" || invoice.status === "overdue" ? "Make Payment" : "View Invoice";
+  const ctaLabel = isPaid
+    ? "View Receipt"
+    : invoice.status === "sent" || invoice.status === "overdue"
+      ? "Make Payment"
+      : "View Invoice";
   const canOpen = isValidHttpsUrl(invoice.hosted_url);
 
   return (
@@ -435,16 +419,12 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
               {INVOICE_STATUS_LABEL[invoice.status]}
             </span>
           </div>
-          {invoice.description && (
-            <p className="mt-1 text-sm text-muted-foreground">{invoice.description}</p>
-          )}
+          {invoice.description && <p className="mt-1 text-sm text-muted-foreground">{invoice.description}</p>}
         </div>
         {amount && (
           <div className="shrink-0 text-right">
             <div className="text-2xl font-semibold tracking-tight text-foreground">{amount}</div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              {invoice.currency}
-            </div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{invoice.currency}</div>
           </div>
         )}
       </div>
@@ -477,15 +457,17 @@ function DeliveryCard({ delivery }: { delivery: Delivery }) {
   const canDownload = isDownloadProvider(delivery.url);
   const canOpen = isValidHttpsUrl(delivery.url);
   const ctaLabel = delivery.is_pinned
-    ? canDownload ? "Download Final Files" : "View Your Content"
+    ? canDownload
+      ? "Download Final Files"
+      : "View Your Content"
     : "Review Your Content";
 
   const KindIcon =
     delivery.kind === "videos" || delivery.kind === "reels"
       ? Film
       : delivery.kind === "documents"
-      ? FileText
-      : ImageIcon;
+        ? FileText
+        : ImageIcon;
 
   return (
     <div className="surface-card space-y-5 p-5 sm:p-6">
@@ -495,15 +477,11 @@ function DeliveryCard({ delivery }: { delivery: Delivery }) {
             <KindIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-foreground sm:text-lg">
-              {delivery.title}
-            </h3>
+            <h3 className="text-base font-semibold text-foreground sm:text-lg">{delivery.title}</h3>
             <p className="mt-0.5 text-xs uppercase tracking-wider text-muted-foreground">
               {kindLabel} · {provider}
             </p>
-            {delivery.description && (
-              <p className="mt-2 text-sm text-muted-foreground">{delivery.description}</p>
-            )}
+            {delivery.description && <p className="mt-2 text-sm text-muted-foreground">{delivery.description}</p>}
           </div>
         </div>
         {canDownload && (
@@ -579,20 +557,10 @@ function ContactCard() {
   );
 }
 
-function MetaField({
-  label,
-  value,
-  icon: Icon,
-}: {
-  label: string;
-  value: string;
-  icon?: typeof Clock;
-}) {
+function MetaField({ label, value, icon: Icon }: { label: string; value: string; icon?: typeof Clock }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </dt>
+      <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
       <dd className="mt-1 flex items-start gap-1.5 text-sm text-foreground">
         {Icon && <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
         <span className="break-words">{value}</span>
@@ -601,13 +569,7 @@ function MetaField({
   );
 }
 
-function PolishedEmpty({
-  icon: Icon,
-  body,
-}: {
-  icon: typeof Sparkles;
-  body: string;
-}) {
+function PolishedEmpty({ icon: Icon, body }: { icon: typeof Sparkles; body: string }) {
   return (
     <div className="surface-card flex flex-col items-center justify-center gap-3 p-8 text-center sm:p-10">
       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/20">
