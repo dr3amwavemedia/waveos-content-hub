@@ -39,16 +39,25 @@ function AuthPage() {
   // Redirect signed-in users to the intended destination (or /home).
   useEffect(() => {
     let cancelled = false;
+    const resolveNext = () => {
+      const stashed =
+        typeof window !== "undefined" ? sessionStorage.getItem("waveos.postAuthNext") : null;
+      const target = safeNext(stashed ?? nextPath);
+      if (stashed) sessionStorage.removeItem("waveos.postAuthNext");
+      return target;
+    };
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (!cancelled && data.session) {
-        if (nextPath.startsWith("/")) window.location.replace(nextPath);
+        const target = resolveNext();
+        if (target !== "/home") window.location.replace(target);
         else navigate({ to: "/home", replace: true });
       }
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
-        if (nextPath !== "/home") window.location.replace(nextPath);
+        const target = resolveNext();
+        if (target !== "/home") window.location.replace(target);
         else navigate({ to: "/home", replace: true });
       }
     });
@@ -57,6 +66,7 @@ function AuthPage() {
       sub.subscription.unsubscribe();
     };
   }, [navigate, nextPath]);
+
 
   async function handleEmailSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -86,20 +96,25 @@ function AuthPage() {
 
   async function handleGoogle() {
     setBusy(true);
-    const nextQ = nextPath !== "/home" ? `?next=${encodeURIComponent(nextPath)}` : "";
+    // Stash the intended destination — redirect_uri must be a plain public URL
+    // (window.location.origin) or Lovable's managed OAuth allowlist rejects it.
+    if (nextPath !== "/home") {
+      sessionStorage.setItem("waveos.postAuthNext", nextPath);
+    }
     const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin + "/auth" + nextQ,
+      redirect_uri: window.location.origin,
     });
     if (result.error) {
       setBusy(false);
+      sessionStorage.removeItem("waveos.postAuthNext");
       toast.error("Couldn't sign in with Google. Please try again.");
       return;
     }
     if (result.redirected) return;
+    // Popup flow: session is set; the auth-state effect will route us.
     setBusy(false);
-    if (nextPath !== "/home") window.location.replace(nextPath);
-    else navigate({ to: "/home", replace: true });
   }
+
 
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
