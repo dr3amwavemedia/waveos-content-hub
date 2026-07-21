@@ -279,16 +279,18 @@ function WorkspaceSwitcher() {
               {w.id === activeWorkspace?.id && <Check className="ml-auto h-4 w-4 text-primary" />}
             </button>
           ))}
-          <button
-            onClick={() => {
-              setOpen(false);
-              navigate({ to: "/onboarding" });
-            }}
-            className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-sm font-medium text-primary hover:bg-elevated"
-          >
-            <Plus className="h-4 w-4" />
-            Create new workspace
-          </button>
+          {user?.isStaff && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                navigate({ to: "/onboarding" });
+              }}
+              className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-sm font-medium text-primary hover:bg-elevated"
+            >
+              <Plus className="h-4 w-4" />
+              New client workspace
+            </button>
+          )}
         </div>
       )}
     </div>
