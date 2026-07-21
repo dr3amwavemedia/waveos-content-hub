@@ -168,7 +168,7 @@ function Shell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-surface/95 px-2 py-2 backdrop-blur lg:hidden">
-        {MOBILE_NAV.map((item) => (
+        {mobileNav.map((item) => (
           <MobileNavLink key={item.to} item={item} />
         ))}
       </nav>
