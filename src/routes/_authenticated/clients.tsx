@@ -658,6 +658,9 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
       </div>
       <Field label="URL">
         <input required type="url" value={url} onChange={(e) => setUrl(e.target.value)} className={inputCls} placeholder="https://drive.google.com/…" />
+        {url.trim() && !urlValid && (
+          <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
+        )}
       </Field>
       <Field label="Description (optional)">
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
