@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/app/empty-state";
 import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { cn } from "@/lib/utils";
+import { isValidHttpsUrl, URL_VALIDATION_MESSAGE } from "@/lib/url-validation";
 import type { Database } from "@/integrations/supabase/types";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
