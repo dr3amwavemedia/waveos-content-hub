@@ -80,10 +80,22 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function Shell({ children }: { children: ReactNode }) {
   const { data: user } = useCurrentUser();
+  const { can, isLoading: permsLoading } = usePermissions();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const nav = [...CLIENT_NAV];
-  if (user?.isStaff) nav.push(...STAFF_NAV);
+  const filterByFeature = (items: NavItem[]) =>
+    items.filter((i) => {
+      if (i.staffOnly) return !!user?.isStaff;
+      if (!i.feature) return true;
+      // While perms load, hide gated items to avoid a flash of forbidden nav.
+      if (permsLoading) return false;
+      return can(i.feature);
+    });
+
+  const clientNav = filterByFeature(CLIENT_NAV);
+  const staffNav = user?.isStaff ? STAFF_NAV : [];
+  const mobileNav = filterByFeature(MOBILE_NAV);
+  const nav = [...clientNav, ...staffNav];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
