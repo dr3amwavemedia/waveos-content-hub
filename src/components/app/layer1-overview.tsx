@@ -593,9 +593,9 @@ function MetaField({
       <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 flex items-center gap-1.5 text-sm text-foreground">
-        {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
-        <span className="truncate">{value}</span>
+      <dd className="mt-1 flex items-start gap-1.5 text-sm text-foreground">
+        {Icon && <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+        <span className="break-words">{value}</span>
       </dd>
     </div>
   );
