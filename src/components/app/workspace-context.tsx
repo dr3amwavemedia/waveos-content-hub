@@ -37,8 +37,6 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const qc = useQueryClient();
   const prev = useRef<string | null>(null);
-  const navigate = useNavigate();
-  const pathname = useRouterState({ select: (r) => r.location.pathname });
 
   useEffect(() => {
     const stored = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
@@ -54,11 +52,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // Orphaned users (signed in but not a member of any workspace) stay on the
   // page they landed on. Individual pages show a friendly "not invited yet"
-  // empty state via the AppShell instead. Staff-only routes handle their own
-  // access checks.
-  void navigate;
-  void pathname;
-  void isLoading;
+  // empty state via the AppShell.
 
   // Clear workspace-scoped caches when the active workspace changes so stale
   // rows from the previous workspace can never briefly appear.
