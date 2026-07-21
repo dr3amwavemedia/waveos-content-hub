@@ -106,7 +106,7 @@ function Shell({ children }: { children: ReactNode }) {
         </div>
         <WorkspaceSwitcher />
         <nav className="mt-2 flex-1 overflow-y-auto px-3 pb-6">
-          <NavGroup items={CLIENT_NAV} />
+          <NavGroup items={clientNav} />
           {user?.isStaff && (
             <>
               <div className="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
