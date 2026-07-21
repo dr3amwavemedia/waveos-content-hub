@@ -53,14 +53,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [workspaces, activeId]);
 
-  // Auto-launch onboarding for authenticated users with no workspace.
-  useEffect(() => {
-    if (isLoading) return;
-    if (workspaces.length > 0) return;
-    if (pathname === "/onboarding") return;
-    if (pathname.startsWith("/accept-invite")) return;
-    navigate({ to: "/onboarding", replace: true });
-  }, [isLoading, workspaces.length, pathname, navigate]);
+  // Orphaned users (signed in but not a member of any workspace) stay on the
+  // page they landed on. Individual pages show a friendly "not invited yet"
+  // empty state via the AppShell instead. Staff-only routes handle their own
+  // access checks.
+  void navigate;
+  void pathname;
+  void isLoading;
 
   // Clear workspace-scoped caches when the active workspace changes so stale
   // rows from the previous workspace can never briefly appear.
