@@ -1,3 +1,4 @@
+import { RequireFeature } from "@/components/app/require-feature";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { Folder, FolderPlus, Images, Loader2, Search, Tag, Trash2, Upload, Video, X } from "lucide-react";

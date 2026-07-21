@@ -1,3 +1,4 @@
+import { RequireFeature } from "@/components/app/require-feature";
 import { createFileRoute } from "@tanstack/react-router";
 import { BarChart3, TrendingUp } from "lucide-react";
 
