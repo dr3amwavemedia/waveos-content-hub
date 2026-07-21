@@ -38,9 +38,8 @@ import { PenSquare } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/create")({
   component: CreatePost,
-  validateSearch: (s: Record<string, unknown>) => ({
-    id: typeof s.id === "string" ? s.id : undefined,
-  }),
+  validateSearch: (s: Record<string, unknown>): { id?: string } =>
+    typeof s.id === "string" ? { id: s.id } : {},
   head: () => ({ meta: [{ title: "Create Post — WaveOS" }, { name: "robots", content: "noindex" }] }),
 });
 
