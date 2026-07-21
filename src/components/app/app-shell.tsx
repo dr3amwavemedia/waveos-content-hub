@@ -112,7 +112,7 @@ function Shell({ children }: { children: ReactNode }) {
               <div className="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Dream Wave Media
               </div>
-              <NavGroup items={STAFF_NAV} />
+              <NavGroup items={staffNav} />
             </>
           )}
         </nav>
