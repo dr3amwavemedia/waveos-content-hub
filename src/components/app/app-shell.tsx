@@ -80,21 +80,24 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function Shell({ children }: { children: ReactNode }) {
   const { data: user } = useCurrentUser();
-  const { can, isLoading: permsLoading } = usePermissions();
+  const { can, isLoading: permsLoading, access, isStaff } = usePermissions();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const filterByFeature = (items: NavItem[]) =>
     items.filter((i) => {
       if (i.staffOnly) return !!user?.isStaff;
       if (!i.feature) return true;
-      // While perms load, hide gated items to avoid a flash of forbidden nav.
       if (permsLoading) return false;
       return can(i.feature);
     });
 
-  const clientNav = filterByFeature(CLIENT_NAV);
+  // Layer 1 (project_client) gets a simplified client-facing nav using
+  // existing routes only. Staff always keep the full nav.
+  const isLayer1 = !isStaff && access?.tier === "project_client";
+
+  const clientNav = isLayer1 ? LAYER1_NAV : filterByFeature(CLIENT_NAV);
   const staffNav = user?.isStaff ? STAFF_NAV : [];
-  const mobileNav = filterByFeature(MOBILE_NAV);
+  const mobileNav = isLayer1 ? LAYER1_MOBILE_NAV : filterByFeature(MOBILE_NAV);
   const nav = [...clientNav, ...staffNav];
 
   return (
