@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
 export const Route = createFileRoute("/auth")({
@@ -40,8 +39,7 @@ function AuthPage() {
   useEffect(() => {
     let cancelled = false;
     const resolveNext = () => {
-      const stashed =
-        typeof window !== "undefined" ? sessionStorage.getItem("waveos.postAuthNext") : null;
+      const stashed = typeof window !== "undefined" ? sessionStorage.getItem("waveos.postAuthNext") : null;
       const target = safeNext(stashed ?? nextPath);
       if (stashed) sessionStorage.removeItem("waveos.postAuthNext");
       return target;
@@ -66,7 +64,6 @@ function AuthPage() {
       sub.subscription.unsubscribe();
     };
   }, [navigate, nextPath]);
-
 
   async function handleEmailSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -96,25 +93,40 @@ function AuthPage() {
 
   async function handleGoogle() {
     setBusy(true);
-    // Stash the intended destination — redirect_uri must be a plain public URL
-    // (window.location.origin) or Lovable's managed OAuth allowlist rejects it.
-    if (nextPath !== "/home") {
-      sessionStorage.setItem("waveos.postAuthNext", nextPath);
-    }
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
-      setBusy(false);
-      sessionStorage.removeItem("waveos.postAuthNext");
-      toast.error("Couldn't sign in with Google. Please try again.");
-      return;
-    }
-    if (result.redirected) return;
-    // Popup flow: session is set; the auth-state effect will route us.
-    setBusy(false);
-  }
 
+    try {
+      if (nextPath !== "/home") {
+        sessionStorage.setItem("waveos.postAuthNext", nextPath);
+      }
+
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth`,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      // Supabase normally redirects automatically in the browser.
+      // This fallback makes sure the redirect occurs.
+      if (data.url) {
+        window.location.assign(data.url);
+        return;
+      }
+
+      throw new Error("Google did not return a sign-in URL.");
+    } catch (error) {
+      sessionStorage.removeItem("waveos.postAuthNext");
+      setBusy(false);
+
+      console.error("[Google sign-in error]", error);
+
+      toast.error(error instanceof Error ? error.message : "Couldn't sign in with Google. Please try again.");
+    }
+  }
 
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
