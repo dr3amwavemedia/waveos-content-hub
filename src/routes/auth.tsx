@@ -32,8 +32,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const search = Route.useSearch();
   const nextPath = safeNext(search.next);
-  const [mode, setMode] = useState<"signin" | "signup" | "reset">("signin");
-  const [fullName, setFullName] = useState("");
+  const [mode, setMode] = useState<"signin" | "reset">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -74,26 +73,6 @@ function AuthPage() {
     toast.success("Welcome back.");
   }
 
-  async function handleSignUp(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    const nextQ = nextPath !== "/home" ? `?next=${encodeURIComponent(nextPath)}` : "";
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth${nextQ}`,
-        data: { full_name: fullName },
-      },
-    });
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Account created — let's set up your workspace.");
-  }
-
   async function handleReset(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -118,7 +97,6 @@ function AuthPage() {
       return;
     }
     if (result.redirected) return;
-    // popup path: session set
     setBusy(false);
     if (nextPath !== "/home") window.location.replace(nextPath);
     else navigate({ to: "/home", replace: true });
@@ -137,22 +115,16 @@ function AuthPage() {
         <div className="surface-card p-8">
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {mode === "signin"
-                ? "Sign in to WaveOS"
-                : mode === "signup"
-                ? "Create your WaveOS account"
-                : "Reset your password"}
+              {mode === "signin" ? "Sign in to WaveOS" : "Reset your password"}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {mode === "signin"
                 ? "Welcome back — sign in to your workspace."
-                : mode === "signup"
-                ? "Start your Brand Workspace in under a minute."
                 : "We'll email you a secure link to set a new password."}
             </p>
           </div>
 
-          {mode !== "reset" && (
+          {mode === "signin" && (
             <>
               <button
                 type="button"
@@ -171,32 +143,9 @@ function AuthPage() {
           )}
 
           <form
-            onSubmit={
-              mode === "signin"
-                ? handleEmailSignIn
-                : mode === "signup"
-                ? handleSignUp
-                : handleReset
-            }
+            onSubmit={mode === "signin" ? handleEmailSignIn : handleReset}
             className="space-y-4"
           >
-            {mode === "signup" && (
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Your name
-                </label>
-                <input
-                  type="text"
-                  autoComplete="name"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
-                  placeholder="Alex Rivera"
-                />
-              </div>
-            )}
-
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                 Email
@@ -212,31 +161,28 @@ function AuthPage() {
               />
             </div>
 
-            {mode !== "reset" && (
+            {mode === "signin" && (
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <label className="text-xs font-medium text-muted-foreground">
                     Password
                   </label>
-                  {mode === "signin" && (
-                    <button
-                      type="button"
-                      onClick={() => setMode("reset")}
-                      className="text-xs text-primary hover:text-primary-glow"
-                    >
-                      Forgot?
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setMode("reset")}
+                    className="text-xs text-primary hover:text-primary-glow"
+                  >
+                    Forgot?
+                  </button>
                 </div>
                 <input
                   type="password"
-                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                  autoComplete="current-password"
                   required
-                  minLength={mode === "signup" ? 8 : undefined}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
-                  placeholder={mode === "signup" ? "At least 8 characters" : "••••••••"}
+                  placeholder="••••••••"
                 />
               </div>
             )}
@@ -247,11 +193,7 @@ function AuthPage() {
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110 disabled:opacity-60"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              {mode === "signin"
-                ? "Sign in"
-                : mode === "signup"
-                ? "Create account"
-                : "Send reset link"}
+              {mode === "signin" ? "Sign in" : "Send reset link"}
             </button>
 
             {mode === "reset" && (
@@ -266,32 +208,15 @@ function AuthPage() {
           </form>
 
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            {mode === "signin" ? (
-              <>
-                Don't have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => setMode("signup")}
-                  className="font-medium text-primary hover:text-primary-glow"
-                >
-                  Create one
-                </button>
-              </>
-            ) : mode === "signup" ? (
-              <>
-                Already have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => setMode("signin")}
-                  className="font-medium text-primary hover:text-primary-glow"
-                >
-                  Sign in
-                </button>
-              </>
-            ) : null}
+            WaveOS is invite-only. Need access?{" "}
+            <a
+              href="mailto:hello@dreamwavemedia.com?subject=WaveOS%20access%20request"
+              className="font-medium text-primary hover:text-primary-glow"
+            >
+              Contact Dream Wave Media
+            </a>
           </p>
         </div>
-
 
         <p className="mt-6 text-center text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
           A Dream Wave Media platform

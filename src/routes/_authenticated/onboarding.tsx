@@ -1,16 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, Loader2, Sparkles, Upload, Users2 } from "lucide-react";
+import { ArrowRight, Check, Loader2, Sparkles, Upload, Users2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/components/app/workspace-context";
+import { useCurrentUser } from "@/hooks/use-waveos";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   component: OnboardingPage,
-  head: () => ({ meta: [{ title: "Welcome to WaveOS" }] }),
+  head: () => ({ meta: [{ title: "New Client Workspace — WaveOS" }] }),
 });
 
 type Step = "welcome" | "details" | "done";
@@ -33,6 +34,29 @@ function OnboardingPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { workspaces, setActiveWorkspaceId, isLoading } = useWorkspace();
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+
+  // Onboarding is staff-only. Clients arrive via invite acceptance.
+  if (!userLoading && user && !user.isStaff) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
+          <ShieldAlert className="h-6 w-6 text-primary" />
+        </div>
+        <h1 className="text-2xl font-semibold text-foreground">Invite required</h1>
+        <p className="mt-3 text-sm text-muted-foreground">
+          WaveOS workspaces are provisioned by Dream Wave Media. Please contact
+          your account manager for an activation link.
+        </p>
+        <button
+          onClick={() => navigate({ to: "/home" })}
+          className="mt-6 inline-flex items-center gap-2 rounded-lg border border-border bg-surface/60 px-4 py-2 text-sm font-medium text-foreground hover:bg-elevated"
+        >
+          Back to WaveOS
+        </button>
+      </div>
+    );
+  }
 
   const [step, setStep] = useState<Step>("welcome");
   const [name, setName] = useState("");

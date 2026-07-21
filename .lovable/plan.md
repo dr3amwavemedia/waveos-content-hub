@@ -1,64 +1,122 @@
-# Hybrid WaveOS: self-service workspaces + Dream Wave invites
 
-## What stays intact
+# WaveOS Upgrade Plan — Audit and 7-Phase Implementation
 
-- All existing tables, RLS, invite RPCs (`create_invite`, `accept_invite`, `revoke_invite`, `resend_invite`), `has_role`, `is_dream_wave_staff`, `handle_new_user`, and the staff bootstrap workspace `11111111-...`.
-- Existing Dream Wave admin, clients, approvals pages.
-- Existing `workspace_members` roles (`owner`, `approver`, `viewer`) — reused as workspace-level roles; we add `admin` and `editor`.
+## Audit Summary
 
-## Database migration
+The codebase is already substantial (~4.7k lines across authenticated routes) and functioning. Key findings:
 
-1. Extend `workspace_member_role` enum: add `admin`, `editor`. (Existing `owner` = Workspace Owner, `viewer` = Workspace Viewer, `approver` kept for Dream Wave client workflow.)
-2. New RPC `public.create_brand_workspace(_name text, _business_name text, _industry text, _website text, _timezone text, _language text, _service_area text)`:
-   - `SECURITY DEFINER`, requires `auth.uid()`.
-   - Sanitizes inputs, generates unique slug from name.
-   - In one transaction: inserts `workspaces` row (not demo, not archived), inserts `workspace_members(owner)`, inserts `brand_profiles` row with supplied fields, inserts 8 default rows into `media_folders` (Photos, Videos, Reels, Brand Assets, Logos, Uploads, Campaigns, Archived), writes an `activity_logs` entry.
-   - Guards: user can create up to N workspaces they own (soft cap 10 to prevent abuse; staff exempt).
-   - Returns new workspace id + slug.
-3. `handle_new_user` unchanged — still bootstraps first user as `dream_wave_owner`. Subsequent self-serve users just get a profile row; no auto workspace (wizard handles it explicitly on next screen).
-4. Verify RLS on `workspaces`, `workspace_members`, `brand_profiles`, `media_folders`, `media_assets` already scopes by `is_workspace_member` / `is_dream_wave_staff`. Add owner-can-rename policy if missing.
-5. Storage: keep single `media` bucket; RLS on `storage.objects` scoped by `workspace_id` folder prefix (verify + patch if needed).
+**Reusable and keep as-is:**
+- Auth stack: Supabase client, `_authenticated` gate, invite/accept flow, MCP OAuth, Google OAuth via Lovable broker
+- Data layer: workspaces, workspace_members, invites (SHA-256 hashed, atomic accept), user_roles (separate table with `has_role`), activity_logs (with redaction), notifications, content_items/post_variants/approvals/comments, media_assets/folders, social_connections, publish_attempts, ayrshare_profiles, webhook_events
+- Ayrshare integration (server-side JWT, workspace-scoped, webhook HMAC verified)
+- Publishing: cron `publish-due` endpoint with `CRON_SECRET`
+- Design system (dark navy + light-blue accent), AppShell with sidebar/mobile drawer/bottom nav, workspace switcher
+- Existing routes: home, content, calendar, create, analytics, social-accounts, brand-voice, feedback, settings, clients, approvals, admin, onboarding
 
-## Frontend changes
+**Gaps blocking the new spec:**
+1. **No client access tiers.** Every workspace member gets full nav; there's no `project_client` / `growth_90` / `retainer_full` model, no term/expiration, no feature flags.
+2. **Public self-registration is enabled** — `/auth` allows signup and `WorkspaceProvider` auto-redirects new users to `/onboarding` to create their own workspace. Spec requires invite-only.
+3. **Nav is not permission-driven.** `app-shell.tsx` shows the same client nav to everyone (staff gets extra items appended).
+4. **No client-facing modules** for: Your Information (profile), Invoices, Your Content (external delivery links), Intake Submissions, CRM sync status.
+5. **No locked-preview UX** for Layer 2 (90-day) restricted features.
+6. **No "View as Client" preview mode** for admins.
+7. **Overview is one-size-fits-all**, not tier-adaptive.
+8. **No projects table** for organizing client work.
+9. **Admin clients page** exists but lacks tier/term/expiration controls, invoice/delivery management, activity view, preview button.
+10. **Mobile:** tables in `/clients` and `/approvals` will overflow at 320px; needs stacked cards + full-screen sheets.
 
-### Onboarding
-- New route `src/routes/_authenticated/onboarding.tsx` — 3-step wizard (Welcome → Workspace form → Success). Calls `create_brand_workspace` via a new server function `createBrandWorkspace` (uses `requireSupabaseAuth`), then invalidates `waveos/workspaces` and sets active workspace.
-- In `WorkspaceProvider`: when loading finishes and `workspaces` is empty, redirect to `/onboarding` (skipped if user is on `/accept-invite` or `/auth`).
-- Replace the "Ask Dream Wave Media to add you" empty state in `AppShell`'s `WorkspaceSwitcher` with a "Create workspace" CTA linking to `/onboarding`.
-- Add "+ Create new workspace" action at the bottom of the switcher dropdown.
+**Security items to fix during Phase 1:**
+- Disable email/password self-signup at the app level; keep Google only for admin-invited users OR require invite token on all signups.
+- Prevent `create_brand_workspace` RPC from being called by non-staff (currently allows anyone; spec says only admins create workspaces).
+- Ensure new tier/invoice/delivery tables have complete GRANT + RLS following the four-step rule.
 
-### Media uploader
-- Upgrade `social-accounts`... actually `content` / media upload surface: build a new `<MediaUploader>` component supporting:
-  - Multi-file `<input multiple>`, drag/drop zone, clipboard paste, folder assignment, tag input.
-  - Per-file queue with progress (XHR upload to Supabase Storage signed upload URL), states waiting/uploading/completed/failed, per-file retry/cancel, batch progress bar.
-  - Duplicate detection by name+size within workspace before upload.
-  - After each success, insert `media_assets` row scoped to active workspace.
-- Wire into existing content/media page (I'll locate the current uploader in `src/hooks/use-media.ts` and the content route).
+## Phased Implementation
 
-### Home dashboard
-- Ensure `/home` reads real counts (media, scheduled posts, connected socials, pending approvals) for the active workspace and shows empty states + quick actions (Upload / Create Post / Connect Socials / Invite Team). Small polish; keep existing stat cards.
+### Phase 1 — Access Foundation (schema + permissions + invite-only)
+Migration:
+- `client_access_tier` enum: `project_client`, `growth_90`, `retainer_full`
+- `agreement_term` enum: `one_time`, `90_day`, `6_month`, `12_month`
+- `account_status` enum: `pending`, `active`, `suspended`, `expired`, `archived`
+- Add to `workspaces`: `access_tier`, `agreement_term`, `access_starts_at`, `access_expires_at`, `account_status`, `activated_at`, `invited_at`, `admin_notes`, `feature_overrides jsonb`, `crm_sync_status`, `crm_external_id`
+- Server-side `has_feature(workspace_id, feature_key)` function that reads tier + overrides
+- Update `create_brand_workspace` RPC → restrict to `is_dream_wave_staff` and require `_access_tier` + `_agreement_term`
+- Restrict `workspace_members` INSERT for self (only via invite accept RPC)
 
-### Team invites
-- The existing invite RPC accepts `_workspace_role` from the `workspace_member_role` enum, so it auto-supports the new `admin`/`editor` values once the enum is extended. Add a "Team" tab under `/settings` with invite form (email + role select) + pending invites list + resend/revoke, gated to workspace `owner`/`admin`.
+Frontend:
+- Central `src/lib/permissions.ts` — pure derivation of feature flags from tier/overrides/status
+- `usePermissions(workspaceId)` hook
+- `<FeatureGate feature="..." mode="hidden|preview">` component
+- Remove signup form + workspace-creation onboarding from public flow; `/auth` becomes sign-in only (with password reset). Onboarding page becomes admin-only "New Client" wizard.
+- Update `WorkspaceProvider` to no longer redirect to `/onboarding` — instead show a "You haven't been invited yet" empty state for orphaned auth users.
 
-## Out of scope for this turn (call out explicitly)
+### Phase 2 — Admin Client Management
+New/updated routes under `/admin/*`:
+- `admin/clients` (rebuild): search + filters (tier/term/status/activation/CRM), mobile stacked cards, desktop table. Quick actions: open, edit access, add invoice, add delivery, resend invite, suspend/restore, upgrade/downgrade, view activity, retry CRM.
+- `admin/clients/$id` — full client account editor: profile, tier/term/dates, feature overrides, projects, invoices, deliveries, members, invitations, activity.
+- `admin/intake` — intake submissions list.
+- `admin/invitations` — invite management (create/resend/revoke).
+- `admin/activity` — global activity log.
 
-- Chunked/TUS resumable uploads for very large files (>50 MB): standard multi-part upload via storage SDK; retry works, true resume-on-drop does not.
-- Ownership transfer UI.
-- Per-permission RBAC beyond the 4 workspace roles.
-- Rewriting analytics — dashboard shows placeholders where data doesn't exist.
+Migration additions:
+- `projects` table (workspace-scoped)
+- `client_invoices` table (title, number, provider, external_url, amount, due_date, status enum, description)
+- `content_deliveries` table (title, description, provider enum, external_url, thumbnail_url, content_type, status enum, expiration, downloads_available, action_required, sort_order, admin_notes)
+- `intake_submissions` table (raw payload + sync fields)
+- `admin_preview_sessions` table (audit trail)
+- `preview_as_client(_workspace_id)` RPC — issues a signed short-lived preview context (server-scoped, not a password swap). Logged in activity_logs.
 
-## Technical notes
+"View as Client" implementation:
+- Admin session stays intact; a `preview_workspace_id` is stored in sessionStorage + validated server-side against `admin_preview_sessions`. Persistent banner + "Exit Preview" in AppShell. All feature checks resolve against the previewed workspace's tier. Mutation surface disabled unless admin explicitly enables.
 
-- Migration is one SQL file; RPC is `SECURITY DEFINER` with `SET search_path = public`, schema-qualified refs, and `auth.uid()` derivation only.
-- Server function `createBrandWorkspace` in `src/lib/workspaces.functions.ts` using `requireSupabaseAuth` + `context.supabase.rpc('create_brand_workspace', ...)` — RLS still applies to the SELECT that returns the new row.
-- All new activity-log entries use `log_activity` with safe metadata (no tokens/keys).
-- Uploader writes directly from the browser using the existing `supabase` client (RLS on `storage.objects` enforces workspace path); no new server function needed for uploads.
+### Phase 3 — Layer 1 Portal (project_client)
+- Tier-driven nav config in `app-shell.tsx` (single source, generated from permissions)
+- `/home` adapts: Layer 1 shows welcome, project status, most recent invoice, most recent delivery, contact card, single primary CTA
+- `/your-information` — safe client profile edit (name, phone, business, socials, billing, project goals). Admin-only fields hidden.
+- `/invoices` — client sees invoice cards with status badges, "View/Pay" links (external)
+- `/your-content` — delivery cards; validate https, open external in new tab with `noopener`; safe iframe fallback
+- `/contact` — Dream Wave contact info + support form
+- `/intake` public route (invite-required) — collects business info; on submit creates/updates client + activity log + email notify + CRM sync attempt
 
-## Deliverables checklist I'll report at the end
+CRM sync architecture:
+- `crm_sync_attempts` table with status + external_id + error
+- Server function `sync_client_to_crm(workspace_id)` — pluggable (Bloom API/webhook/Zapier). Emits honest status (not_connected/pending/synced/failed). Admin can retry.
 
-Migration file, tables touched, new RPC, new/changed RLS, new routes, new components, tests I ran (RLS spot-check across two workspaces, invite acceptance round-trip, multi-upload happy path + one forced failure retry).
+### Phase 4 — Layer 2 Preview (growth_90)
+- Same full nav as Layer 3 rendered, but locked modules use `<FeatureGate mode="preview">` — shows title, screenshot/mock, lock icon, "Available with a 6- or 12-month retainer", subtle CTA
+- Access-period banner (start/end/days remaining)
+- Server-side enforcement: RLS + RPC guards reject premium mutations for `growth_90` (publish, schedule, connect socials, invite members, AI captions, export)
+- Nightly cron transitions expired `growth_90` → `project_client` (data preserved)
 
----
+### Phase 5 — Layer 3 Full Access (retainer_full)
+- Wire existing scheduling/publishing/analytics/AI/team/approvals features to `usePermissions`
+- Enable `invite_member` RPC only when `has_feature(_ws, 'can_invite_members')`
+- Server functions re-check permission before mutation (defense in depth)
 
-**Reply "go" to build this, or tell me what to change** (e.g. skip the team-invite tab, defer the uploader rewrite, change the workspace cap, add ownership transfer, etc.).
+### Phase 6 — Mobile & Accessibility Pass
+- Replace tables in `/clients`, `/approvals`, `/admin/*` with responsive card lists at `<sm`
+- Convert modals to bottom sheets on mobile using existing dialog components
+- Audit at 320/375/390/430/tablet/desktop
+- Focus rings, aria labels, keyboard nav, error copy rewrite ("We couldn't save this…"), empty states, sticky primary CTAs on long forms
+- Skeleton loaders on all query-driven pages
+
+### Phase 7 — Security & Quality Review
+- Run Supabase linter + security scan; fix critical findings
+- Cross-workspace access tests (attempt to read/mutate another workspace)
+- Verify no service-role key in client bundle (`rg -n "SERVICE_ROLE" src/`)
+- Verify invitation table has no anon/authenticated broad SELECT
+- Verify tiered mutation guards
+- Storage bucket policies + signed URL expiry review
+
+## Technical Notes
+
+- All new tables follow the CREATE → GRANT → RLS → POLICY four-step rule; deny-by-default for client tables.
+- Every migration is additive (no drops on production columns). Enum values added with `ALTER TYPE ... ADD VALUE`.
+- Backfill: existing workspaces default to `retainer_full` + `active` + no expiration to preserve current behavior.
+- Permission derivation is pure and unit-testable; server RPCs mirror the same table for enforcement.
+- No new edge functions — all backend logic through TanStack `createServerFn` + server routes per project conventions.
+- Ayrshare, MCP, publishing cron untouched except for permission checks.
+
+## Deliverables per Phase
+After each phase I will list the exact files created/modified and the migration name, then pause for you to review before starting the next. Phase 1 is the largest single migration; Phases 2–7 are smaller batches.
+
+Reply "go" (or with adjustments) and I'll begin Phase 1.
