@@ -20,6 +20,8 @@ import {
   X,
   Check,
   Plus,
+  FileText,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
