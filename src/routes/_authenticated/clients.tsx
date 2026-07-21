@@ -62,7 +62,7 @@ interface ClientWorkspace {
   agreement_term: AgreementTerm | null;
   access_starts_at: string | null;
   access_expires_at: string | null;
-  admin_notes: string | null;
+  
   feature_overrides: Record<string, boolean>;
   last_activity_at: string | null;
   created_at: string;
