@@ -227,6 +227,115 @@ export type Database = {
           },
         ]
       }
+      client_deliveries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          delivered_at: string
+          description: string | null
+          id: string
+          is_pinned: boolean
+          kind: Database["public"]["Enums"]["delivery_kind"]
+          title: string
+          updated_at: string
+          url: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          delivered_at?: string
+          description?: string | null
+          id?: string
+          is_pinned?: boolean
+          kind?: Database["public"]["Enums"]["delivery_kind"]
+          title: string
+          updated_at?: string
+          url: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          delivered_at?: string
+          description?: string | null
+          id?: string
+          is_pinned?: boolean
+          kind?: Database["public"]["Enums"]["delivery_kind"]
+          title?: string
+          updated_at?: string
+          url?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_deliveries_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_invoices: {
+        Row: {
+          amount_cents: number | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          due_at: string | null
+          hosted_url: string | null
+          id: string
+          issued_at: string
+          number: string | null
+          paid_at: string | null
+          status: Database["public"]["Enums"]["invoice_status"]
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          due_at?: string | null
+          hosted_url?: string | null
+          id?: string
+          issued_at?: string
+          number?: string | null
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount_cents?: number | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          due_at?: string | null
+          hosted_url?: string | null
+          id?: string
+          issued_at?: string
+          number?: string | null
+          paid_at?: string | null
+          status?: Database["public"]["Enums"]["invoice_status"]
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_invoices_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       comments: {
         Row: {
           author_id: string | null
@@ -1195,7 +1304,16 @@ export type Database = {
         | "failed"
         | "archived"
       crm_sync_status: "not_connected" | "pending" | "synced" | "failed"
+      delivery_kind:
+        | "photos"
+        | "videos"
+        | "reels"
+        | "graphics"
+        | "documents"
+        | "link"
+        | "other"
       invite_status: "pending" | "accepted" | "expired" | "revoked"
+      invoice_status: "draft" | "sent" | "paid" | "overdue" | "void"
       media_publishing_status:
         | "none"
         | "preparing"
@@ -1395,7 +1513,17 @@ export const Constants = {
         "archived",
       ],
       crm_sync_status: ["not_connected", "pending", "synced", "failed"],
+      delivery_kind: [
+        "photos",
+        "videos",
+        "reels",
+        "graphics",
+        "documents",
+        "link",
+        "other",
+      ],
       invite_status: ["pending", "accepted", "expired", "revoked"],
+      invoice_status: ["draft", "sent", "paid", "overdue", "void"],
       media_publishing_status: [
         "none",
         "preparing",
