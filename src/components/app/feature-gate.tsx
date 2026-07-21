@@ -18,14 +18,7 @@ interface FeatureGateProps {
   preview?: ReactNode;
 }
 
-export function FeatureGate({
-  feature,
-  children,
-  mode = "auto",
-  title,
-  description,
-  preview,
-}: FeatureGateProps) {
+export function FeatureGate({ feature, children, mode = "auto", title, description, preview }: FeatureGateProps) {
   const { can, visibility, isLoading } = usePermissions();
   if (isLoading) return null;
   if (can(feature)) return <>{children}</>;
@@ -51,11 +44,7 @@ export function LockedPreview({
 }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-surface/60 to-surface/20 p-6">
-      {children && (
-        <div className="pointer-events-none mb-6 select-none opacity-40 blur-[1.5px]">
-          {children}
-        </div>
-      )}
+      {children && <div className="pointer-events-none mb-6 select-none opacity-40 blur-[1.5px]">{children}</div>}
       <div className="relative flex flex-col items-start gap-3 rounded-xl border border-primary/20 bg-background/70 p-5 backdrop-blur-md">
         <div className="flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-primary">
           <Lock className="h-3.5 w-3.5" /> Preview
@@ -66,7 +55,7 @@ export function LockedPreview({
           type="button"
           className="mt-2 inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
           onClick={() => {
-            window.location.href = "mailto:hello@dreamwavemedia.com?subject=Upgrade%20my%20WaveOS%20access";
+            window.location.href = "mailto:dr3amwavemedia@outlook.com?subject=Upgrade%20my%20WaveOS%20access";
           }}
         >
           <Sparkles className="h-4 w-4" /> Learn about full access

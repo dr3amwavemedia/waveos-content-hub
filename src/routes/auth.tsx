@@ -64,9 +64,9 @@ function AuthPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
     if (error) {
-      toast.error(error.message === "Invalid login credentials"
-        ? "That email or password isn't right."
-        : error.message);
+      toast.error(
+        error.message === "Invalid login credentials" ? "That email or password isn't right." : error.message,
+      );
       return;
     }
     toast.success("Welcome back.");
@@ -141,14 +141,9 @@ function AuthPage() {
             </>
           )}
 
-          <form
-            onSubmit={mode === "signin" ? handleEmailSignIn : handleReset}
-            className="space-y-4"
-          >
+          <form onSubmit={mode === "signin" ? handleEmailSignIn : handleReset} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                Email
-              </label>
+              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Email</label>
               <input
                 type="email"
                 autoComplete="email"
@@ -163,9 +158,7 @@ function AuthPage() {
             {mode === "signin" && (
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Password
-                  </label>
+                  <label className="text-xs font-medium text-muted-foreground">Password</label>
                   <button
                     type="button"
                     onClick={() => setMode("reset")}
@@ -209,7 +202,7 @@ function AuthPage() {
           <p className="mt-6 text-center text-xs text-muted-foreground">
             WaveOS is invite-only. Need access?{" "}
             <a
-              href="mailto:hello@dreamwavemedia.com?subject=WaveOS%20access%20request"
+              href="mailto:dr3amwavemedia@outlook.com?subject=WaveOS%20access%20request"
               className="font-medium text-primary hover:text-primary-glow"
             >
               Contact Dream Wave Media
@@ -228,10 +221,22 @@ function AuthPage() {
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-      <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.4-1.6 4-5.5 4-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.7 3.4 14.6 2.4 12 2.4 6.7 2.4 2.4 6.7 2.4 12S6.7 21.6 12 21.6c6.9 0 9.5-4.8 9.5-7.3 0-.5-.1-.9-.1-1.3H12z"/>
-      <path fill="#34A853" d="M3.9 7.3l3.2 2.3c.9-2.1 3-3.7 5.4-3.7 1.5 0 2.7.5 3.6 1.4l2.7-2.6C17 3 14.7 2 12 2 8.1 2 4.7 4.2 3.1 7.4l.8-.1z"/>
-      <path fill="#FBBC05" d="M12 22c2.6 0 4.9-.9 6.5-2.4l-3-2.5c-.8.6-2 1-3.5 1-2.7 0-5-1.8-5.8-4.3l-3.1 2.4C4.7 19.7 8.1 22 12 22z"/>
-      <path fill="#4285F4" d="M21.5 12.3c0-.7-.1-1.3-.2-1.9H12v3.9h5.4c-.2 1.2-.9 2.1-1.9 2.8l3 2.4c1.8-1.6 2.9-4 2.9-7.2z"/>
+      <path
+        fill="#EA4335"
+        d="M12 10.2v3.9h5.5c-.2 1.4-1.6 4-5.5 4-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.7 3.4 14.6 2.4 12 2.4 6.7 2.4 2.4 6.7 2.4 12S6.7 21.6 12 21.6c6.9 0 9.5-4.8 9.5-7.3 0-.5-.1-.9-.1-1.3H12z"
+      />
+      <path
+        fill="#34A853"
+        d="M3.9 7.3l3.2 2.3c.9-2.1 3-3.7 5.4-3.7 1.5 0 2.7.5 3.6 1.4l2.7-2.6C17 3 14.7 2 12 2 8.1 2 4.7 4.2 3.1 7.4l.8-.1z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M12 22c2.6 0 4.9-.9 6.5-2.4l-3-2.5c-.8.6-2 1-3.5 1-2.7 0-5-1.8-5.8-4.3l-3.1 2.4C4.7 19.7 8.1 22 12 22z"
+      />
+      <path
+        fill="#4285F4"
+        d="M21.5 12.3c0-.7-.1-1.3-.2-1.9H12v3.9h5.4c-.2 1.2-.9 2.1-1.9 2.8l3 2.4c1.8-1.6 2.9-4 2.9-7.2z"
+      />
     </svg>
   );
 }

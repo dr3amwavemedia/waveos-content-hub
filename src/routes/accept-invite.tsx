@@ -16,10 +16,7 @@ export const Route = createFileRoute("/accept-invite")({
   component: AcceptInvitePage,
   ssr: false,
   head: () => ({
-    meta: [
-      { title: "Accept invite — WaveOS" },
-      { name: "robots", content: "noindex" },
-    ],
+    meta: [{ title: "Accept invite — WaveOS" }, { name: "robots", content: "noindex" }],
   }),
 });
 
@@ -132,18 +129,18 @@ function AcceptInvitePage() {
   }
 
   if (status === "loading")
-    return <Center><Loader2 className="h-6 w-6 animate-spin text-primary" /></Center>;
+    return (
+      <Center>
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </Center>
+    );
 
   if (status === "no-token" || status === "invalid" || status === "revoked" || status === "used") {
     return (
       <Frame>
         <ErrorPanel
           icon={ShieldAlert}
-          title={
-            status === "used"
-              ? "This invite has already been used"
-              : "This invite is no longer valid"
-          }
+          title={status === "used" ? "This invite has already been used" : "This invite is no longer valid"}
           body="It may have been used, revoked, or the link is incorrect. Contact Dream Wave Media for a new invite."
         />
       </Frame>
@@ -164,8 +161,7 @@ function AcceptInvitePage() {
   }
 
   const info = invite!;
-  const emailMatchesSession =
-    sessionUser && sessionUser.email.toLowerCase() === info.email.toLowerCase();
+  const emailMatchesSession = sessionUser && sessionUser.email.toLowerCase() === info.email.toLowerCase();
 
   return (
     <Frame>
@@ -195,10 +191,9 @@ function AcceptInvitePage() {
         ) : (
           <div className="space-y-3 text-center">
             <p className="text-sm text-muted-foreground">
-              You're signed in as{" "}
-              <span className="text-foreground">{sessionUser.email}</span>, but
-              this invite is for <span className="text-foreground">{info.email}</span>.
-              For security, invites can only be accepted by their intended recipient.
+              You're signed in as <span className="text-foreground">{sessionUser.email}</span>, but this invite is for{" "}
+              <span className="text-foreground">{info.email}</span>. For security, invites can only be accepted by their
+              intended recipient.
             </p>
             <button
               onClick={async () => {
@@ -221,9 +216,7 @@ function AcceptInvitePage() {
                 onClick={() => setMode(m)}
                 className={
                   "flex-1 py-2 font-medium " +
-                  (mode === m
-                    ? "bg-primary/15 text-foreground"
-                    : "text-muted-foreground hover:text-foreground")
+                  (mode === m ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground")
                 }
               >
                 {m === "signup" ? "Create account" : "Already have one"}
@@ -233,21 +226,38 @@ function AcceptInvitePage() {
 
           {mode === "signup" && (
             <div className="grid grid-cols-2 gap-2">
-              <input required value={firstName} onChange={(e) => setFirstName(e.target.value)}
-                placeholder="First name" className={inputCls} />
-              <input value={lastName} onChange={(e) => setLastName(e.target.value)}
-                placeholder="Last name" className={inputCls} />
+              <input
+                required
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="First name"
+                className={inputCls}
+              />
+              <input
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Last name"
+                className={inputCls}
+              />
             </div>
           )}
 
           <input readOnly value={info.email} className={inputCls + " opacity-70"} />
-          <input required type="password" value={password}
+          <input
+            required
+            type="password"
+            value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder={mode === "signup" ? "Choose a password" : "Password"}
-            className={inputCls} minLength={8} />
+            className={inputCls}
+            minLength={8}
+          />
 
-          <button type="submit" disabled={busy}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-60">
+          <button
+            type="submit"
+            disabled={busy}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-60"
+          >
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             {mode === "signup" ? "Create account & join" : "Sign in & join"}
           </button>
@@ -281,7 +291,7 @@ function ErrorPanel({
       <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
         {contact && (
           <a
-            href="mailto:hello@dreamwavemedia.co?subject=WaveOS%20invite%20request"
+            href="mailto:dr3amwavemedia@outlook.com?subject=WaveOS%20invite%20request"
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110"
           >
             Contact Dream Wave Media
@@ -304,7 +314,9 @@ function Frame({ children }: { children: React.ReactNode }) {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,color-mix(in_oklab,var(--color-primary)_18%,transparent),transparent_70%)]" />
       <div className="relative w-full max-w-md">
         <div className="mb-8 flex justify-center">
-          <Link to="/"><WaveLogo /></Link>
+          <Link to="/">
+            <WaveLogo />
+          </Link>
         </div>
         <div className="surface-card p-8">{children}</div>
         <p className="mt-6 text-center text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
@@ -316,17 +328,14 @@ function Frame({ children }: { children: React.ReactNode }) {
 }
 
 function Center({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center">{children}</div>
-  );
+  return <div className="flex min-h-screen items-center justify-center">{children}</div>;
 }
 
 function mapAcceptError(msg: string) {
   if (msg.includes("invite_expired")) return "This invite has expired.";
   if (msg.includes("invite_already_used")) return "This invite was already used.";
   if (msg.includes("invite_revoked")) return "This invite has been revoked.";
-  if (msg.includes("invite_email_mismatch"))
-    return "This invite is for a different email address.";
+  if (msg.includes("invite_email_mismatch")) return "This invite is for a different email address.";
   if (msg.includes("invite_not_found")) return "Invite not found.";
   if (msg.includes("not_authenticated")) return "Please sign in first.";
   return "Couldn't accept invite. Please try again.";
