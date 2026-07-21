@@ -34,7 +34,7 @@ const DREAM_WAVE_CONTACT = {
   name: "Dream Wave Media",
   role: "Your creative team",
   email: "dr3amwavemedia@outlook.com",
-  phone: null as string | null,
+  phone: (941 - 914 - 4711) as string | null,
 };
 
 const INVOICE_STATUS_LABEL: Record<Invoice["status"], string> = {
