@@ -8,7 +8,11 @@ import { useWorkspace } from "@/components/app/workspace-context";
 import { useContentItems } from "@/hooks/use-content";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
-  component: CalendarPage,
+  component: () => (
+    <RequireFeature feature="can_view_calendar_preview" title="Calendar isn't included in your plan">
+      <CalendarPage />
+    </RequireFeature>
+  ),
   head: () => ({ meta: [{ title: "Calendar — WaveOS" }, { name: "robots", content: "noindex" }] }),
 });
 

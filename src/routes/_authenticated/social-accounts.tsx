@@ -20,7 +20,11 @@ import {
 } from "@/lib/ayrshare.functions";
 
 export const Route = createFileRoute("/_authenticated/social-accounts")({
-  component: SocialAccountsPage,
+  component: () => (
+    <RequireFeature feature="can_connect_socials" title="Social publishing isn't included in your plan">
+      <SocialAccountsPage />
+    </RequireFeature>
+  ),
   head: () => ({
     meta: [{ title: "Social Accounts — WaveOS" }, { name: "robots", content: "noindex" }],
   }),

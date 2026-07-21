@@ -37,7 +37,11 @@ import {
 import { PenSquare } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/create")({
-  component: CreatePost,
+  component: () => (
+    <RequireFeature feature="can_create_content" title="Content creation isn't included in your plan">
+      <CreatePost />
+    </RequireFeature>
+  ),
   validateSearch: (s: Record<string, unknown>): { id?: string } =>
     typeof s.id === "string" ? { id: s.id } : {},
   head: () => ({ meta: [{ title: "Create Post — WaveOS" }, { name: "robots", content: "noindex" }] }),
