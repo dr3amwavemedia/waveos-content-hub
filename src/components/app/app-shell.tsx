@@ -144,6 +144,7 @@ function Shell({ children }: { children: ReactNode }) {
 
       {/* Main */}
       <main className="min-h-screen lg:pl-64">
+        <ImpersonationBanner />
         <div className="mx-auto max-w-7xl px-4 pb-24 pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">{children}</div>
       </main>
 
