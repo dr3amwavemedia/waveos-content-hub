@@ -29,6 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { WorkspaceProvider, useWorkspace } from "./workspace-context";
+import { ImpersonationBanner } from "./impersonation-banner";
 
 interface NavItem {
   to: string;
