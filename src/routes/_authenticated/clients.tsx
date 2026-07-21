@@ -636,7 +636,8 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
-  const canSubmit = title.trim().length > 0 && /^https?:\/\//.test(url.trim());
+  const urlValid = isValidHttpsUrl(url);
+  const canSubmit = title.trim().length > 0 && urlValid;
 
   return (
     <form
