@@ -896,11 +896,23 @@ export type Database = {
       }
       workspaces: {
         Row: {
+          access_expires_at: string | null
+          access_starts_at: string | null
+          access_tier: Database["public"]["Enums"]["client_access_tier"]
           account_manager_id: string | null
+          account_status: Database["public"]["Enums"]["account_status"]
+          activated_at: string | null
+          admin_notes: string | null
+          agreement_term: Database["public"]["Enums"]["agreement_term"] | null
           created_at: string
           created_by: string | null
+          crm_external_id: string | null
+          crm_last_sync_at: string | null
+          crm_sync_status: Database["public"]["Enums"]["crm_sync_status"]
+          feature_overrides: Json
           id: string
           industry: string | null
+          invited_at: string | null
           is_archived: boolean
           is_demo: boolean
           last_activity_at: string | null
@@ -915,11 +927,23 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          access_expires_at?: string | null
+          access_starts_at?: string | null
+          access_tier?: Database["public"]["Enums"]["client_access_tier"]
           account_manager_id?: string | null
+          account_status?: Database["public"]["Enums"]["account_status"]
+          activated_at?: string | null
+          admin_notes?: string | null
+          agreement_term?: Database["public"]["Enums"]["agreement_term"] | null
           created_at?: string
           created_by?: string | null
+          crm_external_id?: string | null
+          crm_last_sync_at?: string | null
+          crm_sync_status?: Database["public"]["Enums"]["crm_sync_status"]
+          feature_overrides?: Json
           id?: string
           industry?: string | null
+          invited_at?: string | null
           is_archived?: boolean
           is_demo?: boolean
           last_activity_at?: string | null
@@ -934,11 +958,23 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          access_expires_at?: string | null
+          access_starts_at?: string | null
+          access_tier?: Database["public"]["Enums"]["client_access_tier"]
           account_manager_id?: string | null
+          account_status?: Database["public"]["Enums"]["account_status"]
+          activated_at?: string | null
+          admin_notes?: string | null
+          agreement_term?: Database["public"]["Enums"]["agreement_term"] | null
           created_at?: string
           created_by?: string | null
+          crm_external_id?: string | null
+          crm_last_sync_at?: string | null
+          crm_sync_status?: Database["public"]["Enums"]["crm_sync_status"]
+          feature_overrides?: Json
           id?: string
           industry?: string | null
+          invited_at?: string | null
           is_archived?: boolean
           is_demo?: boolean
           last_activity_at?: string | null
@@ -1083,6 +1119,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      has_feature: {
+        Args: { _feature: string; _workspace_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1125,6 +1165,13 @@ export type Database = {
       }
     }
     Enums: {
+      account_status:
+        | "pending"
+        | "active"
+        | "suspended"
+        | "expired"
+        | "archived"
+      agreement_term: "one_time" | "90_day" | "6_month" | "12_month"
       app_role:
         | "dream_wave_owner"
         | "dream_wave_team"
@@ -1136,6 +1183,7 @@ export type Database = {
         | "approved"
         | "changes_requested"
         | "rejected"
+      client_access_tier: "project_client" | "growth_90" | "retainer_full"
       content_status:
         | "draft"
         | "in_review"
@@ -1146,6 +1194,7 @@ export type Database = {
         | "published"
         | "failed"
         | "archived"
+      crm_sync_status: "not_connected" | "pending" | "synced" | "failed"
       invite_status: "pending" | "accepted" | "expired" | "revoked"
       media_publishing_status:
         | "none"
@@ -1318,6 +1367,8 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      account_status: ["pending", "active", "suspended", "expired", "archived"],
+      agreement_term: ["one_time", "90_day", "6_month", "12_month"],
       app_role: [
         "dream_wave_owner",
         "dream_wave_team",
@@ -1331,6 +1382,7 @@ export const Constants = {
         "changes_requested",
         "rejected",
       ],
+      client_access_tier: ["project_client", "growth_90", "retainer_full"],
       content_status: [
         "draft",
         "in_review",
@@ -1342,6 +1394,7 @@ export const Constants = {
         "failed",
         "archived",
       ],
+      crm_sync_status: ["not_connected", "pending", "synced", "failed"],
       invite_status: ["pending", "accepted", "expired", "revoked"],
       media_publishing_status: [
         "none",
