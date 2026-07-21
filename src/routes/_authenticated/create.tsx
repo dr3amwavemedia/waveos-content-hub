@@ -1,3 +1,4 @@
+import { RequireFeature } from "@/components/app/require-feature";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -37,10 +38,13 @@ import {
 import { PenSquare } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/create")({
-  component: CreatePost,
-  validateSearch: (s: Record<string, unknown>) => ({
-    id: typeof s.id === "string" ? s.id : undefined,
-  }),
+  component: () => (
+    <RequireFeature feature="can_create_content" title="Content creation isn't included in your plan">
+      <CreatePost />
+    </RequireFeature>
+  ),
+  validateSearch: (s: Record<string, unknown>): { id?: string } =>
+    typeof s.id === "string" ? { id: s.id } : {},
   head: () => ({ meta: [{ title: "Create Post — WaveOS" }, { name: "robots", content: "noindex" }] }),
 });
 

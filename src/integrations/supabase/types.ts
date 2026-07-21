@@ -971,6 +971,35 @@ export type Database = {
           },
         ]
       }
+      workspace_internal_notes: {
+        Row: {
+          notes: string
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          notes?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          notes?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_internal_notes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_members: {
         Row: {
           created_at: string
@@ -1011,7 +1040,6 @@ export type Database = {
           account_manager_id: string | null
           account_status: Database["public"]["Enums"]["account_status"]
           activated_at: string | null
-          admin_notes: string | null
           agreement_term: Database["public"]["Enums"]["agreement_term"] | null
           created_at: string
           created_by: string | null
@@ -1042,7 +1070,6 @@ export type Database = {
           account_manager_id?: string | null
           account_status?: Database["public"]["Enums"]["account_status"]
           activated_at?: string | null
-          admin_notes?: string | null
           agreement_term?: Database["public"]["Enums"]["agreement_term"] | null
           created_at?: string
           created_by?: string | null
@@ -1073,7 +1100,6 @@ export type Database = {
           account_manager_id?: string | null
           account_status?: Database["public"]["Enums"]["account_status"]
           activated_at?: string | null
-          admin_notes?: string | null
           agreement_term?: Database["public"]["Enums"]["agreement_term"] | null
           created_at?: string
           created_by?: string | null

@@ -1,3 +1,4 @@
+import { RequireFeature } from "@/components/app/require-feature";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
 import { Folder, FolderPlus, Images, Loader2, Search, Tag, Trash2, Upload, Video, X } from "lucide-react";
@@ -18,7 +19,11 @@ import {
 } from "@/hooks/use-media";
 
 export const Route = createFileRoute("/_authenticated/content")({
-  component: ContentLibrary,
+  component: () => (
+    <RequireFeature feature="can_view_media_library" title="Content library isn't included in your plan">
+      <ContentLibrary />
+    </RequireFeature>
+  ),
   head: () => ({ meta: [{ title: "Content — WaveOS" }] }),
 });
 

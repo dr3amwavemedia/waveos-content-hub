@@ -31,22 +31,28 @@ import { useCurrentUser } from "@/hooks/use-waveos";
 import { WorkspaceProvider, useWorkspace } from "./workspace-context";
 import { ImpersonationBanner } from "./impersonation-banner";
 
+import type { FeatureKey } from "@/lib/permissions";
+import { usePermissions } from "@/hooks/use-permissions";
+
 interface NavItem {
   to: string;
   label: string;
   icon: typeof Home;
   staffOnly?: boolean;
+  // When set, the nav item is only shown if the active workspace can access
+  // this feature. Undefined = universal (always shown to any workspace member).
+  feature?: FeatureKey;
 }
 
 const CLIENT_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
-  { to: "/content", label: "Content", icon: Images },
-  { to: "/calendar", label: "Calendar", icon: Calendar },
-  { to: "/create", label: "Create Post", icon: PenSquare },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/social-accounts", label: "Social Accounts", icon: Share2 },
-  { to: "/brand-voice", label: "Brand Voice", icon: Sparkles },
-  { to: "/feedback", label: "Feedback", icon: MessageSquare },
+  { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
+  { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
+  { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
+  { to: "/analytics", label: "Analytics", icon: BarChart3, feature: "can_view_analytics" },
+  { to: "/social-accounts", label: "Social Accounts", icon: Share2, feature: "can_connect_socials" },
+  { to: "/brand-voice", label: "Brand Voice", icon: Sparkles, feature: "can_manage_brand_voice" },
+  { to: "/feedback", label: "Feedback", icon: MessageSquare, feature: "can_contact_support" },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -58,9 +64,9 @@ const STAFF_NAV: NavItem[] = [
 
 const MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
-  { to: "/calendar", label: "Calendar", icon: Calendar },
-  { to: "/create", label: "Create", icon: PenSquare },
-  { to: "/content", label: "Content", icon: Images },
+  { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
+  { to: "/create", label: "Create", icon: PenSquare, feature: "can_create_content" },
+  { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
   { to: "/settings", label: "More", icon: Settings },
 ];
 
@@ -74,10 +80,22 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function Shell({ children }: { children: ReactNode }) {
   const { data: user } = useCurrentUser();
+  const { can, isLoading: permsLoading } = usePermissions();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const nav = [...CLIENT_NAV];
-  if (user?.isStaff) nav.push(...STAFF_NAV);
+  const filterByFeature = (items: NavItem[]) =>
+    items.filter((i) => {
+      if (i.staffOnly) return !!user?.isStaff;
+      if (!i.feature) return true;
+      // While perms load, hide gated items to avoid a flash of forbidden nav.
+      if (permsLoading) return false;
+      return can(i.feature);
+    });
+
+  const clientNav = filterByFeature(CLIENT_NAV);
+  const staffNav = user?.isStaff ? STAFF_NAV : [];
+  const mobileNav = filterByFeature(MOBILE_NAV);
+  const nav = [...clientNav, ...staffNav];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -88,13 +106,13 @@ function Shell({ children }: { children: ReactNode }) {
         </div>
         <WorkspaceSwitcher />
         <nav className="mt-2 flex-1 overflow-y-auto px-3 pb-6">
-          <NavGroup items={CLIENT_NAV} />
+          <NavGroup items={clientNav} />
           {user?.isStaff && (
             <>
               <div className="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Dream Wave Media
               </div>
-              <NavGroup items={STAFF_NAV} />
+              <NavGroup items={staffNav} />
             </>
           )}
         </nav>
@@ -150,7 +168,7 @@ function Shell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-surface/95 px-2 py-2 backdrop-blur lg:hidden">
-        {MOBILE_NAV.map((item) => (
+        {mobileNav.map((item) => (
           <MobileNavLink key={item.to} item={item} />
         ))}
       </nav>

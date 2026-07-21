@@ -1,3 +1,4 @@
+import { RequireFeature } from "@/components/app/require-feature";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
@@ -9,7 +10,11 @@ import { useWorkspace } from "@/components/app/workspace-context";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/brand-voice")({
-  component: BrandVoicePage,
+  component: () => (
+    <RequireFeature feature="can_manage_brand_voice" title="Brand voice isn't included in your plan">
+      <BrandVoicePage />
+    </RequireFeature>
+  ),
   head: () => ({ meta: [{ title: "Brand voice — WaveOS" }] }),
 });
 

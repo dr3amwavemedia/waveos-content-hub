@@ -1,6 +1,6 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Archive,
   Check,
@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/app/empty-state";
 import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { cn } from "@/lib/utils";
+import { isValidHttpsUrl, URL_VALIDATION_MESSAGE } from "@/lib/url-validation";
 import type { Database } from "@/integrations/supabase/types";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
@@ -62,7 +63,7 @@ interface ClientWorkspace {
   agreement_term: AgreementTerm | null;
   access_starts_at: string | null;
   access_expires_at: string | null;
-  admin_notes: string | null;
+  
   feature_overrides: Record<string, boolean>;
   last_activity_at: string | null;
   created_at: string;
@@ -99,7 +100,7 @@ function ClientsPage() {
       const { data: ws, error } = await supabase
         .from("workspaces")
         .select(
-          "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,admin_notes,feature_overrides,last_activity_at,created_at",
+          "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -381,7 +382,22 @@ function AccessTab({
   const [expiresAt, setExpiresAt] = useState(
     workspace.access_expires_at ? workspace.access_expires_at.slice(0, 10) : "",
   );
-  const [notes, setNotes] = useState(workspace.admin_notes ?? "");
+  const notesQ = useQuery({
+    queryKey: ["workspace-internal-notes", workspace.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("workspace_internal_notes")
+        .select("notes")
+        .eq("workspace_id", workspace.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.notes ?? "";
+    },
+  });
+  const [notes, setNotes] = useState("");
+  useEffect(() => {
+    if (notesQ.data !== undefined) setNotes(notesQ.data);
+  }, [notesQ.data]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -393,10 +409,18 @@ function AccessTab({
           agreement_term: term || null,
           access_starts_at: startsAt ? new Date(startsAt).toISOString() : null,
           access_expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-          admin_notes: notes.trim() || null,
         })
         .eq("id", workspace.id);
       if (error) throw error;
+      const { data: auth } = await supabase.auth.getUser();
+      const { error: nerr } = await supabase
+        .from("workspace_internal_notes")
+        .upsert({
+          workspace_id: workspace.id,
+          notes: notes.trim(),
+          updated_by: auth.user?.id ?? null,
+        });
+      if (nerr) throw nerr;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients", "workspaces"] });
@@ -593,16 +617,23 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
 
   const create = useMutation({
     mutationFn: async () => {
+      const trimmed = url.trim();
+      if (!isValidHttpsUrl(trimmed)) throw new Error(URL_VALIDATION_MESSAGE);
       const { data: auth } = await supabase.auth.getUser();
       const { error } = await supabase.from("client_deliveries").insert({
         workspace_id: workspaceId,
         title: title.trim(),
-        url: url.trim(),
+        url: trimmed,
         description: description.trim() || null,
         kind,
         created_by: auth.user?.id ?? null,
       });
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes("client_deliveries_url_https")) {
+          throw new Error(URL_VALIDATION_MESSAGE);
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["client-deliveries", workspaceId] });
@@ -612,7 +643,8 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
-  const canSubmit = title.trim().length > 0 && /^https?:\/\//.test(url.trim());
+  const urlValid = isValidHttpsUrl(url);
+  const canSubmit = title.trim().length > 0 && urlValid;
 
   return (
     <form
@@ -633,6 +665,9 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
       </div>
       <Field label="URL">
         <input required type="url" value={url} onChange={(e) => setUrl(e.target.value)} className={inputCls} placeholder="https://drive.google.com/…" />
+        {url.trim() && !urlValid && (
+          <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
+        )}
       </Field>
       <Field label="Description (optional)">
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className={inputCls} />
@@ -765,6 +800,10 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
 
   const create = useMutation({
     mutationFn: async () => {
+      const trimmedUrl = hostedUrl.trim();
+      if (trimmedUrl && !isValidHttpsUrl(trimmedUrl)) {
+        throw new Error(URL_VALIDATION_MESSAGE);
+      }
       const { data: auth } = await supabase.auth.getUser();
       const cents = amount ? Math.round(parseFloat(amount) * 100) : null;
       const { error } = await supabase.from("client_invoices").insert({
@@ -774,12 +813,17 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
         amount_cents: cents,
         currency: currency.trim().toUpperCase().slice(0, 3),
         status,
-        hosted_url: hostedUrl.trim() || null,
+        hosted_url: trimmedUrl || null,
         due_at: dueAt ? new Date(dueAt).toISOString() : null,
         paid_at: status === "paid" ? new Date().toISOString() : null,
         created_by: auth.user?.id ?? null,
       });
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes("client_invoices_hosted_url_https")) {
+          throw new Error(URL_VALIDATION_MESSAGE);
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] });
@@ -789,9 +833,11 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
+  const hostedUrlValid = !hostedUrl.trim() || isValidHttpsUrl(hostedUrl);
+
   return (
     <form
-      onSubmit={(e) => { e.preventDefault(); create.mutate(); }}
+      onSubmit={(e) => { e.preventDefault(); if (hostedUrlValid) create.mutate(); }}
       className="space-y-3 rounded-lg border border-dashed border-border bg-surface/40 p-3"
     >
       <div className="grid gap-3 sm:grid-cols-3">
@@ -809,11 +855,16 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
           </select>
         </Field>
         <Field label="Due"><input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className={inputCls} /></Field>
-        <Field label="Hosted URL"><input type="url" value={hostedUrl} onChange={(e) => setHostedUrl(e.target.value)} className={inputCls} placeholder="https://…" /></Field>
+        <Field label="Hosted URL">
+          <input type="url" value={hostedUrl} onChange={(e) => setHostedUrl(e.target.value)} className={inputCls} placeholder="https://…" />
+          {!hostedUrlValid && (
+            <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
+          )}
+        </Field>
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onDone} className="rounded-lg border border-border bg-surface/60 px-3 py-1.5 text-xs text-foreground hover:bg-elevated">Cancel</button>
-        <button type="submit" disabled={create.isPending} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">
+        <button type="submit" disabled={!hostedUrlValid || create.isPending} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">
           {create.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Save
         </button>

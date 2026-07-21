@@ -1,3 +1,4 @@
+import { RequireFeature } from "@/components/app/require-feature";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, PenSquare } from "lucide-react";
@@ -8,7 +9,11 @@ import { useWorkspace } from "@/components/app/workspace-context";
 import { useContentItems } from "@/hooks/use-content";
 
 export const Route = createFileRoute("/_authenticated/calendar")({
-  component: CalendarPage,
+  component: () => (
+    <RequireFeature feature="can_view_calendar_preview" title="Calendar isn't included in your plan">
+      <CalendarPage />
+    </RequireFeature>
+  ),
   head: () => ({ meta: [{ title: "Calendar — WaveOS" }, { name: "robots", content: "noindex" }] }),
 });
 
