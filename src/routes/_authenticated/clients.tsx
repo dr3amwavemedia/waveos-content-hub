@@ -99,7 +99,7 @@ function ClientsPage() {
       const { data: ws, error } = await supabase
         .from("workspaces")
         .select(
-          "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,admin_notes,feature_overrides,last_activity_at,created_at",
+          "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
