@@ -381,7 +381,22 @@ function AccessTab({
   const [expiresAt, setExpiresAt] = useState(
     workspace.access_expires_at ? workspace.access_expires_at.slice(0, 10) : "",
   );
-  const [notes, setNotes] = useState(workspace.admin_notes ?? "");
+  const notesQ = useQuery({
+    queryKey: ["workspace-internal-notes", workspace.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("workspace_internal_notes")
+        .select("notes")
+        .eq("workspace_id", workspace.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.notes ?? "";
+    },
+  });
+  const [notes, setNotes] = useState("");
+  useEffect(() => {
+    if (notesQ.data !== undefined) setNotes(notesQ.data);
+  }, [notesQ.data]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -393,10 +408,18 @@ function AccessTab({
           agreement_term: term || null,
           access_starts_at: startsAt ? new Date(startsAt).toISOString() : null,
           access_expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-          admin_notes: notes.trim() || null,
         })
         .eq("id", workspace.id);
       if (error) throw error;
+      const { data: auth } = await supabase.auth.getUser();
+      const { error: nerr } = await supabase
+        .from("workspace_internal_notes")
+        .upsert({
+          workspace_id: workspace.id,
+          notes: notes.trim(),
+          updated_by: auth.user?.id ?? null,
+        });
+      if (nerr) throw nerr;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients", "workspaces"] });
