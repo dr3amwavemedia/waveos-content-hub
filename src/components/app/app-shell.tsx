@@ -31,22 +31,28 @@ import { useCurrentUser } from "@/hooks/use-waveos";
 import { WorkspaceProvider, useWorkspace } from "./workspace-context";
 import { ImpersonationBanner } from "./impersonation-banner";
 
+import type { FeatureKey } from "@/lib/permissions";
+import { usePermissions } from "@/hooks/use-permissions";
+
 interface NavItem {
   to: string;
   label: string;
   icon: typeof Home;
   staffOnly?: boolean;
+  // When set, the nav item is only shown if the active workspace can access
+  // this feature. Undefined = universal (always shown to any workspace member).
+  feature?: FeatureKey;
 }
 
 const CLIENT_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
-  { to: "/content", label: "Content", icon: Images },
-  { to: "/calendar", label: "Calendar", icon: Calendar },
-  { to: "/create", label: "Create Post", icon: PenSquare },
-  { to: "/analytics", label: "Analytics", icon: BarChart3 },
-  { to: "/social-accounts", label: "Social Accounts", icon: Share2 },
-  { to: "/brand-voice", label: "Brand Voice", icon: Sparkles },
-  { to: "/feedback", label: "Feedback", icon: MessageSquare },
+  { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
+  { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
+  { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
+  { to: "/analytics", label: "Analytics", icon: BarChart3, feature: "can_view_analytics" },
+  { to: "/social-accounts", label: "Social Accounts", icon: Share2, feature: "can_connect_socials" },
+  { to: "/brand-voice", label: "Brand Voice", icon: Sparkles, feature: "can_manage_brand_voice" },
+  { to: "/feedback", label: "Feedback", icon: MessageSquare, feature: "can_contact_support" },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -58,9 +64,9 @@ const STAFF_NAV: NavItem[] = [
 
 const MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
-  { to: "/calendar", label: "Calendar", icon: Calendar },
-  { to: "/create", label: "Create", icon: PenSquare },
-  { to: "/content", label: "Content", icon: Images },
+  { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
+  { to: "/create", label: "Create", icon: PenSquare, feature: "can_create_content" },
+  { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
   { to: "/settings", label: "More", icon: Settings },
 ];
 
