@@ -793,6 +793,10 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
 
   const create = useMutation({
     mutationFn: async () => {
+      const trimmedUrl = hostedUrl.trim();
+      if (trimmedUrl && !isValidHttpsUrl(trimmedUrl)) {
+        throw new Error(URL_VALIDATION_MESSAGE);
+      }
       const { data: auth } = await supabase.auth.getUser();
       const cents = amount ? Math.round(parseFloat(amount) * 100) : null;
       const { error } = await supabase.from("client_invoices").insert({
@@ -802,12 +806,17 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
         amount_cents: cents,
         currency: currency.trim().toUpperCase().slice(0, 3),
         status,
-        hosted_url: hostedUrl.trim() || null,
+        hosted_url: trimmedUrl || null,
         due_at: dueAt ? new Date(dueAt).toISOString() : null,
         paid_at: status === "paid" ? new Date().toISOString() : null,
         created_by: auth.user?.id ?? null,
       });
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes("client_invoices_hosted_url_https")) {
+          throw new Error(URL_VALIDATION_MESSAGE);
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] });
@@ -817,9 +826,11 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
+  const hostedUrlValid = !hostedUrl.trim() || isValidHttpsUrl(hostedUrl);
+
   return (
     <form
-      onSubmit={(e) => { e.preventDefault(); create.mutate(); }}
+      onSubmit={(e) => { e.preventDefault(); if (hostedUrlValid) create.mutate(); }}
       className="space-y-3 rounded-lg border border-dashed border-border bg-surface/40 p-3"
     >
       <div className="grid gap-3 sm:grid-cols-3">
@@ -837,11 +848,16 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
           </select>
         </Field>
         <Field label="Due"><input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} className={inputCls} /></Field>
-        <Field label="Hosted URL"><input type="url" value={hostedUrl} onChange={(e) => setHostedUrl(e.target.value)} className={inputCls} placeholder="https://…" /></Field>
+        <Field label="Hosted URL">
+          <input type="url" value={hostedUrl} onChange={(e) => setHostedUrl(e.target.value)} className={inputCls} placeholder="https://…" />
+          {!hostedUrlValid && (
+            <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
+          )}
+        </Field>
       </div>
       <div className="flex justify-end gap-2">
         <button type="button" onClick={onDone} className="rounded-lg border border-border bg-surface/60 px-3 py-1.5 text-xs text-foreground hover:bg-elevated">Cancel</button>
-        <button type="submit" disabled={create.isPending} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">
+        <button type="submit" disabled={!hostedUrlValid || create.isPending} className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60">
           {create.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
           Save
         </button>
