@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { useCurrentUser } from "@/hooks/use-waveos";
+import { useImpersonateClient } from "@/hooks/use-impersonation";
 import {
   hasFeature,
   featureVisibility,
@@ -63,10 +64,22 @@ export function usePermissions(): WorkspacePermissions {
     },
   });
 
+  const impersonate = useImpersonateClient();
+
   return useMemo<WorkspacePermissions>(() => {
     const isStaff = !!user?.isStaff;
-    // Staff always get full access to any workspace they open.
-    if (isStaff) {
+    const clientAccess: WorkspaceAccess | null = data
+      ? {
+          tier: data.access_tier,
+          status: data.account_status,
+          expiresAt: data.access_expires_at,
+          overrides: (data.feature_overrides ?? {}) as WorkspaceAccess["overrides"],
+        }
+      : null;
+
+    // Staff normally get full access; when "View as Client" is on, they get the
+    // exact same access as the actual client of this workspace would.
+    if (isStaff && !impersonate.on) {
       return {
         access: STAFF_ACCESS,
         raw: data ?? null,
@@ -77,22 +90,13 @@ export function usePermissions(): WorkspacePermissions {
       };
     }
 
-    const access: WorkspaceAccess | null = data
-      ? {
-          tier: data.access_tier,
-          status: data.account_status,
-          expiresAt: data.access_expires_at,
-          overrides: (data.feature_overrides ?? {}) as WorkspaceAccess["overrides"],
-        }
-      : null;
-
     return {
-      access,
+      access: clientAccess,
       raw: data ?? null,
       isLoading,
       isStaff,
-      can: (f) => (access ? hasFeature(access, f) : false),
-      visibility: (f) => (access ? featureVisibility(access, f) : "hidden"),
+      can: (f) => (clientAccess ? hasFeature(clientAccess, f) : false),
+      visibility: (f) => (clientAccess ? featureVisibility(clientAccess, f) : "hidden"),
     };
-  }, [data, isLoading, user?.isStaff]);
+  }, [data, isLoading, user?.isStaff, impersonate.on]);
 }
