@@ -39,16 +39,25 @@ function AuthPage() {
   // Redirect signed-in users to the intended destination (or /home).
   useEffect(() => {
     let cancelled = false;
+    const resolveNext = () => {
+      const stashed =
+        typeof window !== "undefined" ? sessionStorage.getItem("waveos.postAuthNext") : null;
+      const target = safeNext(stashed ?? nextPath);
+      if (stashed) sessionStorage.removeItem("waveos.postAuthNext");
+      return target;
+    };
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (!cancelled && data.session) {
-        if (nextPath.startsWith("/")) window.location.replace(nextPath);
+        const target = resolveNext();
+        if (target !== "/home") window.location.replace(target);
         else navigate({ to: "/home", replace: true });
       }
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
-        if (nextPath !== "/home") window.location.replace(nextPath);
+        const target = resolveNext();
+        if (target !== "/home") window.location.replace(target);
         else navigate({ to: "/home", replace: true });
       }
     });
@@ -57,6 +66,7 @@ function AuthPage() {
       sub.subscription.unsubscribe();
     };
   }, [navigate, nextPath]);
+
 
   async function handleEmailSignIn(e: React.FormEvent) {
     e.preventDefault();
