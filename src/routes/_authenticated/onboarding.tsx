@@ -1,16 +1,17 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, Check, Loader2, Sparkles, Upload, Users2 } from "lucide-react";
+import { ArrowRight, Check, Loader2, Sparkles, Upload, Users2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/components/app/workspace-context";
+import { useCurrentUser } from "@/hooks/use-waveos";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   component: OnboardingPage,
-  head: () => ({ meta: [{ title: "Welcome to WaveOS" }] }),
+  head: () => ({ meta: [{ title: "New Client Workspace — WaveOS" }] }),
 });
 
 type Step = "welcome" | "details" | "done";
