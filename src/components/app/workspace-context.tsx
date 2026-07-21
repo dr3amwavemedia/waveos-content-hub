@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { useWorkspaces, type WorkspaceSummary } from "@/hooks/use-waveos";
 
 const STORAGE_KEY = "waveos.active-workspace";
