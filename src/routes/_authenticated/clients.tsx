@@ -617,16 +617,23 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
 
   const create = useMutation({
     mutationFn: async () => {
+      const trimmed = url.trim();
+      if (!isValidHttpsUrl(trimmed)) throw new Error(URL_VALIDATION_MESSAGE);
       const { data: auth } = await supabase.auth.getUser();
       const { error } = await supabase.from("client_deliveries").insert({
         workspace_id: workspaceId,
         title: title.trim(),
-        url: url.trim(),
+        url: trimmed,
         description: description.trim() || null,
         kind,
         created_by: auth.user?.id ?? null,
       });
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes("client_deliveries_url_https")) {
+          throw new Error(URL_VALIDATION_MESSAGE);
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["client-deliveries", workspaceId] });
