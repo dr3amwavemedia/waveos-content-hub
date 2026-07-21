@@ -33,7 +33,7 @@ type DeliveryKind = Database["public"]["Enums"]["delivery_kind"];
 const DREAM_WAVE_CONTACT = {
   name: "Dream Wave Media",
   role: "Your creative team",
-  email: "hello@dreamwavemedia.com",
+  email: "hello@dreamwavemedia.co",
   phone: null as string | null,
 };
 
