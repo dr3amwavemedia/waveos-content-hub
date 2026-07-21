@@ -70,6 +70,25 @@ const MOBILE_NAV: NavItem[] = [
   { to: "/settings", label: "More", icon: Settings },
 ];
 
+// Layer 1 (project_client) client-facing nav. All entries reuse existing
+// routes — no new routes are created. "Your Content" and "Invoices & Payments"
+// scroll to the corresponding section of the Overview.
+const LAYER1_NAV: NavItem[] = [
+  { to: "/home", label: "Overview", icon: Home },
+  { to: "/home#your-content", label: "Your Content", icon: Images },
+  { to: "/home#invoices", label: "Invoices & Payments", icon: FileText },
+  { to: "/settings", label: "Your Information", icon: User },
+  { to: "/feedback", label: "Contact Dream Wave", icon: MessageSquare },
+];
+
+const LAYER1_MOBILE_NAV: NavItem[] = [
+  { to: "/home", label: "Overview", icon: Home },
+  { to: "/home#your-content", label: "Content", icon: Images },
+  { to: "/home#invoices", label: "Invoices", icon: FileText },
+  { to: "/settings", label: "Info", icon: User },
+  { to: "/feedback", label: "Contact", icon: MessageSquare },
+];
+
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <WorkspaceProvider>
