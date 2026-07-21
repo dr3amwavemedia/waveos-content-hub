@@ -212,22 +212,34 @@ function MobileNavLink({ item }: { item: NavItem }) {
 
 function WorkspaceSwitcher() {
   const { workspaces, activeWorkspace, setActiveWorkspaceId } = useWorkspace();
+  const { data: user } = useCurrentUser();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
   if (!workspaces.length) {
+    if (user?.isStaff) {
+      return (
+        <div className="mx-3 mt-2">
+          <button
+            onClick={() => navigate({ to: "/onboarding" })}
+            className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border bg-surface/60 p-3 text-left text-sm text-foreground transition-colors hover:bg-elevated"
+          >
+            <Plus className="h-4 w-4 text-primary" />
+            <span className="flex-1">
+              <span className="block font-medium">New client workspace</span>
+              <span className="block text-[11px] text-muted-foreground">
+                Provision a Dream Wave Media client
+              </span>
+            </span>
+          </button>
+        </div>
+      );
+    }
     return (
-      <div className="mx-3 mt-2">
-        <button
-          onClick={() => navigate({ to: "/onboarding" })}
-          className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border bg-surface/60 p-3 text-left text-sm text-foreground transition-colors hover:bg-elevated"
-        >
-          <Plus className="h-4 w-4 text-primary" />
-          <span className="flex-1">
-            <span className="block font-medium">Create workspace</span>
-            <span className="block text-[11px] text-muted-foreground">Start your own Brand Workspace</span>
-          </span>
-        </button>
+      <div className="mx-3 mt-2 rounded-xl border border-border bg-surface/60 p-3 text-xs text-muted-foreground">
+        <div className="mb-1 font-medium text-foreground">No workspace yet</div>
+        WaveOS is invite-only. Your Dream Wave Media account manager will send
+        your activation link.
       </div>
     );
   }
