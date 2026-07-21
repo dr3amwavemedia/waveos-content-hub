@@ -11,11 +11,25 @@ import { useWorkspace } from "@/components/app/workspace-context";
 import { Section } from "@/components/app/section";
 import { EmptyState } from "@/components/app/empty-state";
 import { StatCard } from "@/components/app/stat-card";
+import { usePermissions } from "@/hooks/use-permissions";
+import { Layer1Overview } from "@/components/app/layer1-overview";
 
 export const Route = createFileRoute("/_authenticated/home")({
-  component: HomeDashboard,
+  component: HomeRoute,
   head: () => ({ meta: [{ title: "Home — WaveOS" }] }),
 });
+
+function HomeRoute() {
+  const { access, isStaff, isLoading } = usePermissions();
+  // Layer 1 project_client gets the premium client-facing overview.
+  // Staff, Layer 2 (growth_90), and Layer 3 (retainer_full) keep the
+  // existing growth dashboard unchanged.
+  if (!isStaff && !isLoading && access?.tier === "project_client") {
+    return <Layer1Overview />;
+  }
+  return <HomeDashboard />;
+}
+
 
 function HomeDashboard() {
   const { data: user } = useCurrentUser();

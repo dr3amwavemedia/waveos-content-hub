@@ -20,6 +20,8 @@ import {
   X,
   Check,
   Plus,
+  FileText,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
@@ -70,6 +72,25 @@ const MOBILE_NAV: NavItem[] = [
   { to: "/settings", label: "More", icon: Settings },
 ];
 
+// Layer 1 (project_client) client-facing nav. All entries reuse existing
+// routes — no new routes are created. "Your Content" and "Invoices & Payments"
+// scroll to the corresponding section of the Overview.
+const LAYER1_NAV: NavItem[] = [
+  { to: "/home", label: "Overview", icon: Home },
+  { to: "/home#your-content", label: "Your Content", icon: Images },
+  { to: "/home#invoices", label: "Invoices & Payments", icon: FileText },
+  { to: "/settings", label: "Your Information", icon: User },
+  { to: "/feedback", label: "Contact Dream Wave", icon: MessageSquare },
+];
+
+const LAYER1_MOBILE_NAV: NavItem[] = [
+  { to: "/home", label: "Overview", icon: Home },
+  { to: "/home#your-content", label: "Content", icon: Images },
+  { to: "/home#invoices", label: "Invoices", icon: FileText },
+  { to: "/settings", label: "Info", icon: User },
+  { to: "/feedback", label: "Contact", icon: MessageSquare },
+];
+
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <WorkspaceProvider>
@@ -80,21 +101,24 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function Shell({ children }: { children: ReactNode }) {
   const { data: user } = useCurrentUser();
-  const { can, isLoading: permsLoading } = usePermissions();
+  const { can, isLoading: permsLoading, access, isStaff } = usePermissions();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const filterByFeature = (items: NavItem[]) =>
     items.filter((i) => {
       if (i.staffOnly) return !!user?.isStaff;
       if (!i.feature) return true;
-      // While perms load, hide gated items to avoid a flash of forbidden nav.
       if (permsLoading) return false;
       return can(i.feature);
     });
 
-  const clientNav = filterByFeature(CLIENT_NAV);
+  // Layer 1 (project_client) gets a simplified client-facing nav using
+  // existing routes only. Staff always keep the full nav.
+  const isLayer1 = !isStaff && access?.tier === "project_client";
+
+  const clientNav = isLayer1 ? LAYER1_NAV : filterByFeature(CLIENT_NAV);
   const staffNav = user?.isStaff ? STAFF_NAV : [];
-  const mobileNav = filterByFeature(MOBILE_NAV);
+  const mobileNav = isLayer1 ? LAYER1_MOBILE_NAV : filterByFeature(MOBILE_NAV);
   const nav = [...clientNav, ...staffNav];
 
   return (
