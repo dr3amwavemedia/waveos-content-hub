@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowRight, CalendarDays, CheckCircle2, Cloud, ImagePlus, PenSquare,
+  ArrowRight, CalendarDays, CheckCircle2, Cloud, ImagePlus, Mail, PenSquare,
   Share2, Sparkles, TrendingUp, Users, FolderOpen,
 } from "lucide-react";
 
