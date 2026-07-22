@@ -144,6 +144,7 @@ function AcceptInvitePage() {
           return;
         }
         const { data: sessionData } = await supabase.auth.getSession();
+
         if (!sessionData.session) {
           toast.success("Check your email to finish creating your WaveOS account.");
           return;
