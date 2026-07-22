@@ -130,7 +130,7 @@ function AcceptInvitePage() {
       sessionStorage.setItem(INVITE_TOKEN_STORAGE_KEY, token);
       sessionStorage.setItem(PENDING_INVITE_TOKEN_KEY, token);
       if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email: invite.email,
           password,
           options: {
