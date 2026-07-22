@@ -216,7 +216,33 @@ function AcceptInvitePage() {
     );
   }
 
-  if (status === "expired") {
+if (status === "check-email") {
+  return (
+    <Frame>
+      <div className="flex flex-col items-center gap-3 text-center">
+        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/20">
+          <MailCheck className="h-5 w-5" />
+        </div>
+
+        <h1 className="text-xl font-semibold text-foreground">
+          Confirm your email
+        </h1>
+
+        <p className="max-w-sm text-sm text-muted-foreground">
+          We sent a confirmation link to{" "}
+          <span className="font-medium text-foreground">
+            {invite?.email}
+          </span>
+          . Open the email and confirm your account to finish entering WaveOS.
+        </p>
+
+        <p className="text-xs text-muted-foreground">
+          Don’t see it? Check your spam or junk folder.
+        </p>
+      </div>
+    </Frame>
+  );
+}
     return (
       <Frame>
         <ErrorPanel
