@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowRight, CalendarDays, CheckCircle2, Cloud, ImagePlus, PenSquare,
+  ArrowRight, CalendarDays, CheckCircle2, Cloud, ImagePlus, Mail, PenSquare,
   Share2, Sparkles, TrendingUp, Users, FolderOpen,
 } from "lucide-react";
 
@@ -21,6 +21,36 @@ export const Route = createFileRoute("/_authenticated/home")({
 
 function HomeRoute() {
   const { access, isStaff, isLoading } = usePermissions();
+  const { workspaces, isLoading: wsLoading } = useWorkspace();
+
+  // Signed in but no workspace membership yet — invite hasn't been accepted
+  // or the admin hasn't provisioned one. Show a clear dead-end instead of a
+  // blank dashboard.
+  if (!isStaff && !wsLoading && !isLoading && workspaces.length === 0) {
+    return (
+      <div className="mx-auto max-w-lg py-16">
+        <div className="surface-card p-8 text-center">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/12 text-primary ring-1 ring-primary/20">
+            <Mail className="h-5 w-5" />
+          </div>
+          <h1 className="mt-4 text-xl font-semibold tracking-tight text-foreground">
+            You haven't been invited to a workspace yet.
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            WaveOS access is provisioned by Dream Wave Media. Once your team
+            sends you an invite, your workspace will appear here automatically.
+          </p>
+          <a
+            href="mailto:hello@dreamwavemedia.co?subject=WaveOS%20access%20request"
+            className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
+          >
+            Contact Dream Wave Media
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   // Layer 1 project_client gets the premium client-facing overview.
   // Staff, Layer 2 (growth_90), and Layer 3 (retainer_full) keep the
   // existing growth dashboard unchanged.
