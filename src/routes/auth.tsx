@@ -99,25 +99,19 @@ function AuthPage() {
         sessionStorage.setItem("waveos.postAuthNext", nextPath);
       }
 
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth`,
-        },
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: `${window.location.origin}/auth`,
       });
 
-      if (error) {
-        throw error;
+      if (result.error) {
+        throw result.error;
       }
 
-      // Supabase normally redirects automatically in the browser.
-      // This fallback makes sure the redirect occurs.
-      if (data.url) {
-        window.location.assign(data.url);
-        return;
+      // Managed Lovable authentication either redirects the browser
+      // or establishes the Supabase session through the wrapper.
+      if (!result.redirected) {
+        navigate({ to: "/home", replace: true });
       }
-
-      throw new Error("Google did not return a sign-in URL.");
     } catch (error) {
       sessionStorage.removeItem("waveos.postAuthNext");
       setBusy(false);
