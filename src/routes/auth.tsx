@@ -118,9 +118,11 @@ function AuthPage() {
         throw result.error;
       }
 
-      // Managed Lovable authentication either redirects the browser
-      // or establishes the Supabase session through the wrapper.
       if (!result.redirected) {
+        if (result.tokens) {
+          const { error } = await supabase.auth.setSession(result.tokens);
+          if (error) throw error;
+        }
         navigate({ to: "/home", replace: true });
       }
     } catch (error) {

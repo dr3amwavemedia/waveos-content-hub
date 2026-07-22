@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
 const INVITE_TOKEN_STORAGE_KEY = "waveos.inviteToken";
@@ -164,6 +165,38 @@ function AcceptInvitePage() {
     }
   }
 
+  async function handleGoogleInviteSignIn() {
+    if (!invite || !token) return;
+    setBusy(true);
+    try {
+      sessionStorage.setItem(INVITE_TOKEN_STORAGE_KEY, token);
+      sessionStorage.setItem(PENDING_INVITE_TOKEN_KEY, token);
+      const next = `/accept-invite?token=${encodeURIComponent(token)}`;
+      sessionStorage.setItem("waveos.postAuthNext", next);
+
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: `${window.location.origin}/auth-callback`,
+        extraParams: {
+          prompt: "select_account",
+          login_hint: invite.email,
+        },
+      });
+      if (result.error) throw result.error;
+      if (!result.redirected) {
+        if (result.tokens) {
+          const { error } = await supabase.auth.setSession(result.tokens);
+          if (error) throw error;
+        }
+        await acceptWithSession(token);
+      }
+    } catch (error) {
+      sessionStorage.removeItem(PENDING_INVITE_TOKEN_KEY);
+      sessionStorage.removeItem("waveos.postAuthNext");
+      toast.error(error instanceof Error ? error.message : "Couldn't sign in with Google. Please try again.");
+      setBusy(false);
+    }
+  }
+
   if (status === "loading")
     return (
       <Center>
@@ -243,7 +276,21 @@ function AcceptInvitePage() {
           </div>
         )
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={handleGoogleInviteSignIn}
+            disabled={busy}
+            className="flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-elevated disabled:opacity-60"
+          >
+            <GoogleIcon /> Continue with Google
+          </button>
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="h-px flex-1 bg-border" />
+            or
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-3">
           <div className="mb-2 flex overflow-hidden rounded-lg border border-border bg-surface/60 text-xs">
             {(["signup", "signin"] as const).map((m) => (
               <button
@@ -297,7 +344,8 @@ function AcceptInvitePage() {
             {busy && <Loader2 className="h-4 w-4 animate-spin" />}
             {mode === "signup" ? "Create account & join" : "Sign in & join"}
           </button>
-        </form>
+          </form>
+        </div>
       )}
     </Frame>
   );
@@ -365,6 +413,29 @@ function Frame({ children }: { children: React.ReactNode }) {
 
 function Center({ children }: { children: React.ReactNode }) {
   return <div className="flex min-h-screen items-center justify-center">{children}</div>;
+}
+
+function GoogleIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+      <path
+        fill="#EA4335"
+        d="M12 10.2v3.9h5.5c-.2 1.4-1.6 4-5.5 4-3.3 0-6-2.7-6-6.1s2.7-6.1 6-6.1c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.7 3.4 14.6 2.4 12 2.4 6.7 2.4 2.4 6.7 2.4 12S6.7 21.6 12 21.6c6.9 0 9.5-4.8 9.5-7.3 0-.5-.1-.9-.1-1.3H12z"
+      />
+      <path
+        fill="#34A853"
+        d="M3.9 7.3l3.2 2.3c.9-2.1 3-3.7 5.4-3.7 1.5 0 2.7.5 3.6 1.4l2.7-2.6C17 3 14.7 2 12 2 8.1 2 4.7 4.2 3.1 7.4l.8-.1z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M12 22c2.6 0 4.9-.9 6.5-2.4l-3-2.5c-.8.6-2 1-3.5 1-2.7 0-5-1.8-5.8-4.3l-3.1 2.4C4.7 19.7 8.1 22 12 22z"
+      />
+      <path
+        fill="#4285F4"
+        d="M21.5 12.3c0-.7-.1-1.3-.2-1.9H12v3.9h5.4c-.2 1.2-.9 2.1-1.9 2.8l3 2.4c1.8-1.6 2.9-4 2.9-7.2z"
+      />
+    </svg>
+  );
 }
 
 function mapAcceptError(msg: string) {
