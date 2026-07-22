@@ -19,7 +19,7 @@ export default defineConfig({
         "https://clsuecactijyjecxwuxp.supabase.co",
       ),
       "import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6ImNsc3VlY2FjdGlqeWplY3h3dXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwODMyMjQsImV4cCI6MjA5OTY1OTIyNH0.7lfS3KCgoSVRz9fPhN3xwzLKTZKVgUxnA_myRLXC8Q4",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsc3VlY2FjdGlqeWplY3h3dXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwODMyMjQsImV4cCI6MjA5OTY1OTIyNH0.7lfS3KCgoSVRz9fPhN3xwzLKTZKVgUxnA_myRLXC8Q4",
       ),
     },
     plugins: [mcpPlugin()],
