@@ -24,7 +24,7 @@ test.describe("Google sign-in", () => {
 
   test("preserves ?next= destination in sessionStorage before OAuth", async ({ page }) => {
     await page.goto("/auth?next=/calendar");
-    // sessionStorage is only written when the click handler runs and next !== /home.
+    // sessionStorage is written when the click handler runs so the callback can finish routing.
     await page.getByRole("button", { name: /continue with google/i }).click().catch(() => {});
     // A best-effort read — the click may navigate away, so we allow either
     // the stored value or a navigation to have started.
@@ -59,5 +59,16 @@ test.describe("Google sign-in", () => {
 
     const [popup, nav, req] = await Promise.all([popupPromise, navPromise, reqPromise]);
     expect(popup || nav || req, "expected a popup, navigation, or OAuth request").toBeTruthy();
+  });
+
+  test("Google hand-off uses the public callback route", async ({ page }) => {
+    await page.goto("/auth?next=/home");
+
+    const oauthRequest = page.waitForRequest((request) => request.url().includes("/~oauth/initiate"));
+    await page.getByRole("button", { name: /continue with google/i }).click();
+
+    const request = await oauthRequest;
+    const url = new URL(request.url());
+    expect(url.searchParams.get("redirect_uri")).toBe(`${new URL(page.url()).origin}/auth-callback`);
   });
 });
