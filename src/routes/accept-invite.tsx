@@ -243,6 +243,7 @@ if (status === "check-email") {
     </Frame>
   );
 }
+  if (status === "expired") {
     return (
       <Frame>
         <ErrorPanel
