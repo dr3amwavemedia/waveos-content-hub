@@ -143,11 +143,11 @@ function AcceptInvitePage() {
           setBusy(false);
           return;
         }
-        const { data: sessionData } = await supabase.auth.getSession();
-
-        if (!sessionData.session) {
-          toast.success("Check your email to finish creating your WaveOS account.");
-          return;
+if (!data.session) {
+  setStatus("check-email");
+  toast.success("Check your email to confirm your WaveOS account.");
+  return;
+}
         }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
