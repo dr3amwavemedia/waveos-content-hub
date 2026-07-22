@@ -6,9 +6,9 @@ import { AppShell } from "@/components/app/app-shell";
 // Supabase stores the session in localStorage, which the server cannot read.
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
-  beforeLoad: async () => {
+  beforeLoad: async ({ location }) => {
     const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth" });
+    if (error || !data.user) throw redirect({ to: "/auth", search: { next: location.href } });
     return { user: data.user };
   },
   component: AuthenticatedLayout,
