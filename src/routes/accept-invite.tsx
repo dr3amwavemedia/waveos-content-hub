@@ -51,7 +51,7 @@ function AcceptInvitePage() {
   const autoAcceptStarted = useRef(false);
 
   const [status, setStatus] = useState<
-    "loading" | "no-token" | "invalid" | "expired" | "revoked" | "used" | "form" | "accepting" | "done"
+    "loading" | "no-token" | "invalid" | "expired" | "revoked" | "used" | "form" | "accepting" | "check-email" | "done"
   >("loading");
   const [invite, setInvite] = useState<InvitePublic | null>(null);
   const [sessionUser, setSessionUser] = useState<{ id: string; email: string } | null>(null);
@@ -291,59 +291,59 @@ function AcceptInvitePage() {
             <div className="h-px flex-1 bg-border" />
           </div>
           <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="mb-2 flex overflow-hidden rounded-lg border border-border bg-surface/60 text-xs">
-            {(["signup", "signin"] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setMode(m)}
-                className={
-                  "flex-1 py-2 font-medium " +
-                  (mode === m ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground")
-                }
-              >
-                {m === "signup" ? "Create account" : "Already have one"}
-              </button>
-            ))}
-          </div>
-
-          {mode === "signup" && (
-            <div className="grid grid-cols-2 gap-2">
-              <input
-                required
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                placeholder="First name"
-                className={inputCls}
-              />
-              <input
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                placeholder="Last name"
-                className={inputCls}
-              />
+            <div className="mb-2 flex overflow-hidden rounded-lg border border-border bg-surface/60 text-xs">
+              {(["signup", "signin"] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setMode(m)}
+                  className={
+                    "flex-1 py-2 font-medium " +
+                    (mode === m ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground")
+                  }
+                >
+                  {m === "signup" ? "Create account" : "Already have one"}
+                </button>
+              ))}
             </div>
-          )}
 
-          <input readOnly value={info.email} className={inputCls + " opacity-70"} />
-          <input
-            required
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={mode === "signup" ? "Choose a password" : "Password"}
-            className={inputCls}
-            minLength={8}
-          />
+            {mode === "signup" && (
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  required
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="First name"
+                  className={inputCls}
+                />
+                <input
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Last name"
+                  className={inputCls}
+                />
+              </div>
+            )}
 
-          <button
-            type="submit"
-            disabled={busy}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-60"
-          >
-            {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-            {mode === "signup" ? "Create account & join" : "Sign in & join"}
-          </button>
+            <input readOnly value={info.email} className={inputCls + " opacity-70"} />
+            <input
+              required
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={mode === "signup" ? "Choose a password" : "Password"}
+              className={inputCls}
+              minLength={8}
+            />
+
+            <button
+              type="submit"
+              disabled={busy}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-60"
+            >
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {mode === "signup" ? "Create account & join" : "Sign in & join"}
+            </button>
           </form>
         </div>
       )}
