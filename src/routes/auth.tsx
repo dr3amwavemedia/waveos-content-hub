@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
+import { lovable } from "@/integrations/lovable";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
 export const Route = createFileRoute("/auth")({
