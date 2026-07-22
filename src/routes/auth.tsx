@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
+const POST_AUTH_NEXT_KEY = "waveos.postAuthNext";
+
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
   validateSearch: (s: Record<string, unknown>): { next?: string } =>
@@ -15,6 +17,10 @@ export const Route = createFileRoute("/auth")({
     meta: [
       { title: "Sign in — WaveOS" },
       { name: "description", content: "Sign in to your WaveOS workspace." },
+      { property: "og:title", content: "Sign in — WaveOS" },
+      { property: "og:description", content: "Sign in to your WaveOS workspace." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -24,6 +30,8 @@ export const Route = createFileRoute("/auth")({
 function safeNext(next: string | undefined): string {
   if (!next) return "/home";
   if (!next.startsWith("/") || next.startsWith("//")) return "/home";
+  const pathname = next.split(/[?#]/, 1)[0];
+  if (pathname === "/auth" || pathname === "/auth-callback") return "/home";
   return next;
 }
 
@@ -40,9 +48,9 @@ function AuthPage() {
   useEffect(() => {
     let cancelled = false;
     const resolveNext = () => {
-      const stashed = typeof window !== "undefined" ? sessionStorage.getItem("waveos.postAuthNext") : null;
+      const stashed = typeof window !== "undefined" ? sessionStorage.getItem(POST_AUTH_NEXT_KEY) : null;
       const target = safeNext(stashed ?? nextPath);
-      if (stashed) sessionStorage.removeItem("waveos.postAuthNext");
+      if (stashed) sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
       return target;
     };
     (async () => {
@@ -96,12 +104,10 @@ function AuthPage() {
     setBusy(true);
 
     try {
-      if (nextPath !== "/home") {
-        sessionStorage.setItem("waveos.postAuthNext", nextPath);
-      }
+      sessionStorage.setItem(POST_AUTH_NEXT_KEY, nextPath);
 
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/auth-callback`,
         extraParams: {
           prompt: "select_account",
           ...(email ? { login_hint: email } : {}),
@@ -118,7 +124,7 @@ function AuthPage() {
         navigate({ to: "/home", replace: true });
       }
     } catch (error) {
-      sessionStorage.removeItem("waveos.postAuthNext");
+      sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
       setBusy(false);
 
       console.error("[Google sign-in error]", error);

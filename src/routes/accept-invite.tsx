@@ -1,11 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, MailCheck, ShieldAlert, MailX } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
+
+const INVITE_TOKEN_STORAGE_KEY = "waveos.inviteToken";
+const PENDING_INVITE_TOKEN_KEY = "waveos.pendingInviteToken";
 
 const searchSchema = z.object({
   token: z.string().min(8).optional(),
@@ -16,7 +19,15 @@ export const Route = createFileRoute("/accept-invite")({
   component: AcceptInvitePage,
   ssr: false,
   head: () => ({
-    meta: [{ title: "Accept invite — WaveOS" }, { name: "robots", content: "noindex" }],
+    meta: [
+      { title: "Accept invite — WaveOS" },
+      { name: "description", content: "Accept your secure WaveOS workspace invite." },
+      { property: "og:title", content: "Accept invite — WaveOS" },
+      { property: "og:description", content: "Accept your secure WaveOS workspace invite." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { name: "robots", content: "noindex" },
+    ],
   }),
 });
 
@@ -30,8 +41,13 @@ type InvitePublic = {
 };
 
 function AcceptInvitePage() {
-  const { token } = Route.useSearch();
+  const { token: routeToken } = Route.useSearch();
   const navigate = useNavigate();
+  const [storedToken, setStoredToken] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : sessionStorage.getItem(INVITE_TOKEN_STORAGE_KEY),
+  );
+  const token = routeToken ?? storedToken ?? undefined;
+  const autoAcceptStarted = useRef(false);
 
   const [status, setStatus] = useState<
     "loading" | "no-token" | "invalid" | "expired" | "revoked" | "used" | "form" | "accepting" | "done"
@@ -47,13 +63,15 @@ function AcceptInvitePage() {
 
   // Keep token in memory but strip from the visible URL immediately.
   useEffect(() => {
-    if (typeof window === "undefined" || !token) return;
+    if (typeof window === "undefined" || !routeToken) return;
+    sessionStorage.setItem(INVITE_TOKEN_STORAGE_KEY, routeToken);
+    setStoredToken(routeToken);
     const url = new URL(window.location.href);
     if (url.searchParams.has("token")) {
       url.searchParams.delete("token");
       window.history.replaceState({}, "", url.toString());
     }
-  }, [token]);
+  }, [routeToken]);
 
   useEffect(() => {
     if (!token) {
@@ -78,37 +96,55 @@ function AcceptInvitePage() {
     })();
   }, [token]);
 
-  async function acceptWithSession() {
-    if (!token) return;
+  async function acceptWithSession(inviteToken = token) {
+    if (!inviteToken) return;
     setStatus("accepting");
-    const { error } = await supabase.rpc("accept_invite", { _token: token });
+    const { error } = await supabase.rpc("accept_invite", { _token: inviteToken });
     if (error) {
       toast.error(mapAcceptError(error.message));
       setStatus("form");
       return;
     }
+    sessionStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
+    sessionStorage.removeItem(PENDING_INVITE_TOKEN_KEY);
     toast.success("You're in. Welcome to WaveOS.");
     setStatus("done");
     setTimeout(() => navigate({ to: "/home", replace: true }), 400);
   }
+
+  useEffect(() => {
+    if (!sessionUser || !invite || status !== "form" || !token || autoAcceptStarted.current) return;
+    const pendingToken = sessionStorage.getItem(PENDING_INVITE_TOKEN_KEY);
+    if (pendingToken !== token) return;
+    if (sessionUser.email.toLowerCase() !== invite.email.toLowerCase()) return;
+    autoAcceptStarted.current = true;
+    void acceptWithSession(token);
+  }, [invite, sessionUser, status, token]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!invite || !token) return;
     setBusy(true);
     try {
+      sessionStorage.setItem(INVITE_TOKEN_STORAGE_KEY, token);
+      sessionStorage.setItem(PENDING_INVITE_TOKEN_KEY, token);
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email: invite.email,
           password,
           options: {
             data: { first_name: firstName, last_name: lastName },
-            emailRedirectTo: `${window.location.origin}/accept-invite`,
+            emailRedirectTo: `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`,
           },
         });
         if (error) {
           toast.error(error.message);
           setBusy(false);
+          return;
+        }
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData.session) {
+          toast.success("Check your email to finish creating your WaveOS account.");
           return;
         }
       } else {
@@ -122,7 +158,7 @@ function AcceptInvitePage() {
           return;
         }
       }
-      await acceptWithSession();
+      await acceptWithSession(token);
     } finally {
       setBusy(false);
     }
