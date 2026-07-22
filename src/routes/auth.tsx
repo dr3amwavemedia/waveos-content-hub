@@ -104,7 +104,7 @@ function AuthPage() {
         redirect_uri: window.location.origin,
         extraParams: {
           prompt: "select_account",
-          login_hint: email || "dr3amwavemedia@gmail.com",
+          ...(email ? { login_hint: email } : {}),
         },
       });
 
