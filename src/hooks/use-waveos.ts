@@ -23,14 +23,15 @@ export interface CurrentUserContext {
 }
 
 async function loadContext(): Promise<CurrentUserContext> {
-  const { data: auth } = await supabase.auth.getUser();
-  const user = auth.user!;
+  const { data: auth, error } = await supabase.auth.getUser();
+
+  if (error || !auth.user) {
+    throw new Error("Your session expired. Please sign in again.");
+  }
+
+  const user = auth.user;
   const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("first_name,last_name,avatar_url")
-      .eq("id", user.id)
-      .maybeSingle(),
+    supabase.from("profiles").select("first_name,last_name,avatar_url").eq("id", user.id).maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", user.id),
   ]);
   const roleList = (roles ?? []).map((r) => r.role);
@@ -40,17 +41,13 @@ async function loadContext(): Promise<CurrentUserContext> {
     firstName: profile?.first_name ?? null,
     lastName: profile?.last_name ?? null,
     avatarUrl: profile?.avatar_url ?? null,
-    isStaff:
-      roleList.includes("dream_wave_owner") ||
-      roleList.includes("dream_wave_team"),
+    isStaff: roleList.includes("dream_wave_owner") || roleList.includes("dream_wave_team"),
     isDreamWaveOwner: roleList.includes("dream_wave_owner"),
     roles: roleList,
   };
 }
 
-async function loadWorkspaces(
-  ctx: CurrentUserContext,
-): Promise<WorkspaceSummary[]> {
+async function loadWorkspaces(ctx: CurrentUserContext): Promise<WorkspaceSummary[]> {
   const { data: workspaces } = await supabase
     .from("workspaces")
     .select("id,name,slug,industry,timezone,is_demo")
@@ -64,19 +61,13 @@ async function loadWorkspaces(
     .select("workspace_id, role")
     .eq("user_id", ctx.userId);
 
-  const membershipMap = new Map(
-    (memberships ?? []).map((m) => [m.workspace_id, m.role]),
-  );
+  const membershipMap = new Map((memberships ?? []).map((m) => [m.workspace_id, m.role]));
 
   return workspaces.map((w) => {
     const role = membershipMap.get(w.id);
     return {
       ...w,
-      role: (role ?? (ctx.isStaff ? "staff" : "viewer")) as
-        | "owner"
-        | "approver"
-        | "viewer"
-        | "staff",
+      role: (role ?? (ctx.isStaff ? "staff" : "viewer")) as "owner" | "approver" | "viewer" | "staff",
     };
   });
 }
