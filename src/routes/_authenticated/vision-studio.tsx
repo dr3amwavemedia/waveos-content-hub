@@ -14,29 +14,20 @@ import { parseVisionDeckContent, serializeVisionDeckContent, type VisionDeck } f
 
 export const Route = createFileRoute("/_authenticated/vision-studio")({
   beforeLoad: async () => {
-   const { data: roles } = await supabase
-  .from("user_roles")
-  .select("role")
-  .eq("user_id", data.user.id);
+    const { data } = await supabase.auth.getUser();
 
-const isStaff = (roles ?? []).some(
-  (role) =>
-    role.role === "dream_wave_owner" ||
-    role.role === "dream_wave_team",
-);
+    if (!data.user) {
+      throw redirect({ to: "/auth" });
+    }
 
-if (!isStaff) {
-  throw redirect({ to: "/home" });
-}
-const isStaff = (roles ?? []).some(
-  (role) =>
-    role.role === "dream_wave_owner" ||
-    role.role === "dream_wave_team",
-);
+    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
 
-if (!isStaff) {
-  throw redirect({ to: "/home" });
-}
+    const isStaff = (roles ?? []).some((role) => role.role === "dream_wave_owner" || role.role === "dream_wave_team");
+
+    if (!isStaff) {
+      throw redirect({ to: "/home" });
+    }
+  },
   component: VisionStudioPage,
   head: () => ({
     meta: [{ title: "Vision Studio — WaveOS" }, { name: "robots", content: "noindex,nofollow" }],
@@ -133,7 +124,10 @@ function VisionStudioPage() {
 
   const archiveDeck = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("vision_decks").update({ status: "archived", share_enabled: false }).eq("id", id);
+      const { error } = await supabase
+        .from("vision_decks")
+        .update({ status: "archived", share_enabled: false })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: async () => {
