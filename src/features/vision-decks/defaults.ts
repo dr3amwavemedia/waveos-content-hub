@@ -1,8 +1,6 @@
 import type { VisionDeckContent } from "./types";
 
-export function createDefaultVisionDeckContent(
-  companyName = "Your next client",
-): VisionDeckContent {
+export function createDefaultVisionDeckContent(companyName = "Your next client"): VisionDeckContent {
   return {
     cover: {
       eyebrow: "A Dream Wave Media vision",
@@ -78,11 +76,63 @@ export function createDefaultVisionDeckContent(
       closeRate: 20,
       customerValue: 4500,
     },
+    packages: {
+      eyebrow: "Choose your campaign",
+      headline: "Two ways to bring the vision to life.",
+      introduction: "Compare the complete campaign experience with a focused, budget-conscious alternative.",
+      currency: "USD",
+      options: [
+        {
+          id: "package-option-1",
+          name: "Client Package 1",
+          price: 0,
+          paymentPlan: "Add payment schedule",
+          description: "Add a description of the complete campaign package and the value it provides.",
+          deliverableCount: 0,
+          features: ["Add package feature", "Add package feature", "Add package feature"],
+          badge: "Recommended",
+          callToAction: "Select Package 1",
+          recommended: true,
+        },
+        {
+          id: "package-option-2",
+          name: "Client Package 2",
+          price: 0,
+          paymentPlan: "Add payment schedule",
+          description: "Add a description of the focused or budget-conscious campaign package.",
+          deliverableCount: 0,
+          features: ["Add package feature", "Add package feature", "Add package feature"],
+          badge: "Budget Friendly",
+          callToAction: "Select Package 2",
+          recommended: false,
+        },
+      ],
+    },
     timeline: [
-      { id: "timeline-strategy", phase: "Strategy", timing: "Week 1", detail: "Goals, audience, creative territory, and measurement plan." },
-      { id: "timeline-preproduction", phase: "Pre-production", timing: "Week 2", detail: "Concepts, scripts, schedule, locations, talent, and shot plan." },
-      { id: "timeline-production", phase: "Production", timing: "Week 3", detail: "A focused capture day designed around the complete content system." },
-      { id: "timeline-delivery", phase: "Edit & launch", timing: "Weeks 4–5", detail: "Editorial, internal review, client refinement, delivery, and rollout." },
+      {
+        id: "timeline-strategy",
+        phase: "Strategy",
+        timing: "Week 1",
+        detail: "Goals, audience, creative territory, and measurement plan.",
+      },
+      {
+        id: "timeline-preproduction",
+        phase: "Pre-production",
+        timing: "Week 2",
+        detail: "Concepts, scripts, schedule, locations, talent, and shot plan.",
+      },
+      {
+        id: "timeline-production",
+        phase: "Production",
+        timing: "Week 3",
+        detail: "A focused capture day designed around the complete content system.",
+      },
+      {
+        id: "timeline-delivery",
+        phase: "Edit & launch",
+        timing: "Weeks 4–5",
+        detail: "Editorial, internal review, client refinement, delivery, and rollout.",
+      },
     ],
     close: {
       headline: "Let's make the future version of the brand visible.",
