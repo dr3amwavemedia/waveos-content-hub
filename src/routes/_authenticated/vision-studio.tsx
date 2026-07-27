@@ -29,9 +29,6 @@ export const Route = createFileRoute("/_authenticated/vision-studio")({
     }
   },
   component: VisionStudioPage,
-  head: () => ({
-    meta: [{ title: "Vision Studio — WaveOS" }, { name: "robots", content: "noindex,nofollow" }],
-  }),
 });
 
 function VisionStudioPage() {
