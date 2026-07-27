@@ -96,6 +96,48 @@ export function VisionDeckEditor({
 
   const branding = draft.content.branding;
   const companyLogo = branding?.companyLogo;
+  
+    const packages = draft.content.packages ?? {
+    eyebrow: "Choose your campaign",
+    headline: "Two ways to bring the vision to life.",
+    introduction:
+      "Compare the complete campaign experience with a focused, budget-conscious alternative.",
+    currency: "USD",
+    options: [
+      {
+        id: "package-option-1",
+        name: "Client Package 1",
+        price: 0,
+        paymentPlan: "Add payment schedule",
+        description: "Add the complete campaign package description.",
+        deliverableCount: 0,
+        features: [
+          "Add package feature",
+          "Add package feature",
+          "Add package feature",
+        ],
+        badge: "Recommended",
+        callToAction: "Select Package 1",
+        recommended: true,
+      },
+      {
+        id: "package-option-2",
+        name: "Client Package 2",
+        price: 0,
+        paymentPlan: "Add payment schedule",
+        description: "Add the budget-conscious package description.",
+        deliverableCount: 0,
+        features: [
+          "Add package feature",
+          "Add package feature",
+          "Add package feature",
+        ],
+        badge: "Budget Friendly",
+        callToAction: "Select Package 2",
+        recommended: false,
+      },
+    ],
+  };
 
   const setCompanyLogo = (logo: NonNullable<VisionDeckContent["branding"]>["companyLogo"] | undefined) => {
     updateContent("branding", {
@@ -554,6 +596,263 @@ export function VisionDeckEditor({
 <EditorSection
   title="Package comparison"
             <EditorSection title="Roadmap" description="Explain how Dream Wave moves the concept into production.">
+                          <EditorSection
+              title="Package comparison"
+              description="Create two client investment options for the presentation."
+            >
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Section label">
+                    <Input
+                      value={packages.eyebrow}
+                      onChange={(eyebrow) =>
+                        updateContent("packages", { ...packages, eyebrow })
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Currency">
+                    <Input
+                      value={packages.currency}
+                      onChange={(currency) =>
+                        updateContent("packages", { ...packages, currency })
+                      }
+                      placeholder="USD"
+                    />
+                  </Field>
+                </div>
+
+                <Field label="Slide headline">
+                  <Input
+                    value={packages.headline}
+                    onChange={(headline) =>
+                      updateContent("packages", { ...packages, headline })
+                    }
+                  />
+                </Field>
+
+                <Field label="Introduction">
+                  <Textarea
+                    value={packages.introduction}
+                    onChange={(introduction) =>
+                      updateContent("packages", {
+                        ...packages,
+                        introduction,
+                      })
+                    }
+                    rows={3}
+                  />
+                </Field>
+
+                <div className="grid gap-5 lg:grid-cols-2">
+                  {packages.options.map((option, optionIndex) => (
+                    <div
+                      key={option.id}
+                      className="rounded-2xl border border-border bg-elevated/35 p-4"
+                    >
+                      <div className="mb-4 flex items-center justify-between gap-3">
+                        <h3 className="text-sm font-semibold text-foreground">
+                          Package {optionIndex + 1}
+                        </h3>
+
+                        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <input
+                            type="radio"
+                            name="recommended-package"
+                            checked={option.recommended}
+                            onChange={() => {
+                              const options = packages.options.map(
+                                (currentOption, currentIndex) => ({
+                                  ...currentOption,
+                                  recommended: currentIndex === optionIndex,
+                                }),
+                              );
+
+                              updateContent("packages", {
+                                ...packages,
+                                options,
+                              });
+                            }}
+                          />
+                          Recommended
+                        </label>
+                      </div>
+
+                      <div className="space-y-4">
+                        <Field label="Package name">
+                          <Input
+                            value={option.name}
+                            onChange={(name) => {
+                              const options = [...packages.options];
+                              options[optionIndex] = { ...option, name };
+
+                              updateContent("packages", {
+                                ...packages,
+                                options,
+                              });
+                            }}
+                          />
+                        </Field>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <Field label="Price">
+                            <input
+                              type="number"
+                              min={0}
+                              step={50}
+                              value={option.price}
+                              onChange={(event) => {
+                                const options = [...packages.options];
+
+                                options[optionIndex] = {
+                                  ...option,
+                                  price: Math.max(
+                                    0,
+                                    Number(event.target.value) || 0,
+                                  ),
+                                };
+
+                                updateContent("packages", {
+                                  ...packages,
+                                  options,
+                                });
+                              }}
+                              className={inputClass}
+                            />
+                          </Field>
+
+                          <Field label="Deliverables">
+                            <input
+                              type="number"
+                              min={0}
+                              value={option.deliverableCount}
+                              onChange={(event) => {
+                                const options = [...packages.options];
+
+                                options[optionIndex] = {
+                                  ...option,
+                                  deliverableCount: Math.max(
+                                    0,
+                                    Number(event.target.value) || 0,
+                                  ),
+                                };
+
+                                updateContent("packages", {
+                                  ...packages,
+                                  options,
+                                });
+                              }}
+                              className={inputClass}
+                            />
+                          </Field>
+                        </div>
+
+                        <Field label="Payment schedule">
+                          <Input
+                            value={option.paymentPlan}
+                            onChange={(paymentPlan) => {
+                              const options = [...packages.options];
+
+                              options[optionIndex] = {
+                                ...option,
+                                paymentPlan,
+                              };
+
+                              updateContent("packages", {
+                                ...packages,
+                                options,
+                              });
+                            }}
+                            placeholder="Example: Two payments of $2,750"
+                          />
+                        </Field>
+
+                        <Field label="Package description">
+                          <Textarea
+                            value={option.description}
+                            onChange={(description) => {
+                              const options = [...packages.options];
+
+                              options[optionIndex] = {
+                                ...option,
+                                description,
+                              };
+
+                              updateContent("packages", {
+                                ...packages,
+                                options,
+                              });
+                            }}
+                            rows={3}
+                          />
+                        </Field>
+
+                        <Field
+                          label="Package features"
+                          hint="Enter one feature on each line."
+                        >
+                          <Textarea
+                            value={option.features.join("\n")}
+                            onChange={(value) => {
+                              const options = [...packages.options];
+
+                              options[optionIndex] = {
+                                ...option,
+                                features: value
+                                  .split("\n")
+                                  .map((feature) => feature.trim())
+                                  .filter(Boolean),
+                              };
+
+                              updateContent("packages", {
+                                ...packages,
+                                options,
+                              });
+                            }}
+                            rows={7}
+                          />
+                        </Field>
+
+                        <Field label="Badge">
+                          <Input
+                            value={option.badge}
+                            onChange={(badge) => {
+                              const options = [...packages.options];
+                              options[optionIndex] = { ...option, badge };
+
+                              updateContent("packages", {
+                                ...packages,
+                                options,
+                              });
+                            }}
+                            placeholder="Recommended"
+                          />
+                        </Field>
+
+                        <Field label="Button label">
+                          <Input
+                            value={option.callToAction}
+                            onChange={(callToAction) => {
+                              const options = [...packages.options];
+
+                              options[optionIndex] = {
+                                ...option,
+                                callToAction,
+                              };
+
+                              updateContent("packages", {
+                                ...packages,
+                                options,
+                              });
+                            }}
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </EditorSection>
               <RepeaterHeader
                 title="Phases"
                 actionLabel="Add phase"
