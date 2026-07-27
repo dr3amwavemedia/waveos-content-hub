@@ -920,6 +920,98 @@ export type Database = {
         }
         Relationships: []
       }
+      vision_deck_events: {
+        Row: {
+          created_at: string
+          deck_id: string
+          event_type: string
+          id: string
+          safe_metadata: Json
+          session_id: string
+          slide_key: string | null
+        }
+        Insert: {
+          created_at?: string
+          deck_id: string
+          event_type: string
+          id?: string
+          safe_metadata?: Json
+          session_id: string
+          slide_key?: string | null
+        }
+        Update: {
+          created_at?: string
+          deck_id?: string
+          event_type?: string
+          id?: string
+          safe_metadata?: Json
+          session_id?: string
+          slide_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vision_deck_events_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "vision_decks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vision_decks: {
+        Row: {
+          accent_color: string
+          company_name: string
+          content: Json
+          created_at: string
+          created_by: string
+          id: string
+          prospect_email: string | null
+          prospect_name: string | null
+          published_at: string | null
+          share_enabled: boolean
+          share_token: string
+          status: Database["public"]["Enums"]["vision_deck_status"]
+          title: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          accent_color?: string
+          company_name: string
+          content?: Json
+          created_at?: string
+          created_by: string
+          id?: string
+          prospect_email?: string | null
+          prospect_name?: string | null
+          published_at?: string | null
+          share_enabled?: boolean
+          share_token?: string
+          status?: Database["public"]["Enums"]["vision_deck_status"]
+          title: string
+          updated_at?: string
+          updated_by: string
+        }
+        Update: {
+          accent_color?: string
+          company_name?: string
+          content?: Json
+          created_at?: string
+          created_by?: string
+          id?: string
+          prospect_email?: string | null
+          prospect_name?: string | null
+          published_at?: string | null
+          share_enabled?: boolean
+          share_token?: string
+          status?: Database["public"]["Enums"]["vision_deck_status"]
+          title?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: []
+      }
       webhook_events: {
         Row: {
           content_item_id: string | null
@@ -1247,6 +1339,18 @@ export type Database = {
           workspace_role: Database["public"]["Enums"]["workspace_member_role"]
         }[]
       }
+      get_public_vision_deck: {
+        Args: { _share_token: string }
+        Returns: {
+          accent_color: string
+          company_name: string
+          content: Json
+          id: string
+          prospect_name: string
+          published_at: string
+          title: string
+        }[]
+      }
       grant_staff_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1279,6 +1383,15 @@ export type Database = {
           _workspace_id: string
         }
         Returns: undefined
+      }
+      record_vision_deck_event: {
+        Args: {
+          _event_type: string
+          _session_id: string
+          _share_token: string
+          _slide_key?: string
+        }
+        Returns: boolean
       }
       resend_invite: {
         Args: { _extend_days?: number; _invite_id: string }
@@ -1377,6 +1490,7 @@ export type Database = {
         | "bluesky"
         | "gmb"
         | "snapchat"
+      vision_deck_status: "draft" | "ready" | "archived"
       workspace_member_role:
         | "owner"
         | "approver"
@@ -1591,6 +1705,7 @@ export const Constants = {
         "gmb",
         "snapchat",
       ],
+      vision_deck_status: ["draft", "ready", "archived"],
       workspace_member_role: ["owner", "approver", "viewer", "admin", "editor"],
       workspace_status: ["onboarding", "active", "paused", "archived"],
     },

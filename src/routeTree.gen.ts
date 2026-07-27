@@ -19,7 +19,9 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VisionTokenRouteImport } from './routes/vision/$token'
 import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
+import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
@@ -35,6 +37,7 @@ import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
+import { Route as ApiPublicVisionAssetRouteImport } from './routes/api/public/vision-asset'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
@@ -89,11 +92,22 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VisionTokenRoute = VisionTokenRouteImport.update({
+  id: '/vision/$token',
+  path: '/vision/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SocialConnectionsCallbackRoute =
   SocialConnectionsCallbackRouteImport.update({
     id: '/social-connections/callback',
     path: '/social-connections/callback',
     getParentRoute: () => rootRouteImport,
+  } as any)
+const AuthenticatedVisionStudioRoute =
+  AuthenticatedVisionStudioRouteImport.update({
+    id: '/vision-studio',
+    path: '/vision-studio',
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedSocialAccountsRoute =
   AuthenticatedSocialAccountsRouteImport.update({
@@ -173,6 +187,11 @@ const Char91DotmcpChar93ListToolsRoute =
     path: '/.mcp/list-tools',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicVisionAssetRoute = ApiPublicVisionAssetRouteImport.update({
+  id: '/api/public/vision-asset',
+  path: '/api/public/vision-asset',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -221,9 +240,12 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
+  '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -252,9 +274,12 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
+  '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -285,9 +310,12 @@ export interface FileRoutesById {
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
+  '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -318,9 +346,12 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/settings'
     | '/social-accounts'
+    | '/vision-studio'
     | '/social-connections/callback'
+    | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
   fileRoutesByTo: FileRoutesByTo
@@ -349,9 +380,12 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/settings'
     | '/social-accounts'
+    | '/vision-studio'
     | '/social-connections/callback'
+    | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
   id:
@@ -381,9 +415,12 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding'
     | '/_authenticated/settings'
     | '/_authenticated/social-accounts'
+    | '/_authenticated/vision-studio'
     | '/social-connections/callback'
+    | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
   fileRoutesById: FileRoutesById
@@ -402,8 +439,10 @@ export interface RootRouteChildren {
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   SocialConnectionsCallbackRoute: typeof SocialConnectionsCallbackRoute
+  VisionTokenRoute: typeof VisionTokenRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiPublicVisionAssetRoute: typeof ApiPublicVisionAssetRoute
   ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
 }
@@ -480,12 +519,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vision/$token': {
+      id: '/vision/$token'
+      path: '/vision/$token'
+      fullPath: '/vision/$token'
+      preLoaderRoute: typeof VisionTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/social-connections/callback': {
       id: '/social-connections/callback'
       path: '/social-connections/callback'
       fullPath: '/social-connections/callback'
       preLoaderRoute: typeof SocialConnectionsCallbackRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/vision-studio': {
+      id: '/_authenticated/vision-studio'
+      path: '/vision-studio'
+      fullPath: '/vision-studio'
+      preLoaderRoute: typeof AuthenticatedVisionStudioRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/social-accounts': {
       id: '/_authenticated/social-accounts'
@@ -592,6 +645,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/vision-asset': {
+      id: '/api/public/vision-asset'
+      path: '/api/public/vision-asset'
+      fullPath: '/api/public/vision-asset'
+      preLoaderRoute: typeof ApiPublicVisionAssetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
@@ -637,6 +697,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSocialAccountsRoute: typeof AuthenticatedSocialAccountsRoute
+  AuthenticatedVisionStudioRoute: typeof AuthenticatedVisionStudioRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -653,6 +714,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSocialAccountsRoute: AuthenticatedSocialAccountsRoute,
+  AuthenticatedVisionStudioRoute: AuthenticatedVisionStudioRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
@@ -673,8 +735,10 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   SocialConnectionsCallbackRoute: SocialConnectionsCallbackRoute,
+  VisionTokenRoute: VisionTokenRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiPublicVisionAssetRoute: ApiPublicVisionAssetRoute,
   ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
 }
