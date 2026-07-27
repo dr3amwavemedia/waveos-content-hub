@@ -37,6 +37,27 @@ export interface VisionRoiModel {
   customerValue: number;
 }
 
+export interface VisionPackageOption {
+  id: string;
+  name: string;
+  price: number;
+  paymentPlan: string;
+  description: string;
+  deliverableCount: number;
+  features: string[];
+  badge: string;
+  callToAction: string;
+  recommended: boolean;
+}
+
+export interface VisionPackageComparison {
+  eyebrow: string;
+  headline: string;
+  introduction: string;
+  currency: string;
+  options: VisionPackageOption[];
+}
+
 export interface VisionDeckBranding {
   companyLogo?: {
     storagePath: string;
@@ -69,6 +90,7 @@ export interface VisionDeckContent {
     posterUrl: string;
   };
   roi: VisionRoiModel;
+  packages?: VisionPackageComparison;
   timeline: VisionTimelineStep[];
   close: {
     headline: string;
