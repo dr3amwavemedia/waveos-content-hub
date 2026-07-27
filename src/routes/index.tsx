@@ -10,13 +10,11 @@ export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       {
-        title:
-          "WaveOS",
+        title: "WaveOS",
       },
       {
         name: "description",
-        content:
-          "DWM",
+        content: "DWM",
       },
     ],
   }),
@@ -51,8 +49,9 @@ function Landing() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!cancelled && data.session) {
+      const { data, error } = await supabase.auth.getUser();
+
+      if (!cancelled && !error && data.user) {
         navigate({ to: "/home", replace: true });
       }
     })();
@@ -84,17 +83,15 @@ function Landing() {
       <main className="relative mx-auto max-w-6xl px-6 pt-16 pb-24 sm:pt-24">
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground backdrop-blur">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_10px] shadow-primary/80" />
-            A Dream Wave Media platform
+            <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_10px] shadow-primary/80" />A Dream Wave
+            Media platform
           </span>
           <h1 className="mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-6xl md:text-7xl">
-            Create. Approve.{" "}
-            <span className="text-gradient-primary">Schedule. Grow.</span>
+            Create. Approve. <span className="text-gradient-primary">Schedule. Grow.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground">
-            WaveOS is the content operating system for Dream Wave Media clients. Your
-            content, social accounts, analytics, and brand voice — organized in one
-            calm, cinematic place.
+            WaveOS is the content operating system for Dream Wave Media clients. Your content, social accounts,
+            analytics, and brand voice — organized in one calm, cinematic place.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
@@ -128,12 +125,8 @@ function Landing() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
                 <h.icon className="h-5 w-5" />
               </div>
-              <h3 className="mt-4 text-lg font-semibold text-foreground">
-                {h.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                {h.body}
-              </p>
+              <h3 className="mt-4 text-lg font-semibold text-foreground">{h.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{h.body}</p>
             </div>
           ))}
         </div>
@@ -144,9 +137,7 @@ function Landing() {
           <div className="flex items-center gap-2">
             <WaveLogo compact />
           </div>
-          <p>
-            © {new Date().getFullYear()} Dream Wave Media. Powered by WaveOS.
-          </p>
+          <p>© {new Date().getFullYear()} Dream Wave Media. Powered by WaveOS.</p>
         </div>
       </footer>
     </div>
