@@ -13,7 +13,6 @@ import { VisionDeckEditor, type VisionDeckSavePayload } from "@/features/vision-
 import { parseVisionDeckContent, serializeVisionDeckContent, type VisionDeck } from "@/features/vision-decks/types";
 
 export const Route = createFileRoute("/_authenticated/vision-studio")({
-  Commit changes → Commit directly to main
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
 
