@@ -28,6 +28,15 @@ const isStaff = (roles ?? []).some(
 if (!isStaff) {
   throw redirect({ to: "/home" });
 }
+const isStaff = (roles ?? []).some(
+  (role) =>
+    role.role === "dream_wave_owner" ||
+    role.role === "dream_wave_team",
+);
+
+if (!isStaff) {
+  throw redirect({ to: "/home" });
+}
   component: VisionStudioPage,
   head: () => ({
     meta: [{ title: "Vision Studio — WaveOS" }, { name: "robots", content: "noindex,nofollow" }],
