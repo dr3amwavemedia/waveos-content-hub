@@ -16,12 +16,7 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { URL_VALIDATION_MESSAGE, isValidHttpsUrl } from "@/lib/url-validation";
@@ -83,10 +78,7 @@ export function VisionDeckEditor({
     setDirty(true);
   };
 
-  const updateContent = <K extends keyof VisionDeckContent>(
-    key: K,
-    value: VisionDeckContent[K],
-  ) => {
+  const updateContent = <K extends keyof VisionDeckContent>(key: K, value: VisionDeckContent[K]) => {
     setDraft((current) => ({
       ...current,
       content: { ...current.content, [key]: value },
@@ -96,12 +88,11 @@ export function VisionDeckEditor({
 
   const branding = draft.content.branding;
   const companyLogo = branding?.companyLogo;
-  
-    const packages = draft.content.packages ?? {
+
+  const packages = draft.content.packages ?? {
     eyebrow: "Choose your campaign",
     headline: "Two ways to bring the vision to life.",
-    introduction:
-      "Compare the complete campaign experience with a focused, budget-conscious alternative.",
+    introduction: "Compare the complete campaign experience with a focused, budget-conscious alternative.",
     currency: "USD",
     options: [
       {
@@ -111,11 +102,7 @@ export function VisionDeckEditor({
         paymentPlan: "Add payment schedule",
         description: "Add the complete campaign package description.",
         deliverableCount: 0,
-        features: [
-          "Add package feature",
-          "Add package feature",
-          "Add package feature",
-        ],
+        features: ["Add package feature", "Add package feature", "Add package feature"],
         badge: "Recommended",
         callToAction: "Select Package 1",
         recommended: true,
@@ -127,11 +114,7 @@ export function VisionDeckEditor({
         paymentPlan: "Add payment schedule",
         description: "Add the budget-conscious package description.",
         deliverableCount: 0,
-        features: [
-          "Add package feature",
-          "Add package feature",
-          "Add package feature",
-        ],
+        features: ["Add package feature", "Add package feature", "Add package feature"],
         badge: "Budget Friendly",
         callToAction: "Select Package 2",
         recommended: false,
@@ -157,7 +140,12 @@ export function VisionDeckEditor({
     }
     setUploadingLogo(true);
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") || "png";
+      const ext =
+        file.name
+          .split(".")
+          .pop()
+          ?.toLowerCase()
+          .replace(/[^a-z0-9]/g, "") || "png";
       const path = `${deck.id}/logos/${crypto.randomUUID()}.${ext}`;
       const { error } = await supabase.storage
         .from(VISION_ASSETS_BUCKET)
@@ -237,11 +225,7 @@ export function VisionDeckEditor({
                 disabled={isSaving || !dirty}
                 className="inline-flex items-center gap-2 rounded-lg border border-border bg-elevated px-3 py-2 text-xs font-medium text-foreground hover:bg-surface-2 disabled:opacity-40"
               >
-                {isSaving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Save className="h-3.5 w-3.5" />
-                )}
+                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
                 Save
               </button>
               <button
@@ -249,11 +233,7 @@ export function VisionDeckEditor({
                 disabled={isSaving}
                 className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-50"
               >
-                {isSaving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Send className="h-3.5 w-3.5" />
-                )}
+                {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                 {deck.share_enabled ? "Update live deck" : "Publish link"}
               </button>
             </div>
@@ -304,16 +284,33 @@ export function VisionDeckEditor({
             <EditorSection title="Deck identity" description="Internal organization and prospect details." defaultOpen>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Internal title">
-                  <Input value={draft.title} onChange={(value) => updateDeck("title", value)} placeholder="Acme 2026 content vision" />
+                  <Input
+                    value={draft.title}
+                    onChange={(value) => updateDeck("title", value)}
+                    placeholder="Acme 2026 content vision"
+                  />
                 </Field>
                 <Field label="Company name">
-                  <Input value={draft.company_name} onChange={(value) => updateDeck("company_name", value)} placeholder="Acme Company" />
+                  <Input
+                    value={draft.company_name}
+                    onChange={(value) => updateDeck("company_name", value)}
+                    placeholder="Acme Company"
+                  />
                 </Field>
                 <Field label="Prospect name">
-                  <Input value={draft.prospect_name ?? ""} onChange={(value) => updateDeck("prospect_name", value)} placeholder="Jordan Lee" />
+                  <Input
+                    value={draft.prospect_name ?? ""}
+                    onChange={(value) => updateDeck("prospect_name", value)}
+                    placeholder="Jordan Lee"
+                  />
                 </Field>
                 <Field label="Prospect email" hint="Internal only; never exposed in the presentation.">
-                  <Input type="email" value={draft.prospect_email ?? ""} onChange={(value) => updateDeck("prospect_email", value)} placeholder="jordan@example.com" />
+                  <Input
+                    type="email"
+                    value={draft.prospect_email ?? ""}
+                    onChange={(value) => updateDeck("prospect_email", value)}
+                    placeholder="jordan@example.com"
+                  />
                 </Field>
               </div>
             </EditorSection>
@@ -321,13 +318,24 @@ export function VisionDeckEditor({
             <EditorSection title="Opening" description="The first impression and core promise." defaultOpen>
               <div className="space-y-4">
                 <Field label="Eyebrow">
-                  <Input value={draft.content.cover.eyebrow} onChange={(eyebrow) => updateContent("cover", { ...draft.content.cover, eyebrow })} />
+                  <Input
+                    value={draft.content.cover.eyebrow}
+                    onChange={(eyebrow) => updateContent("cover", { ...draft.content.cover, eyebrow })}
+                  />
                 </Field>
                 <Field label="Headline">
-                  <Textarea value={draft.content.cover.headline} onChange={(headline) => updateContent("cover", { ...draft.content.cover, headline })} rows={3} />
+                  <Textarea
+                    value={draft.content.cover.headline}
+                    onChange={(headline) => updateContent("cover", { ...draft.content.cover, headline })}
+                    rows={3}
+                  />
                 </Field>
                 <Field label="Supporting statement">
-                  <Textarea value={draft.content.cover.subhead} onChange={(subhead) => updateContent("cover", { ...draft.content.cover, subhead })} rows={3} />
+                  <Textarea
+                    value={draft.content.cover.subhead}
+                    onChange={(subhead) => updateContent("cover", { ...draft.content.cover, subhead })}
+                    rows={3}
+                  />
                 </Field>
               </div>
             </EditorSection>
@@ -335,29 +343,59 @@ export function VisionDeckEditor({
             <EditorSection title="What we heard" description="Meeting summary, goals, obstacles, and target audience.">
               <div className="space-y-4">
                 <Field label="Meeting summary">
-                  <Textarea value={draft.content.discovery.summary} onChange={(summary) => updateContent("discovery", { ...draft.content.discovery, summary })} rows={5} />
+                  <Textarea
+                    value={draft.content.discovery.summary}
+                    onChange={(summary) => updateContent("discovery", { ...draft.content.discovery, summary })}
+                    rows={5}
+                  />
                 </Field>
                 <Field label="Audience">
-                  <Textarea value={draft.content.discovery.audience} onChange={(audience) => updateContent("discovery", { ...draft.content.discovery, audience })} rows={2} />
+                  <Textarea
+                    value={draft.content.discovery.audience}
+                    onChange={(audience) => updateContent("discovery", { ...draft.content.discovery, audience })}
+                    rows={2}
+                  />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Goals" hint="One item per line.">
-                    <Textarea value={draft.content.discovery.goals.join("\n")} onChange={(value) => updateContent("discovery", { ...draft.content.discovery, goals: lines(value) })} rows={6} />
+                    <Textarea
+                      value={draft.content.discovery.goals.join("\n")}
+                      onChange={(value) =>
+                        updateContent("discovery", { ...draft.content.discovery, goals: lines(value) })
+                      }
+                      rows={6}
+                    />
                   </Field>
                   <Field label="Challenges" hint="One item per line.">
-                    <Textarea value={draft.content.discovery.challenges.join("\n")} onChange={(value) => updateContent("discovery", { ...draft.content.discovery, challenges: lines(value) })} rows={6} />
+                    <Textarea
+                      value={draft.content.discovery.challenges.join("\n")}
+                      onChange={(value) =>
+                        updateContent("discovery", { ...draft.content.discovery, challenges: lines(value) })
+                      }
+                      rows={6}
+                    />
                   </Field>
                 </div>
               </div>
             </EditorSection>
 
-            <EditorSection title="Creative direction" description="Define the feeling, narrative, and reference material.">
+            <EditorSection
+              title="Creative direction"
+              description="Define the feeling, narrative, and reference material."
+            >
               <div className="space-y-4">
                 <Field label="Direction title">
-                  <Input value={draft.content.direction.title} onChange={(title) => updateContent("direction", { ...draft.content.direction, title })} />
+                  <Input
+                    value={draft.content.direction.title}
+                    onChange={(title) => updateContent("direction", { ...draft.content.direction, title })}
+                  />
                 </Field>
                 <Field label="Creative narrative">
-                  <Textarea value={draft.content.direction.narrative} onChange={(narrative) => updateContent("direction", { ...draft.content.direction, narrative })} rows={4} />
+                  <Textarea
+                    value={draft.content.direction.narrative}
+                    onChange={(narrative) => updateContent("direction", { ...draft.content.direction, narrative })}
+                    rows={4}
+                  />
                 </Field>
                 <Field label="Creative keywords" hint="Separate with commas.">
                   <Input
@@ -365,7 +403,10 @@ export function VisionDeckEditor({
                     onChange={(value) =>
                       updateContent("direction", {
                         ...draft.content.direction,
-                        keywords: value.split(",").map((item) => item.trim()).filter(Boolean),
+                        keywords: value
+                          .split(",")
+                          .map((item) => item.trim())
+                          .filter(Boolean),
                       })
                     }
                   />
@@ -391,7 +432,10 @@ export function VisionDeckEditor({
                           value={reference.kind}
                           onChange={(event) => {
                             const references = [...draft.content.direction.references];
-                            references[referenceIndex] = { ...reference, kind: event.target.value as VisionReferenceKind };
+                            references[referenceIndex] = {
+                              ...reference,
+                              kind: event.target.value as VisionReferenceKind,
+                            };
                             updateContent("direction", { ...draft.content.direction, references });
                           }}
                           className={inputClass}
@@ -455,10 +499,18 @@ export function VisionDeckEditor({
           </TabsContent>
 
           <TabsContent value="experience" className="mt-4 space-y-4">
-            <EditorSection title="Content system" description="Show how the proposed deliverables work together." defaultOpen>
+            <EditorSection
+              title="Content system"
+              description="Show how the proposed deliverables work together."
+              defaultOpen
+            >
               <div className="space-y-4">
                 <Field label="Content-system narrative">
-                  <Textarea value={draft.content.plan.narrative} onChange={(narrative) => updateContent("plan", { ...draft.content.plan, narrative })} rows={4} />
+                  <Textarea
+                    value={draft.content.plan.narrative}
+                    onChange={(narrative) => updateContent("plan", { ...draft.content.plan, narrative })}
+                    rows={4}
+                  />
                 </Field>
                 <RepeaterHeader
                   title="Deliverables"
@@ -468,7 +520,13 @@ export function VisionDeckEditor({
                       ...draft.content.plan,
                       deliverables: [
                         ...draft.content.plan.deliverables,
-                        { id: newVisionId("deliverable"), quantity: 1, title: "New deliverable", description: "", platform: "Cross-platform" },
+                        {
+                          id: newVisionId("deliverable"),
+                          quantity: 1,
+                          title: "New deliverable",
+                          description: "",
+                          platform: "Cross-platform",
+                        },
                       ],
                     })
                   }
@@ -483,7 +541,10 @@ export function VisionDeckEditor({
                           value={item.quantity}
                           onChange={(event) => {
                             const deliverables = [...draft.content.plan.deliverables];
-                            deliverables[itemIndex] = { ...item, quantity: Math.max(1, Number(event.target.value) || 1) };
+                            deliverables[itemIndex] = {
+                              ...item,
+                              quantity: Math.max(1, Number(event.target.value) || 1),
+                            };
                             updateContent("plan", { ...draft.content.plan, deliverables });
                           }}
                           className={inputClass}
@@ -512,7 +573,9 @@ export function VisionDeckEditor({
                           onClick={() =>
                             updateContent("plan", {
                               ...draft.content.plan,
-                              deliverables: draft.content.plan.deliverables.filter((deliverable) => deliverable.id !== item.id),
+                              deliverables: draft.content.plan.deliverables.filter(
+                                (deliverable) => deliverable.id !== item.id,
+                              ),
                             })
                           }
                           className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
@@ -541,27 +604,52 @@ export function VisionDeckEditor({
             <EditorSection title="Vertical social preview" description="Configure the interactive phone concept.">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Social handle">
-                  <Input value={draft.content.social.handle} onChange={(handle) => updateContent("social", { ...draft.content.social, handle })} />
+                  <Input
+                    value={draft.content.social.handle}
+                    onChange={(handle) => updateContent("social", { ...draft.content.social, handle })}
+                  />
                 </Field>
                 <Field label="Button label">
-                  <Input value={draft.content.social.callToAction} onChange={(callToAction) => updateContent("social", { ...draft.content.social, callToAction })} />
+                  <Input
+                    value={draft.content.social.callToAction}
+                    onChange={(callToAction) => updateContent("social", { ...draft.content.social, callToAction })}
+                  />
                 </Field>
                 <Field label="Hook">
-                  <Textarea value={draft.content.social.hook} onChange={(hook) => updateContent("social", { ...draft.content.social, hook })} rows={3} />
+                  <Textarea
+                    value={draft.content.social.hook}
+                    onChange={(hook) => updateContent("social", { ...draft.content.social, hook })}
+                    rows={3}
+                  />
                 </Field>
                 <Field label="Caption">
-                  <Textarea value={draft.content.social.caption} onChange={(caption) => updateContent("social", { ...draft.content.social, caption })} rows={3} />
+                  <Textarea
+                    value={draft.content.social.caption}
+                    onChange={(caption) => updateContent("social", { ...draft.content.social, caption })}
+                    rows={3}
+                  />
                 </Field>
                 <Field label="Direct MP4/WebM URL" hint="YouTube and Vimeo URLs open as references.">
-                  <Input value={draft.content.social.videoUrl} onChange={(videoUrl) => updateContent("social", { ...draft.content.social, videoUrl })} placeholder="https://…/concept.mp4" />
+                  <Input
+                    value={draft.content.social.videoUrl}
+                    onChange={(videoUrl) => updateContent("social", { ...draft.content.social, videoUrl })}
+                    placeholder="https://…/concept.mp4"
+                  />
                 </Field>
                 <Field label="Poster image URL">
-                  <Input value={draft.content.social.posterUrl} onChange={(posterUrl) => updateContent("social", { ...draft.content.social, posterUrl })} placeholder="https://…/poster.webp" />
+                  <Input
+                    value={draft.content.social.posterUrl}
+                    onChange={(posterUrl) => updateContent("social", { ...draft.content.social, posterUrl })}
+                    placeholder="https://…/poster.webp"
+                  />
                 </Field>
               </div>
             </EditorSection>
 
-            <EditorSection title="ROI scenario" description="Set transparent, editable planning assumptions—not promises.">
+            <EditorSection
+              title="ROI scenario"
+              description="Set transparent, editable planning assumptions—not promises."
+            >
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {(
                   [
@@ -582,7 +670,10 @@ export function VisionDeckEditor({
                       step={step}
                       value={draft.content.roi[key]}
                       onChange={(event) =>
-                        updateContent("roi", { ...draft.content.roi, [key]: Math.max(0, Number(event.target.value) || 0) })
+                        updateContent("roi", {
+                          ...draft.content.roi,
+                          [key]: Math.max(0, Number(event.target.value) || 0),
+                        })
                       }
                       className={inputClass}
                     />
@@ -590,13 +681,11 @@ export function VisionDeckEditor({
                 ))}
               </div>
               <p className="mt-4 rounded-xl border border-warning/20 bg-warning/[0.04] px-3 py-2 text-xs leading-relaxed text-warning">
-                The published presentation labels all ROI figures as scenarios. Only use assumptions your team can explain and defend.
+                The published presentation labels all ROI figures as scenarios. Only use assumptions your team can
+                explain and defend.
               </p>
             </EditorSection>
-<EditorSection
-  title="Package comparison"
-            <EditorSection title="Roadmap" description="Explain how Dream Wave moves the concept into production.">
-                          <EditorSection
+            <EditorSection
               title="Package comparison"
               description="Create two client investment options for the presentation."
             >
@@ -605,18 +694,14 @@ export function VisionDeckEditor({
                   <Field label="Section label">
                     <Input
                       value={packages.eyebrow}
-                      onChange={(eyebrow) =>
-                        updateContent("packages", { ...packages, eyebrow })
-                      }
+                      onChange={(eyebrow) => updateContent("packages", { ...packages, eyebrow })}
                     />
                   </Field>
 
                   <Field label="Currency">
                     <Input
                       value={packages.currency}
-                      onChange={(currency) =>
-                        updateContent("packages", { ...packages, currency })
-                      }
+                      onChange={(currency) => updateContent("packages", { ...packages, currency })}
                       placeholder="USD"
                     />
                   </Field>
@@ -625,9 +710,7 @@ export function VisionDeckEditor({
                 <Field label="Slide headline">
                   <Input
                     value={packages.headline}
-                    onChange={(headline) =>
-                      updateContent("packages", { ...packages, headline })
-                    }
+                    onChange={(headline) => updateContent("packages", { ...packages, headline })}
                   />
                 </Field>
 
@@ -646,14 +729,9 @@ export function VisionDeckEditor({
 
                 <div className="grid gap-5 lg:grid-cols-2">
                   {packages.options.map((option, optionIndex) => (
-                    <div
-                      key={option.id}
-                      className="rounded-2xl border border-border bg-elevated/35 p-4"
-                    >
+                    <div key={option.id} className="rounded-2xl border border-border bg-elevated/35 p-4">
                       <div className="mb-4 flex items-center justify-between gap-3">
-                        <h3 className="text-sm font-semibold text-foreground">
-                          Package {optionIndex + 1}
-                        </h3>
+                        <h3 className="text-sm font-semibold text-foreground">Package {optionIndex + 1}</h3>
 
                         <label className="flex items-center gap-2 text-xs text-muted-foreground">
                           <input
@@ -661,12 +739,10 @@ export function VisionDeckEditor({
                             name="recommended-package"
                             checked={option.recommended}
                             onChange={() => {
-                              const options = packages.options.map(
-                                (currentOption, currentIndex) => ({
-                                  ...currentOption,
-                                  recommended: currentIndex === optionIndex,
-                                }),
-                              );
+                              const options = packages.options.map((currentOption, currentIndex) => ({
+                                ...currentOption,
+                                recommended: currentIndex === optionIndex,
+                              }));
 
                               updateContent("packages", {
                                 ...packages,
@@ -706,10 +782,7 @@ export function VisionDeckEditor({
 
                                 options[optionIndex] = {
                                   ...option,
-                                  price: Math.max(
-                                    0,
-                                    Number(event.target.value) || 0,
-                                  ),
+                                  price: Math.max(0, Number(event.target.value) || 0),
                                 };
 
                                 updateContent("packages", {
@@ -731,10 +804,7 @@ export function VisionDeckEditor({
 
                                 options[optionIndex] = {
                                   ...option,
-                                  deliverableCount: Math.max(
-                                    0,
-                                    Number(event.target.value) || 0,
-                                  ),
+                                  deliverableCount: Math.max(0, Number(event.target.value) || 0),
                                 };
 
                                 updateContent("packages", {
@@ -787,10 +857,7 @@ export function VisionDeckEditor({
                           />
                         </Field>
 
-                        <Field
-                          label="Package features"
-                          hint="Enter one feature on each line."
-                        >
+                        <Field label="Package features" hint="Enter one feature on each line.">
                           <Textarea
                             value={option.features.join("\n")}
                             onChange={(value) => {
@@ -853,6 +920,8 @@ export function VisionDeckEditor({
                 </div>
               </div>
             </EditorSection>
+
+            <EditorSection title="Roadmap" description="Explain how Dream Wave moves the concept into production.">
               <RepeaterHeader
                 title="Phases"
                 actionLabel="Add phase"
@@ -890,16 +959,25 @@ export function VisionDeckEditor({
                           icon={ArrowUp}
                           label="Move phase up"
                           disabled={stepIndex === 0}
-                          onClick={() => updateContent("timeline", move(draft.content.timeline, stepIndex, stepIndex - 1))}
+                          onClick={() =>
+                            updateContent("timeline", move(draft.content.timeline, stepIndex, stepIndex - 1))
+                          }
                         />
                         <OrderButton
                           icon={ArrowDown}
                           label="Move phase down"
                           disabled={stepIndex === draft.content.timeline.length - 1}
-                          onClick={() => updateContent("timeline", move(draft.content.timeline, stepIndex, stepIndex + 1))}
+                          onClick={() =>
+                            updateContent("timeline", move(draft.content.timeline, stepIndex, stepIndex + 1))
+                          }
                         />
                         <button
-                          onClick={() => updateContent("timeline", draft.content.timeline.filter((item) => item.id !== step.id))}
+                          onClick={() =>
+                            updateContent(
+                              "timeline",
+                              draft.content.timeline.filter((item) => item.id !== step.id),
+                            )
+                          }
                           className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                           aria-label="Remove phase"
                         >
@@ -925,17 +1003,36 @@ export function VisionDeckEditor({
             <EditorSection title="Closing" description="End with a confident, specific next step.">
               <div className="space-y-4">
                 <Field label="Headline">
-                  <Textarea value={draft.content.close.headline} onChange={(headline) => updateContent("close", { ...draft.content.close, headline })} rows={3} />
+                  <Textarea
+                    value={draft.content.close.headline}
+                    onChange={(headline) => updateContent("close", { ...draft.content.close, headline })}
+                    rows={3}
+                  />
                 </Field>
                 <Field label="Supporting statement">
-                  <Textarea value={draft.content.close.body} onChange={(body) => updateContent("close", { ...draft.content.close, body })} rows={3} />
+                  <Textarea
+                    value={draft.content.close.body}
+                    onChange={(body) => updateContent("close", { ...draft.content.close, body })}
+                    rows={3}
+                  />
                 </Field>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Button label">
-                    <Input value={draft.content.close.callToActionLabel} onChange={(callToActionLabel) => updateContent("close", { ...draft.content.close, callToActionLabel })} />
+                    <Input
+                      value={draft.content.close.callToActionLabel}
+                      onChange={(callToActionLabel) =>
+                        updateContent("close", { ...draft.content.close, callToActionLabel })
+                      }
+                    />
                   </Field>
                   <Field label="Button URL">
-                    <Input value={draft.content.close.callToActionUrl} onChange={(callToActionUrl) => updateContent("close", { ...draft.content.close, callToActionUrl })} placeholder="https://cal.com/…" />
+                    <Input
+                      value={draft.content.close.callToActionUrl}
+                      onChange={(callToActionUrl) =>
+                        updateContent("close", { ...draft.content.close, callToActionUrl })
+                      }
+                      placeholder="https://cal.com/…"
+                    />
                   </Field>
                 </div>
               </div>
@@ -983,7 +1080,11 @@ export function VisionDeckEditor({
                       disabled={uploadingLogo}
                       className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
                     >
-                      {uploadingLogo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                      {uploadingLogo ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Upload className="h-3.5 w-3.5" />
+                      )}
                       {companyLogo?.storagePath ? "Replace logo" : "Upload logo"}
                     </button>
                     {companyLogo?.storagePath && (
@@ -1020,7 +1121,8 @@ export function VisionDeckEditor({
                     </select>
                   </Field>
                   <p className="text-[11px] text-muted-foreground">
-                    Removing the logo here only clears the reference; the file is preserved so duplicated decks keep working.
+                    Removing the logo here only clears the reference; the file is preserved so duplicated decks keep
+                    working.
                   </p>
                 </div>
               </div>
@@ -1050,7 +1152,8 @@ export function VisionDeckEditor({
             <div className="surface-card p-5">
               <h2 className="text-sm font-semibold text-foreground">Deck actions</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Duplicate creates an independent draft. Archive removes this deck from the active studio list and disables its prospect link.
+                Duplicate creates an independent draft. Archive removes this deck from the active studio list and
+                disables its prospect link.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -1071,9 +1174,7 @@ export function VisionDeckEditor({
         </Tabs>
       </div>
 
-      {previewing && (
-        <VisionPresentation deck={{ ...draft, ...payload }} onClose={() => setPreviewing(false)} />
-      )}
+      {previewing && <VisionPresentation deck={{ ...draft, ...payload }} onClose={() => setPreviewing(false)} />}
     </>
   );
 }
@@ -1138,7 +1239,12 @@ function Input({
 
 function Textarea({ value, onChange, rows }: { value: string; onChange: (value: string) => void; rows: number }) {
   return (
-    <textarea value={value} onChange={(event) => onChange(event.target.value)} rows={rows} className={cn(inputClass, "resize-y")} />
+    <textarea
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      rows={rows}
+      className={cn(inputClass, "resize-y")}
+    />
   );
 }
 
@@ -1183,7 +1289,10 @@ const inputClass =
   "w-full rounded-lg border border-input bg-surface/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/35";
 
 function lines(value: string): string[] {
-  return value.split("\n").map((item) => item.trim()).filter(Boolean);
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function move<T>(items: T[], from: number, to: number): T[] {
