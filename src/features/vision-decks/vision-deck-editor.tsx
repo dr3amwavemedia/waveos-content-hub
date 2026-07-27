@@ -551,7 +551,8 @@ export function VisionDeckEditor({
                 The published presentation labels all ROI figures as scenarios. Only use assumptions your team can explain and defend.
               </p>
             </EditorSection>
-
+<EditorSection
+  title="Package comparison"
             <EditorSection title="Roadmap" description="Explain how Dream Wave moves the concept into production.">
               <RepeaterHeader
                 title="Phases"
