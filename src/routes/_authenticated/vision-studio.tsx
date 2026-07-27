@@ -12,6 +12,7 @@ import { createDefaultVisionDeckContent } from "@/features/vision-decks/defaults
 import { VisionDeckEditor, type VisionDeckSavePayload } from "@/features/vision-decks/vision-deck-editor";
 import { parseVisionDeckContent, serializeVisionDeckContent, type VisionDeck } from "@/features/vision-decks/types";
 
+// Vision Studio is available to authorized Dream Wave staff.
 export const Route = createFileRoute("/_authenticated/vision-studio")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
