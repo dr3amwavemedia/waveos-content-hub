@@ -21,15 +21,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
 import { WaveLogo } from "@/components/branding/wave-logo";
 import { cn } from "@/lib/utils";
@@ -65,16 +57,14 @@ export function VisionPresentation({ deck, onClose, onSlideChange, shareToken }:
       { key: "content-system", shortLabel: "Content system", content: <ContentSystemSlide deck={deck} /> },
       { key: "social-preview", shortLabel: "In the feed", content: <SocialPreviewSlide deck={deck} /> },
       { key: "roi", shortLabel: "Opportunity", content: <RoiSlide deck={deck} /> },
+      { key: "packages", shortLabel: "Investment", content: <PackageComparisonSlide deck={deck} /> },
       { key: "roadmap", shortLabel: "Roadmap", content: <RoadmapSlide deck={deck} /> },
       { key: "next-step", shortLabel: "Next step", content: <ClosingSlide deck={deck} /> },
     ],
     [deck, shareToken],
   );
 
-  const goTo = useCallback(
-    (next: number) => setIndex(Math.max(0, Math.min(slides.length - 1, next))),
-    [slides.length],
-  );
+  const goTo = useCallback((next: number) => setIndex(Math.max(0, Math.min(slides.length - 1, next))), [slides.length]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -266,7 +256,9 @@ function DiscoverySlide({ deck }: { deck: PresentableDeck }) {
           </h2>
           <p className="mt-5 text-base leading-relaxed text-white/60 sm:text-lg">{discovery.summary}</p>
           <div className="mt-8 rounded-2xl border border-white/10 bg-white/[0.035] p-5">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--vision-accent)]">The audience</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--vision-accent)]">
+              The audience
+            </p>
             <p className="mt-2 text-sm leading-relaxed text-white/75">{discovery.audience}</p>
           </div>
         </div>
@@ -291,7 +283,10 @@ function DirectionSlide({ deck }: { deck: PresentableDeck }) {
         </div>
         <div className="flex max-w-lg flex-wrap gap-2">
           {direction.keywords.map((keyword) => (
-            <span key={keyword} className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-white/75">
+            <span
+              key={keyword}
+              className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-white/75"
+            >
               {keyword}
             </span>
           ))}
@@ -321,14 +316,21 @@ function ContentSystemSlide({ deck }: { deck: PresentableDeck }) {
         </div>
         <div className="space-y-3">
           {plan.deliverables.map((item, itemIndex) => (
-            <div key={item.id} className="group grid gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-5 transition hover:border-white/20 hover:bg-white/[0.055] sm:grid-cols-[auto_1fr_auto] sm:items-center">
+            <div
+              key={item.id}
+              className="group grid gap-4 rounded-2xl border border-white/10 bg-white/[0.035] p-5 transition hover:border-white/20 hover:bg-white/[0.055] sm:grid-cols-[auto_1fr_auto] sm:items-center"
+            >
               <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[color-mix(in_srgb,var(--vision-accent)_14%,transparent)] text-sm font-semibold text-[var(--vision-accent)]">
                 {String(itemIndex + 1).padStart(2, "0")}
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="font-semibold text-white">{item.quantity}× {item.title}</h3>
-                  <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-white/45">{item.platform}</span>
+                  <h3 className="font-semibold text-white">
+                    {item.quantity}× {item.title}
+                  </h3>
+                  <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-white/45">
+                    {item.platform}
+                  </span>
                 </div>
                 <p className="mt-1 text-sm leading-relaxed text-white/50">{item.description}</p>
               </div>
@@ -352,12 +354,15 @@ function SocialPreviewSlide({ deck }: { deck: PresentableDeck }) {
           <span className="block text-[var(--vision-accent)]">And earn the next click.</span>
         </h2>
         <p className="mt-5 max-w-xl text-base leading-relaxed text-white/60">
-          This concept preview demonstrates how the creative direction can translate into a vertical
-          story. Final performance depends on distribution, consistency, offer, and audience response.
+          This concept preview demonstrates how the creative direction can translate into a vertical story. Final
+          performance depends on distribution, consistency, offer, and audience response.
         </p>
         <div className="mt-7 flex flex-wrap gap-3 text-xs text-white/55">
           {["Hook in 2 seconds", "Native 9:16 framing", "One clear action"].map((item) => (
-            <span key={item} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+            <span
+              key={item}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2"
+            >
               <Check className="h-3.5 w-3.5 text-[var(--vision-accent)]" />
               {item}
             </span>
@@ -382,12 +387,37 @@ function RoiSlide({ deck }: { deck: PresentableDeck }) {
             <span className="block text-[var(--vision-accent)]">visible.</span>
           </h2>
           <p className="mt-5 max-w-xl text-sm leading-relaxed text-white/55">
-            Adjust the assumptions to explore possible outcomes. These figures are planning scenarios—not performance guarantees.
+            Adjust the assumptions to explore possible outcomes. These figures are planning scenarios—not performance
+            guarantees.
           </p>
           <div className="mt-8 space-y-5">
-            <RoiControl label="Average views per video" value={model.averageViews} min={500} max={25000} step={500} display={formatNumber(model.averageViews)} onChange={(averageViews) => setModel((c) => ({ ...c, averageViews }))} />
-            <RoiControl label="Website click rate" value={model.clickRate} min={0.2} max={8} step={0.1} display={`${model.clickRate.toFixed(1)}%`} onChange={(clickRate) => setModel((c) => ({ ...c, clickRate }))} />
-            <RoiControl label="Average customer value" value={model.customerValue} min={500} max={25000} step={500} display={formatMoney(model.customerValue)} onChange={(customerValue) => setModel((c) => ({ ...c, customerValue }))} />
+            <RoiControl
+              label="Average views per video"
+              value={model.averageViews}
+              min={500}
+              max={25000}
+              step={500}
+              display={formatNumber(model.averageViews)}
+              onChange={(averageViews) => setModel((c) => ({ ...c, averageViews }))}
+            />
+            <RoiControl
+              label="Website click rate"
+              value={model.clickRate}
+              min={0.2}
+              max={8}
+              step={0.1}
+              display={`${model.clickRate.toFixed(1)}%`}
+              onChange={(clickRate) => setModel((c) => ({ ...c, clickRate }))}
+            />
+            <RoiControl
+              label="Average customer value"
+              value={model.customerValue}
+              min={500}
+              max={25000}
+              step={500}
+              display={formatMoney(model.customerValue)}
+              onChange={(customerValue) => setModel((c) => ({ ...c, customerValue }))}
+            />
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -398,7 +428,9 @@ function RoiSlide({ deck }: { deck: PresentableDeck }) {
           <div className="sm:col-span-2 rounded-3xl border border-[color-mix(in_srgb,var(--vision-accent)_35%,transparent)] bg-[color-mix(in_srgb,var(--vision-accent)_10%,transparent)] p-6">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--vision-accent)]">Modeled business value</p>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--vision-accent)]">
+                  Modeled business value
+                </p>
                 <p className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">{formatMoney(result.value)}</p>
               </div>
               <CircleDollarSign className="h-10 w-10 text-[var(--vision-accent)] opacity-75" />
@@ -414,7 +446,126 @@ function RoiSlide({ deck }: { deck: PresentableDeck }) {
     </section>
   );
 }
+function PackageComparisonSlide({ deck }: { deck: PresentableDeck }) {
+  const comparison = deck.content.packages ?? {
+    eyebrow: "Choose your campaign",
+    headline: "Two ways to bring the vision to life.",
+    introduction: "Compare the complete campaign experience with a focused, budget-conscious alternative.",
+    currency: "USD",
+    options: [
+      {
+        id: "package-option-1",
+        name: "Client Package 1",
+        price: 0,
+        paymentPlan: "Add payment schedule",
+        description: "Add the complete campaign package description.",
+        deliverableCount: 0,
+        features: ["Add package feature", "Add package feature", "Add package feature"],
+        badge: "Recommended",
+        callToAction: "Select Package 1",
+        recommended: true,
+      },
+      {
+        id: "package-option-2",
+        name: "Client Package 2",
+        price: 0,
+        paymentPlan: "Add payment schedule",
+        description: "Add the budget-conscious package description.",
+        deliverableCount: 0,
+        features: ["Add package feature", "Add package feature", "Add package feature"],
+        badge: "Budget Friendly",
+        callToAction: "Select Package 2",
+        recommended: false,
+      },
+    ],
+  };
 
+  const initialSelection =
+    comparison.options.find((option) => option.recommended)?.id ?? comparison.options[0]?.id ?? "";
+
+  const [selectedId, setSelectedId] = useState(initialSelection);
+
+  return (
+    <section className="w-full">
+      <Eyebrow icon={CircleDollarSign}>{comparison.eyebrow}</Eyebrow>
+
+      <div className="mt-6 max-w-3xl">
+        <h2 className="text-4xl font-semibold tracking-[-0.04em] sm:text-6xl">{comparison.headline}</h2>
+
+        <p className="mt-5 text-base leading-relaxed text-white/55">{comparison.introduction}</p>
+      </div>
+
+      <div className="mt-9 grid gap-5 lg:grid-cols-2">
+        {comparison.options.map((option) => {
+          const selected = selectedId === option.id;
+
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setSelectedId(option.id)}
+              onMouseEnter={() => setSelectedId(option.id)}
+              onFocus={() => setSelectedId(option.id)}
+              aria-pressed={selected}
+              className={cn(
+                "relative rounded-3xl border p-6 text-left",
+                "transition-all duration-300 ease-out",
+                "motion-reduce:transform-none motion-reduce:transition-none",
+                selected
+                  ? "z-10 scale-[1.035] -translate-y-1 border-[var(--vision-accent)] bg-white/[0.08] shadow-[0_24px_70px_-25px_var(--vision-accent)]"
+                  : "scale-100 border-white/10 bg-white/[0.035] opacity-75 hover:opacity-100",
+              )}
+            >
+              {option.badge && (
+                <span className="inline-flex rounded-full bg-[var(--vision-accent)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-[#04101a]">
+                  {option.badge}
+                </span>
+              )}
+
+              <h3 className="mt-5 text-2xl font-semibold text-white">{option.name}</h3>
+
+              <div className="mt-4">
+                <span className="text-4xl font-semibold tracking-tight text-white">
+                  {option.price > 0 ? formatMoney(option.price) : "Custom"}
+                </span>
+
+                <p className="mt-1 text-sm text-[var(--vision-accent)]">{option.paymentPlan}</p>
+              </div>
+
+              <p className="mt-5 text-sm leading-relaxed text-white/60">{option.description}</p>
+
+              {option.deliverableCount > 0 && (
+                <p className="mt-5 text-sm font-semibold text-white">
+                  Approximately {option.deliverableCount} deliverables
+                </p>
+              )}
+
+              <ul className="mt-5 space-y-3">
+                {option.features.map((feature, featureIndex) => (
+                  <li key={`${option.id}-${featureIndex}`} className="flex items-start gap-3 text-sm text-white/65">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[var(--vision-accent)]" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <div
+                className={cn(
+                  "mt-7 rounded-full px-4 py-3 text-center text-sm font-semibold transition",
+                  selected
+                    ? "bg-[var(--vision-accent)] text-[#04101a]"
+                    : "border border-white/10 bg-white/5 text-white",
+                )}
+              >
+                {option.callToAction}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
 function RoadmapSlide({ deck }: { deck: PresentableDeck }) {
   return (
     <section className="w-full">
@@ -426,7 +577,8 @@ function RoadmapSlide({ deck }: { deck: PresentableDeck }) {
             <span className="block text-[var(--vision-accent)]">No guesswork.</span>
           </h2>
           <p className="mt-5 text-base leading-relaxed text-white/55">
-            Every phase has a purpose, an owner, and a clear decision. The result is a production process that protects both the creative and the timeline.
+            Every phase has a purpose, an owner, and a clear decision. The result is a production process that protects
+            both the creative and the timeline.
           </p>
         </div>
         <div className="relative space-y-3 before:absolute before:bottom-8 before:left-[1.375rem] before:top-8 before:w-px before:bg-gradient-to-b before:from-[var(--vision-accent)] before:to-white/5">
@@ -600,7 +752,15 @@ function PhonePreview({ deck }: { deck: PresentableDeck }) {
         <div className="absolute left-1/2 top-2 z-20 h-5 w-24 -translate-x-1/2 rounded-full bg-black" />
         <div className="absolute inset-0">
           {video?.kind === "video" ? (
-            <video src={video.url} poster={poster} className="h-full w-full object-cover" autoPlay muted loop playsInline />
+            <video
+              src={video.url}
+              poster={poster}
+              className="h-full w-full object-cover"
+              autoPlay
+              muted
+              loop
+              playsInline
+            />
           ) : poster ? (
             <img src={poster} alt="" className="h-full w-full object-cover" />
           ) : (
@@ -652,8 +812,22 @@ function PhonePreview({ deck }: { deck: PresentableDeck }) {
 }
 
 function RoiControl({
-  label, value, min, max, step, display, onChange,
-}: { label: string; value: number; min: number; max: number; step: number; display: string; onChange: (value: number) => void }) {
+  label,
+  value,
+  min,
+  max,
+  step,
+  display,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  display: string;
+  onChange: (value: number) => void;
+}) {
   return (
     <label className="block">
       <span className="mb-2 flex items-center justify-between text-xs">
