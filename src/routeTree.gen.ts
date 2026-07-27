@@ -35,6 +35,7 @@ import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
+import { Route as ApiPublicVisionAssetRouteImport } from './routes/api/public/vision-asset'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
@@ -173,6 +174,11 @@ const Char91DotmcpChar93ListToolsRoute =
     path: '/.mcp/list-tools',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicVisionAssetRoute = ApiPublicVisionAssetRouteImport.update({
+  id: '/api/public/vision-asset',
+  path: '/api/public/vision-asset',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -224,6 +230,7 @@ export interface FileRoutesByFullPath {
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -255,6 +262,7 @@ export interface FileRoutesByTo {
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -288,6 +296,7 @@ export interface FileRoutesById {
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -321,6 +330,7 @@ export interface FileRouteTypes {
     | '/social-connections/callback'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
   fileRoutesByTo: FileRoutesByTo
@@ -352,6 +362,7 @@ export interface FileRouteTypes {
     | '/social-connections/callback'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
   id:
@@ -384,6 +395,7 @@ export interface FileRouteTypes {
     | '/social-connections/callback'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
   fileRoutesById: FileRoutesById
@@ -404,6 +416,7 @@ export interface RootRouteChildren {
   SocialConnectionsCallbackRoute: typeof SocialConnectionsCallbackRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiPublicVisionAssetRoute: typeof ApiPublicVisionAssetRoute
   ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
 }
@@ -592,6 +605,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/vision-asset': {
+      id: '/api/public/vision-asset'
+      path: '/api/public/vision-asset'
+      fullPath: '/api/public/vision-asset'
+      preLoaderRoute: typeof ApiPublicVisionAssetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
@@ -675,6 +695,7 @@ const rootRouteChildren: RootRouteChildren = {
   SocialConnectionsCallbackRoute: SocialConnectionsCallbackRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiPublicVisionAssetRoute: ApiPublicVisionAssetRoute,
   ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
 }
