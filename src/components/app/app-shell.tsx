@@ -61,6 +61,7 @@ const CLIENT_NAV: NavItem[] = [
 const STAFF_NAV: NavItem[] = [
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
+  { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
   { to: "/admin", label: "Admin", icon: ShieldCheck, staffOnly: true },
 ];
 
@@ -271,9 +272,7 @@ function WorkspaceSwitcher() {
             <Plus className="h-4 w-4 text-primary" />
             <span className="flex-1">
               <span className="block font-medium">New client workspace</span>
-              <span className="block text-[11px] text-muted-foreground">
-                Provision a Dream Wave Media client
-              </span>
+              <span className="block text-[11px] text-muted-foreground">Provision a Dream Wave Media client</span>
             </span>
           </button>
         </div>
@@ -282,8 +281,7 @@ function WorkspaceSwitcher() {
     return (
       <div className="mx-3 mt-2 rounded-xl border border-border bg-surface/60 p-3 text-xs text-muted-foreground">
         <div className="mb-1 font-medium text-foreground">No workspace yet</div>
-        WaveOS is invite-only. Your Dream Wave Media account manager will send
-        your activation link.
+        WaveOS is invite-only. Your Dream Wave Media account manager will send your activation link.
       </div>
     );
   }

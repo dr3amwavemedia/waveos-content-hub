@@ -14,12 +14,20 @@ import { parseVisionDeckContent, serializeVisionDeckContent, type VisionDeck } f
 
 export const Route = createFileRoute("/_authenticated/vision-studio")({
   beforeLoad: async () => {
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) throw redirect({ to: "/auth" });
-    const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", data.user.id);
-    const isOwner = (roles ?? []).some((r) => r.role === "dream_wave_owner");
-    if (!isOwner) throw redirect({ to: "/home" });
-  },
+   const { data: roles } = await supabase
+  .from("user_roles")
+  .select("role")
+  .eq("user_id", data.user.id);
+
+const isStaff = (roles ?? []).some(
+  (role) =>
+    role.role === "dream_wave_owner" ||
+    role.role === "dream_wave_team",
+);
+
+if (!isStaff) {
+  throw redirect({ to: "/home" });
+}
   component: VisionStudioPage,
   head: () => ({
     meta: [{ title: "Vision Studio — WaveOS" }, { name: "robots", content: "noindex,nofollow" }],
