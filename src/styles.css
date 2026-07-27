@@ -231,3 +231,71 @@ select {
     font-size: 16px;
   }
 }
+
+/* Vision Studio presentation experience */
+.vision-grid {
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--vision-accent, #4db8ff) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--vision-accent, #4db8ff) 7%, transparent) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: linear-gradient(to bottom, black, transparent 90%);
+}
+
+.vision-orb {
+  position: absolute;
+  width: min(44rem, 75vw);
+  height: min(44rem, 75vw);
+  border-radius: 9999px;
+  background: var(--vision-accent, #4db8ff);
+  filter: blur(130px);
+  opacity: 0.09;
+  animation: vision-orb-drift 15s ease-in-out infinite alternate;
+}
+
+.vision-orb-one { top: -25%; right: -10%; }
+.vision-orb-two { bottom: -40%; left: -20%; opacity: 0.055; animation-delay: -7s; }
+
+.animate-vision-slide-in {
+  animation: vision-slide-in 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.vision-range {
+  height: 0.3rem;
+  appearance: none;
+  border-radius: 9999px;
+  background: color-mix(in srgb, white 12%, transparent);
+  cursor: pointer;
+}
+
+.vision-range::-webkit-slider-thumb {
+  width: 1rem;
+  height: 1rem;
+  appearance: none;
+  border: 3px solid #08101c;
+  border-radius: 9999px;
+  background: var(--vision-accent, #4db8ff);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--vision-accent, #4db8ff) 60%, transparent);
+}
+
+.vision-range::-moz-range-thumb {
+  width: 0.75rem;
+  height: 0.75rem;
+  border: 3px solid #08101c;
+  border-radius: 9999px;
+  background: var(--vision-accent, #4db8ff);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--vision-accent, #4db8ff) 60%, transparent);
+}
+
+@keyframes vision-slide-in {
+  from { opacity: 0; transform: translate3d(0, 24px, 0) scale(0.992); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+@keyframes vision-orb-drift {
+  from { transform: translate3d(-3%, -2%, 0) scale(0.96); }
+  to { transform: translate3d(4%, 5%, 0) scale(1.08); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-vision-slide-in, .vision-orb { animation: none; }
+}
