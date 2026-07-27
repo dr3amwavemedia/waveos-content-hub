@@ -178,7 +178,7 @@ function VisionStudioPage() {
           <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Vision Studio</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
             Turn discovery notes, creative references, content plans, and defensible ROI scenarios into a guided
-            prospect experience. Only Dream Wave owners can access this studio.
+            prospect experience. Only authorized Dream Wave staff can access this studio.
           </p>
         </div>
         <button
