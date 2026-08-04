@@ -30,6 +30,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
 import { useCurrentUser } from "@/hooks/use-waveos";
+import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { WorkspaceProvider, useWorkspace } from "./workspace-context";
 import { ImpersonationBanner } from "./impersonation-banner";
 
@@ -52,7 +53,12 @@ const CLIENT_NAV: NavItem[] = [
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
   { to: "/analytics", label: "Analytics", icon: BarChart3, feature: "can_view_analytics" },
-  { to: "/social-accounts", label: "Social Accounts", icon: Share2, feature: "can_connect_socials" },
+  {
+    to: "/social-accounts",
+    label: "Social Accounts",
+    icon: Share2,
+    feature: "can_connect_socials",
+  },
   { to: "/brand-voice", label: "Brand Voice", icon: Sparkles, feature: "can_manage_brand_voice" },
   { to: "/feedback", label: "Feedback", icon: MessageSquare, feature: "can_contact_support" },
   { to: "/settings", label: "Settings", icon: Settings },
@@ -101,13 +107,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  const { data: user } = useCurrentUser();
   const { can, isLoading: permsLoading, access, isStaff } = usePermissions();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const filterByFeature = (items: NavItem[]) =>
     items.filter((i) => {
-      if (i.staffOnly) return !!user?.isStaff;
+      if (i.staffOnly) return isStaff;
       if (!i.feature) return true;
       if (permsLoading) return false;
       return can(i.feature);
@@ -118,7 +123,7 @@ function Shell({ children }: { children: ReactNode }) {
   const isLayer1 = !isStaff && access?.tier === "project_client";
 
   const clientNav = isLayer1 ? LAYER1_NAV : filterByFeature(CLIENT_NAV);
-  const staffNav = user?.isStaff ? STAFF_NAV : [];
+  const staffNav = isStaff ? STAFF_NAV : [];
   const mobileNav = isLayer1 ? LAYER1_MOBILE_NAV : filterByFeature(MOBILE_NAV);
   const nav = [...clientNav, ...staffNav];
 
@@ -132,7 +137,7 @@ function Shell({ children }: { children: ReactNode }) {
         <WorkspaceSwitcher />
         <nav className="mt-2 flex-1 overflow-y-auto px-3 pb-6">
           <NavGroup items={clientNav} />
-          {user?.isStaff && (
+          {isStaff && (
             <>
               <div className="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Dream Wave Media
@@ -162,7 +167,10 @@ function Shell({ children }: { children: ReactNode }) {
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog">
-          <div className="absolute inset-0 bg-background/70 backdrop-blur" onClick={() => setMobileOpen(false)} />
+          <div
+            className="absolute inset-0 bg-background/70 backdrop-blur"
+            onClick={() => setMobileOpen(false)}
+          />
           <div className="absolute inset-y-0 left-0 w-72 border-r border-border bg-sidebar p-4">
             <div className="flex items-center justify-between">
               <WaveLogo />
@@ -188,7 +196,9 @@ function Shell({ children }: { children: ReactNode }) {
       {/* Main */}
       <main className="min-h-screen lg:pl-64">
         <ImpersonationBanner />
-        <div className="mx-auto max-w-7xl px-4 pb-24 pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">{children}</div>
+        <div className="mx-auto max-w-7xl px-4 pb-24 pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
+          {children}
+        </div>
       </main>
 
       {/* Mobile bottom nav */}
@@ -258,6 +268,7 @@ function MobileNavLink({ item }: { item: NavItem }) {
 function WorkspaceSwitcher() {
   const { workspaces, activeWorkspace, setActiveWorkspaceId } = useWorkspace();
   const { data: user } = useCurrentUser();
+  const impersonate = useImpersonateClient();
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -272,7 +283,9 @@ function WorkspaceSwitcher() {
             <Plus className="h-4 w-4 text-primary" />
             <span className="flex-1">
               <span className="block font-medium">New client workspace</span>
-              <span className="block text-[11px] text-muted-foreground">Provision a Dream Wave Media client</span>
+              <span className="block text-[11px] text-muted-foreground">
+                Provision a Dream Wave Media client
+              </span>
             </span>
           </button>
         </div>
@@ -321,7 +334,7 @@ function WorkspaceSwitcher() {
               {w.id === activeWorkspace?.id && <Check className="ml-auto h-4 w-4 text-primary" />}
             </button>
           ))}
-          {user?.isStaff && (
+          {user?.isStaff && !impersonate.on && (
             <button
               onClick={() => {
                 setOpen(false);
@@ -352,7 +365,8 @@ function UserFooter() {
     navigate({ to: "/auth", replace: true });
   }
 
-  const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "You";
+  const displayName =
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "You";
 
   return (
     <div className="border-t border-border/80 p-3">
