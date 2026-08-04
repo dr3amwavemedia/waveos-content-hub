@@ -53,7 +53,6 @@ export function usePermissions(): WorkspacePermissions {
     queryFn: async (): Promise<WorkspaceAccessRow | null> => {
       const { data, error } = await supabase
         .from("workspaces")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .select(
           "access_tier, account_status, agreement_term, access_starts_at, access_expires_at, activated_at, invited_at, feature_overrides",
         )
@@ -67,7 +66,9 @@ export function usePermissions(): WorkspacePermissions {
   const impersonate = useImpersonateClient();
 
   return useMemo<WorkspacePermissions>(() => {
-    const isStaff = !!user?.isStaff;
+    // During "View as client", all UI authorization must use the effective
+    // client identity. The real staff role remains available only after exit.
+    const isStaff = !!user?.isStaff && !impersonate.on;
     const clientAccess: WorkspaceAccess | null = data
       ? {
           tier: data.access_tier,
@@ -79,7 +80,7 @@ export function usePermissions(): WorkspacePermissions {
 
     // Staff normally get full access; when "View as Client" is on, they get the
     // exact same access as the actual client of this workspace would.
-    if (isStaff && !impersonate.on) {
+    if (isStaff) {
       return {
         access: STAFF_ACCESS,
         raw: data ?? null,

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useImpersonateClient } from "@/hooks/use-impersonation";
 
 export interface WorkspaceSummary {
   id: string;
@@ -31,7 +32,11 @@ async function loadContext(): Promise<CurrentUserContext> {
 
   const user = auth.user;
   const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase.from("profiles").select("first_name,last_name,avatar_url").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("profiles")
+      .select("first_name,last_name,avatar_url")
+      .eq("id", user.id)
+      .maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", user.id),
   ]);
   const roleList = (roles ?? []).map((r) => r.role);
@@ -47,15 +52,10 @@ async function loadContext(): Promise<CurrentUserContext> {
   };
 }
 
-async function loadWorkspaces(ctx: CurrentUserContext): Promise<WorkspaceSummary[]> {
-  const { data: workspaces } = await supabase
-    .from("workspaces")
-    .select("id,name,slug,industry,timezone,is_demo")
-    .eq("is_archived", false)
-    .order("name", { ascending: true });
-
-  if (!workspaces) return [];
-
+async function loadWorkspaces(
+  ctx: CurrentUserContext,
+  previewWorkspaceId: string | null,
+): Promise<WorkspaceSummary[]> {
   const { data: memberships } = await supabase
     .from("workspace_members")
     .select("workspace_id, role")
@@ -63,11 +63,36 @@ async function loadWorkspaces(ctx: CurrentUserContext): Promise<WorkspaceSummary
 
   const membershipMap = new Map((memberships ?? []).map((m) => [m.workspace_id, m.role]));
 
-  return workspaces.map((w) => {
+  // The account switcher is for workspaces the signed-in account actually
+  // belongs to. Staff can read every client workspace through RLS for
+  // administration, but their normal account view is the seeded internal
+  // Dream Wave Media workspace only. While previewing, expose only the
+  // explicitly selected client workspace.
+  const workspaceIds = previewWorkspaceId
+    ? [previewWorkspaceId]
+    : ctx.isStaff
+      ? ["11111111-1111-1111-1111-111111111111"]
+      : Array.from(membershipMap.keys());
+
+  if (!workspaceIds.length) return [];
+
+  const { data: workspaces, error } = await supabase
+    .from("workspaces")
+    .select("id,name,slug,industry,timezone,is_demo")
+    .in("id", workspaceIds)
+    .eq("is_archived", false)
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+
+  return (workspaces ?? []).map((w) => {
     const role = membershipMap.get(w.id);
     return {
       ...w,
-      role: (role ?? (ctx.isStaff ? "staff" : "viewer")) as "owner" | "approver" | "viewer" | "staff",
+      // A staff preview is intentionally represented as client-level access.
+      // Outside preview, the internal account is labelled with the app role.
+      role: (previewWorkspaceId ? "viewer" : ctx.isStaff ? "staff" : (role ?? "viewer")) as
+        "owner" | "approver" | "viewer" | "staff",
     };
   });
 }
@@ -82,9 +107,15 @@ export function useCurrentUser() {
 
 export function useWorkspaces() {
   const { data: user } = useCurrentUser();
+  const impersonate = useImpersonateClient();
+  const previewWorkspaceId =
+    typeof window !== "undefined" && impersonate.on
+      ? localStorage.getItem("waveos.active-workspace")
+      : null;
+
   return useQuery({
-    queryKey: ["waveos", "workspaces", user?.userId],
-    queryFn: () => loadWorkspaces(user!),
+    queryKey: ["waveos", "workspaces", user?.userId, previewWorkspaceId],
+    queryFn: () => loadWorkspaces(user!, previewWorkspaceId),
     enabled: !!user,
     staleTime: 30_000,
   });
