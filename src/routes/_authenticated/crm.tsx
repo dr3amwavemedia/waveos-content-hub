@@ -206,7 +206,8 @@ function CrmPage() {
         }
       }
 
-      const ids = Array.from(new Set((roles ?? []).map((role) => role.user_id)));
+      const visibleRoles = (roles ?? []).filter((role) => role.user_id === auth.user!.id);
+      const ids = Array.from(new Set(visibleRoles.map((role) => role.user_id)));
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id,first_name,last_name")
@@ -223,7 +224,7 @@ function CrmPage() {
         staff: ids.map((id) => ({
           id,
           name: names.get(id) ?? "Staff member",
-          isOwner: (roles ?? []).some(
+          isOwner: visibleRoles.some(
             (role) => role.user_id === id && role.role === "dream_wave_owner",
           ),
         })),
@@ -516,20 +517,26 @@ function CrmPage() {
               </option>
             ))}
           </select>
-          <select
-            value={assignee}
-            onChange={(e) => setAssignee(e.target.value)}
-            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
-          >
-            <option value="all">All assignees</option>
-            <option value="mine">My leads</option>
-            <option value="unassigned">Unassigned</option>
-            {(staffQ.data?.staff ?? []).map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.name}
-              </option>
-            ))}
-          </select>
+          {staffQ.data?.isOwner ? (
+            <select
+              value={assignee}
+              onChange={(e) => setAssignee(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="all">All assignees</option>
+              <option value="mine">My leads</option>
+              <option value="unassigned">Unassigned</option>
+              {(staffQ.data?.staff ?? []).map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+              My assigned leads
+            </div>
+          )}
           <select
             value={priority}
             onChange={(e) => setPriority(e.target.value as Priority | "all")}
