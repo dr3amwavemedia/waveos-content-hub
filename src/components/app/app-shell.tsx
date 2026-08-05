@@ -68,7 +68,7 @@ const CLIENT_NAV: NavItem[] = [
 
 const STAFF_NAV: NavItem[] = [
   { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
-  { to: "/clients", label: "Clients", icon: Users2, staffOnly: true },
+  { to: "/clients", label: "Clients", icon: Users2, staffOnly: true, ownerOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
   { to: "/admin", label: "Staff", icon: ShieldCheck, staffOnly: true, ownerOnly: true },
@@ -77,7 +77,6 @@ const STAFF_NAV: NavItem[] = [
 const TEAM_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
   { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
-  { to: "/clients", label: "Clients", icon: Users2, staffOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
 ];
