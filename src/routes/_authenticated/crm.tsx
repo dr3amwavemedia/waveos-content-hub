@@ -1095,6 +1095,8 @@ function OverviewTab({
 }) {
   const qc = useQueryClient();
   const [workspaceId, setWorkspaceId] = useState(account.linked_workspace_id ?? "");
+  const [conversionTier, setConversionTier] = useState("retainer_full");
+  const [conversionTerm, setConversionTerm] = useState("");
   const [editing, setEditing] = useState(false);
   const [edit, setEdit] = useState({
     business: account.business_name,
@@ -1136,6 +1138,35 @@ function OverviewTab({
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Could not link workspace."),
+  });
+  const convertMutation = useMutation({
+    mutationFn: async () => {
+      if (account.linked_workspace_id) throw new Error("This lead is already linked to a client.");
+      const confirmed = window.confirm(
+        `Create a new client profile for ${account.business_name}?\n\nThe lead will be marked Won. You can review the profile and send the client invite afterward.`,
+      );
+      if (!confirmed) return null;
+      const { data, error } = await db.rpc("crm_convert_lead_to_client", {
+        _account_id: account.id,
+        _access_tier: conversionTier,
+        _agreement_term: conversionTerm || null,
+        _timezone: "America/New_York",
+      });
+      if (error) throw error;
+      return (data as Array<{ workspace_id: string }> | null)?.[0] ?? null;
+    },
+    onSuccess: (created) => {
+      if (!created) return;
+      setWorkspaceId(created.workspace_id);
+      qc.invalidateQueries({ queryKey: ["crm"] });
+      qc.invalidateQueries({ queryKey: ["crm", "workspaces"] });
+      qc.invalidateQueries({ queryKey: ["clients", "workspaces"] });
+      qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] });
+      toast.success("Client profile created. The lead is now marked Won.");
+      onRefresh();
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not create client profile."),
   });
   const editMutation = useMutation({
     mutationFn: async () => {
@@ -1317,9 +1348,48 @@ function OverviewTab({
             <h3 className="text-sm font-semibold">Convert to WaveOS client</h3>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Link this CRM account to an existing client workspace. This also marks the opportunity
-            Won.
+            Create a new client profile from this lead, or link it to an existing workspace. Either
+            option marks the opportunity Won.
           </p>
+          {!account.linked_workspace_id && (
+            <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
+              <p className="text-xs font-semibold text-foreground">Create a new client profile</p>
+              <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                <select
+                  value={conversionTier}
+                  onChange={(event) => setConversionTier(event.target.value)}
+                  className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                >
+                  <option value="project_client">Project Client</option>
+                  <option value="growth_90">Growth (90 days)</option>
+                  <option value="retainer_full">Retainer</option>
+                </select>
+                <select
+                  value={conversionTerm}
+                  onChange={(event) => setConversionTerm(event.target.value)}
+                  className="min-w-0 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">No agreement term</option>
+                  <option value="one_time">One-time</option>
+                  <option value="90_day">90 days</option>
+                  <option value="6_month">6 months</option>
+                  <option value="12_month">12 months</option>
+                </select>
+                <button
+                  onClick={() => convertMutation.mutate()}
+                  disabled={convertMutation.isPending}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+                >
+                  {convertMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <UserPlus className="h-4 w-4" />
+                  )}
+                  Create client
+                </button>
+              </div>
+            </div>
+          )}
           <div className="mt-3 flex flex-col gap-2 sm:flex-row">
             <select
               value={workspaceId}
