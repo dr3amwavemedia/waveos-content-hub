@@ -58,7 +58,8 @@ const STAGES = [
   "archived",
 ] as const;
 type Stage = (typeof STAGES)[number];
-type Priority = "low" | "normal" | "high" | "urgent";
+const PRIORITIES = ["low", "normal", "high", "urgent"] as const;
+type Priority = (typeof PRIORITIES)[number];
 
 const STAGE_LABEL: Record<Stage, string> = {
   new_lead: "New Lead",
@@ -325,6 +326,19 @@ function CrmPage() {
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Could not update stage."),
+  });
+
+  const priorityMutation = useMutation({
+    mutationFn: async ({ id, priority }: { id: string; priority: Priority }) => {
+      const { error } = await db.from("crm_accounts").update({ priority }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm"] });
+      toast.success("Lead priority updated.");
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not update priority."),
   });
 
   const toCsvRow = (account: Account): CrmCsvRow => {
@@ -623,7 +637,31 @@ function CrmPage() {
                         </select>
                       </td>
                       <td className="px-4 py-3">
-                        <PriorityBadge value={account.priority} />
+                        <select
+                          value={account.priority}
+                          onChange={(event) =>
+                            priorityMutation.mutate({
+                              id: account.id,
+                              priority: event.target.value as Priority,
+                            })
+                          }
+                          disabled={priorityMutation.isPending}
+                          className={cn(
+                            "rounded-md border border-border bg-background px-2 py-1 text-xs font-medium capitalize disabled:opacity-50",
+                            account.priority === "urgent"
+                              ? "text-destructive"
+                              : account.priority === "high"
+                                ? "text-warning"
+                                : "text-foreground",
+                          )}
+                          aria-label={`Priority for ${account.business_name}`}
+                        >
+                          {PRIORITIES.map((value) => (
+                            <option key={value} value={value}>
+                              {value}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td className="px-4 py-3">
                         {staffQ.data?.isOwner ? (
