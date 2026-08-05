@@ -13,6 +13,7 @@ import {
   Link2,
   Loader2,
   MessageSquareText,
+  PhoneCall,
   Plus,
   Search,
   UserPlus,
@@ -91,6 +92,7 @@ interface Account {
   stage: Stage;
   priority: Priority;
   estimated_value_cents: number | null;
+  assigned_to: string | null;
   preferred_contact_method: string | null;
   last_contacted_at: string | null;
   next_follow_up_at: string | null;
@@ -107,6 +109,13 @@ interface Task {
   due_at: string | null;
   priority: Priority;
   status: "open" | "in_progress" | "completed" | "cancelled";
+  assigned_to: string | null;
+}
+
+interface StaffMember {
+  id: string;
+  name: string;
+  isOwner: boolean;
 }
 
 // CRM tables arrive in the generated database types after the migration is applied.
@@ -119,8 +128,50 @@ function CrmPage() {
   const [search, setSearch] = useState("");
   const [stage, setStage] = useState<Stage | "all">("all");
   const [priority, setPriority] = useState<Priority | "all">("all");
+  const [assignee, setAssignee] = useState<"all" | "mine" | "unassigned" | string>("all");
   const [addOpen, setAddOpen] = useState(false);
   const [selected, setSelected] = useState<Account | null>(null);
+
+  const staffQ = useQuery({
+    queryKey: ["crm", "staff"],
+    queryFn: async (): Promise<{
+      currentUserId: string;
+      isOwner: boolean;
+      staff: StaffMember[];
+    }> => {
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) throw new Error("Sign in required.");
+      const { data: roles, error } = await supabase
+        .from("user_roles")
+        .select("user_id,role")
+        .in("role", ["dream_wave_owner", "dream_wave_team"]);
+      if (error) throw error;
+      const ids = Array.from(new Set((roles ?? []).map((role) => role.user_id)));
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id,first_name,last_name")
+        .in("id", ids);
+      const names = new Map(
+        (profiles ?? []).map((profile) => [
+          profile.id,
+          `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() || "Staff member",
+        ]),
+      );
+      return {
+        currentUserId: auth.user.id,
+        isOwner: (roles ?? []).some(
+          (role) => role.user_id === auth.user!.id && role.role === "dream_wave_owner",
+        ),
+        staff: ids.map((id) => ({
+          id,
+          name: names.get(id) ?? "Staff member",
+          isOwner: (roles ?? []).some(
+            (role) => role.user_id === id && role.role === "dream_wave_owner",
+          ),
+        })),
+      };
+    },
+  });
 
   const accountsQ = useQuery({
     queryKey: ["crm", "accounts"],
@@ -138,7 +189,7 @@ function CrmPage() {
     queryFn: async (): Promise<Task[]> => {
       const { data, error } = await db
         .from("crm_tasks")
-        .select("id,account_id,title,due_at,priority,status")
+        .select("id,account_id,title,due_at,priority,status,assigned_to")
         .neq("status", "cancelled")
         .order("due_at");
       if (error) throw error;
@@ -167,10 +218,14 @@ function CrmPage() {
       return (
         (!needle || haystack.includes(needle)) &&
         (stage === "all" || account.stage === stage) &&
-        (priority === "all" || account.priority === priority)
+        (priority === "all" || account.priority === priority) &&
+        (assignee === "all" ||
+          (assignee === "mine" && account.assigned_to === staffQ.data?.currentUserId) ||
+          (assignee === "unassigned" && !account.assigned_to) ||
+          account.assigned_to === assignee)
       );
     });
-  }, [accounts, priority, search, stage]);
+  }, [accounts, assignee, priority, search, staffQ.data?.currentUserId, stage]);
 
   const now = Date.now();
   const openTasks = (tasksQ.data ?? []).filter((t) => t.status !== "completed");
@@ -181,6 +236,24 @@ function CrmPage() {
   const pipelineValue = accounts
     .filter((a) => !["won", "lost", "archived"].includes(a.stage))
     .reduce((sum, a) => sum + (a.estimated_value_cents ?? 0), 0);
+  const activeWithoutFollowUp = accounts.filter(
+    (a) => !["won", "lost", "archived"].includes(a.stage) && !a.next_follow_up_at,
+  );
+
+  const assignmentMutation = useMutation({
+    mutationFn: async ({ id, assignedTo }: { id: string; assignedTo: string | null }) => {
+      const { error } = await db
+        .from("crm_accounts")
+        .update({ assigned_to: assignedTo })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm"] });
+      toast.success("Lead owner updated.");
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not assign lead."),
+  });
 
   const stageMutation = useMutation({
     mutationFn: async ({ id, stage }: { id: string; stage: Stage }) => {
@@ -270,14 +343,49 @@ function CrmPage() {
         />
         <Metric
           icon={AlertCircle}
-          label="Overdue tasks"
-          value={overdueTasks.length}
-          tone={overdueTasks.length ? "danger" : "default"}
+          label="Missing follow-up"
+          value={activeWithoutFollowUp.length}
+          tone={activeWithoutFollowUp.length ? "danger" : "default"}
         />
       </div>
 
+      <section className="surface-card p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Daily follow-up queue</h2>
+            <p className="text-xs text-muted-foreground">
+              {overdueTasks.length} overdue · {dueToday.length} due today
+            </p>
+          </div>
+          <button
+            onClick={() => setAssignee("mine")}
+            className="rounded-lg border border-border px-3 py-2 text-xs font-medium"
+          >
+            My leads
+          </button>
+        </div>
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          {[...overdueTasks, ...dueToday.filter((task) => !overdueTasks.includes(task))]
+            .slice(0, 6)
+            .map((task) => (
+              <div
+                key={task.id}
+                className="rounded-lg border border-border bg-background/40 p-3 text-sm"
+              >
+                <div className="font-medium">{task.title}</div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {task.due_at ? new Date(task.due_at).toLocaleString() : "No due date"}
+                </div>
+              </div>
+            ))}
+          {!overdueTasks.length && !dueToday.length && (
+            <p className="text-sm text-muted-foreground">Nothing urgent today.</p>
+          )}
+        </div>
+      </section>
+
       <section className="surface-card overflow-hidden">
-        <div className="grid gap-3 border-b border-border p-4 md:grid-cols-[1fr_190px_160px]">
+        <div className="grid gap-3 border-b border-border p-4 md:grid-cols-[1fr_180px_150px_180px]">
           <label className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
             <input
@@ -296,6 +404,20 @@ function CrmPage() {
             {STAGES.map((s) => (
               <option key={s} value={s}>
                 {STAGE_LABEL[s]}
+              </option>
+            ))}
+          </select>
+          <select
+            value={assignee}
+            onChange={(e) => setAssignee(e.target.value)}
+            className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          >
+            <option value="all">All assignees</option>
+            <option value="mine">My leads</option>
+            <option value="unassigned">Unassigned</option>
+            {(staffQ.data?.staff ?? []).map((member) => (
+              <option key={member.id} value={member.id}>
+                {member.name}
               </option>
             ))}
           </select>
@@ -336,6 +458,7 @@ function CrmPage() {
                   <th className="px-4 py-3">Business</th>
                   <th className="px-4 py-3">Stage</th>
                   <th className="px-4 py-3">Priority</th>
+                  <th className="px-4 py-3">Owner</th>
                   <th className="px-4 py-3">Value</th>
                   <th className="px-4 py-3">Next follow-up</th>
                   <th className="px-4 py-3">Contact</th>
@@ -376,6 +499,32 @@ function CrmPage() {
                       </td>
                       <td className="px-4 py-3">
                         <PriorityBadge value={account.priority} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {staffQ.data?.isOwner ? (
+                          <select
+                            value={account.assigned_to ?? ""}
+                            onChange={(e) =>
+                              assignmentMutation.mutate({
+                                id: account.id,
+                                assignedTo: e.target.value || null,
+                              })
+                            }
+                            className="max-w-40 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                          >
+                            <option value="">Unassigned</option>
+                            {(staffQ.data.staff ?? []).map((member) => (
+                              <option key={member.id} value={member.id}>
+                                {member.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-xs">
+                            {staffQ.data?.staff.find((member) => member.id === account.assigned_to)
+                              ?.name ?? "Unassigned"}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3">{money(account.estimated_value_cents)}</td>
                       <td className="px-4 py-3">{dateLabel(account.next_follow_up_at)}</td>
@@ -419,6 +568,8 @@ function CrmPage() {
           account={selected}
           onClose={() => setSelected(null)}
           onRefresh={() => qc.invalidateQueries({ queryKey: ["crm"] })}
+          staff={staffQ.data?.staff ?? []}
+          isOwner={staffQ.data?.isOwner ?? false}
           onExport={() =>
             downloadCsv(`${safeCsvFilename(selected.business_name)}-crm.csv`, [toCsvRow(selected)])
           }
@@ -704,21 +855,26 @@ function AccountDrawer({
   onClose,
   onExport,
   onRefresh,
+  staff,
+  isOwner,
 }: {
   account: Account;
   onClose: () => void;
   onExport: () => void;
   onRefresh: () => void;
+  staff: StaffMember[];
+  isOwner: boolean;
 }) {
-  const [tab, setTab] = useState<"overview" | "contacts" | "notes" | "tasks" | "activity">(
-    "overview",
-  );
+  const [tab, setTab] = useState<
+    "overview" | "contacts" | "notes" | "tasks" | "communication" | "activity"
+  >("overview");
   const contact = account.crm_contacts?.find((c) => c.is_primary) ?? account.crm_contacts?.[0];
   const tabs = [
     ["overview", "Overview", BriefcaseBusiness],
     ["contacts", "Contacts", Users2],
     ["notes", "Notes", MessageSquareText],
     ["tasks", "Tasks", ClipboardList],
+    ["communication", "Log contact", PhoneCall],
     ["activity", "Activity", Activity],
   ] as const;
   return (
@@ -772,11 +928,19 @@ function AccountDrawer({
         </div>
         <div className="mt-5">
           {tab === "overview" && (
-            <OverviewTab account={account} contact={contact} onRefresh={onRefresh} />
+            <OverviewTab
+              account={account}
+              contact={contact}
+              onRefresh={onRefresh}
+              isOwner={isOwner}
+            />
           )}
           {tab === "contacts" && <ContactsTab accountId={account.id} onRefresh={onRefresh} />}
           {tab === "notes" && <NotesTab accountId={account.id} />}
           {tab === "tasks" && <TasksTab accountId={account.id} onRefresh={onRefresh} />}
+          {tab === "communication" && (
+            <CommunicationTab account={account} staff={staff} onRefresh={onRefresh} />
+          )}
           {tab === "activity" && <ActivityTab accountId={account.id} />}
         </div>
       </aside>
@@ -788,13 +952,24 @@ function OverviewTab({
   account,
   contact,
   onRefresh,
+  isOwner,
 }: {
   account: Account;
   contact: Contact | undefined;
   onRefresh: () => void;
+  isOwner: boolean;
 }) {
   const qc = useQueryClient();
   const [workspaceId, setWorkspaceId] = useState(account.linked_workspace_id ?? "");
+  const [editing, setEditing] = useState(false);
+  const [edit, setEdit] = useState({
+    business: account.business_name,
+    email: account.email ?? "",
+    phone: account.phone ?? "",
+    industry: account.industry ?? "",
+    value: account.estimated_value_cents == null ? "" : String(account.estimated_value_cents / 100),
+    followUp: account.next_follow_up_at ? account.next_follow_up_at.slice(0, 16) : "",
+  });
   const workspacesQ = useQuery({
     queryKey: ["crm", "workspaces"],
     queryFn: async () => {
@@ -828,9 +1003,120 @@ function OverviewTab({
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Could not link workspace."),
   });
+  const editMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await db
+        .from("crm_accounts")
+        .update({
+          business_name: edit.business.trim(),
+          email: edit.email.trim() || null,
+          phone: edit.phone.trim() || null,
+          industry: edit.industry.trim() || null,
+          estimated_value_cents: edit.value ? Math.round(Number(edit.value) * 100) : null,
+          next_follow_up_at: edit.followUp ? new Date(edit.followUp).toISOString() : null,
+        })
+        .eq("id", account.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditing(false);
+      onRefresh();
+      toast.success("Account updated.");
+    },
+  });
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      const archived = account.stage === "archived";
+      const { error } = await db
+        .from("crm_accounts")
+        .update({
+          stage: archived ? "new_lead" : "archived",
+          archived_at: archived ? null : new Date().toISOString(),
+        })
+        .eq("id", account.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      onRefresh();
+      toast.success(account.stage === "archived" ? "Lead restored." : "Lead archived.");
+    },
+  });
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => setEditing((value) => !value)}
+          className="rounded-lg border border-border px-3 py-2 text-xs"
+        >
+          {editing ? "Cancel editing" : "Edit account"}
+        </button>
+        <button
+          onClick={() => archiveMutation.mutate()}
+          disabled={
+            Boolean(account.linked_workspace_id && account.stage !== "archived") ||
+            archiveMutation.isPending
+          }
+          title={
+            account.linked_workspace_id ? "Linked client records cannot be archived." : undefined
+          }
+          className="rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-50"
+        >
+          {account.stage === "archived" ? "Restore" : "Archive"}
+        </button>
+      </div>
+      {editing && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            editMutation.mutate();
+          }}
+          className="grid gap-3 rounded-xl border border-border bg-background/40 p-4 sm:grid-cols-2"
+        >
+          <Field
+            label="Business"
+            required
+            value={edit.business}
+            onChange={(value) => setEdit((state) => ({ ...state, business: value }))}
+          />
+          <Field
+            label="Industry"
+            value={edit.industry}
+            onChange={(value) => setEdit((state) => ({ ...state, industry: value }))}
+          />
+          <Field
+            label="Email"
+            type="email"
+            value={edit.email}
+            onChange={(value) => setEdit((state) => ({ ...state, email: value }))}
+          />
+          <Field
+            label="Phone"
+            value={edit.phone}
+            onChange={(value) => setEdit((state) => ({ ...state, phone: value }))}
+          />
+          <Field
+            label="Estimated value ($)"
+            type="number"
+            value={edit.value}
+            onChange={(value) => setEdit((state) => ({ ...state, value }))}
+          />
+          <Field
+            label="Next follow-up"
+            type="datetime-local"
+            value={edit.followUp}
+            onChange={(value) => setEdit((state) => ({ ...state, followUp: value }))}
+          />
+          <div className="sm:col-span-2 flex justify-end">
+            <button
+              disabled={!edit.business.trim() || editMutation.isPending}
+              className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+            >
+              Save changes
+            </button>
+          </div>
+        </form>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <Detail label="Pipeline stage" value={STAGE_LABEL[account.stage]} />
         <Detail label="Priority" value={account.priority} />
@@ -852,42 +1138,44 @@ function OverviewTab({
           value={[account.city, account.state].filter(Boolean).join(", ") || "—"}
         />
       </div>
-      <div className="rounded-xl border border-border bg-background/40 p-4">
-        <div className="flex items-center gap-2">
-          <Link2 className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold">Convert to WaveOS client</h3>
+      {isOwner && (
+        <div className="rounded-xl border border-border bg-background/40 p-4">
+          <div className="flex items-center gap-2">
+            <Link2 className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Convert to WaveOS client</h3>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Link this CRM account to an existing client workspace. This also marks the opportunity
+            Won.
+          </p>
+          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+            <select
+              value={workspaceId}
+              onChange={(e) => setWorkspaceId(e.target.value)}
+              className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Choose client workspace…</option>
+              {(workspacesQ.data ?? []).map((workspace) => (
+                <option key={workspace.id} value={workspace.id}>
+                  {workspace.name} · {workspace.account_status}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => linkMutation.mutate()}
+              disabled={!workspaceId || linkMutation.isPending}
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {linkMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              Link client
+            </button>
+          </div>
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Link this CRM account to an existing client workspace. This also marks the opportunity
-          Won.
-        </p>
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-          <select
-            value={workspaceId}
-            onChange={(e) => setWorkspaceId(e.target.value)}
-            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
-          >
-            <option value="">Choose client workspace…</option>
-            {(workspacesQ.data ?? []).map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>
-                {workspace.name} · {workspace.account_status}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => linkMutation.mutate()}
-            disabled={!workspaceId || linkMutation.isPending}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-          >
-            {linkMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="h-4 w-4" />
-            )}
-            Link client
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -1252,6 +1540,128 @@ function TasksTab({ accountId, onRefresh }: { accountId: string; onRefresh: () =
         ))}
       </ul>
     </div>
+  );
+}
+
+function CommunicationTab({
+  account,
+  staff,
+  onRefresh,
+}: {
+  account: Account;
+  staff: StaffMember[];
+  onRefresh: () => void;
+}) {
+  const qc = useQueryClient();
+  const [type, setType] = useState("call");
+  const [summary, setSummary] = useState("");
+  const [occurredAt, setOccurredAt] = useState(() => new Date().toISOString().slice(0, 16));
+  const [nextAction, setNextAction] = useState("");
+  const [nextDueAt, setNextDueAt] = useState("");
+  const [assignedTo, setAssignedTo] = useState(account.assigned_to ?? "");
+  const mutation = useMutation({
+    mutationFn: async () => {
+      // Generated RPC types arrive after the manual migration is applied.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).rpc("crm_log_communication", {
+        _account_id: account.id,
+        _activity_type: type,
+        _summary: summary.trim(),
+        _occurred_at: new Date(occurredAt).toISOString(),
+        _next_action: nextAction.trim() || null,
+        _next_due_at: nextDueAt ? new Date(nextDueAt).toISOString() : null,
+        _assigned_to: assignedTo || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setSummary("");
+      setNextAction("");
+      setNextDueAt("");
+      qc.invalidateQueries({ queryKey: ["crm"] });
+      onRefresh();
+      toast.success("Communication logged.");
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Could not log communication."),
+  });
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        mutation.mutate();
+      }}
+      className="space-y-4"
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1 text-sm">
+          <span>Type</span>
+          <select
+            value={type}
+            onChange={(event) => setType(event.target.value)}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2"
+          >
+            <option value="call">Call</option>
+            <option value="email">Email</option>
+            <option value="meeting">Meeting</option>
+            <option value="proposal">Proposal</option>
+            <option value="client_check_in">Client check-in</option>
+          </select>
+        </label>
+        <Field
+          label="Date and time"
+          type="datetime-local"
+          value={occurredAt}
+          onChange={setOccurredAt}
+        />
+      </div>
+      <label className="space-y-1 text-sm">
+        <span>Summary *</span>
+        <textarea
+          value={summary}
+          onChange={(event) => setSummary(event.target.value)}
+          rows={3}
+          maxLength={500}
+          className="w-full rounded-xl border border-border bg-background px-3 py-2"
+          placeholder="What happened and what matters next?"
+        />
+      </label>
+      <div className="rounded-xl border border-border bg-background/40 p-3">
+        <h3 className="text-sm font-semibold">Optional next follow-up</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Field
+            label="Next action"
+            value={nextAction}
+            onChange={setNextAction}
+            placeholder="Send revised proposal"
+          />
+          <Field label="Due" type="datetime-local" value={nextDueAt} onChange={setNextDueAt} />
+          <label className="space-y-1 text-sm sm:col-span-2">
+            <span>Assign task to</span>
+            <select
+              value={assignedTo}
+              onChange={(event) => setAssignedTo(event.target.value)}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2"
+            >
+              <option value="">Current staff member</option>
+              {staff.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <button
+          disabled={!summary.trim() || mutation.isPending}
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          Log communication
+        </button>
+      </div>
+    </form>
   );
 }
 
