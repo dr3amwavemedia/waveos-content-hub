@@ -43,6 +43,8 @@ const INVOICE_STATUS_LABEL: Record<Invoice["status"], string> = {
   paid: "Paid",
   overdue: "Overdue",
   void: "Void",
+  deposit: "Deposit received",
+  unpaid: "Unpaid",
 };
 
 const INVOICE_STATUS_TONE: Record<Invoice["status"], string> = {
@@ -51,6 +53,8 @@ const INVOICE_STATUS_TONE: Record<Invoice["status"], string> = {
   paid: "bg-success/15 text-success ring-success/30",
   overdue: "bg-destructive/15 text-destructive ring-destructive/30",
   void: "bg-muted/20 text-muted-foreground ring-border",
+  deposit: "bg-primary/15 text-primary ring-primary/30",
+  unpaid: "bg-warning/15 text-warning ring-warning/30",
 };
 
 const DELIVERY_KIND_LABEL: Record<DeliveryKind, string> = {
@@ -132,7 +136,11 @@ export function Layer1Overview() {
     enabled: !!wsId,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data } = await supabase.from("workspaces").select("account_status").eq("id", wsId!).maybeSingle();
+      const { data } = await supabase
+        .from("workspaces")
+        .select("account_status")
+        .eq("id", wsId!)
+        .maybeSingle();
       return data;
     },
   });
@@ -174,7 +182,9 @@ export function Layer1Overview() {
     const items = invoicesQ.data ?? [];
     const now = Date.now();
     const overdue = items.find(
-      (i) => i.status === "overdue" || (i.status === "sent" && i.due_at && new Date(i.due_at).getTime() < now),
+      (i) =>
+        i.status === "overdue" ||
+        (i.status === "sent" && i.due_at && new Date(i.due_at).getTime() < now),
     );
     if (overdue) return overdue;
     const sent = items.find((i) => i.status === "sent");
@@ -189,7 +199,9 @@ export function Layer1Overview() {
 
   const projectName = brandQ.data?.business_name?.trim() || activeWorkspace?.name || "Your project";
 
-  const statusLabel = wsMetaQ.data?.account_status ? STATUS_LABELS[wsMetaQ.data.account_status] : null;
+  const statusLabel = wsMetaQ.data?.account_status
+    ? STATUS_LABELS[wsMetaQ.data.account_status]
+    : null;
 
   const primaryAction = derivePrimaryAction(primaryInvoice, primaryDelivery);
 
@@ -197,7 +209,9 @@ export function Layer1Overview() {
     <div className="space-y-8">
       {/* Welcome */}
       <header className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">{projectName}</p>
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          {projectName}
+        </p>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
           {firstName ? `Welcome back, ${firstName}.` : "Welcome back."}
         </h1>
@@ -259,9 +273,11 @@ function derivePrimaryAction(inv: Invoice | null, del: Delivery | null): Primary
   const now = Date.now();
   if (inv) {
     const isOverdue =
-      inv.status === "overdue" || (inv.status === "sent" && inv.due_at && new Date(inv.due_at).getTime() < now);
+      inv.status === "overdue" ||
+      (inv.status === "sent" && inv.due_at && new Date(inv.due_at).getTime() < now);
     if (isOverdue && isValidHttpsUrl(inv.hosted_url)) return { kind: "overdue", invoice: inv };
-    if (inv.status === "sent" && isValidHttpsUrl(inv.hosted_url)) return { kind: "pay", invoice: inv };
+    if (inv.status === "sent" && isValidHttpsUrl(inv.hosted_url))
+      return { kind: "pay", invoice: inv };
   }
   if (del && isValidHttpsUrl(del.url)) {
     // "Review" for early-stage kinds; "final" once it looks like a final delivery.
@@ -313,7 +329,9 @@ function PrimaryActionBanner({ action }: { action: PrimaryAction }) {
         ? `Your final deliverables for "${action.delivery.title}" are ready to view or download.`
         : "Your final deliverables from Dream Wave Media are ready.";
       cta = {
-        label: isDownloadProvider(action.delivery.url) ? "Download Final Files" : "View Your Content",
+        label: isDownloadProvider(action.delivery.url)
+          ? "Download Final Files"
+          : "View Your Content",
         href: action.delivery.url,
       };
       break;
@@ -419,12 +437,16 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
               {INVOICE_STATUS_LABEL[invoice.status]}
             </span>
           </div>
-          {invoice.description && <p className="mt-1 text-sm text-muted-foreground">{invoice.description}</p>}
+          {invoice.description && (
+            <p className="mt-1 text-sm text-muted-foreground">{invoice.description}</p>
+          )}
         </div>
         {amount && (
           <div className="shrink-0 text-right">
             <div className="text-2xl font-semibold tracking-tight text-foreground">{amount}</div>
-            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{invoice.currency}</div>
+            <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+              {invoice.currency}
+            </div>
           </div>
         )}
       </div>
@@ -481,7 +503,9 @@ function DeliveryCard({ delivery }: { delivery: Delivery }) {
             <p className="mt-0.5 text-xs uppercase tracking-wider text-muted-foreground">
               {kindLabel} · {provider}
             </p>
-            {delivery.description && <p className="mt-2 text-sm text-muted-foreground">{delivery.description}</p>}
+            {delivery.description && (
+              <p className="mt-2 text-sm text-muted-foreground">{delivery.description}</p>
+            )}
           </div>
         </div>
         {canDownload && (
@@ -557,10 +581,20 @@ function ContactCard() {
   );
 }
 
-function MetaField({ label, value, icon: Icon }: { label: string; value: string; icon?: typeof Clock }) {
+function MetaField({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  icon?: typeof Clock;
+}) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dt className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </dt>
       <dd className="mt-1 flex items-start gap-1.5 text-sm text-foreground">
         {Icon && <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
         <span className="break-words">{value}</span>
