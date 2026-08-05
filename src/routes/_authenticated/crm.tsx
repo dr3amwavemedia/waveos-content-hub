@@ -16,6 +16,7 @@ import {
   PhoneCall,
   Plus,
   Search,
+  Trash2,
   UserPlus,
   UserRound,
   Users2,
@@ -120,8 +121,14 @@ interface StaffMember {
 
 // CRM tables arrive in the generated database types after the migration is applied.
 // This small adapter keeps the branch buildable before that deployment step.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const db = supabase as unknown as { from: (table: string) => any };
+const db = supabase as unknown as {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from: (table: string) => any;
+  rpc: (
+    fn: string,
+    args?: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: Error | null }>;
+};
 
 function CrmPage() {
   const qc = useQueryClient();
@@ -567,6 +574,10 @@ function CrmPage() {
         <AccountDrawer
           account={selected}
           onClose={() => setSelected(null)}
+          onDeleted={() => {
+            setSelected(null);
+            qc.invalidateQueries({ queryKey: ["crm"] });
+          }}
           onRefresh={() => qc.invalidateQueries({ queryKey: ["crm"] })}
           staff={staffQ.data?.staff ?? []}
           isOwner={staffQ.data?.isOwner ?? false}
@@ -855,6 +866,7 @@ function AccountDrawer({
   onClose,
   onExport,
   onRefresh,
+  onDeleted,
   staff,
   isOwner,
 }: {
@@ -862,6 +874,7 @@ function AccountDrawer({
   onClose: () => void;
   onExport: () => void;
   onRefresh: () => void;
+  onDeleted: () => void;
   staff: StaffMember[];
   isOwner: boolean;
 }) {
@@ -932,6 +945,7 @@ function AccountDrawer({
               account={account}
               contact={contact}
               onRefresh={onRefresh}
+              onDeleted={onDeleted}
               isOwner={isOwner}
             />
           )}
@@ -952,11 +966,13 @@ function OverviewTab({
   account,
   contact,
   onRefresh,
+  onDeleted,
   isOwner,
 }: {
   account: Account;
   contact: Contact | undefined;
   onRefresh: () => void;
+  onDeleted: () => void;
   isOwner: boolean;
 }) {
   const qc = useQueryClient();
@@ -1041,6 +1057,25 @@ function OverviewTab({
       toast.success(account.stage === "archived" ? "Lead restored." : "Lead archived.");
     },
   });
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (account.linked_workspace_id) throw new Error("Unlink this lead from its client first.");
+      const confirmation = window.prompt(
+        `Permanently delete this lead and all of its CRM history?\n\nType ${account.business_name} to confirm.`,
+      );
+      if (confirmation === null) return false;
+      if (confirmation !== account.business_name) throw new Error("Business name did not match.");
+      const { error } = await db.rpc("crm_delete_lead", { _account_id: account.id });
+      if (error) throw error;
+      return true;
+    },
+    onSuccess: (deleted) => {
+      if (!deleted) return;
+      toast.success("Lead permanently deleted.");
+      onDeleted();
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not delete lead."),
+  });
 
   return (
     <div className="space-y-5">
@@ -1064,6 +1099,25 @@ function OverviewTab({
         >
           {account.stage === "archived" ? "Restore" : "Archive"}
         </button>
+        {isOwner && (
+          <button
+            onClick={() => deleteMutation.mutate()}
+            disabled={Boolean(account.linked_workspace_id) || deleteMutation.isPending}
+            title={
+              account.linked_workspace_id
+                ? "Unlink this lead from its client workspace before deleting it."
+                : "Permanently delete this lead and its CRM history."
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive hover:bg-destructive/20 disabled:opacity-50"
+          >
+            {deleteMutation.isPending ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Trash2 className="h-3.5 w-3.5" />
+            )}
+            Delete permanently
+          </button>
+        )}
       </div>
       {editing && (
         <form
