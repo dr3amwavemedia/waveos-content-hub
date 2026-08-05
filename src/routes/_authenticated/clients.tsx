@@ -1160,6 +1160,22 @@ function InvitesTab({
   onNewInvite: (p: { link: string; email: string; workspace: string }) => void;
 }) {
   const qc = useQueryClient();
+  const membersQ = useQuery({
+    queryKey: ["clients", "members", workspace.id],
+    queryFn: async () => {
+      const { data, error } = await db.rpc("get_client_member_directory", {
+        _workspace_id: workspace.id,
+      });
+      if (error) throw error;
+      return (data ?? []) as Array<{
+        user_id: string;
+        email: string | null;
+        first_name: string | null;
+        last_name: string | null;
+        workspace_role: string;
+      }>;
+    },
+  });
   const invitesQ = useQuery({
     queryKey: ["clients", "invites", workspace.id],
     queryFn: async () => {
@@ -1206,9 +1222,55 @@ function InvitesTab({
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
+  const sendPasswordReset = useMutation({
+    mutationFn: async (targetEmail: string) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      return targetEmail;
+    },
+    onSuccess: (targetEmail) => toast.success(`Password reset sent to ${targetEmail}.`),
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not send password reset."),
+  });
+
   return (
     <div className="space-y-3">
       <InviteQuickForm workspace={workspace} onNewInvite={onNewInvite} />
+      {(membersQ.data ?? []).length > 0 && (
+        <div className="rounded-lg border border-border/60 bg-surface/40 p-3">
+          <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Current client members
+          </p>
+          <ul className="space-y-2">
+            {membersQ.data!.map((member) => {
+              const name = `${member.first_name ?? ""} ${member.last_name ?? ""}`.trim();
+              return (
+                <li key={member.user_id} className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm text-foreground">
+                      {name || member.email || "Client member"}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {member.email} · {member.workspace_role}
+                    </p>
+                  </div>
+                  {member.email && (
+                    <button
+                      onClick={() => sendPasswordReset.mutate(member.email!)}
+                      disabled={sendPasswordReset.isPending}
+                      className="whitespace-nowrap rounded-lg border border-primary/30 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
+                    >
+                      Send password reset
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
       {invitesQ.isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
       ) : (invitesQ.data ?? []).length === 0 ? (

@@ -7,6 +7,7 @@ import {
   Copy,
   Loader2,
   MailPlus,
+  KeyRound,
   RefreshCw,
   ShieldCheck,
   UserMinus,
@@ -185,6 +186,19 @@ function AdminPage() {
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Could not update staff position."),
+  });
+
+  const sendPasswordReset = useMutation({
+    mutationFn: async (targetEmail: string) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw error;
+      return targetEmail;
+    },
+    onSuccess: (targetEmail) => toast.success(`Password reset sent to ${targetEmail}.`),
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not send password reset."),
   });
 
   const statusFn = useServerFn(getIntegrationStatus);
@@ -371,6 +385,16 @@ function AdminPage() {
                     <option value="sales">Sales</option>
                     <option value="media_manager">Media Manager</option>
                   </select>
+                  {s.email && (
+                    <button
+                      onClick={() => sendPasswordReset.mutate(s.email!)}
+                      disabled={sendPasswordReset.isPending}
+                      className="rounded-md p-1.5 text-primary hover:bg-primary/15 disabled:opacity-50"
+                      title={`Send password reset to ${s.email}`}
+                    >
+                      <KeyRound className="h-4 w-4" />
+                    </button>
+                  )}
                   {s.role === "dream_wave_team" && (
                     <button
                       onClick={() => revoke.mutate({ userId: s.user_id, role: "dream_wave_team" })}

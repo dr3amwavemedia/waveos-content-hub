@@ -24,6 +24,7 @@ import {
   useDecideApproval,
   type ContentItem,
 } from "@/hooks/use-content";
+import { ClientCommunicationCenter } from "@/components/approvals/client-communication-center";
 
 export const Route = createFileRoute("/_authenticated/approvals")({
   beforeLoad: async () => {
@@ -40,6 +41,7 @@ function ApprovalsPage() {
   const { activeWorkspace } = useWorkspace();
   const { data: user } = useCurrentUser();
   const [filter, setFilter] = useState<"pending" | "all">("pending");
+  const [area, setArea] = useState<"content" | "client">("content");
   const items = useContentItems(
     activeWorkspace?.id ?? null,
     filter === "pending" ? ["in_review", "changes_requested"] : undefined,
@@ -73,7 +75,9 @@ function ApprovalsPage() {
               onClick={() => setFilter(f)}
               className={cn(
                 "px-3 py-1.5 font-medium capitalize transition-colors",
-                filter === f ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+                filter === f
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {f}
@@ -82,55 +86,82 @@ function ApprovalsPage() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <div className="surface-card divide-y divide-border p-0">
-          {items.isLoading ? (
-            <div className="flex items-center justify-center p-10 text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
-            </div>
-          ) : (items.data ?? []).length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              Nothing waiting on approval.
-            </div>
-          ) : (
-            (items.data ?? []).map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setSelectedId(c.id)}
-                className={cn(
-                  "flex w-full flex-col gap-1 p-4 text-left transition-colors",
-                  selectedId === c.id ? "bg-primary/10" : "hover:bg-elevated/60",
-                )}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-sm font-semibold text-foreground">
-                    {c.title || "Untitled post"}
-                  </span>
-                  <StatusPill status={c.status} />
-                </div>
-                <span className="line-clamp-2 text-xs text-muted-foreground">
-                  {c.primary_caption ?? "No caption yet"}
-                </span>
-                <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                  <Clock className="h-3 w-3" />
-                  {new Date(c.updated_at).toLocaleString()}
-                </span>
-              </button>
-            ))
+      <div className="inline-flex rounded-full border border-border bg-elevated p-1 text-xs">
+        <button
+          onClick={() => setArea("content")}
+          className={cn(
+            "rounded-full px-4 py-2",
+            area === "content" ? "bg-primary text-primary-foreground" : "text-muted-foreground",
           )}
-        </div>
-
-        <div>
-          {selected ? (
-            <ApprovalDetail item={selected} />
-          ) : (
-            <div className="surface-card flex flex-col items-center justify-center gap-2 p-12 text-center text-muted-foreground">
-              <Filter className="h-6 w-6" />
-              <p className="text-sm">Select a post from the list to review it.</p>
-            </div>
+        >
+          Content approvals
+        </button>
+        <button
+          onClick={() => setArea("client")}
+          className={cn(
+            "rounded-full px-4 py-2",
+            area === "client" ? "bg-primary text-primary-foreground" : "text-muted-foreground",
           )}
-        </div>
+        >
+          Client center
+        </button>
       </div>
+
+      {area === "client" ? (
+        <ClientCommunicationCenter />
+      ) : (
+        <>
+          <div className="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+            <div className="surface-card divide-y divide-border p-0">
+              {items.isLoading ? (
+                <div className="flex items-center justify-center p-10 text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+                </div>
+              ) : (items.data ?? []).length === 0 ? (
+                <div className="p-8 text-center text-sm text-muted-foreground">
+                  Nothing waiting on approval.
+                </div>
+              ) : (
+                (items.data ?? []).map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedId(c.id)}
+                    className={cn(
+                      "flex w-full flex-col gap-1 p-4 text-left transition-colors",
+                      selectedId === c.id ? "bg-primary/10" : "hover:bg-elevated/60",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-semibold text-foreground">
+                        {c.title || "Untitled post"}
+                      </span>
+                      <StatusPill status={c.status} />
+                    </div>
+                    <span className="line-clamp-2 text-xs text-muted-foreground">
+                      {c.primary_caption ?? "No caption yet"}
+                    </span>
+                    <span className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      {new Date(c.updated_at).toLocaleString()}
+                    </span>
+                  </button>
+                ))
+              )}
+            </div>
+
+            <div>
+              {selected ? (
+                <ApprovalDetail item={selected} />
+              ) : (
+                <div className="surface-card flex flex-col items-center justify-center gap-2 p-12 text-center text-muted-foreground">
+                  <Filter className="h-6 w-6" />
+                  <p className="text-sm">Select a post from the list to review it.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -148,7 +179,9 @@ function StatusPill({ status }: { status: ContentItem["status"] }) {
     archived: "bg-muted text-muted-foreground",
   };
   return (
-    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", map[status])}>
+    <span
+      className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase", map[status])}
+    >
       {status.replace("_", " ")}
     </span>
   );
@@ -176,8 +209,11 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
       });
       setNote("");
       toast.success(
-        decision === "approved" ? "Approved" :
-        decision === "changes_requested" ? "Changes requested" : "Rejected",
+        decision === "approved"
+          ? "Approved"
+          : decision === "changes_requested"
+            ? "Changes requested"
+            : "Rejected",
       );
     } catch (e) {
       toast.error((e as Error).message);
