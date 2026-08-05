@@ -21,6 +21,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
 type StaffType = "sales" | "media_manager";
+type StaffPosition = StaffType | "admin";
 
 const STAFF_TYPE_LABEL: Record<StaffType, string> = {
   sales: "Sales",
@@ -170,20 +171,20 @@ function AdminPage() {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
-  const changeStaffType = useMutation({
-    mutationFn: async ({ userId, type }: { userId: string; type: StaffType }) => {
-      const { error } = await db.rpc("set_staff_type", {
+  const changeStaffPosition = useMutation({
+    mutationFn: async ({ userId, position }: { userId: string; position: StaffPosition }) => {
+      const { error } = await db.rpc("set_staff_position", {
         _target_user: userId,
-        _staff_type: type,
+        _position: position,
       });
       if (error) throw error;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "staff"] });
-      toast.success("Staff type updated.");
+      toast.success("Staff position updated.");
     },
     onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "Could not update staff type."),
+      toast.error(e instanceof Error ? e.message : "Could not update staff position."),
   });
 
   const statusFn = useServerFn(getIntegrationStatus);
@@ -203,8 +204,9 @@ function AdminPage() {
           Staff
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Invite employees by email and manage Dream Wave Team access. Staff accounts are separate
-          from client workspaces. The protected Owner role can never be granted through the app.
+          Invite employees by email and manage Dream Wave Team access. After an invitation is
+          accepted, an Admin can change that person between Admin, Sales, and Media Manager. WaveOS
+          always protects the final remaining Admin.
         </p>
       </header>
 
@@ -347,35 +349,36 @@ function AdminPage() {
                         : "bg-elevated text-foreground ring-border")
                     }
                   >
-                    {s.role === "dream_wave_owner" ? "Owner" : "Team"}
+                    {s.role === "dream_wave_owner" ? "Admin" : "Team"}
                   </span>
+                  <select
+                    value={
+                      s.role === "dream_wave_owner"
+                        ? "admin"
+                        : ((s.staff_type ?? "sales") as StaffType)
+                    }
+                    onChange={(e) =>
+                      changeStaffPosition.mutate({
+                        userId: s.user_id,
+                        position: e.target.value as StaffPosition,
+                      })
+                    }
+                    disabled={changeStaffPosition.isPending}
+                    className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
+                    aria-label={`Staff position for ${s.email ?? s.user_id}`}
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="sales">Sales</option>
+                    <option value="media_manager">Media Manager</option>
+                  </select>
                   {s.role === "dream_wave_team" && (
-                    <>
-                      <select
-                        value={(s.staff_type ?? "sales") as StaffType}
-                        onChange={(e) =>
-                          changeStaffType.mutate({
-                            userId: s.user_id,
-                            type: e.target.value as StaffType,
-                          })
-                        }
-                        disabled={changeStaffType.isPending}
-                        className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
-                        aria-label={`Staff type for ${s.email ?? s.user_id}`}
-                      >
-                        <option value="sales">Sales</option>
-                        <option value="media_manager">Media Manager</option>
-                      </select>
-                      <button
-                        onClick={() =>
-                          revoke.mutate({ userId: s.user_id, role: "dream_wave_team" })
-                        }
-                        className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
-                        title="Revoke staff role"
-                      >
-                        <UserMinus className="h-4 w-4" />
-                      </button>
-                    </>
+                    <button
+                      onClick={() => revoke.mutate({ userId: s.user_id, role: "dream_wave_team" })}
+                      className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
+                      title="Revoke staff role"
+                    >
+                      <UserMinus className="h-4 w-4" />
+                    </button>
                   )}
                 </div>
               </li>
