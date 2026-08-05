@@ -62,6 +62,7 @@ const CLIENT_NAV: NavItem[] = [
     feature: "can_connect_socials",
   },
   { to: "/brand-voice", label: "Brand Voice", icon: Sparkles, feature: "can_manage_brand_voice" },
+  { to: "/approvals", label: "Approvals", icon: CheckSquare },
   { to: "/feedback", label: "Feedback", icon: MessageSquare, feature: "can_contact_support" },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
@@ -98,6 +99,7 @@ const MOBILE_NAV: NavItem[] = [
 // scroll to the corresponding section of the Overview.
 const LAYER1_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
+  { to: "/approvals", label: "Approvals", icon: CheckSquare },
   { to: "/home#your-content", label: "Your Content", icon: Images },
   { to: "/home#invoices", label: "Invoices & Payments", icon: FileText },
   { to: "/settings", label: "Your Information", icon: User },

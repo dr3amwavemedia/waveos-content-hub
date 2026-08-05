@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useWorkspaces, type WorkspaceSummary } from "@/hooks/use-waveos";
 
@@ -30,6 +38,10 @@ const WORKSPACE_SCOPED_KEYS = [
   "comments",
   "approvals",
   "notifications",
+  "phase4-requests",
+  "phase4-internal-notes",
+  "phase4-checklist",
+  "phase4-timeline",
 ];
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
