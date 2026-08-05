@@ -20,6 +20,21 @@ import { getIntegrationStatus } from "@/lib/ayrshare.functions";
 import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
+type StaffType = "sales" | "media_manager";
+
+const STAFF_TYPE_LABEL: Record<StaffType, string> = {
+  sales: "Sales",
+  media_manager: "Media Manager",
+};
+
+const db = supabase as unknown as {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from: (table: string) => any;
+  rpc: (
+    fn: string,
+    args?: Record<string, unknown>,
+  ) => Promise<{ data: Array<{ raw_token?: string }> | null; error: Error | null }>;
+};
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
@@ -41,26 +56,34 @@ export const Route = createFileRoute("/_authenticated/admin")({
 function AdminPage() {
   const qc = useQueryClient();
   const [email, setEmail] = useState("");
+  const [staffType, setStaffType] = useState<StaffType>("sales");
   const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   const staffQ = useQuery({
     queryKey: ["admin", "staff"],
     queryFn: async () => {
-      const { data: roles, error } = await supabase
+      const { data: roles, error } = await db
         .from("user_roles")
-        .select("id,user_id,role,created_at")
+        .select("id,user_id,role,staff_type,created_at")
         .in("role", ["dream_wave_owner", "dream_wave_team"])
         .order("created_at", { ascending: true });
       if (error) throw error;
-      const userIds = Array.from(new Set((roles ?? []).map((r) => r.user_id)));
+      const roleRows = (roles ?? []) as Array<{
+        id: string;
+        user_id: string;
+        role: AppRole;
+        staff_type: StaffType | null;
+        created_at: string;
+      }>;
+      const userIds = Array.from(new Set(roleRows.map((role) => role.user_id)));
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id,first_name,last_name")
         .in("id", userIds);
       const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
-      return (roles ?? []).map((r) => ({
-        ...r,
-        profile: byId.get(r.user_id) ?? null,
+      return roleRows.map((role) => ({
+        ...role,
+        profile: byId.get(role.user_id) ?? null,
       }));
     },
   });
@@ -68,25 +91,32 @@ function AdminPage() {
   const invitesQ = useQuery({
     queryKey: ["admin", "staff-invites"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await db
         .from("invites_admin")
-        .select("id,email,status,expires_at,created_at,resend_count")
+        .select("id,email,status,staff_type,expires_at,created_at,resend_count")
         .is("workspace_id", null)
         .eq("app_role", "dream_wave_team")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Array<{
+        id: string;
+        email: string;
+        status: string;
+        staff_type: StaffType | null;
+        expires_at: string | null;
+        created_at: string;
+        resend_count: number;
+      }>;
     },
   });
 
   const invite = useMutation({
-    mutationFn: async (targetEmail: string) => {
+    mutationFn: async ({ targetEmail, type }: { targetEmail: string; type: StaffType }) => {
       const clean = targetEmail.trim().toLowerCase();
       if (!clean) throw new Error("Enter an email.");
-      // Generated types update after the accompanying migration is deployed.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any).rpc("create_staff_invite", {
+      const { data, error } = await db.rpc("create_staff_invite", {
         _email: clean,
+        _staff_type: type,
         _expires_days: 14,
       });
       if (error) throw error;
@@ -150,6 +180,22 @@ function AdminPage() {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
+  const changeStaffType = useMutation({
+    mutationFn: async ({ userId, type }: { userId: string; type: StaffType }) => {
+      const { error } = await db.rpc("set_staff_type", {
+        _target_user: userId,
+        _staff_type: type,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "staff"] });
+      toast.success("Staff type updated.");
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not update staff type."),
+  });
+
   const statusFn = useServerFn(getIntegrationStatus);
   const statusQ = useQuery({
     queryKey: ["integration-status"],
@@ -181,9 +227,9 @@ function AdminPage() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            invite.mutate(email);
+            invite.mutate({ targetEmail: email, type: staffType });
           }}
-          className="mt-3 flex gap-2"
+          className="mt-3 flex flex-col gap-2 sm:flex-row"
         >
           <input
             value={email}
@@ -192,6 +238,14 @@ function AdminPage() {
             placeholder="employee@dreamwavemedia.co"
             className="flex-1 rounded-lg border border-input bg-surface/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
           />
+          <select
+            value={staffType}
+            onChange={(e) => setStaffType(e.target.value as StaffType)}
+            className="rounded-lg border border-input bg-surface/60 px-3 py-2 text-sm text-foreground"
+          >
+            <option value="sales">Sales</option>
+            <option value="media_manager">Media Manager</option>
+          </select>
           <button
             type="submit"
             disabled={invite.isPending || !email.trim()}
@@ -238,7 +292,8 @@ function AdminPage() {
                 <div>
                   <div className="text-sm font-medium text-foreground">{item.email}</div>
                   <div className="text-xs text-muted-foreground">
-                    {item.status} · expires{" "}
+                    {STAFF_TYPE_LABEL[(item.staff_type ?? "sales") as StaffType]} · {item.status} ·
+                    expires{" "}
                     {item.expires_at ? new Date(item.expires_at).toLocaleDateString() : "not set"}
                   </div>
                 </div>
@@ -303,13 +358,32 @@ function AdminPage() {
                     {s.role === "dream_wave_owner" ? "Owner" : "Team"}
                   </span>
                   {s.role === "dream_wave_team" && (
-                    <button
-                      onClick={() => revoke.mutate({ userId: s.user_id, role: "dream_wave_team" })}
-                      className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
-                      title="Revoke staff role"
-                    >
-                      <UserMinus className="h-4 w-4" />
-                    </button>
+                    <>
+                      <select
+                        value={(s.staff_type ?? "sales") as StaffType}
+                        onChange={(e) =>
+                          changeStaffType.mutate({
+                            userId: s.user_id,
+                            type: e.target.value as StaffType,
+                          })
+                        }
+                        disabled={changeStaffType.isPending}
+                        className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
+                        aria-label={`Staff type for ${s.user_id}`}
+                      >
+                        <option value="sales">Sales</option>
+                        <option value="media_manager">Media Manager</option>
+                      </select>
+                      <button
+                        onClick={() =>
+                          revoke.mutate({ userId: s.user_id, role: "dream_wave_team" })
+                        }
+                        className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
+                        title="Revoke staff role"
+                      >
+                        <UserMinus className="h-4 w-4" />
+                      </button>
+                    </>
                   )}
                 </div>
               </li>

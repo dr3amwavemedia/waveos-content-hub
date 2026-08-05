@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Activity,
   AlertCircle,
@@ -17,6 +17,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Upload,
   UserPlus,
   UserRound,
   Users2,
@@ -27,6 +28,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { downloadCsv, safeCsvFilename, type CrmCsvRow } from "@/lib/crm-csv";
+import { parseBloomLeadsCsv } from "@/lib/bloom-csv";
 
 export const Route = createFileRoute("/_authenticated/crm")({
   beforeLoad: async () => {
@@ -138,6 +140,8 @@ function CrmPage() {
   const [assignee, setAssignee] = useState<"all" | "mine" | "unassigned" | string>("all");
   const [addOpen, setAddOpen] = useState(false);
   const [selected, setSelected] = useState<Account | null>(null);
+  const [importing, setImporting] = useState(false);
+  const bloomInputRef = useRef<HTMLInputElement>(null);
 
   const staffQ = useQuery({
     queryKey: ["crm", "staff"],
@@ -301,6 +305,30 @@ function CrmPage() {
     };
   };
 
+  async function importBloomCsv(file: File) {
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Choose a Bloom CSV smaller than 5 MB.");
+      return;
+    }
+    setImporting(true);
+    try {
+      const leads = parseBloomLeadsCsv(await file.text());
+      if (!window.confirm(`Import ${leads.length} Bloom leads into WaveCRM?`)) return;
+      const { data, error } = await db.rpc("crm_import_bloom_leads", { _leads: leads });
+      if (error) throw error;
+      const result = data as { imported?: number; skipped?: number } | null;
+      await qc.invalidateQueries({ queryKey: ["crm"] });
+      toast.success(
+        `Imported ${result?.imported ?? 0} leads. Skipped ${result?.skipped ?? 0} duplicate emails.`,
+      );
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not import the Bloom CSV.");
+    } finally {
+      setImporting(false);
+      if (bloomInputRef.current) bloomInputRef.current.value = "";
+    }
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -314,6 +342,28 @@ function CrmPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <input
+            ref={bloomInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void importBloomCsv(file);
+            }}
+          />
+          <button
+            onClick={() => bloomInputRef.current?.click()}
+            disabled={importing}
+            className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm font-medium hover:bg-elevated disabled:opacity-50"
+          >
+            {importing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
+            Import Bloom CSV
+          </button>
           <button
             onClick={() =>
               downloadCsv(

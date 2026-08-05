@@ -43,6 +43,7 @@ interface NavItem {
   label: string;
   icon: typeof Home;
   staffOnly?: boolean;
+  ownerOnly?: boolean;
   // When set, the nav item is only shown if the active workspace can access
   // this feature. Undefined = universal (always shown to any workspace member).
   feature?: FeatureKey;
@@ -70,8 +71,20 @@ const STAFF_NAV: NavItem[] = [
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
-  { to: "/admin", label: "Staff", icon: ShieldCheck, staffOnly: true },
+  { to: "/admin", label: "Staff", icon: ShieldCheck, staffOnly: true, ownerOnly: true },
 ];
+
+const TEAM_NAV: NavItem[] = [
+  { to: "/home", label: "Overview", icon: Home },
+  { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
+  { to: "/clients", label: "Clients", icon: Users2, staffOnly: true },
+  { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
+  { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
+];
+
+const MEDIA_MANAGER_CLIENT_NAV = CLIENT_NAV.filter(
+  (item) => item.to !== "/feedback" && item.to !== "/settings",
+);
 
 const MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
@@ -110,10 +123,16 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function Shell({ children }: { children: ReactNode }) {
   const { can, isLoading: permsLoading, access, isStaff } = usePermissions();
+  const { data: user } = useCurrentUser();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isOwner = Boolean(user?.isDreamWaveOwner);
+  const isTeamMember = isStaff && !isOwner;
+  const isMediaManager = isTeamMember && user?.staffType === "media_manager";
+  const isSales = isTeamMember && !isMediaManager;
 
   const filterByFeature = (items: NavItem[]) =>
     items.filter((i) => {
+      if (i.ownerOnly) return isOwner;
       if (i.staffOnly) return isStaff;
       if (!i.feature) return true;
       if (permsLoading) return false;
@@ -124,9 +143,21 @@ function Shell({ children }: { children: ReactNode }) {
   // existing routes only. Staff always keep the full nav.
   const isLayer1 = !isStaff && access?.tier === "project_client";
 
-  const clientNav = isLayer1 ? LAYER1_NAV : filterByFeature(CLIENT_NAV);
-  const staffNav = isStaff ? STAFF_NAV : [];
-  const mobileNav = isLayer1 ? LAYER1_MOBILE_NAV : filterByFeature(MOBILE_NAV);
+  const clientNav = isSales
+    ? TEAM_NAV.slice(0, 1)
+    : isMediaManager
+      ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV)
+      : isLayer1
+        ? LAYER1_NAV
+        : filterByFeature(CLIENT_NAV);
+  const staffNav = isStaff ? filterByFeature(STAFF_NAV) : [];
+  const mobileNav = isSales
+    ? TEAM_NAV
+    : isMediaManager
+      ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV).slice(0, 5)
+      : isLayer1
+        ? LAYER1_MOBILE_NAV
+        : filterByFeature(MOBILE_NAV);
   const nav = [...clientNav, ...staffNav];
 
   return (
@@ -275,7 +306,7 @@ function WorkspaceSwitcher() {
   const navigate = useNavigate();
 
   if (!workspaces.length) {
-    if (user?.isStaff) {
+    if (user?.isDreamWaveOwner) {
       return (
         <div className="mx-3 mt-2">
           <button
@@ -336,7 +367,7 @@ function WorkspaceSwitcher() {
               {w.id === activeWorkspace?.id && <Check className="ml-auto h-4 w-4 text-primary" />}
             </button>
           ))}
-          {user?.isStaff && !impersonate.on && (
+          {user?.isDreamWaveOwner && !impersonate.on && (
             <button
               onClick={() => {
                 setOpen(false);

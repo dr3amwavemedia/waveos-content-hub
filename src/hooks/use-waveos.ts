@@ -20,8 +20,14 @@ export interface CurrentUserContext {
   avatarUrl: string | null;
   isStaff: boolean;
   isDreamWaveOwner: boolean;
+  staffType: "sales" | "media_manager" | null;
   roles: string[];
 }
+
+const db = supabase as unknown as {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from: (table: string) => any;
+};
 
 async function loadContext(): Promise<CurrentUserContext> {
   const { data: auth, error } = await supabase.auth.getUser();
@@ -37,9 +43,14 @@ async function loadContext(): Promise<CurrentUserContext> {
       .select("first_name,last_name,avatar_url")
       .eq("id", user.id)
       .maybeSingle(),
-    supabase.from("user_roles").select("role").eq("user_id", user.id),
+    db.from("user_roles").select("role,staff_type").eq("user_id", user.id),
   ]);
-  const roleList = (roles ?? []).map((r) => r.role);
+  const roleRows = (roles ?? []) as Array<{
+    role: string;
+    staff_type: "sales" | "media_manager" | null;
+  }>;
+  const roleList = roleRows.map((role) => role.role);
+  const teamRole = roleRows.find((role) => role.role === "dream_wave_team");
   return {
     userId: user.id,
     email: user.email ?? "",
@@ -48,6 +59,9 @@ async function loadContext(): Promise<CurrentUserContext> {
     avatarUrl: profile?.avatar_url ?? null,
     isStaff: roleList.includes("dream_wave_owner") || roleList.includes("dream_wave_team"),
     isDreamWaveOwner: roleList.includes("dream_wave_owner"),
+    staffType: roleList.includes("dream_wave_owner")
+      ? null
+      : ((teamRole?.staff_type as "sales" | "media_manager" | null) ?? "sales"),
     roles: roleList,
   };
 }
@@ -70,18 +84,23 @@ async function loadWorkspaces(
   // explicitly selected client workspace.
   const workspaceIds = previewWorkspaceId
     ? [previewWorkspaceId]
-    : ctx.isStaff
+    : ctx.isStaff && ctx.staffType !== "media_manager"
       ? ["11111111-1111-1111-1111-111111111111"]
       : Array.from(membershipMap.keys());
 
-  if (!workspaceIds.length) return [];
+  if (!workspaceIds.length && ctx.staffType !== "media_manager") return [];
 
-  const { data: workspaces, error } = await supabase
+  let workspacesQuery = supabase
     .from("workspaces")
     .select("id,name,slug,industry,timezone,is_demo")
-    .in("id", workspaceIds)
     .eq("is_archived", false)
     .order("name", { ascending: true });
+
+  if (ctx.staffType !== "media_manager" || previewWorkspaceId) {
+    workspacesQuery = workspacesQuery.in("id", workspaceIds);
+  }
+
+  const { data: workspaces, error } = await workspacesQuery;
 
   if (error) throw error;
 
