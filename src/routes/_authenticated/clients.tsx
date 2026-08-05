@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Archive,
+  BellRing,
   Check,
   Copy,
   Eye,
@@ -704,6 +705,24 @@ function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
+  const notifyRevisions = useMutation({
+    mutationFn: async (deliveryId: string) => {
+      const { data, error } = await db.rpc("notify_delivery_revisions_updated", {
+        _delivery_id: deliveryId,
+      });
+      if (error) throw error;
+      return typeof data === "number" ? data : 0;
+    },
+    onSuccess: (recipientCount) =>
+      toast.success(
+        recipientCount === 1
+          ? "Revision notification sent to 1 client member."
+          : `Revision notification sent to ${recipientCount} client members.`,
+      ),
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not notify the client."),
+  });
+
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
@@ -748,12 +767,22 @@ function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
                   </a>
                 </div>
               </div>
-              <button
-                onClick={() => confirm("Remove this delivery?") && del.mutate(d.id)}
-                className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => notifyRevisions.mutate(d.id)}
+                  disabled={notifyRevisions.isPending}
+                  className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary/30 px-2.5 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
+                  title="Notify this client that revisions are updated"
+                >
+                  <BellRing className="h-3.5 w-3.5" /> Revisions updated
+                </button>
+                <button
+                  onClick={() => confirm("Remove this delivery?") && del.mutate(d.id)}
+                  className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -916,6 +945,25 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: InvoiceStatus }) => {
+      const { error } = await supabase
+        .from("client_invoices")
+        .update({
+          status,
+          paid_at: status === "paid" ? new Date().toISOString() : null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] });
+      toast.success("Invoice status updated.");
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not update invoice."),
+  });
+
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
@@ -971,12 +1019,34 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
                   )}
                 </div>
               </div>
-              <button
-                onClick={() => confirm("Remove this invoice?") && del.mutate(i.id)}
-                className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={i.status}
+                  onChange={(event) =>
+                    updateStatus.mutate({
+                      id: i.id,
+                      status: event.target.value as InvoiceStatus,
+                    })
+                  }
+                  disabled={updateStatus.isPending}
+                  className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground disabled:opacity-50"
+                  aria-label={`Invoice status for ${i.number || "invoice"}`}
+                >
+                  <option value="deposit">Deposit</option>
+                  <option value="paid">Paid</option>
+                  <option value="unpaid">Unpaid</option>
+                  <option value="draft">Draft</option>
+                  <option value="sent">Sent</option>
+                  <option value="overdue">Overdue</option>
+                  <option value="void">Void</option>
+                </select>
+                <button
+                  onClick={() => confirm("Remove this invoice?") && del.mutate(i.id)}
+                  className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -992,6 +1062,8 @@ function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
     paid: "bg-success/15 text-success ring-success/30",
     overdue: "bg-warning/15 text-warning ring-warning/30",
     void: "bg-muted/20 text-muted-foreground ring-border",
+    deposit: "bg-primary/15 text-primary ring-primary/30",
+    unpaid: "bg-warning/15 text-warning ring-warning/30",
   };
   return (
     <span
@@ -1011,7 +1083,7 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
-  const [status, setStatus] = useState<InvoiceStatus>("sent");
+  const [status, setStatus] = useState<InvoiceStatus>("unpaid");
   const [hostedUrl, setHostedUrl] = useState("");
   const [dueAt, setDueAt] = useState("");
 
@@ -1103,7 +1175,7 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
             onChange={(e) => setStatus(e.target.value as InvoiceStatus)}
             className={inputCls}
           >
-            {(["draft", "sent", "paid", "overdue", "void"] as InvoiceStatus[]).map((s) => (
+            {(["deposit", "paid", "unpaid"] as InvoiceStatus[]).map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
