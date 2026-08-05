@@ -121,6 +121,14 @@ interface StaffMember {
   isOwner: boolean;
 }
 
+interface StaffDirectoryRow {
+  user_id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  role: "dream_wave_owner" | "dream_wave_team";
+}
+
 // CRM tables arrive in the generated database types after the migration is applied.
 // This small adapter keeps the branch buildable before that deployment step.
 const db = supabase as unknown as {
@@ -173,6 +181,31 @@ function CrmPage() {
         .select("user_id,role")
         .in("role", ["dream_wave_owner", "dream_wave_team"]);
       if (error) throw error;
+      const isOwner = (roles ?? []).some(
+        (role) => role.user_id === auth.user!.id && role.role === "dream_wave_owner",
+      );
+
+      // Owners receive the protected directory so assignment menus show a
+      // useful name/email instead of an opaque user id.
+      if (isOwner) {
+        const { data: directory, error: directoryError } = await db.rpc("get_staff_directory");
+        if (!directoryError) {
+          const staffDirectory = (directory ?? []) as StaffDirectoryRow[];
+          return {
+            currentUserId: auth.user.id,
+            isOwner: true,
+            staff: staffDirectory.map((member) => ({
+              id: member.user_id,
+              name:
+                `${member.first_name ?? ""} ${member.last_name ?? ""}`.trim() ||
+                member.email ||
+                "Staff member",
+              isOwner: member.role === "dream_wave_owner",
+            })),
+          };
+        }
+      }
+
       const ids = Array.from(new Set((roles ?? []).map((role) => role.user_id)));
       const { data: profiles } = await supabase
         .from("profiles")
@@ -186,9 +219,7 @@ function CrmPage() {
       );
       return {
         currentUserId: auth.user.id,
-        isOwner: (roles ?? []).some(
-          (role) => role.user_id === auth.user!.id && role.role === "dream_wave_owner",
-        ),
+        isOwner,
         staff: ids.map((id) => ({
           id,
           name: names.get(id) ?? "Staff member",
