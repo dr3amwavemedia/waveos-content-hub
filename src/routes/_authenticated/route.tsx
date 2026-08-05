@@ -2,7 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app/app-shell";
 
-const TEAM_ALLOWED_ROUTES = ["/home", "/crm", "/clients", "/approvals", "/vision-studio"];
+const TEAM_ALLOWED_ROUTES = ["/home", "/crm", "/approvals", "/vision-studio"];
 const MEDIA_MANAGER_ALLOWED_ROUTES = [
   ...TEAM_ALLOWED_ROUTES,
   "/content",
