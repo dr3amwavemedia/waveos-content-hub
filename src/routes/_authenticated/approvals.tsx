@@ -24,7 +24,7 @@ import {
   useDecideApproval,
   type ContentItem,
 } from "@/hooks/use-content";
-import { ClientCommunicationCenter } from "@/components/approvals/client-communication-center";
+import { ClientCommunicationCenter } from "@/components/client-communication-center";
 
 export const Route = createFileRoute("/_authenticated/approvals")({
   beforeLoad: async () => {
