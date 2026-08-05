@@ -289,7 +289,7 @@ function AcceptInvitePage() {
       {sessionUser ? (
         emailMatchesSession ? (
           <button
-            onClick={acceptWithSession}
+            onClick={() => acceptWithSession()}
             disabled={status === "accepting"}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-60"
           >

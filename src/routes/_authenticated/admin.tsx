@@ -238,19 +238,20 @@ function AdminPage() {
                 <div>
                   <div className="text-sm font-medium text-foreground">{item.email}</div>
                   <div className="text-xs text-muted-foreground">
-                    {item.status} · expires {new Date(item.expires_at).toLocaleDateString()}
+                    {item.status} · expires{" "}
+                    {item.expires_at ? new Date(item.expires_at).toLocaleDateString() : "not set"}
                   </div>
                 </div>
                 {item.status === "pending" && (
                   <div className="flex gap-2">
                     <button
-                      onClick={() => resend.mutate(item.id)}
+                      onClick={() => item.id && resend.mutate(item.id)}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-elevated"
                     >
                       <RefreshCw className="h-3.5 w-3.5" /> Refresh link
                     </button>
                     <button
-                      onClick={() => revokeInvite.mutate(item.id)}
+                      onClick={() => item.id && revokeInvite.mutate(item.id)}
                       className="rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"
                     >
                       Revoke
