@@ -143,6 +143,22 @@ function CrmPage() {
   const [importing, setImporting] = useState(false);
   const bloomInputRef = useRef<HTMLInputElement>(null);
 
+  const clearFilters = () => {
+    setSearch("");
+    setStage("all");
+    setPriority("all");
+    setAssignee("all");
+  };
+
+  const showMyLeads = () => {
+    // This is a shortcut to the user's complete assigned pipeline, so stale
+    // search, stage, and priority filters should not hide valid assignments.
+    setSearch("");
+    setStage("all");
+    setPriority("all");
+    setAssignee("mine");
+  };
+
   const staffQ = useQuery({
     queryKey: ["crm", "staff"],
     queryFn: async (): Promise<{
@@ -415,10 +431,15 @@ function CrmPage() {
             </p>
           </div>
           <button
-            onClick={() => setAssignee("mine")}
-            className="rounded-lg border border-border px-3 py-2 text-xs font-medium"
+            onClick={assignee === "mine" ? clearFilters : showMyLeads}
+            className={
+              "rounded-lg border px-3 py-2 text-xs font-medium " +
+              (assignee === "mine"
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-border")
+            }
           >
-            My leads
+            {assignee === "mine" ? "Show all leads" : "My leads"}
           </button>
         </div>
         <div className="mt-3 grid gap-2 md:grid-cols-2">
@@ -504,8 +525,17 @@ function CrmPage() {
             <UserRound className="mx-auto h-9 w-9 text-muted-foreground" />
             <h2 className="mt-3 font-semibold">No matching CRM records</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Add your first lead or adjust the current filters.
+              {assignee === "mine"
+                ? "No leads are currently assigned to you."
+                : "Add your first lead or adjust the current filters."}
             </p>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="mt-4 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-elevated"
+            >
+              Clear filters
+            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
