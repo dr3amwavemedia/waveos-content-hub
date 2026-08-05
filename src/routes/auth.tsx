@@ -63,9 +63,14 @@ function AuthPage() {
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
-        const target = resolveNext();
-        if (target !== "/home") window.location.replace(target);
-        else navigate({ to: "/home", replace: true });
+        // Let Supabase finish releasing its auth lock before the destination
+        // route calls getUser(). Navigating synchronously here can deadlock.
+        window.setTimeout(() => {
+          if (cancelled) return;
+          const target = resolveNext();
+          if (target !== "/home") window.location.replace(target);
+          else navigate({ to: "/home", replace: true });
+        }, 0);
       }
     });
     return () => {

@@ -56,7 +56,10 @@ function AuthCallbackPage() {
     };
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) goToTarget();
+      if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
+        // Defer navigation until Supabase has released its internal auth lock.
+        window.setTimeout(goToTarget, 0);
+      }
     });
 
     (async () => {

@@ -57,7 +57,10 @@ function Landing() {
     })();
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
-        navigate({ to: "/home", replace: true });
+        // The protected route reads the user; wait until the auth event ends.
+        window.setTimeout(() => {
+          if (!cancelled) navigate({ to: "/home", replace: true });
+        }, 0);
       }
     });
     return () => {

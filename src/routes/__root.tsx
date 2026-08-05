@@ -150,8 +150,12 @@ function RootComponent() {
         event !== "USER_UPDATED"
       )
         return;
-      router.invalidate();
-      if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+      // Router loaders and queries call Supabase. Run them after the auth
+      // callback completes to avoid blocking the client auth lock.
+      window.setTimeout(() => {
+        router.invalidate();
+        if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+      }, 0);
     });
     return () => {
       sub.subscription.unsubscribe();
