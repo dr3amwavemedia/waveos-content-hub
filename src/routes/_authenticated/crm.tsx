@@ -2,15 +2,20 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
+  Activity,
   AlertCircle,
   ArrowUpRight,
   BriefcaseBusiness,
   CalendarClock,
   CheckCircle2,
+  ClipboardList,
   Download,
+  Link2,
   Loader2,
+  MessageSquareText,
   Plus,
   Search,
+  UserPlus,
   UserRound,
   Users2,
   X,
@@ -413,6 +418,7 @@ function CrmPage() {
         <AccountDrawer
           account={selected}
           onClose={() => setSelected(null)}
+          onRefresh={() => qc.invalidateQueries({ queryKey: ["crm"] })}
           onExport={() =>
             downloadCsv(`${safeCsvFilename(selected.business_name)}-crm.csv`, [toCsvRow(selected)])
           }
@@ -697,12 +703,24 @@ function AccountDrawer({
   account,
   onClose,
   onExport,
+  onRefresh,
 }: {
   account: Account;
   onClose: () => void;
   onExport: () => void;
+  onRefresh: () => void;
 }) {
+  const [tab, setTab] = useState<"overview" | "contacts" | "notes" | "tasks" | "activity">(
+    "overview",
+  );
   const contact = account.crm_contacts?.find((c) => c.is_primary) ?? account.crm_contacts?.[0];
+  const tabs = [
+    ["overview", "Overview", BriefcaseBusiness],
+    ["contacts", "Contacts", Users2],
+    ["notes", "Notes", MessageSquareText],
+    ["tasks", "Tasks", ClipboardList],
+    ["activity", "Activity", Activity],
+  ] as const;
   return (
     <div className="fixed inset-0 z-50">
       <button
@@ -736,28 +754,544 @@ function AccountDrawer({
             </span>
           )}
         </div>
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
-          <Detail label="Pipeline stage" value={STAGE_LABEL[account.stage]} />
-          <Detail label="Priority" value={account.priority} />
-          <Detail label="Estimated value" value={money(account.estimated_value_cents)} />
-          <Detail label="Next follow-up" value={dateLabel(account.next_follow_up_at)} />
-          <Detail
-            label="Primary contact"
-            value={contact ? `${contact.first_name} ${contact.last_name ?? ""}` : "—"}
-          />
-          <Detail label="Email" value={contact?.email ?? account.email ?? "—"} />
-          <Detail label="Phone" value={contact?.phone ?? account.phone ?? "—"} />
-          <Detail label="Lead source" value={account.lead_source || "—"} />
-          <Detail
-            label="Interested services"
-            value={account.interested_services?.join(", ") || "—"}
-          />
-          <Detail
-            label="Location"
-            value={[account.city, account.state].filter(Boolean).join(", ") || "—"}
-          />
+        <div className="mt-6 flex gap-1 overflow-x-auto border-b border-border">
+          {tabs.map(([value, label, Icon]) => (
+            <button
+              key={value}
+              onClick={() => setTab(value)}
+              className={cn(
+                "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-xs font-medium",
+                tab === value
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5" /> {label}
+            </button>
+          ))}
+        </div>
+        <div className="mt-5">
+          {tab === "overview" && (
+            <OverviewTab account={account} contact={contact} onRefresh={onRefresh} />
+          )}
+          {tab === "contacts" && <ContactsTab accountId={account.id} onRefresh={onRefresh} />}
+          {tab === "notes" && <NotesTab accountId={account.id} />}
+          {tab === "tasks" && <TasksTab accountId={account.id} onRefresh={onRefresh} />}
+          {tab === "activity" && <ActivityTab accountId={account.id} />}
         </div>
       </aside>
+    </div>
+  );
+}
+
+function OverviewTab({
+  account,
+  contact,
+  onRefresh,
+}: {
+  account: Account;
+  contact: Contact | undefined;
+  onRefresh: () => void;
+}) {
+  const qc = useQueryClient();
+  const [workspaceId, setWorkspaceId] = useState(account.linked_workspace_id ?? "");
+  const workspacesQ = useQuery({
+    queryKey: ["crm", "workspaces"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("workspaces")
+        .select("id,name,account_status")
+        .neq("account_status", "archived")
+        .order("name");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const linkMutation = useMutation({
+    mutationFn: async () => {
+      if (!workspaceId) throw new Error("Choose a client workspace.");
+      const { error } = await db
+        .from("crm_accounts")
+        .update({
+          linked_workspace_id: workspaceId,
+          stage: "won",
+          converted_at: new Date().toISOString(),
+        })
+        .eq("id", account.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm"] });
+      toast.success("Lead linked to the client workspace and marked Won.");
+      onRefresh();
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not link workspace."),
+  });
+
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Detail label="Pipeline stage" value={STAGE_LABEL[account.stage]} />
+        <Detail label="Priority" value={account.priority} />
+        <Detail label="Estimated value" value={money(account.estimated_value_cents)} />
+        <Detail label="Next follow-up" value={dateLabel(account.next_follow_up_at)} />
+        <Detail
+          label="Primary contact"
+          value={contact ? `${contact.first_name} ${contact.last_name ?? ""}` : "—"}
+        />
+        <Detail label="Email" value={contact?.email ?? account.email ?? "—"} />
+        <Detail label="Phone" value={contact?.phone ?? account.phone ?? "—"} />
+        <Detail label="Lead source" value={account.lead_source || "—"} />
+        <Detail
+          label="Interested services"
+          value={account.interested_services?.join(", ") || "—"}
+        />
+        <Detail
+          label="Location"
+          value={[account.city, account.state].filter(Boolean).join(", ") || "—"}
+        />
+      </div>
+      <div className="rounded-xl border border-border bg-background/40 p-4">
+        <div className="flex items-center gap-2">
+          <Link2 className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Convert to WaveOS client</h3>
+        </div>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Link this CRM account to an existing client workspace. This also marks the opportunity
+          Won.
+        </p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+          <select
+            value={workspaceId}
+            onChange={(e) => setWorkspaceId(e.target.value)}
+            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+          >
+            <option value="">Choose client workspace…</option>
+            {(workspacesQ.data ?? []).map((workspace) => (
+              <option key={workspace.id} value={workspace.id}>
+                {workspace.name} · {workspace.account_status}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => linkMutation.mutate()}
+            disabled={!workspaceId || linkMutation.isPending}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {linkMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="h-4 w-4" />
+            )}
+            Link client
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContactsTab({ accountId, onRefresh }: { accountId: string; onRefresh: () => void }) {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ first: "", last: "", title: "", email: "", phone: "" });
+  const contactsQ = useQuery({
+    queryKey: ["crm", "contacts", accountId],
+    queryFn: async (): Promise<Contact[]> => {
+      const { data, error } = await db
+        .from("crm_contacts")
+        .select("id,first_name,last_name,job_title,email,phone,is_primary")
+        .eq("account_id", accountId)
+        .order("is_primary", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await db.from("crm_contacts").insert({
+        account_id: accountId,
+        first_name: form.first.trim(),
+        last_name: form.last.trim() || null,
+        job_title: form.title.trim() || null,
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        is_primary: !(contactsQ.data ?? []).length,
+        created_by: auth.user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setForm({ first: "", last: "", title: "", email: "", phone: "" });
+      setShowForm(false);
+      qc.invalidateQueries({ queryKey: ["crm", "contacts", accountId] });
+      onRefresh();
+      toast.success("Contact added.");
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not add contact."),
+  });
+  const primaryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error: clearError } = await db
+        .from("crm_contacts")
+        .update({ is_primary: false })
+        .eq("account_id", accountId)
+        .eq("is_primary", true);
+      if (clearError) throw clearError;
+      const { error } = await db.from("crm_contacts").update({ is_primary: true }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm", "contacts", accountId] });
+      onRefresh();
+      toast.success("Primary contact updated.");
+    },
+  });
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <button
+          onClick={() => setShowForm((value) => !value)}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+        >
+          <UserPlus className="h-3.5 w-3.5" /> Add contact
+        </button>
+      </div>
+      {showForm && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            addMutation.mutate();
+          }}
+          className="grid gap-3 rounded-xl border border-border bg-background/40 p-3 sm:grid-cols-2"
+        >
+          <Field
+            label="First name"
+            required
+            value={form.first}
+            onChange={(v) => setForm((f) => ({ ...f, first: v }))}
+          />
+          <Field
+            label="Last name"
+            value={form.last}
+            onChange={(v) => setForm((f) => ({ ...f, last: v }))}
+          />
+          <Field
+            label="Job title"
+            value={form.title}
+            onChange={(v) => setForm((f) => ({ ...f, title: v }))}
+          />
+          <Field
+            label="Email"
+            type="email"
+            value={form.email}
+            onChange={(v) => setForm((f) => ({ ...f, email: v }))}
+          />
+          <Field
+            label="Phone"
+            type="tel"
+            value={form.phone}
+            onChange={(v) => setForm((f) => ({ ...f, phone: v }))}
+          />
+          <div className="flex items-end justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="rounded-lg border border-border px-3 py-2 text-xs"
+            >
+              Cancel
+            </button>
+            <button
+              disabled={!form.first.trim() || addMutation.isPending}
+              className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              Save contact
+            </button>
+          </div>
+        </form>
+      )}
+      {contactsQ.isLoading ? (
+        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+      ) : !(contactsQ.data ?? []).length ? (
+        <p className="text-sm text-muted-foreground">No contacts yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {contactsQ.data!.map((item) => (
+            <li key={item.id} className="rounded-xl border border-border bg-background/40 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold">
+                    {item.first_name} {item.last_name ?? ""}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {(item as Contact & { job_title?: string | null }).job_title || "Contact"}
+                  </div>
+                  <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    {item.email && <div>{item.email}</div>}
+                    {item.phone && <div>{item.phone}</div>}
+                  </div>
+                </div>
+                {item.is_primary ? (
+                  <span className="rounded-full bg-success/15 px-2 py-1 text-[10px] font-medium text-success">
+                    Primary
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => primaryMutation.mutate(item.id)}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Make primary
+                  </button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function NotesTab({ accountId }: { accountId: string }) {
+  const qc = useQueryClient();
+  const [body, setBody] = useState("");
+  const notesQ = useQuery({
+    queryKey: ["crm", "notes", accountId],
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("crm_notes")
+        .select("id,body,created_at,author_id")
+        .eq("account_id", accountId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await db.from("crm_notes").insert({
+        account_id: accountId,
+        body: body.trim(),
+        author_id: auth.user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setBody("");
+      qc.invalidateQueries({ queryKey: ["crm", "notes", accountId] });
+      toast.success("Internal note added.");
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not add note."),
+  });
+  return (
+    <div className="space-y-4">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          addMutation.mutate();
+        }}
+        className="space-y-2"
+      >
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={3}
+          placeholder="Add a private staff note…"
+          className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+        />
+        <div className="flex justify-end">
+          <button
+            disabled={!body.trim() || addMutation.isPending}
+            className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            Add note
+          </button>
+        </div>
+      </form>
+      <ul className="space-y-2">
+        {(notesQ.data ?? []).map((note: { id: string; body: string; created_at: string }) => (
+          <li key={note.id} className="rounded-xl border border-border bg-background/40 p-3">
+            <p className="whitespace-pre-wrap text-sm">{note.body}</p>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              {new Date(note.created_at).toLocaleString()}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function TasksTab({ accountId, onRefresh }: { accountId: string; onRefresh: () => void }) {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState("");
+  const [dueAt, setDueAt] = useState("");
+  const [priority, setPriority] = useState<Priority>("normal");
+  const tasksQ = useQuery({
+    queryKey: ["crm", "tasks", accountId],
+    queryFn: async (): Promise<Task[]> => {
+      const { data, error } = await db
+        .from("crm_tasks")
+        .select("id,account_id,title,due_at,priority,status")
+        .eq("account_id", accountId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await db.from("crm_tasks").insert({
+        account_id: accountId,
+        title: title.trim(),
+        due_at: dueAt ? new Date(dueAt).toISOString() : null,
+        priority,
+        created_by: auth.user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setTitle("");
+      setDueAt("");
+      setPriority("normal");
+      qc.invalidateQueries({ queryKey: ["crm", "tasks"] });
+      onRefresh();
+      toast.success("Follow-up task added.");
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not add task."),
+  });
+  const completeMutation = useMutation({
+    mutationFn: async ({ id, complete }: { id: string; complete: boolean }) => {
+      const { error } = await db
+        .from("crm_tasks")
+        .update({
+          status: complete ? "completed" : "open",
+          completed_at: complete ? new Date().toISOString() : null,
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["crm", "tasks"] });
+      onRefresh();
+    },
+  });
+  return (
+    <div className="space-y-4">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          addMutation.mutate();
+        }}
+        className="space-y-3 rounded-xl border border-border bg-background/40 p-3"
+      >
+        <Field
+          label="Task or follow-up"
+          required
+          value={title}
+          onChange={setTitle}
+          placeholder="Call about proposal"
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Due" type="datetime-local" value={dueAt} onChange={setDueAt} />
+          <label className="space-y-1 text-sm">
+            <span>Priority</span>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as Priority)}
+              className="w-full rounded-lg border border-border bg-background px-3 py-2"
+            >
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </label>
+        </div>
+        <div className="flex justify-end">
+          <button
+            disabled={!title.trim() || addMutation.isPending}
+            className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            Add task
+          </button>
+        </div>
+      </form>
+      <ul className="space-y-2">
+        {(tasksQ.data ?? []).map((task) => (
+          <li
+            key={task.id}
+            className="flex items-start gap-3 rounded-xl border border-border bg-background/40 p-3"
+          >
+            <input
+              type="checkbox"
+              checked={task.status === "completed"}
+              onChange={(e) => completeMutation.mutate({ id: task.id, complete: e.target.checked })}
+              className="mt-1 h-4 w-4"
+            />
+            <div className="min-w-0 flex-1">
+              <div
+                className={cn(
+                  "text-sm font-medium",
+                  task.status === "completed" && "text-muted-foreground line-through",
+                )}
+              >
+                {task.title}
+              </div>
+              <div className="mt-1 flex gap-2 text-[11px] text-muted-foreground">
+                <span>{task.due_at ? new Date(task.due_at).toLocaleString() : "No due date"}</span>
+                <PriorityBadge value={task.priority} />
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ActivityTab({ accountId }: { accountId: string }) {
+  const activityQ = useQuery({
+    queryKey: ["crm", "activity", accountId],
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("crm_activities")
+        .select("id,activity_type,summary,safe_metadata,occurred_at")
+        .eq("account_id", accountId)
+        .order("occurred_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  return (
+    <div className="space-y-2">
+      {(activityQ.data ?? []).map(
+        (item: { id: string; activity_type: string; summary: string; occurred_at: string }) => (
+          <div
+            key={item.id}
+            className="flex gap-3 rounded-xl border border-border bg-background/40 p-3"
+          >
+            <div className="mt-0.5 rounded-full bg-primary/15 p-1.5 text-primary">
+              <Activity className="h-3.5 w-3.5" />
+            </div>
+            <div>
+              <div className="text-sm font-medium">{item.summary}</div>
+              <div className="mt-1 text-[11px] capitalize text-muted-foreground">
+                {item.activity_type.replaceAll("_", " ")} ·{" "}
+                {new Date(item.occurred_at).toLocaleString()}
+              </div>
+            </div>
+          </div>
+        ),
+      )}
+      {!activityQ.isLoading && !(activityQ.data ?? []).length && (
+        <p className="text-sm text-muted-foreground">No activity yet.</p>
+      )}
     </div>
   );
 }
