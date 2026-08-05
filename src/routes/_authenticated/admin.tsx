@@ -33,8 +33,18 @@ const db = supabase as unknown as {
   rpc: (
     fn: string,
     args?: Record<string, unknown>,
-  ) => Promise<{ data: Array<{ raw_token?: string }> | null; error: Error | null }>;
+  ) => Promise<{ data: Array<Record<string, unknown>> | null; error: Error | null }>;
 };
+
+interface StaffDirectoryRow {
+  user_id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  role: AppRole;
+  staff_type: StaffType | null;
+  created_at: string;
+}
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
@@ -62,29 +72,9 @@ function AdminPage() {
   const staffQ = useQuery({
     queryKey: ["admin", "staff"],
     queryFn: async () => {
-      const { data: roles, error } = await db
-        .from("user_roles")
-        .select("id,user_id,role,staff_type,created_at")
-        .in("role", ["dream_wave_owner", "dream_wave_team"])
-        .order("created_at", { ascending: true });
+      const { data, error } = await db.rpc("get_staff_directory");
       if (error) throw error;
-      const roleRows = (roles ?? []) as Array<{
-        id: string;
-        user_id: string;
-        role: AppRole;
-        staff_type: StaffType | null;
-        created_at: string;
-      }>;
-      const userIds = Array.from(new Set(roleRows.map((role) => role.user_id)));
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id,first_name,last_name")
-        .in("id", userIds);
-      const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
-      return roleRows.map((role) => ({
-        ...role,
-        profile: byId.get(role.user_id) ?? null,
-      }));
+      return (data ?? []) as unknown as StaffDirectoryRow[];
     },
   });
 
@@ -334,17 +324,19 @@ function AdminPage() {
         ) : (
           <ul className="divide-y divide-border/60">
             {staffQ.data!.map((s) => (
-              <li key={s.id} className="flex items-center justify-between px-5 py-3">
+              <li
+                key={`${s.user_id}-${s.role}`}
+                className="flex items-center justify-between px-5 py-3"
+              >
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground">
-                    {s.profile
-                      ? `${s.profile.first_name ?? ""} ${s.profile.last_name ?? ""}`.trim() ||
-                        s.user_id
-                      : s.user_id}
+                    {`${s.first_name ?? ""} ${s.last_name ?? ""}`.trim() ||
+                      s.email ||
+                      "Staff member"}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    <span className="font-mono">{s.user_id}</span>
-                  </div>
+                  {s.email && (
+                    <div className="truncate text-xs text-muted-foreground">{s.email}</div>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
                   <span
@@ -369,7 +361,7 @@ function AdminPage() {
                         }
                         disabled={changeStaffType.isPending}
                         className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
-                        aria-label={`Staff type for ${s.user_id}`}
+                        aria-label={`Staff type for ${s.email ?? s.user_id}`}
                       >
                         <option value="sales">Sales</option>
                         <option value="media_manager">Media Manager</option>
