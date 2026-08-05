@@ -449,6 +449,298 @@ export type Database = {
           },
         ]
       }
+      crm_accounts: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          archived_at: string | null
+          assigned_to: string | null
+          business_name: string
+          city: string | null
+          converted_at: string | null
+          country: string
+          created_at: string
+          created_by: string
+          email: string | null
+          estimated_value_cents: number | null
+          id: string
+          industry: string | null
+          interested_services: string[]
+          last_contacted_at: string | null
+          lead_source: string | null
+          linked_workspace_id: string | null
+          next_follow_up_at: string | null
+          phone: string | null
+          postal_code: string | null
+          preferred_contact_method: string | null
+          priority: Database["public"]["Enums"]["crm_priority"]
+          referral_name: string | null
+          social_links: Json
+          stage: Database["public"]["Enums"]["crm_pipeline_stage"]
+          state: string | null
+          updated_at: string
+          updated_by: string | null
+          website: string | null
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          archived_at?: string | null
+          assigned_to?: string | null
+          business_name: string
+          city?: string | null
+          converted_at?: string | null
+          country?: string
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          estimated_value_cents?: number | null
+          id?: string
+          industry?: string | null
+          interested_services?: string[]
+          last_contacted_at?: string | null
+          lead_source?: string | null
+          linked_workspace_id?: string | null
+          next_follow_up_at?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          preferred_contact_method?: string | null
+          priority?: Database["public"]["Enums"]["crm_priority"]
+          referral_name?: string | null
+          social_links?: Json
+          stage?: Database["public"]["Enums"]["crm_pipeline_stage"]
+          state?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          website?: string | null
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          archived_at?: string | null
+          assigned_to?: string | null
+          business_name?: string
+          city?: string | null
+          converted_at?: string | null
+          country?: string
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          estimated_value_cents?: number | null
+          id?: string
+          industry?: string | null
+          interested_services?: string[]
+          last_contacted_at?: string | null
+          lead_source?: string | null
+          linked_workspace_id?: string | null
+          next_follow_up_at?: string | null
+          phone?: string | null
+          postal_code?: string | null
+          preferred_contact_method?: string | null
+          priority?: Database["public"]["Enums"]["crm_priority"]
+          referral_name?: string | null
+          social_links?: Json
+          stage?: Database["public"]["Enums"]["crm_pipeline_stage"]
+          state?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          website?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_accounts_linked_workspace_id_fkey"
+            columns: ["linked_workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_activities: {
+        Row: {
+          account_id: string
+          activity_type: string
+          actor_id: string | null
+          created_at: string
+          id: string
+          occurred_at: string
+          safe_metadata: Json
+          summary: string
+        }
+        Insert: {
+          account_id: string
+          activity_type: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          occurred_at?: string
+          safe_metadata?: Json
+          summary: string
+        }
+        Update: {
+          account_id?: string
+          activity_type?: string
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          occurred_at?: string
+          safe_metadata?: Json
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_activities_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_contacts: {
+        Row: {
+          account_id: string
+          created_at: string
+          created_by: string
+          email: string | null
+          first_name: string
+          id: string
+          is_primary: boolean
+          job_title: string | null
+          last_name: string | null
+          phone: string | null
+          preferred_contact_method: string | null
+          social_links: Json
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          first_name: string
+          id?: string
+          is_primary?: boolean
+          job_title?: string | null
+          last_name?: string | null
+          phone?: string | null
+          preferred_contact_method?: string | null
+          social_links?: Json
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          created_by?: string
+          email?: string | null
+          first_name?: string
+          id?: string
+          is_primary?: boolean
+          job_title?: string | null
+          last_name?: string | null
+          phone?: string | null
+          preferred_contact_method?: string | null
+          social_links?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_contacts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_notes: {
+        Row: {
+          account_id: string
+          author_id: string
+          body: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          author_id?: string
+          body: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          author_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_notes_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_tasks: {
+        Row: {
+          account_id: string | null
+          assigned_to: string | null
+          completed_at: string | null
+          created_at: string
+          created_by: string
+          description: string | null
+          due_at: string | null
+          id: string
+          priority: Database["public"]["Enums"]["crm_priority"]
+          status: Database["public"]["Enums"]["crm_task_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          account_id?: string | null
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["crm_priority"]
+          status?: Database["public"]["Enums"]["crm_task_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string | null
+          assigned_to?: string | null
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["crm_priority"]
+          status?: Database["public"]["Enums"]["crm_task_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_tasks_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           accepted_at: string | null
@@ -1328,6 +1620,26 @@ export type Database = {
         }
         Returns: string
       }
+      crm_find_duplicates: {
+        Args: { _business_name: string; _email: string; _phone: string }
+        Returns: {
+          account_id: string
+          business_name: string
+          match_reason: string
+        }[]
+      }
+      crm_log_communication: {
+        Args: {
+          _account_id: string
+          _activity_type: string
+          _assigned_to?: string
+          _next_action?: string
+          _next_due_at?: string
+          _occurred_at?: string
+          _summary: string
+        }
+        Returns: string
+      }
       get_invite_public: {
         Args: { _token: string }
         Returns: {
@@ -1442,7 +1754,19 @@ export type Database = {
         | "published"
         | "failed"
         | "archived"
+      crm_pipeline_stage:
+        | "new_lead"
+        | "contacted"
+        | "discovery_scheduled"
+        | "qualified"
+        | "proposal_sent"
+        | "negotiating"
+        | "won"
+        | "lost"
+        | "archived"
+      crm_priority: "low" | "normal" | "high" | "urgent"
       crm_sync_status: "not_connected" | "pending" | "synced" | "failed"
+      crm_task_status: "open" | "in_progress" | "completed" | "cancelled"
       delivery_kind:
         | "photos"
         | "videos"
@@ -1652,7 +1976,20 @@ export const Constants = {
         "failed",
         "archived",
       ],
+      crm_pipeline_stage: [
+        "new_lead",
+        "contacted",
+        "discovery_scheduled",
+        "qualified",
+        "proposal_sent",
+        "negotiating",
+        "won",
+        "lost",
+        "archived",
+      ],
+      crm_priority: ["low", "normal", "high", "urgent"],
       crm_sync_status: ["not_connected", "pending", "synced", "failed"],
+      crm_task_status: ["open", "in_progress", "completed", "cancelled"],
       delivery_kind: [
         "photos",
         "videos",
