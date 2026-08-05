@@ -22,6 +22,7 @@ import {
   Plus,
   FileText,
   User,
+  BriefcaseBusiness,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
@@ -65,6 +66,7 @@ const CLIENT_NAV: NavItem[] = [
 ];
 
 const STAFF_NAV: NavItem[] = [
+  { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
