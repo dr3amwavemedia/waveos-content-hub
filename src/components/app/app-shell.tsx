@@ -70,7 +70,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
-  { to: "/admin", label: "Admin", icon: ShieldCheck, staffOnly: true },
+  { to: "/admin", label: "Staff", icon: ShieldCheck, staffOnly: true },
 ];
 
 const MOBILE_NAV: NavItem[] = [

@@ -51,7 +51,16 @@ function AcceptInvitePage() {
   const autoAcceptStarted = useRef(false);
 
   const [status, setStatus] = useState<
-    "loading" | "no-token" | "invalid" | "expired" | "revoked" | "used" | "form" | "accepting" | "check-email" | "done"
+    | "loading"
+    | "no-token"
+    | "invalid"
+    | "expired"
+    | "revoked"
+    | "used"
+    | "form"
+    | "accepting"
+    | "check-email"
+    | "done"
   >("loading");
   const [invite, setInvite] = useState<InvitePublic | null>(null);
   const [sessionUser, setSessionUser] = useState<{ id: string; email: string } | null>(null);
@@ -110,7 +119,7 @@ function AcceptInvitePage() {
     sessionStorage.removeItem(PENDING_INVITE_TOKEN_KEY);
     toast.success("You're in. Welcome to WaveOS.");
     setStatus("done");
-    setTimeout(() => navigate({ to: "/home", replace: true }), 400);
+    setTimeout(() => navigate({ to: invite?.workspace_id ? "/home" : "/crm", replace: true }), 400);
   }
 
   useEffect(() => {
@@ -192,7 +201,9 @@ function AcceptInvitePage() {
     } catch (error) {
       sessionStorage.removeItem(PENDING_INVITE_TOKEN_KEY);
       sessionStorage.removeItem("waveos.postAuthNext");
-      toast.error(error instanceof Error ? error.message : "Couldn't sign in with Google. Please try again.");
+      toast.error(
+        error instanceof Error ? error.message : "Couldn't sign in with Google. Please try again.",
+      );
       setBusy(false);
     }
   }
@@ -209,40 +220,40 @@ function AcceptInvitePage() {
       <Frame>
         <ErrorPanel
           icon={ShieldAlert}
-          title={status === "used" ? "This invite has already been used" : "This invite is no longer valid"}
+          title={
+            status === "used"
+              ? "This invite has already been used"
+              : "This invite is no longer valid"
+          }
           body="It may have been used, revoked, or the link is incorrect. Contact Dream Wave Media for a new invite."
         />
       </Frame>
     );
   }
 
-if (status === "check-email") {
-  return (
-    <Frame>
-      <div className="flex flex-col items-center gap-3 text-center">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/20">
-          <MailCheck className="h-5 w-5" />
+  if (status === "check-email") {
+    return (
+      <Frame>
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary ring-1 ring-primary/20">
+            <MailCheck className="h-5 w-5" />
+          </div>
+
+          <h1 className="text-xl font-semibold text-foreground">Confirm your email</h1>
+
+          <p className="max-w-sm text-sm text-muted-foreground">
+            We sent a confirmation link to{" "}
+            <span className="font-medium text-foreground">{invite?.email}</span>. Open the email and
+            confirm your account to finish entering WaveOS.
+          </p>
+
+          <p className="text-xs text-muted-foreground">
+            Don’t see it? Check your spam or junk folder.
+          </p>
         </div>
-
-        <h1 className="text-xl font-semibold text-foreground">
-          Confirm your email
-        </h1>
-
-        <p className="max-w-sm text-sm text-muted-foreground">
-          We sent a confirmation link to{" "}
-          <span className="font-medium text-foreground">
-            {invite?.email}
-          </span>
-          . Open the email and confirm your account to finish entering WaveOS.
-        </p>
-
-        <p className="text-xs text-muted-foreground">
-          Don’t see it? Check your spam or junk folder.
-        </p>
-      </div>
-    </Frame>
-  );
-}
+      </Frame>
+    );
+  }
   if (status === "expired") {
     return (
       <Frame>
@@ -257,7 +268,8 @@ if (status === "check-email") {
   }
 
   const info = invite!;
-  const emailMatchesSession = sessionUser && sessionUser.email.toLowerCase() === info.email.toLowerCase();
+  const emailMatchesSession =
+    sessionUser && sessionUser.email.toLowerCase() === info.email.toLowerCase();
 
   return (
     <Frame>
@@ -266,7 +278,7 @@ if (status === "check-email") {
           <MailCheck className="h-5 w-5" />
         </div>
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
-          {info.workspace_name ? `Join ${info.workspace_name}` : "Accept your invite"}
+          {info.workspace_name ? `Join ${info.workspace_name}` : "Join Dream Wave Media staff"}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Invited as <span className="text-foreground">{info.email}</span> · role{" "}
@@ -287,9 +299,9 @@ if (status === "check-email") {
         ) : (
           <div className="space-y-3 text-center">
             <p className="text-sm text-muted-foreground">
-              You're signed in as <span className="text-foreground">{sessionUser.email}</span>, but this invite is for{" "}
-              <span className="text-foreground">{info.email}</span>. For security, invites can only be accepted by their
-              intended recipient.
+              You're signed in as <span className="text-foreground">{sessionUser.email}</span>, but
+              this invite is for <span className="text-foreground">{info.email}</span>. For
+              security, invites can only be accepted by their intended recipient.
             </p>
             <button
               onClick={async () => {
@@ -326,7 +338,9 @@ if (status === "check-email") {
                   onClick={() => setMode(m)}
                   className={
                     "flex-1 py-2 font-medium " +
-                    (mode === m ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground")
+                    (mode === m
+                      ? "bg-primary/15 text-foreground"
+                      : "text-muted-foreground hover:text-foreground")
                   }
                 >
                   {m === "signup" ? "Create account" : "Already have one"}

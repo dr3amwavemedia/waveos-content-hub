@@ -2,7 +2,16 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { CheckCircle2, Loader2, ShieldCheck, UserMinus, UserPlus, XCircle } from "lucide-react";
+import {
+  CheckCircle2,
+  Copy,
+  Loader2,
+  MailPlus,
+  RefreshCw,
+  ShieldCheck,
+  UserMinus,
+  XCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
@@ -17,7 +26,9 @@ export const Route = createFileRoute("/_authenticated/admin")({
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/auth" });
     const { data: roles } = await supabase
-      .from("user_roles").select("role").eq("user_id", data.user.id);
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", data.user.id);
     const isOwner = (roles ?? []).some((r) => r.role === "dream_wave_owner");
     if (!isOwner) throw redirect({ to: "/home" });
   },
@@ -30,6 +41,7 @@ export const Route = createFileRoute("/_authenticated/admin")({
 function AdminPage() {
   const qc = useQueryClient();
   const [email, setEmail] = useState("");
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
 
   const staffQ = useQuery({
     queryKey: ["admin", "staff"],
@@ -53,41 +65,81 @@ function AdminPage() {
     },
   });
 
-  const grant = useMutation({
+  const invitesQ = useQuery({
+    queryKey: ["admin", "staff-invites"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invites_admin")
+        .select("id,email,status,expires_at,created_at,resend_count")
+        .is("workspace_id", null)
+        .eq("app_role", "dream_wave_team")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const invite = useMutation({
     mutationFn: async (targetEmail: string) => {
-      // Look up user via profiles/auth is not directly possible; require the
-      // person to already have a profile (i.e. signed up once).
       const clean = targetEmail.trim().toLowerCase();
       if (!clean) throw new Error("Enter an email.");
-      // Use RPC to resolve — we don't expose auth.users to authenticated. So the
-      // owner is expected to paste the user's UUID for now; email → uuid resolution
-      // requires an admin serverFn we'll add in Phase 3.
-      // For the MVP we accept either email OR uuid, but only uuid works client-side.
-      // If not a uuid, guide the owner.
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean);
-      if (!isUuid) {
-        throw new Error(
-          "Paste the user's UUID (from their profile). Email→UUID lookup will be added when the admin server function ships.",
-        );
-      }
-      const { error } = await supabase.rpc("grant_staff_role", {
-        _target_user: clean,
-        _role: "dream_wave_team" as AppRole,
+      // Generated types update after the accompanying migration is deployed.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc("create_staff_invite", {
+        _email: clean,
+        _expires_days: 14,
       });
+      if (error) throw error;
+      const token = data?.[0]?.raw_token as string | undefined;
+      if (!token) throw new Error("The staff invite was created without a link.");
+      return `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`;
+    },
+    onSuccess: (link) => {
+      setEmail("");
+      setInviteLink(link);
+      qc.invalidateQueries({ queryKey: ["admin", "staff-invites"] });
+      toast.success("Staff invitation created.");
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not create staff invitation."),
+  });
+
+  const resend = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const { data, error } = await supabase.rpc("resend_invite", {
+        _invite_id: inviteId,
+        _extend_days: 14,
+      });
+      if (error) throw error;
+      const token = data?.[0]?.raw_token;
+      if (!token) throw new Error("Could not create a refreshed invitation link.");
+      return `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`;
+    },
+    onSuccess: (link) => {
+      setInviteLink(link);
+      qc.invalidateQueries({ queryKey: ["admin", "staff-invites"] });
+      toast.success("Staff invitation refreshed.");
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not resend."),
+  });
+
+  const revokeInvite = useMutation({
+    mutationFn: async (inviteId: string) => {
+      const { error } = await supabase.rpc("revoke_invite", { _invite_id: inviteId });
       if (error) throw error;
     },
     onSuccess: () => {
-      setEmail("");
-      qc.invalidateQueries({ queryKey: ["admin", "staff"] });
-      toast.success("Staff role granted.");
+      qc.invalidateQueries({ queryKey: ["admin", "staff-invites"] });
+      toast.success("Staff invitation revoked.");
     },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not revoke."),
   });
 
   const revoke = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
       const { error } = await supabase.rpc("revoke_staff_role", {
-        _target_user: userId, _role: role,
+        _target_user: userId,
+        _role: role,
       });
       if (error) throw error;
     },
@@ -112,39 +164,103 @@ function AdminPage() {
           Dream Wave Media
         </p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-          Staff & permissions
+          Staff
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Only Dream Wave Owners can promote team members. The Owner role can never
-          be granted through the app — it's reserved for the original founder and
-          protected against demotion.
+          Invite employees by email and manage Dream Wave Team access. Staff accounts are separate
+          from client workspaces. The protected Owner role can never be granted through the app.
         </p>
       </header>
 
       <div className="surface-card p-5">
-        <h2 className="text-sm font-semibold text-foreground">Promote a user to Dream Wave Team</h2>
+        <h2 className="text-sm font-semibold text-foreground">Invite a staff member</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          The user must sign in at least once before you can promote them.
+          Enter their work email. They will create or sign into their own staff account through a
+          secure, single-use link.
         </p>
         <form
-          onSubmit={(e) => { e.preventDefault(); grant.mutate(email); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            invite.mutate(email);
+          }}
           className="mt-3 flex gap-2"
         >
           <input
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="User UUID (from their profile)"
+            type="email"
+            placeholder="employee@dreamwavemedia.co"
             className="flex-1 rounded-lg border border-input bg-surface/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
           />
           <button
             type="submit"
-            disabled={grant.isPending}
+            disabled={invite.isPending || !email.trim()}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-60"
           >
-            {grant.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-            Grant staff role
+            {invite.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <MailPlus className="h-4 w-4" />
+            )}
+            Create staff invite
           </button>
         </form>
+        {inviteLink && (
+          <div className="mt-4 rounded-lg border border-primary/30 bg-primary/10 p-3">
+            <p className="text-xs font-medium text-foreground">Secure staff invite link</p>
+            <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{inviteLink}</p>
+            <button
+              onClick={async () => {
+                await navigator.clipboard.writeText(inviteLink);
+                toast.success("Invite link copied.");
+              }}
+              className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary"
+            >
+              <Copy className="h-3.5 w-3.5" /> Copy link
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="surface-card overflow-hidden">
+        <div className="border-b border-border/60 px-5 py-3">
+          <h2 className="text-sm font-semibold text-foreground">Staff invitations</h2>
+        </div>
+        {(invitesQ.data ?? []).length === 0 ? (
+          <div className="px-5 py-6 text-sm text-muted-foreground">No staff invitations yet.</div>
+        ) : (
+          <ul className="divide-y divide-border/60">
+            {invitesQ.data!.map((item) => (
+              <li
+                key={item.id}
+                className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+              >
+                <div>
+                  <div className="text-sm font-medium text-foreground">{item.email}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {item.status} · expires {new Date(item.expires_at).toLocaleDateString()}
+                  </div>
+                </div>
+                {item.status === "pending" && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => resend.mutate(item.id)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-elevated"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" /> Refresh link
+                    </button>
+                    <button
+                      onClick={() => revokeInvite.mutate(item.id)}
+                      className="rounded-lg border border-destructive/30 px-3 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+                    >
+                      Revoke
+                    </button>
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="surface-card overflow-hidden">
@@ -166,7 +282,8 @@ function AdminPage() {
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground">
                     {s.profile
-                      ? `${s.profile.first_name ?? ""} ${s.profile.last_name ?? ""}`.trim() || s.user_id
+                      ? `${s.profile.first_name ?? ""} ${s.profile.last_name ?? ""}`.trim() ||
+                        s.user_id
                       : s.user_id}
                   </div>
                   <div className="text-xs text-muted-foreground">
@@ -213,8 +330,14 @@ function AdminPage() {
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             <StatusRow label="Ayrshare API key" ok={!!statusQ.data?.ayrshare.api_key} />
             <StatusRow label="Ayrshare white-label domain" ok={!!statusQ.data?.ayrshare.domain} />
-            <StatusRow label="Ayrshare webhook secret" ok={!!statusQ.data?.ayrshare.webhook_secret} />
-            <StatusRow label="Ayrshare private key (white-label)" ok={!!statusQ.data?.ayrshare.white_label_private_key} />
+            <StatusRow
+              label="Ayrshare webhook secret"
+              ok={!!statusQ.data?.ayrshare.webhook_secret}
+            />
+            <StatusRow
+              label="Ayrshare private key (white-label)"
+              ok={!!statusQ.data?.ayrshare.white_label_private_key}
+            />
             <StatusRow label="App base URL" ok={!!statusQ.data?.app.base_url} />
             <StatusRow label="Lovable AI Gateway" ok={!!statusQ.data?.lovable.ai_gateway} />
           </div>
