@@ -1,1 +1,10 @@
 project_id = "clsuecactijyjecxwuxp"
+
+[functions.send-revision-update]
+verify_jwt = true
+
+[functions.outlook-oauth]
+verify_jwt = false
+
+[functions.outlook-calendar]
+verify_jwt = true
