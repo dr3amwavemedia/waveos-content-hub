@@ -124,7 +124,7 @@ function StaffEmailPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const result = await api("/api/outlook/mail", { action: "list", folder });
+      const result = await api("outlook-mail", { action: "list", folder });
       setMessages(result.messages ?? []);
       setSelected(null);
     } catch (error) {
@@ -138,7 +138,7 @@ function StaffEmailPage() {
     void load();
   }, [folder]);
   useEffect(() => {
-    void api("/api/outlook/contacts")
+    void api("outlook-contacts")
       .then((result) => setContacts(result.contacts ?? []))
       .catch(() => setContacts([]));
   }, []);
@@ -171,10 +171,10 @@ function StaffEmailPage() {
 
   const openMessage = async (message: Message) => {
     try {
-      const result = await api("/api/outlook/mail", { action: "get", id: message.id });
+      const result = await api("outlook-mail", { action: "get", id: message.id });
       setSelected(result.message);
       if (!message.isRead) {
-        void api("/api/outlook/mail", { action: "mark", id: message.id, isRead: true });
+        void api("outlook-mail", { action: "mark", id: message.id, isRead: true });
         setMessages((items) =>
           items.map((item) => (item.id === message.id ? { ...item, isRead: true } : item)),
         );
@@ -187,7 +187,7 @@ function StaffEmailPage() {
   const remove = async (message: Message) => {
     if (!window.confirm(`Delete “${message.subject || "this message"}”?`)) return;
     try {
-      await api("/api/outlook/mail", { action: "delete", id: message.id });
+      await api("outlook-mail", { action: "delete", id: message.id });
       setMessages((items) => items.filter((item) => item.id !== message.id));
       setSelected(null);
       toast.success(
@@ -221,15 +221,15 @@ function StaffEmailPage() {
         attachments: compose.attachments,
       };
       if (compose.mode === "reply" && compose.messageId && !draft) {
-        await api("/api/outlook/mail", {
+        await api("outlook-mail", {
           action: "reply",
           id: compose.messageId,
           message: compose.message,
         });
       } else if (compose.mode === "forward" && compose.messageId && !draft) {
-        await api("/api/outlook/mail", { action: "forward", id: compose.messageId, ...common });
+        await api("outlook-mail", { action: "forward", id: compose.messageId, ...common });
       } else {
-        await api("/api/outlook/mail", { action: draft ? "draft" : "send", ...common });
+        await api("outlook-mail", { action: draft ? "draft" : "send", ...common });
       }
       toast.success(draft ? "Draft saved in Outlook" : "Email sent from Outlook");
       setCompose(null);
@@ -409,7 +409,7 @@ function StaffEmailPage() {
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                      void api("/api/outlook/mail", {
+                      void api("outlook-mail", {
                         action: "mark",
                         id: selected.id,
                         isRead: !selected.isRead,
