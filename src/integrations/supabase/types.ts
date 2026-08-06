@@ -570,6 +570,38 @@ export type Database = {
           },
         ]
       }
+      content_item_internal_notes: {
+        Row: {
+          content_item_id: string
+          created_at: string
+          notes: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          content_item_id: string
+          created_at?: string
+          notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          content_item_id?: string
+          created_at?: string
+          notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "content_item_internal_notes_content_item_id_fkey"
+            columns: ["content_item_id"]
+            isOneToOne: true
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       content_items: {
         Row: {
           approved_at: string | null
@@ -579,7 +611,6 @@ export type Database = {
           first_published_url: string | null
           hashtags: string[]
           id: string
-          internal_notes: string | null
           media_asset_ids: string[]
           metadata: Json
           primary_caption: string | null
@@ -599,7 +630,6 @@ export type Database = {
           first_published_url?: string | null
           hashtags?: string[]
           id?: string
-          internal_notes?: string | null
           media_asset_ids?: string[]
           metadata?: Json
           primary_caption?: string | null
@@ -619,7 +649,6 @@ export type Database = {
           first_published_url?: string | null
           hashtags?: string[]
           id?: string
-          internal_notes?: string | null
           media_asset_ids?: string[]
           metadata?: Json
           primary_caption?: string | null
