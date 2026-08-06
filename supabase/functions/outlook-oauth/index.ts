@@ -5,6 +5,7 @@ import {
   encrypt,
   env,
   json,
+  OUTLOOK_SCOPES,
   redirectUri,
 } from "../_shared/outlook.ts";
 
@@ -55,7 +56,7 @@ Deno.serve(async (request) => {
             code,
             code_verifier: stateRow.code_verifier,
             redirect_uri: redirectUri(),
-            scope: "openid profile email offline_access User.Read Calendars.ReadWrite Mail.Send",
+            scope: OUTLOOK_SCOPES,
           }),
         },
       );
@@ -113,7 +114,7 @@ Deno.serve(async (request) => {
         response_type: "code",
         redirect_uri: redirectUri(),
         response_mode: "query",
-        scope: "openid profile email offline_access User.Read Calendars.ReadWrite Mail.Send",
+        scope: OUTLOOK_SCOPES,
         state,
         code_challenge: await challenge(verifier),
         code_challenge_method: "S256",

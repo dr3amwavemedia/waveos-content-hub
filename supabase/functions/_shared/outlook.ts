@@ -5,6 +5,9 @@ export const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
 };
 
+export const OUTLOOK_SCOPES =
+  "openid profile email offline_access User.Read Calendars.ReadWrite Mail.ReadWrite Mail.Send";
+
 export const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -23,11 +26,25 @@ export function adminClient() {
   });
 }
 
+export function userClient(token: string) {
+  return createClient(env("SUPABASE_URL"), env("SUPABASE_ANON_KEY"), {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 export async function authenticatedStaffUser(request: Request) {
+  const context = await staffContext(request);
+  return context?.user ?? null;
+}
+
+/** Authenticated Dream Wave staff, plus a user-scoped client so RLS still applies. */
+export async function staffContext(request: Request) {
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) return null;
+  const token = authorization.slice(7);
   const admin = adminClient();
-  const { data, error } = await admin.auth.getUser(authorization.slice(7));
+  const { data, error } = await admin.auth.getUser(token);
   if (error || !data.user) return null;
   const { data: role } = await admin
     .from("user_roles")
@@ -36,7 +53,8 @@ export async function authenticatedStaffUser(request: Request) {
     .in("role", ["dream_wave_owner", "dream_wave_team"])
     .limit(1)
     .maybeSingle();
-  return role ? data.user : null;
+  if (!role) return null;
+  return { user: data.user, db: userClient(token) };
 }
 
 function bytesToBase64(bytes: Uint8Array) {
@@ -77,7 +95,9 @@ export async function decrypt(value: string) {
   return new TextDecoder().decode(clear);
 }
 
-export const redirectUri = () => `${env("SUPABASE_URL")}/functions/v1/outlook-oauth/callback`;
+/** Keeps the redirect URI already registered with Microsoft (the app callback route). */
+export const redirectUri = () =>
+  `${env("WAVEOS_APP_URL").replace(/\/$/, "")}/api/outlook/callback`;
 
 export async function graphToken(userId: string) {
   const admin = adminClient();
@@ -92,6 +112,7 @@ export async function graphToken(userId: string) {
     return decrypt(connection.access_token_encrypted);
   }
 
+  const refreshToken = await decrypt(connection.refresh_token_encrypted);
   const response = await fetch(
     `https://login.microsoftonline.com/${env("OUTLOOK_TENANT_ID")}/oauth2/v2.0/token`,
     {
@@ -101,9 +122,9 @@ export async function graphToken(userId: string) {
         client_id: env("OUTLOOK_CLIENT_ID"),
         client_secret: env("OUTLOOK_CLIENT_SECRET"),
         grant_type: "refresh_token",
-        refresh_token: await decrypt(connection.refresh_token_encrypted),
+        refresh_token: refreshToken,
         redirect_uri: redirectUri(),
-        scope: "openid profile email offline_access User.Read Calendars.ReadWrite Mail.Send",
+        scope: OUTLOOK_SCOPES,
       }),
     },
   );
@@ -113,9 +134,7 @@ export async function graphToken(userId: string) {
     .from("outlook_connections")
     .update({
       access_token_encrypted: await encrypt(tokens.access_token),
-      refresh_token_encrypted: await encrypt(
-        tokens.refresh_token ?? (await decrypt(connection.refresh_token_encrypted)),
-      ),
+      refresh_token_encrypted: await encrypt(tokens.refresh_token ?? refreshToken),
       token_expires_at: new Date(
         Date.now() + Number(tokens.expires_in ?? 3600) * 1000,
       ).toISOString(),
@@ -124,4 +143,24 @@ export async function graphToken(userId: string) {
     })
     .eq("user_id", userId);
   return tokens.access_token as string;
+}
+
+export async function graphFetch(
+  token: string,
+  path: string,
+  init?: RequestInit & { prefer?: string },
+) {
+  const response = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+      ...(init?.prefer ? { Prefer: init.prefer } : {}),
+      ...(init?.headers ?? {}),
+    },
+  });
+  if (response.status === 204) return null;
+  const result = await response.json();
+  if (!response.ok) throw new Error(result?.error?.message ?? "Microsoft Graph request failed");
+  return result;
 }

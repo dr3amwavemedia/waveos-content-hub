@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.outlook-calendar]
 verify_jwt = true
+
+[functions.outlook-mail]
+verify_jwt = true
+
+[functions.outlook-contacts]
+verify_jwt = true
