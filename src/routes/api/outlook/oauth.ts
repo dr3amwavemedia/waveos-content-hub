@@ -49,7 +49,8 @@ export const Route = createFileRoute("/api/outlook/oauth")({
           response_type: "code",
           redirect_uri: outlookRedirectUri(),
           response_mode: "query",
-          scope: "openid profile email offline_access User.Read Calendars.ReadWrite Mail.Send",
+          scope:
+            "openid profile email offline_access User.Read Calendars.ReadWrite Mail.ReadWrite Mail.Send",
           state,
           code_challenge: challenge,
           code_challenge_method: "S256",

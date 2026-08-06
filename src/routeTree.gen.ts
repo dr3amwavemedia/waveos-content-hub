@@ -36,6 +36,7 @@ import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authentic
 import { Route as AuthenticatedOutlookRouteImport } from './routes/_authenticated/outlook'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
+import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
 import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
 import { Route as VisionTokenRouteImport } from './routes/vision/$token'
@@ -43,6 +44,8 @@ import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiOutlookCalendarRouteImport } from './routes/api/outlook/calendar'
 import { Route as ApiOutlookCallbackRouteImport } from './routes/api/outlook/callback'
+import { Route as ApiOutlookContactsRouteImport } from './routes/api/outlook/contacts'
+import { Route as ApiOutlookMailRouteImport } from './routes/api/outlook/mail'
 import { Route as ApiOutlookOauthRouteImport } from './routes/api/outlook/oauth'
 import { Route as ApiPublicVisionAssetRouteImport } from './routes/api/public/vision-asset'
 import { Route as ApiPublicHooksAyrshareRouteImport } from './routes/api/public/hooks/ayrshare'
@@ -185,6 +188,11 @@ const AuthenticatedSocialAccountsRoute =
     path: '/social-accounts',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedStaffEmailRoute = AuthenticatedStaffEmailRouteImport.update({
+  id: '/staff-email',
+  path: '/staff-email',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedVisionStudioRoute =
   AuthenticatedVisionStudioRouteImport.update({
     id: '/vision-studio',
@@ -221,6 +229,16 @@ const ApiOutlookCalendarRoute = ApiOutlookCalendarRouteImport.update({
 const ApiOutlookCallbackRoute = ApiOutlookCallbackRouteImport.update({
   id: '/api/outlook/callback',
   path: '/api/outlook/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOutlookContactsRoute = ApiOutlookContactsRouteImport.update({
+  id: '/api/outlook/contacts',
+  path: '/api/outlook/contacts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOutlookMailRoute = ApiOutlookMailRouteImport.update({
+  id: '/api/outlook/mail',
+  path: '/api/outlook/mail',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOutlookOauthRoute = ApiOutlookOauthRouteImport.update({
@@ -272,6 +290,7 @@ export interface FileRoutesByFullPath {
   '/outlook': typeof AuthenticatedOutlookRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/vision/$token': typeof VisionTokenRoute
@@ -279,6 +298,8 @@ export interface FileRoutesByFullPath {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/outlook/calendar': typeof ApiOutlookCalendarRoute
   '/api/outlook/callback': typeof ApiOutlookCallbackRoute
+  '/api/outlook/contacts': typeof ApiOutlookContactsRoute
+  '/api/outlook/mail': typeof ApiOutlookMailRoute
   '/api/outlook/oauth': typeof ApiOutlookOauthRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
@@ -311,6 +332,7 @@ export interface FileRoutesByTo {
   '/outlook': typeof AuthenticatedOutlookRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/vision/$token': typeof VisionTokenRoute
@@ -318,6 +340,8 @@ export interface FileRoutesByTo {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/outlook/calendar': typeof ApiOutlookCalendarRoute
   '/api/outlook/callback': typeof ApiOutlookCallbackRoute
+  '/api/outlook/contacts': typeof ApiOutlookContactsRoute
+  '/api/outlook/mail': typeof ApiOutlookMailRoute
   '/api/outlook/oauth': typeof ApiOutlookOauthRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
@@ -352,6 +376,7 @@ export interface FileRoutesById {
   '/_authenticated/outlook': typeof AuthenticatedOutlookRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
+  '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/vision/$token': typeof VisionTokenRoute
@@ -359,6 +384,8 @@ export interface FileRoutesById {
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/outlook/calendar': typeof ApiOutlookCalendarRoute
   '/api/outlook/callback': typeof ApiOutlookCallbackRoute
+  '/api/outlook/contacts': typeof ApiOutlookContactsRoute
+  '/api/outlook/mail': typeof ApiOutlookMailRoute
   '/api/outlook/oauth': typeof ApiOutlookOauthRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
@@ -393,6 +420,7 @@ export interface FileRouteTypes {
     | '/outlook'
     | '/settings'
     | '/social-accounts'
+    | '/staff-email'
     | '/vision-studio'
     | '/social-connections/callback'
     | '/vision/$token'
@@ -400,6 +428,8 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/api/outlook/calendar'
     | '/api/outlook/callback'
+    | '/api/outlook/contacts'
+    | '/api/outlook/mail'
     | '/api/outlook/oauth'
     | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
@@ -432,6 +462,7 @@ export interface FileRouteTypes {
     | '/outlook'
     | '/settings'
     | '/social-accounts'
+    | '/staff-email'
     | '/vision-studio'
     | '/social-connections/callback'
     | '/vision/$token'
@@ -439,6 +470,8 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/api/outlook/calendar'
     | '/api/outlook/callback'
+    | '/api/outlook/contacts'
+    | '/api/outlook/mail'
     | '/api/outlook/oauth'
     | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
@@ -472,6 +505,7 @@ export interface FileRouteTypes {
     | '/_authenticated/outlook'
     | '/_authenticated/settings'
     | '/_authenticated/social-accounts'
+    | '/_authenticated/staff-email'
     | '/_authenticated/vision-studio'
     | '/social-connections/callback'
     | '/vision/$token'
@@ -479,6 +513,8 @@ export interface FileRouteTypes {
     | '/.mcp/invoke-tool/$tool'
     | '/api/outlook/calendar'
     | '/api/outlook/callback'
+    | '/api/outlook/contacts'
+    | '/api/outlook/mail'
     | '/api/outlook/oauth'
     | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
@@ -504,6 +540,8 @@ export interface RootRouteChildren {
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiOutlookCalendarRoute: typeof ApiOutlookCalendarRoute
   ApiOutlookCallbackRoute: typeof ApiOutlookCallbackRoute
+  ApiOutlookContactsRoute: typeof ApiOutlookContactsRoute
+  ApiOutlookMailRoute: typeof ApiOutlookMailRoute
   ApiOutlookOauthRoute: typeof ApiOutlookOauthRoute
   ApiPublicVisionAssetRoute: typeof ApiPublicVisionAssetRoute
   ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
@@ -701,6 +739,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSocialAccountsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/staff-email': {
+      id: '/_authenticated/staff-email'
+      path: '/staff-email'
+      fullPath: '/staff-email'
+      preLoaderRoute: typeof AuthenticatedStaffEmailRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/vision-studio': {
       id: '/_authenticated/vision-studio'
       path: '/vision-studio'
@@ -750,6 +795,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOutlookCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/outlook/contacts': {
+      id: '/api/outlook/contacts'
+      path: '/api/outlook/contacts'
+      fullPath: '/api/outlook/contacts'
+      preLoaderRoute: typeof ApiOutlookContactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/outlook/mail': {
+      id: '/api/outlook/mail'
+      path: '/api/outlook/mail'
+      fullPath: '/api/outlook/mail'
+      preLoaderRoute: typeof ApiOutlookMailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/outlook/oauth': {
       id: '/api/outlook/oauth'
       path: '/api/outlook/oauth'
@@ -797,6 +856,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedOutlookRoute: typeof AuthenticatedOutlookRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSocialAccountsRoute: typeof AuthenticatedSocialAccountsRoute
+  AuthenticatedStaffEmailRoute: typeof AuthenticatedStaffEmailRoute
   AuthenticatedVisionStudioRoute: typeof AuthenticatedVisionStudioRoute
 }
 
@@ -816,6 +876,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedOutlookRoute: AuthenticatedOutlookRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSocialAccountsRoute: AuthenticatedSocialAccountsRoute,
+  AuthenticatedStaffEmailRoute: AuthenticatedStaffEmailRoute,
   AuthenticatedVisionStudioRoute: AuthenticatedVisionStudioRoute,
 }
 
@@ -842,6 +903,8 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiOutlookCalendarRoute: ApiOutlookCalendarRoute,
   ApiOutlookCallbackRoute: ApiOutlookCallbackRoute,
+  ApiOutlookContactsRoute: ApiOutlookContactsRoute,
+  ApiOutlookMailRoute: ApiOutlookMailRoute,
   ApiOutlookOauthRoute: ApiOutlookOauthRoute,
   ApiPublicVisionAssetRoute: ApiPublicVisionAssetRoute,
   ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,

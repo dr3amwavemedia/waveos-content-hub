@@ -80,7 +80,8 @@ export async function outlookGraphToken(userId: string) {
         grant_type: "refresh_token",
         refresh_token: refreshToken,
         redirect_uri: outlookRedirectUri(),
-        scope: "openid profile email offline_access User.Read Calendars.ReadWrite Mail.Send",
+        scope:
+          "openid profile email offline_access User.Read Calendars.ReadWrite Mail.ReadWrite Mail.Send",
       }),
     },
   );

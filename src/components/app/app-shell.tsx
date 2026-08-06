@@ -23,6 +23,7 @@ import {
   FileText,
   User,
   BriefcaseBusiness,
+  Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
@@ -70,6 +71,7 @@ const CLIENT_NAV: NavItem[] = [
 const STAFF_NAV: NavItem[] = [
   { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
   { to: "/outlook", label: "Outlook Calendar", icon: Calendar, staffOnly: true },
+  { to: "/staff-email", label: "Staff Email", icon: Mail, staffOnly: true },
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true, ownerOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },

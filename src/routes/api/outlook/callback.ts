@@ -32,7 +32,8 @@ export const Route = createFileRoute("/api/outlook/callback")({
               code,
               code_verifier: stateRow.code_verifier,
               redirect_uri: outlookRedirectUri(),
-              scope: "openid profile email offline_access User.Read Calendars.ReadWrite Mail.Send",
+              scope:
+                "openid profile email offline_access User.Read Calendars.ReadWrite Mail.ReadWrite Mail.Send",
             }),
           },
         );
