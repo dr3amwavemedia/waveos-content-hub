@@ -80,13 +80,17 @@ async function invoke(name: "oauth" | "calendar", body: Record<string, unknown>)
   const { data: session } = await supabase.auth.getSession();
   const token = session.session?.access_token;
   if (!token) throw new Error("Your session expired. Please sign in again.");
-  const response = await fetch(`/api/outlook/${name}`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+  const { data, error } = await supabase.functions.invoke(`outlook-${name}`, {
+    body,
+    headers: { Authorization: `Bearer ${token}` },
   });
-  const data = await response.json();
-  if (!response.ok || data?.error) throw new Error(data?.error ?? "Outlook request failed");
+  if (error) {
+    const detail = await (error as { context?: Response }).context
+      ?.json?.()
+      .catch(() => null);
+    throw new Error(detail?.error ?? error.message ?? "Outlook request failed");
+  }
+  if (data?.error) throw new Error(data.error);
   return data;
 }
 
