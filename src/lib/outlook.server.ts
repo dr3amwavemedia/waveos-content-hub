@@ -1,10 +1,20 @@
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { createClient } from "@supabase/supabase-js";
 
-const db = supabaseAdmin as unknown as {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  from: (table: string) => any;
-  auth: typeof supabaseAdmin.auth;
-};
+const SUPABASE_URL = process.env.SUPABASE_URL ?? "https://clsuecactijyjecxwuxp.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY =
+  process.env.SUPABASE_PUBLISHABLE_KEY ??
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNsc3VlY2FjdGlqeWplY3h3dXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwODMyMjQsImV4cCI6MjA5OTY1OTIyNH0.7lfS3KCgoSVRz9fPhN3xwzLKTZKVgUxnA_myRLXC8Q4";
+
+export const outlookPublicDb = () =>
+  createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
+  });
+
+const userDb = (token: string) =>
+  createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
+  });
 
 export function outlookEnv(name: string) {
   const value = process.env[name];
@@ -45,7 +55,9 @@ export async function decryptOutlook(value: string) {
 export async function requireOutlookStaff(request: Request) {
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) return null;
-  const { data, error } = await db.auth.getUser(authorization.slice(7));
+  const token = authorization.slice(7);
+  const db = userDb(token);
+  const { data, error } = await db.auth.getUser(token);
   if (error || !data.user) return null;
   const { data: role } = await db
     .from("user_roles")
@@ -54,10 +66,10 @@ export async function requireOutlookStaff(request: Request) {
     .in("role", ["dream_wave_owner", "dream_wave_team"])
     .limit(1)
     .maybeSingle();
-  return role ? data.user : null;
+  return role ? { user: data.user, db } : null;
 }
 
-export async function outlookGraphToken(userId: string) {
+export async function outlookGraphToken(userId: string, db: ReturnType<typeof userDb>) {
   const { data: connection, error } = await db
     .from("outlook_connections")
     .select("*")
@@ -101,5 +113,3 @@ export async function outlookGraphToken(userId: string) {
     .eq("user_id", userId);
   return tokens.access_token as string;
 }
-
-export { db as outlookDb };

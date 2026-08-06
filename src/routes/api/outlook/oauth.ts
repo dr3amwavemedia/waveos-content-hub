@@ -7,17 +7,18 @@ export const Route = createFileRoute("/api/outlook/oauth")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const { outlookDb, outlookEnv, outlookRedirectUri, requireOutlookStaff } =
+        const { outlookEnv, outlookRedirectUri, requireOutlookStaff } =
           await import("@/lib/outlook.server");
-        const user = await requireOutlookStaff(request);
-        if (!user) return json({ error: "not_authenticated" }, 401);
+        const auth = await requireOutlookStaff(request);
+        if (!auth) return json({ error: "not_authenticated" }, 401);
+        const { user, db } = auth;
         const body = await request.json().catch(() => ({}));
         if (body.action === "disconnect") {
-          await outlookDb.from("outlook_connections").delete().eq("user_id", user.id);
+          await db.from("outlook_connections").delete().eq("user_id", user.id);
           return json({ connected: false });
         }
         if (body.action === "status") {
-          const { data } = await outlookDb
+          const { data } = await db
             .from("outlook_connections")
             .select("email,updated_at")
             .eq("user_id", user.id)
@@ -34,13 +35,14 @@ export const Route = createFileRoute("/api/outlook/oauth")({
         const state = randomValue(32);
         const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
         const challenge = Buffer.from(digest).toString("base64url");
-        await outlookDb.from("outlook_oauth_states").delete().eq("user_id", user.id);
-        await outlookDb.from("outlook_oauth_states").insert({
+        await db.from("outlook_oauth_states").delete().eq("user_id", user.id);
+        const { error: stateError } = await db.from("outlook_oauth_states").insert({
           state,
           user_id: user.id,
           code_verifier: verifier,
           expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
         });
+        if (stateError) return json({ error: "outlook_state_not_available" }, 500);
         const authorize = new URL(
           `https://login.microsoftonline.com/${outlookEnv("OUTLOOK_TENANT_ID")}/oauth2/v2.0/authorize`,
         );

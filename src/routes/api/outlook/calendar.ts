@@ -8,12 +8,12 @@ export const Route = createFileRoute("/api/outlook/calendar")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { outlookDb, outlookGraphToken, requireOutlookStaff } =
-            await import("@/lib/outlook.server");
-          const user = await requireOutlookStaff(request);
-          if (!user) return json({ error: "not_authenticated" }, 401);
+          const { outlookGraphToken, requireOutlookStaff } = await import("@/lib/outlook.server");
+          const auth = await requireOutlookStaff(request);
+          if (!auth) return json({ error: "not_authenticated" }, 401);
+          const { user, db } = auth;
           const body = await request.json().catch(() => ({}));
-          const token = await outlookGraphToken(user.id);
+          const token = await outlookGraphToken(user.id, db);
           const graph = async (path: string, init?: RequestInit) => {
             const response = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
               ...init,
@@ -99,7 +99,7 @@ export const Route = createFileRoute("/api/outlook/calendar")({
               body.action === "create" ? "/me/events" : `/me/events/${encodeURIComponent(body.id)}`,
               { method: body.action === "create" ? "POST" : "PATCH", body: JSON.stringify(event) },
             );
-            await outlookDb.from("notifications").insert({
+            await db.from("notifications").insert({
               user_id: user.id,
               kind: "generic",
               title: body.action === "create" ? "Outlook event added" : "Outlook event updated",

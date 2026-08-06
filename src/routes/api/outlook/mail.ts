@@ -18,12 +18,12 @@ export const Route = createFileRoute("/api/outlook/mail")({
     handlers: {
       POST: async ({ request }) => {
         try {
-          const { outlookDb, outlookGraphToken, requireOutlookStaff } =
-            await import("@/lib/outlook.server");
-          const user = await requireOutlookStaff(request);
-          if (!user) return json({ error: "not_authenticated" }, 401);
+          const { outlookGraphToken, requireOutlookStaff } = await import("@/lib/outlook.server");
+          const auth = await requireOutlookStaff(request);
+          if (!auth) return json({ error: "not_authenticated" }, 401);
+          const { user, db } = auth;
           const body = await request.json().catch(() => ({}));
-          const token = await outlookGraphToken(user.id);
+          const token = await outlookGraphToken(user.id, db);
           const graph = async (path: string, init?: RequestInit) => {
             const response = await fetch(`https://graph.microsoft.com/v1.0${path}`, {
               ...init,
@@ -133,14 +133,14 @@ export const Route = createFileRoute("/api/outlook/mail")({
                   })
                 : await graph("/me/messages", { method: "POST", body: JSON.stringify(message) });
             if (body.action === "send" && typeof body.accountId === "string") {
-              await outlookDb.from("crm_activities").insert({
+              await db.from("crm_activities").insert({
                 account_id: body.accountId,
                 actor_id: user.id,
                 activity_type: "email",
                 summary: `Email sent: ${message.subject || "(no subject)"}`,
                 safe_metadata: { recipients: to },
               });
-              await outlookDb
+              await db
                 .from("crm_accounts")
                 .update({ last_contacted_at: new Date().toISOString(), updated_by: user.id })
                 .eq("id", body.accountId);

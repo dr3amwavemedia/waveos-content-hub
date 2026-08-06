@@ -12,14 +12,24 @@ type CrmAccount = {
   linked_workspace_id: string | null;
 };
 
+type RecipientResult = {
+  id: string;
+  accountId: string | null;
+  name: string;
+  business?: string;
+  email: string;
+  type: string;
+};
+
 export const Route = createFileRoute("/api/outlook/contacts")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { outlookDb, requireOutlookStaff } = await import("@/lib/outlook.server");
-        const user = await requireOutlookStaff(request);
-        if (!user) return json({ error: "not_authenticated" }, 401);
-        const { data: roles } = await outlookDb
+        const { requireOutlookStaff } = await import("@/lib/outlook.server");
+        const auth = await requireOutlookStaff(request);
+        if (!auth) return json({ error: "not_authenticated" }, 401);
+        const { user, db } = auth;
+        const { data: roles } = await db
           .from("user_roles")
           .select("role,staff_type")
           .eq("user_id", user.id);
@@ -31,7 +41,7 @@ export const Route = createFileRoute("/api/outlook/contacts")({
             role.role === "dream_wave_team" && role.staff_type === "media_manager",
         );
 
-        let accountsQuery = outlookDb
+        let accountsQuery = db
           .from("crm_accounts")
           .select("id,business_name,email,stage,assigned_to,linked_workspace_id")
           .is("archived_at", null)
@@ -40,7 +50,7 @@ export const Route = createFileRoute("/api/outlook/contacts")({
         const { data: accounts } = await accountsQuery;
         const accountIds = (accounts ?? []).map((account: { id: string }) => account.id);
         const { data: contacts } = accountIds.length
-          ? await outlookDb
+          ? await db
               .from("crm_contacts")
               .select("id,account_id,first_name,last_name,email,is_primary")
               .in("account_id", accountIds)
@@ -49,7 +59,7 @@ export const Route = createFileRoute("/api/outlook/contacts")({
         const byAccount = new Map<string, CrmAccount>(
           typedAccounts.map((account) => [account.id, account]),
         );
-        const results = [
+        const results: RecipientResult[] = [
           ...typedAccounts
             .filter((account): account is CrmAccount & { email: string } => Boolean(account.email))
             .map((account) => ({
@@ -83,11 +93,12 @@ export const Route = createFileRoute("/api/outlook/contacts")({
         ];
 
         if (owner || mediaManager) {
-          const { data: clientContacts } = await outlookDb
+          const { data: clientContacts } = await db
             .from("client_contact_preferences")
             .select("workspace_id,contact_email,workspaces(name)")
             .not("contact_email", "is", null);
           for (const contact of clientContacts ?? []) {
+            if (!contact.contact_email) continue;
             const workspace = Array.isArray(contact.workspaces)
               ? contact.workspaces[0]
               : contact.workspaces;

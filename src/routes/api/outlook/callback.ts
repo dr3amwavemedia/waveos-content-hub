@@ -4,21 +4,19 @@ export const Route = createFileRoute("/api/outlook/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { encryptOutlook, outlookDb, outlookEnv, outlookRedirectUri } =
+        const { encryptOutlook, outlookEnv, outlookPublicDb, outlookRedirectUri } =
           await import("@/lib/outlook.server");
+        const db = outlookPublicDb();
         const appUrl = outlookEnv("WAVEOS_APP_URL").replace(/\/$/, "");
         const url = new URL(request.url);
         const state = url.searchParams.get("state") ?? "";
         const code = url.searchParams.get("code") ?? "";
-        const { data: stateRow } = await outlookDb
-          .from("outlook_oauth_states")
-          .select("*")
-          .eq("state", state)
-          .gt("expires_at", new Date().toISOString())
-          .maybeSingle();
+        const { data: stateRows } = await db.rpc("outlook_read_oauth_state", {
+          _state: state,
+        });
+        const stateRow = Array.isArray(stateRows) ? stateRows[0] : null;
         if (!stateRow || !code)
           return Response.redirect(`${appUrl}/outlook?error=invalid_state`, 302);
-        await outlookDb.from("outlook_oauth_states").delete().eq("state", state);
 
         const tokenResponse = await fetch(
           `https://login.microsoftonline.com/${outlookEnv("OUTLOOK_TENANT_ID")}/oauth2/v2.0/token`,
@@ -48,18 +46,18 @@ export const Route = createFileRoute("/api/outlook/callback")({
         const me = await meResponse.json();
         if (!meResponse.ok || !me.id)
           return Response.redirect(`${appUrl}/outlook?error=profile`, 302);
-        await outlookDb.from("outlook_connections").upsert({
-          user_id: stateRow.user_id,
-          microsoft_user_id: me.id,
-          email: me.mail ?? me.userPrincipalName,
-          access_token_encrypted: await encryptOutlook(tokens.access_token),
-          refresh_token_encrypted: await encryptOutlook(tokens.refresh_token),
-          token_expires_at: new Date(
+        const { error: saveError } = await db.rpc("outlook_complete_connection", {
+          _state: state,
+          _microsoft_user_id: me.id,
+          _email: me.mail ?? me.userPrincipalName,
+          _access_token_encrypted: await encryptOutlook(tokens.access_token),
+          _refresh_token_encrypted: await encryptOutlook(tokens.refresh_token),
+          _token_expires_at: new Date(
             Date.now() + Number(tokens.expires_in ?? 3600) * 1000,
           ).toISOString(),
-          scopes: tokens.scope ?? "",
-          updated_at: new Date().toISOString(),
+          _scopes: tokens.scope ?? "",
         });
+        if (saveError) return Response.redirect(`${appUrl}/outlook?error=connection_save`, 302);
         return Response.redirect(`${appUrl}/outlook?connected=1`, 302);
       },
     },
