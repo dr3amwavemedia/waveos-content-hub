@@ -41,6 +41,9 @@ import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-c
 import { Route as VisionTokenRouteImport } from './routes/vision/$token'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as ApiOutlookCalendarRouteImport } from './routes/api/outlook/calendar'
+import { Route as ApiOutlookCallbackRouteImport } from './routes/api/outlook/callback'
+import { Route as ApiOutlookOauthRouteImport } from './routes/api/outlook/oauth'
 import { Route as ApiPublicVisionAssetRouteImport } from './routes/api/public/vision-asset'
 import { Route as ApiPublicHooksAyrshareRouteImport } from './routes/api/public/hooks/ayrshare'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
@@ -210,6 +213,21 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiOutlookCalendarRoute = ApiOutlookCalendarRouteImport.update({
+  id: '/api/outlook/calendar',
+  path: '/api/outlook/calendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOutlookCallbackRoute = ApiOutlookCallbackRouteImport.update({
+  id: '/api/outlook/callback',
+  path: '/api/outlook/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOutlookOauthRoute = ApiOutlookOauthRouteImport.update({
+  id: '/api/outlook/oauth',
+  path: '/api/outlook/oauth',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicVisionAssetRoute = ApiPublicVisionAssetRouteImport.update({
   id: '/api/public/vision-asset',
   path: '/api/public/vision-asset',
@@ -259,6 +277,9 @@ export interface FileRoutesByFullPath {
   '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/outlook/calendar': typeof ApiOutlookCalendarRoute
+  '/api/outlook/callback': typeof ApiOutlookCallbackRoute
+  '/api/outlook/oauth': typeof ApiOutlookOauthRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
@@ -295,6 +316,9 @@ export interface FileRoutesByTo {
   '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/outlook/calendar': typeof ApiOutlookCalendarRoute
+  '/api/outlook/callback': typeof ApiOutlookCallbackRoute
+  '/api/outlook/oauth': typeof ApiOutlookOauthRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
@@ -333,6 +357,9 @@ export interface FileRoutesById {
   '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/outlook/calendar': typeof ApiOutlookCalendarRoute
+  '/api/outlook/callback': typeof ApiOutlookCallbackRoute
+  '/api/outlook/oauth': typeof ApiOutlookOauthRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
@@ -371,6 +398,9 @@ export interface FileRouteTypes {
     | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/outlook/calendar'
+    | '/api/outlook/callback'
+    | '/api/outlook/oauth'
     | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
@@ -407,6 +437,9 @@ export interface FileRouteTypes {
     | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/outlook/calendar'
+    | '/api/outlook/callback'
+    | '/api/outlook/oauth'
     | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
@@ -444,6 +477,9 @@ export interface FileRouteTypes {
     | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/outlook/calendar'
+    | '/api/outlook/callback'
+    | '/api/outlook/oauth'
     | '/api/public/vision-asset'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
@@ -466,6 +502,9 @@ export interface RootRouteChildren {
   VisionTokenRoute: typeof VisionTokenRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiOutlookCalendarRoute: typeof ApiOutlookCalendarRoute
+  ApiOutlookCallbackRoute: typeof ApiOutlookCallbackRoute
+  ApiOutlookOauthRoute: typeof ApiOutlookOauthRoute
   ApiPublicVisionAssetRoute: typeof ApiPublicVisionAssetRoute
   ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
@@ -697,6 +736,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/outlook/calendar': {
+      id: '/api/outlook/calendar'
+      path: '/api/outlook/calendar'
+      fullPath: '/api/outlook/calendar'
+      preLoaderRoute: typeof ApiOutlookCalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/outlook/callback': {
+      id: '/api/outlook/callback'
+      path: '/api/outlook/callback'
+      fullPath: '/api/outlook/callback'
+      preLoaderRoute: typeof ApiOutlookCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/outlook/oauth': {
+      id: '/api/outlook/oauth'
+      path: '/api/outlook/oauth'
+      fullPath: '/api/outlook/oauth'
+      preLoaderRoute: typeof ApiOutlookOauthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/vision-asset': {
       id: '/api/public/vision-asset'
       path: '/api/public/vision-asset'
@@ -780,6 +840,9 @@ const rootRouteChildren: RootRouteChildren = {
   VisionTokenRoute: VisionTokenRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiOutlookCalendarRoute: ApiOutlookCalendarRoute,
+  ApiOutlookCallbackRoute: ApiOutlookCallbackRoute,
+  ApiOutlookOauthRoute: ApiOutlookOauthRoute,
   ApiPublicVisionAssetRoute: ApiPublicVisionAssetRoute,
   ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,

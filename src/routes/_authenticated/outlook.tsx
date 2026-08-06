@@ -76,10 +76,17 @@ const newForm = (): EventForm => {
   };
 };
 
-async function invoke(name: string, body: Record<string, unknown>) {
-  const { data, error } = await supabase.functions.invoke(name, { body });
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
+async function invoke(name: "oauth" | "calendar", body: Record<string, unknown>) {
+  const { data: session } = await supabase.auth.getSession();
+  const token = session.session?.access_token;
+  if (!token) throw new Error("Your session expired. Please sign in again.");
+  const response = await fetch(`/api/outlook/${name}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!response.ok || data?.error) throw new Error(data?.error ?? "Outlook request failed");
   return data;
 }
 
@@ -101,12 +108,12 @@ function OutlookPage() {
   }, [cursor]);
 
   const loadConnection = async () => {
-    const data = await invoke("outlook-oauth", { action: "status" });
+    const data = await invoke("oauth", { action: "status" });
     setConnection(data);
     return Boolean(data.connected);
   };
   const loadEvents = async () => {
-    const data = await invoke("outlook-calendar", {
+    const data = await invoke("calendar", {
       action: "list",
       start: range.start.toISOString(),
       end: range.end.toISOString(),
@@ -131,7 +138,7 @@ function OutlookPage() {
 
   const connect = async () => {
     try {
-      const data = await invoke("outlook-oauth", { action: "connect" });
+      const data = await invoke("oauth", { action: "connect" });
       window.location.assign(data.url);
     } catch {
       toast.error("Could not start Outlook connection");
@@ -157,7 +164,7 @@ function OutlookPage() {
     if (!form) return;
     setSaving(true);
     try {
-      await invoke("outlook-calendar", {
+      await invoke("calendar", {
         action: form.id ? "update" : "create",
         ...form,
         start: new Date(form.start).toISOString(),
@@ -185,7 +192,7 @@ function OutlookPage() {
     )
       return;
     try {
-      await invoke("outlook-calendar", { action: "delete", id: event.id });
+      await invoke("calendar", { action: "delete", id: event.id });
       toast.success("Event deleted");
       await loadEvents();
     } catch {
@@ -250,7 +257,7 @@ function OutlookPage() {
               variant="outline"
               size="sm"
               onClick={async () => {
-                await invoke("outlook-oauth", { action: "disconnect" });
+                await invoke("oauth", { action: "disconnect" });
                 await refresh();
               }}
             >
