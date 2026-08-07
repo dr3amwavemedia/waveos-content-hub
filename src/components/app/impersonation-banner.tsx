@@ -19,10 +19,10 @@ export function ImpersonationBanner() {
       acting.identity.email ||
       "staff member";
     return (
-      <div className="sticky top-0 z-30 flex items-center justify-center gap-3 border-b border-primary/30 bg-primary/10 px-4 py-2 text-xs backdrop-blur">
+      <div className="sticky top-0 z-30 flex flex-wrap items-center justify-center gap-3 border-b border-primary/30 bg-primary/10 px-4 py-2 text-xs backdrop-blur">
         <UserCog className="h-3.5 w-3.5 text-primary" />
         <span className="text-foreground">
-          Admin acting as <span className="font-semibold">{name}</span>. Staff navigation and workspace behavior are active.
+          Admin acting as <span className="font-semibold">{name}</span> for WaveOS tasks. Email sending is disabled in acting mode.
         </span>
         <button
           onClick={async () => {
