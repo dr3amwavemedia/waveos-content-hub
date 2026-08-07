@@ -68,10 +68,18 @@ const CLIENT_NAV: NavItem[] = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
+// Keep Outlook features out of navigation until their Lovable Cloud Edge
+// Functions are deployed. Flip this to true when that backend is ready.
+const OUTLOOK_INTEGRATIONS_ENABLED = false;
+
 const STAFF_NAV: NavItem[] = [
   { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
-  { to: "/outlook", label: "Outlook Calendar", icon: Calendar, staffOnly: true },
-  { to: "/staff-email", label: "Staff Email", icon: Mail, staffOnly: true },
+  ...(OUTLOOK_INTEGRATIONS_ENABLED
+    ? [
+        { to: "/outlook", label: "Outlook Calendar", icon: Calendar, staffOnly: true },
+        { to: "/staff-email", label: "Staff Email", icon: Mail, staffOnly: true },
+      ]
+    : []),
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true, ownerOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },

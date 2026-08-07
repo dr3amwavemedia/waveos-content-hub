@@ -33,6 +33,7 @@ as $$
   order by coalesce(p.first_name, ''), coalesce(p.last_name, ''), au.email;
 $$;
 
+revoke all on function public.get_staff_forward_directory() from public, anon;
 grant execute on function public.get_staff_forward_directory() to authenticated;
 
 create or replace function public.admin_update_staff_name(
@@ -66,6 +67,7 @@ begin
 end;
 $$;
 
+revoke all on function public.admin_update_staff_name(uuid, text, text) from public, anon;
 grant execute on function public.admin_update_staff_name(uuid, text, text) to authenticated;
 
 create or replace function public.admin_update_workspace_name(
@@ -95,6 +97,7 @@ begin
 end;
 $$;
 
+revoke all on function public.admin_update_workspace_name(uuid, text) from public, anon;
 grant execute on function public.admin_update_workspace_name(uuid, text) to authenticated;
 
 create or replace function public.admin_update_crm_identity(
@@ -135,4 +138,7 @@ begin
 end;
 $$;
 
-grant execute on function public.admin_update_crm_identity(uuid, text, uuid, text, text) to authenticated;
+revoke all on function public.admin_update_crm_identity(uuid, text, uuid, text, text)
+from public, anon;
+grant execute on function public.admin_update_crm_identity(uuid, text, uuid, text, text)
+to authenticated;

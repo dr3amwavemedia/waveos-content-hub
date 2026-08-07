@@ -2,14 +2,8 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app/app-shell";
 
-const TEAM_ALLOWED_ROUTES = [
-  "/home",
-  "/crm",
-  "/outlook",
-  "/staff-email",
-  "/approvals",
-  "/vision-studio",
-];
+const TEAM_ALLOWED_ROUTES = ["/home", "/crm", "/approvals", "/vision-studio"];
+const OUTLOOK_INTEGRATIONS_ENABLED = false;
 const MEDIA_MANAGER_ALLOWED_ROUTES = [
   ...TEAM_ALLOWED_ROUTES,
   "/content",
@@ -37,6 +31,16 @@ export const Route = createFileRoute("/_authenticated")({
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) {
       throw redirect({ to: "/auth", search: { next: location.href } });
+    }
+
+    if (
+      !OUTLOOK_INTEGRATIONS_ENABLED &&
+      (location.pathname === "/outlook" ||
+        location.pathname.startsWith("/outlook/") ||
+        location.pathname === "/staff-email" ||
+        location.pathname.startsWith("/staff-email/"))
+    ) {
+      throw redirect({ to: "/home" });
     }
 
     // Admin acting mode is only for WaveOS workflow/admin tasks. It must never
