@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
 
 const KEY = "waveos.acting-staff";
 
@@ -15,17 +15,23 @@ export interface ActingStaffIdentity {
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
-export function getActingStaff(): ActingStaffIdentity | null {
-  if (typeof window === "undefined") return null;
-  const raw = sessionStorage.getItem(KEY);
+function readRaw(): string {
+  if (typeof window === "undefined") return "";
+  return sessionStorage.getItem(KEY) ?? "";
+}
+
+function parse(raw: string): ActingStaffIdentity | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as ActingStaffIdentity;
     return parsed?.userId ? parsed : null;
   } catch {
-    sessionStorage.removeItem(KEY);
     return null;
   }
+}
+
+export function getActingStaff(): ActingStaffIdentity | null {
+  return parse(readRaw());
 }
 
 function subscribe(listener: Listener) {
@@ -45,7 +51,8 @@ function notify() {
 }
 
 export function useActingStaff() {
-  const identity = useSyncExternalStore(subscribe, getActingStaff, () => null);
+  const raw = useSyncExternalStore(subscribe, readRaw, () => "");
+  const identity = useMemo(() => parse(raw), [raw]);
   return {
     on: Boolean(identity),
     identity,
