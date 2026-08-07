@@ -1,5 +1,6 @@
 import { Eye, UserCog, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { AdminIdentityLauncher } from "@/components/admin/admin-identity-launcher";
 import { useActingStaff } from "@/hooks/use-acting-staff";
 import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { useCurrentUser } from "@/hooks/use-waveos";
@@ -40,8 +41,7 @@ export function ImpersonationBanner() {
     );
   }
 
-  if (!user?.isStaff || !on) return null;
-  return (
+  const clientBanner = user?.isStaff && on ? (
     <div className="sticky top-0 z-30 flex items-center justify-center gap-3 border-b border-primary/30 bg-primary/10 px-4 py-2 text-xs backdrop-blur">
       <Eye className="h-3.5 w-3.5 text-primary" />
       <span className="text-foreground">
@@ -55,5 +55,12 @@ export function ImpersonationBanner() {
         <X className="h-3 w-3" /> Exit
       </button>
     </div>
+  ) : null;
+
+  return (
+    <>
+      {user?.isDreamWaveOwner && <AdminIdentityLauncher />}
+      {clientBanner}
+    </>
   );
 }
