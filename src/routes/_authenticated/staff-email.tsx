@@ -159,15 +159,18 @@ function StaffEmailPage() {
   }, [messages, search]);
 
   const recipientTerm = compose?.to.split(",").at(-1)?.trim().toLowerCase() ?? "";
+  const staffContacts = contacts.filter((contact) => contact.type.startsWith("Staff"));
   const recipientMatches = recipientTerm.length
     ? contacts
         .filter((contact) =>
-          [contact.name, contact.business, contact.email]
+          [contact.name, contact.business, contact.email, contact.type]
             .filter(Boolean)
             .some((value) => value!.toLowerCase().includes(recipientTerm)),
         )
-        .slice(0, 8)
-    : [];
+        .slice(0, 12)
+    : compose?.mode === "forward"
+      ? staffContacts.slice(0, 20)
+      : [];
 
   const openMessage = async (message: Message) => {
     try {
@@ -233,6 +236,7 @@ function StaffEmailPage() {
       }
       toast.success(draft ? "Draft saved in Outlook" : "Email sent from Outlook");
       setCompose(null);
+      setShowRecipientMatches(false);
       if (folder === "sent" || folder === "drafts") await load();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not send email");
@@ -380,6 +384,7 @@ function StaffEmailPage() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    title="Reply"
                     onClick={() =>
                       setCompose({
                         ...blankCompose(),
@@ -394,14 +399,16 @@ function StaffEmailPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() =>
+                    title="Forward to staff"
+                    onClick={() => {
                       setCompose({
                         ...blankCompose(),
                         mode: "forward",
                         messageId: selected.id,
                         subject: `Fwd: ${selected.subject ?? ""}`,
-                      })
-                    }
+                      });
+                      setShowRecipientMatches(true);
+                    }}
                   >
                     <Forward className="h-4 w-4" />
                   </Button>
@@ -435,14 +442,22 @@ function StaffEmailPage() {
         </section>
       </div>
 
-      <Dialog open={Boolean(compose)} onOpenChange={(open) => !open && setCompose(null)}>
+      <Dialog
+        open={Boolean(compose)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCompose(null);
+            setShowRecipientMatches(false);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {compose?.mode === "reply"
                 ? "Reply"
                 : compose?.mode === "forward"
-                  ? "Forward"
+                  ? "Forward to staff"
                   : "New email"}
             </DialogTitle>
           </DialogHeader>
@@ -457,8 +472,17 @@ function StaffEmailPage() {
                     setCompose({ ...compose, to: event.target.value });
                     setShowRecipientMatches(true);
                   }}
-                  placeholder="Type a lead, client, name, or email"
+                  placeholder={
+                    compose.mode === "forward"
+                      ? "Select a staff member or type another email"
+                      : "Type a lead, client, staff name, or email"
+                  }
                 />
+                {compose.mode === "forward" && !recipientTerm && staffContacts.length > 0 && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Choose a Dream Wave staff member below, or type any email address.
+                  </p>
+                )}
                 {showRecipientMatches && recipientMatches.length > 0 && (
                   <div className="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-xl">
                     {recipientMatches.map((contact) => (
@@ -522,6 +546,11 @@ function StaffEmailPage() {
                   value={compose.message}
                   onChange={(event) => setCompose({ ...compose, message: event.target.value })}
                 />
+                {compose.mode !== "reply" && (
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Your Dream Wave Media signature is added automatically when the email is sent.
+                  </p>
+                )}
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
