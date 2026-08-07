@@ -159,8 +159,23 @@ export async function graphFetch(
       ...(init?.headers ?? {}),
     },
   });
-  if (response.status === 204) return null;
-  const result = await response.json();
-  if (!response.ok) throw new Error(result?.error?.message ?? "Microsoft Graph request failed");
+  // Graph returns 202/204 with an empty body for sendMail and similar actions.
+  const raw = await response.text();
+  const isJson = (response.headers.get("content-type") ?? "").includes("json");
+  let result: any = null;
+  if (isJson && raw.trim()) {
+    try {
+      result = JSON.parse(raw);
+    } catch {
+      result = null;
+    }
+  }
+
+  if (!response.ok) {
+    const message =
+      result?.error?.message ??
+      (raw.trim() ? raw.trim().slice(0, 500) : `Microsoft Graph request failed (${response.status})`);
+    throw new Error(message);
+  }
   return result;
 }

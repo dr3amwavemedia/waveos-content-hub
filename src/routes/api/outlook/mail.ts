@@ -34,10 +34,23 @@ export const Route = createFileRoute("/api/outlook/mail")({
                 ...(init?.headers ?? {}),
               },
             });
-            if (response.status === 204) return null;
-            const result = await response.json();
+            const raw = await response.text();
+            const isJson = (response.headers.get("content-type") ?? "").includes("json");
+            let result: any = null;
+            if (isJson && raw.trim()) {
+              try {
+                result = JSON.parse(raw);
+              } catch {
+                result = null;
+              }
+            }
             if (!response.ok)
-              throw new Error(result?.error?.message ?? "Microsoft Graph request failed");
+              throw new Error(
+                result?.error?.message ??
+                  (raw.trim()
+                    ? raw.trim().slice(0, 500)
+                    : `Microsoft Graph request failed (${response.status})`),
+              );
             return result;
           };
 
