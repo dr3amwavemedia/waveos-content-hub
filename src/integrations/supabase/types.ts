@@ -1869,6 +1869,24 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { _token: string }; Returns: string }
+      admin_update_crm_identity: {
+        Args: {
+          _account_id: string
+          _business_name: string
+          _contact_id?: string
+          _first_name?: string
+          _last_name?: string
+        }
+        Returns: undefined
+      }
+      admin_update_staff_name: {
+        Args: { _first_name: string; _last_name?: string; _target_user: string }
+        Returns: undefined
+      }
+      admin_update_workspace_name: {
+        Args: { _name: string; _workspace_id: string }
+        Returns: undefined
+      }
       create_brand_workspace: {
         Args: {
           _business_name?: string
@@ -2010,6 +2028,17 @@ export type Database = {
           last_name: string
           role: Database["public"]["Enums"]["app_role"]
           staff_type: Database["public"]["Enums"]["staff_type"]
+          user_id: string
+        }[]
+      }
+      get_staff_forward_directory: {
+        Args: never
+        Returns: {
+          email: string
+          first_name: string
+          last_name: string
+          role: Database["public"]["Enums"]["app_role"]
+          staff_type: string
           user_id: string
         }[]
       }
