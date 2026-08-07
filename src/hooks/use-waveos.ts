@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getActingStaff } from "@/hooks/use-acting-staff";
 import { useImpersonateClient } from "@/hooks/use-impersonation";
 
 export interface WorkspaceSummary {
@@ -22,6 +23,8 @@ export interface CurrentUserContext {
   isDreamWaveOwner: boolean;
   staffType: "sales" | "media_manager" | null;
   roles: string[];
+  actingAsStaff: boolean;
+  actualUserId: string;
 }
 
 const db = supabase as unknown as {
@@ -50,6 +53,25 @@ async function loadContext(): Promise<CurrentUserContext> {
     staff_type: "sales" | "media_manager" | null;
   }>;
   const roleList = roleRows.map((role) => role.role);
+  const actualOwner = roleList.includes("dream_wave_owner");
+  const acting = actualOwner ? getActingStaff() : null;
+
+  if (acting) {
+    return {
+      userId: acting.userId,
+      email: acting.email,
+      firstName: acting.firstName,
+      lastName: acting.lastName,
+      avatarUrl: null,
+      isStaff: true,
+      isDreamWaveOwner: false,
+      staffType: acting.staffType ?? "sales",
+      roles: ["dream_wave_team"],
+      actingAsStaff: true,
+      actualUserId: user.id,
+    };
+  }
+
   const teamRole = roleRows.find((role) => role.role === "dream_wave_team");
   return {
     userId: user.id,
@@ -58,11 +80,13 @@ async function loadContext(): Promise<CurrentUserContext> {
     lastName: profile?.last_name ?? null,
     avatarUrl: profile?.avatar_url ?? null,
     isStaff: roleList.includes("dream_wave_owner") || roleList.includes("dream_wave_team"),
-    isDreamWaveOwner: roleList.includes("dream_wave_owner"),
-    staffType: roleList.includes("dream_wave_owner")
+    isDreamWaveOwner: actualOwner,
+    staffType: actualOwner
       ? null
       : ((teamRole?.staff_type as "sales" | "media_manager" | null) ?? "sales"),
     roles: roleList,
+    actingAsStaff: false,
+    actualUserId: user.id,
   };
 }
 
@@ -77,11 +101,8 @@ async function loadWorkspaces(
 
   const membershipMap = new Map((memberships ?? []).map((m) => [m.workspace_id, m.role]));
 
-  // The account switcher is for workspaces the signed-in account actually
-  // belongs to. Staff can read every client workspace through RLS for
-  // administration, but their normal account view is the seeded internal
-  // Dream Wave Media workspace only. While previewing, expose only the
-  // explicitly selected client workspace.
+  // The account switcher is for workspaces the effective account actually
+  // belongs to. During admin acting mode, ctx.userId is the selected staff id.
   const workspaceIds = previewWorkspaceId
     ? [previewWorkspaceId]
     : ctx.isStaff && ctx.staffType !== "media_manager"
@@ -108,8 +129,6 @@ async function loadWorkspaces(
     const role = membershipMap.get(w.id);
     return {
       ...w,
-      // A staff preview is intentionally represented as client-level access.
-      // Outside preview, the internal account is labelled with the app role.
       role: (previewWorkspaceId ? "viewer" : ctx.isStaff ? "staff" : (role ?? "viewer")) as
         "owner" | "approver" | "viewer" | "staff",
     };

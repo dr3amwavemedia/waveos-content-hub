@@ -39,6 +39,17 @@ export const Route = createFileRoute("/_authenticated")({
       throw redirect({ to: "/auth", search: { next: location.href } });
     }
 
+    // Admin acting mode is only for WaveOS workflow/admin tasks. It must never
+    // become a way to send email on behalf of the selected employee.
+    const actingAsStaff =
+      typeof window !== "undefined" && Boolean(sessionStorage.getItem("waveos.acting-staff"));
+    if (
+      actingAsStaff &&
+      (location.pathname === "/staff-email" || location.pathname.startsWith("/staff-email/"))
+    ) {
+      throw redirect({ to: "/home" });
+    }
+
     let roleRows: Array<{
       role: string;
       staff_type: "sales" | "media_manager" | null;

@@ -18,6 +18,15 @@ type RecipientResult = {
   type: string;
 };
 
+type StaffDirectoryRow = {
+  user_id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  role: string;
+  staff_type: string | null;
+};
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   try {
@@ -102,6 +111,26 @@ Deno.serve(async (request) => {
           type: "Client contact",
         });
       }
+    }
+
+    const { data: staffDirectory } = await db.rpc("get_staff_forward_directory");
+    for (const member of (staffDirectory ?? []) as StaffDirectoryRow[]) {
+      if (!member.email || member.user_id === user.id) continue;
+      const name = `${member.first_name ?? ""} ${member.last_name ?? ""}`.trim() || member.email;
+      const roleLabel =
+        member.role === "dream_wave_owner"
+          ? "Admin"
+          : member.staff_type === "media_manager"
+            ? "Media Manager"
+            : "Sales";
+      results.push({
+        id: `staff:${member.user_id}`,
+        accountId: null,
+        name,
+        business: "Dream Wave Media",
+        email: member.email,
+        type: `Staff · ${roleLabel}`,
+      });
     }
 
     const unique = Array.from(

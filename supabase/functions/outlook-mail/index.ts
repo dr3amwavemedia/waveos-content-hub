@@ -13,6 +13,45 @@ const emailList = (value: unknown) =>
 const validId = (value: unknown) =>
   typeof value === "string" && value.length > 5 && value.length < 2048;
 
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+
+const textToHtml = (value: string) =>
+  escapeHtml(value).replace(/\r?\n/g, "<br>");
+
+async function staffSignature(
+  db: any,
+  user: { id: string; email?: string | null },
+): Promise<{ html: string; text: string }> {
+  const [{ data: profile }, { data: roles }] = await Promise.all([
+    db.from("profiles").select("first_name,last_name").eq("id", user.id).maybeSingle(),
+    db.from("user_roles").select("role,staff_type").eq("user_id", user.id),
+  ]);
+  const name =
+    `${profile?.first_name ?? ""} ${profile?.last_name ?? ""}`.trim() ||
+    user.email ||
+    "Dream Wave Media";
+  const owner = (roles ?? []).some((row: { role: string }) => row.role === "dream_wave_owner");
+  const team = (roles ?? []).find((row: { role: string }) => row.role === "dream_wave_team");
+  const role = owner
+    ? "Admin"
+    : team?.staff_type === "media_manager"
+      ? "Media Manager"
+      : team?.staff_type === "sales"
+        ? "Sales"
+        : "Dream Wave Media Team";
+  const email = user.email ?? "dr3amwavemedia@outlook.com";
+  return {
+    html: `<div style="margin-top:28px;padding-top:16px;border-top:1px solid #d7dde5;font-family:Arial,Helvetica,sans-serif;color:#172033;line-height:1.45"><div style="font-size:15px;font-weight:700">${escapeHtml(name)}</div><div style="font-size:13px;color:#536174">${escapeHtml(role)} | Dream Wave Media</div><div style="margin-top:5px;font-size:12px;color:#536174"><a href="mailto:${escapeHtml(email)}" style="color:#1688c8;text-decoration:none">${escapeHtml(email)}</a> &nbsp;•&nbsp; <a href="https://dreamwavemedia.co" style="color:#1688c8;text-decoration:none">dreamwavemedia.co</a></div></div>`,
+    text: `\n\n—\n${name}\n${role} | Dream Wave Media\n${email}\ndreamwavemedia.co`,
+  };
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -66,6 +105,8 @@ Deno.serve(async (request) => {
       return json({ deleted: true });
     }
 
+    // Replies intentionally do not add the WaveOS signature because the sender is
+    // already participating in an existing conversation thread.
     if (body.action === "reply") {
       if (!validId(body.id)) return json({ error: "invalid_message" }, 400);
       await graph(`/me/messages/${encodeURIComponent(body.id)}/reply`, {
@@ -79,12 +120,11 @@ Deno.serve(async (request) => {
       if (!validId(body.id)) return json({ error: "invalid_message" }, 400);
       const recipients = emailList(body.to).map((address) => ({ emailAddress: { address } }));
       if (!recipients.length) return json({ error: "recipient_required" }, 400);
+      const signature = await staffSignature(db, user);
+      const comment = `${String(body.message ?? "").slice(0, 45_000)}${signature.text}`;
       await graph(`/me/messages/${encodeURIComponent(body.id)}/forward`, {
         method: "POST",
-        body: JSON.stringify({
-          comment: String(body.message ?? "").slice(0, 50_000),
-          toRecipients: recipients,
-        }),
+        body: JSON.stringify({ comment, toRecipients: recipients }),
       });
       return json({ sent: true });
     }
@@ -111,9 +151,18 @@ Deno.serve(async (request) => {
               contentBytes: item.contentBytes,
             }))
         : [];
+
+      const rawMessage = String(body.message ?? "").slice(0, 90_000);
+      const signature = body.action === "send" ? await staffSignature(db, user) : null;
+      const messageBody = signature
+        ? `<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.55;color:#172033">${textToHtml(rawMessage)}</div>${signature.html}`
+        : rawMessage;
       const message = {
         subject: String(body.subject ?? "").slice(0, 255),
-        body: { contentType: "Text", content: String(body.message ?? "").slice(0, 100_000) },
+        body: {
+          contentType: signature ? "HTML" : "Text",
+          content: messageBody,
+        },
         toRecipients: to.map((address) => ({ emailAddress: { address } })),
         ccRecipients: cc.map((address) => ({ emailAddress: { address } })),
         bccRecipients: bcc.map((address) => ({ emailAddress: { address } })),
