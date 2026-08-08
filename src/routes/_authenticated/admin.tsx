@@ -8,6 +8,7 @@ import {
   Loader2,
   MailPlus,
   KeyRound,
+  History,
   RefreshCw,
   ShieldCheck,
   UserMinus,
@@ -46,6 +47,15 @@ interface StaffDirectoryRow {
   last_name: string | null;
   role: AppRole;
   staff_type: StaffType | null;
+  created_at: string;
+}
+
+interface AuditRow {
+  id: string;
+  actor_user_id: string | null;
+  action: string;
+  entity_type: string | null;
+  safe_metadata: Record<string, unknown>;
   created_at: string;
 }
 
@@ -100,6 +110,19 @@ function AdminPage() {
         created_at: string;
         resend_count: number;
       }>;
+    },
+  });
+
+  const auditQ = useQuery({
+    queryKey: ["admin", "audit-log"],
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("activity_logs")
+        .select("id,actor_user_id,action,entity_type,safe_metadata,created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data ?? []) as AuditRow[];
     },
   });
 
@@ -330,6 +353,67 @@ function AdminPage() {
       </div>
 
       <div className="surface-card overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3 sm:px-5">
+          <div>
+            <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+              <History className="h-4 w-4 text-primary" /> Admin audit history
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Recent invitations, access changes, approvals, CRM conversions, and account actions.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => auditQ.refetch()}
+            className="min-h-10 min-w-10 rounded-lg border border-border p-2.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
+            aria-label="Refresh audit history"
+          >
+            <RefreshCw className={auditQ.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+          </button>
+        </div>
+        {auditQ.isLoading ? (
+          <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading history…
+          </div>
+        ) : auditQ.isError ? (
+          <div className="px-5 py-5 text-sm text-muted-foreground">
+            Audit history could not be loaded. Existing account tools are unaffected.
+          </div>
+        ) : !(auditQ.data ?? []).length ? (
+          <div className="px-5 py-5 text-sm text-muted-foreground">
+            No account activity recorded yet.
+          </div>
+        ) : (
+          <ul className="max-h-[28rem] divide-y divide-border/60 overflow-y-auto">
+            {auditQ.data!.map((entry) => {
+              const actor = staffQ.data?.find((staff) => staff.user_id === entry.actor_user_id);
+              const actorName = actor
+                ? `${actor.first_name ?? ""} ${actor.last_name ?? ""}`.trim() || actor.email
+                : null;
+              return (
+                <li key={entry.id} className="px-4 py-3 sm:px-5">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-medium text-foreground">
+                        {entry.action.replaceAll("_", " ")}
+                      </p>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {actorName ?? "System"}
+                        {entry.entity_type ? ` · ${entry.entity_type}` : ""}
+                      </p>
+                    </div>
+                    <time className="shrink-0 text-xs text-muted-foreground">
+                      {new Date(entry.created_at).toLocaleString()}
+                    </time>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="surface-card overflow-hidden">
         <div className="border-b border-border/60 px-5 py-3">
           <h2 className="text-sm font-semibold text-foreground">Current staff</h2>
         </div>
@@ -346,7 +430,7 @@ function AdminPage() {
             {staffQ.data!.map((s) => (
               <li
                 key={`${s.user_id}-${s.role}`}
-                className="flex items-center justify-between px-5 py-3"
+                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3"
               >
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground">
@@ -358,7 +442,7 @@ function AdminPage() {
                     <div className="truncate text-xs text-muted-foreground">{s.email}</div>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:gap-3">
                   <span
                     className={
                       "rounded-md px-2 py-0.5 text-xs font-medium ring-1 " +
@@ -382,7 +466,7 @@ function AdminPage() {
                       })
                     }
                     disabled={changeStaffPosition.isPending}
-                    className="rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground"
+                    className="min-h-10 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground sm:min-h-0 sm:flex-none"
                     aria-label={`Staff position for ${s.email ?? s.user_id}`}
                   >
                     <option value="admin">Admin</option>
@@ -393,7 +477,7 @@ function AdminPage() {
                     <button
                       onClick={() => sendPasswordReset.mutate(s.email!)}
                       disabled={sendPasswordReset.isPending}
-                      className="rounded-md p-1.5 text-primary hover:bg-primary/15 disabled:opacity-50"
+                      className="min-h-10 min-w-10 rounded-md p-2 text-primary hover:bg-primary/15 disabled:opacity-50 sm:min-h-0 sm:min-w-0 sm:p-1.5"
                       title={`Send password reset to ${s.email}`}
                     >
                       <KeyRound className="h-4 w-4" />
@@ -402,7 +486,7 @@ function AdminPage() {
                   {s.role === "dream_wave_team" && (
                     <button
                       onClick={() => revoke.mutate({ userId: s.user_id, role: "dream_wave_team" })}
-                      className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
+                      className="min-h-10 min-w-10 rounded-md p-2 text-destructive hover:bg-destructive/15 sm:min-h-0 sm:min-w-0 sm:p-1.5"
                       title="Revoke staff role"
                     >
                       <UserMinus className="h-4 w-4" />
