@@ -8,7 +8,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  */
 export const publishContentItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { contentId: string }) => d)
+  .validator((d: { contentId: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const apiKey = process.env.AYRSHARE_API_KEY;
@@ -115,7 +115,8 @@ export const publishContentItem = createServerFn({ method: "POST" })
         const json = (await res.json()) as Record<string, unknown>;
         if (!res.ok) throw new Error(String(json.message ?? `HTTP ${res.status}`));
 
-        const postIds = json.postIds as Array<{ platform: string; id?: string; postUrl?: string }> | undefined;
+        const postIds = json.postIds as
+          Array<{ platform: string; id?: string; postUrl?: string }> | undefined;
         const first = postIds?.[0];
         await supabaseAdmin
           .from("publish_attempts")
@@ -141,10 +142,7 @@ export const publishContentItem = createServerFn({ method: "POST" })
       }
     }
 
-    const nextStatus =
-      failCount === 0 ? "published" :
-      successCount === 0 ? "failed" :
-      "published"; // partial success still marks published; details in publish_attempts
+    const nextStatus = failCount === 0 ? "published" : successCount === 0 ? "failed" : "published"; // partial success still marks published; details in publish_attempts
 
     await supabase
       .from("content_items")
