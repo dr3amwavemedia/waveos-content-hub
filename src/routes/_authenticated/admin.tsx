@@ -17,6 +17,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/app/empty-state";
+import { AdminIdentityLauncher } from "@/components/admin/admin-identity-launcher";
 import { getIntegrationStatus } from "@/lib/ayrshare.functions";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -210,18 +211,21 @@ function AdminPage() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
-          Dream Wave Media
-        </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-          Staff
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Invite employees by email and manage Dream Wave Team access. After an invitation is
-          accepted, an Admin can change that person between Admin, Sales, and Media Manager. WaveOS
-          always protects the final remaining Admin.
-        </p>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
+            Dream Wave Media
+          </p>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            Staff
+          </h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Invite employees by email and manage Dream Wave Team access. After an invitation is
+            accepted, an Admin can change that person between Admin, Sales, and Media Manager.
+            WaveOS always protects the final remaining Admin.
+          </p>
+        </div>
+        <AdminIdentityLauncher />
       </header>
 
       <div className="surface-card p-5">

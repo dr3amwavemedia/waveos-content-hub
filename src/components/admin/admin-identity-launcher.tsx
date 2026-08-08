@@ -9,12 +9,7 @@ export function AdminIdentityLauncher() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => setOpen(true)}
-        className="fixed right-4 top-20 z-30 gap-2 shadow-lg lg:right-6 lg:top-4"
-      >
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)} className="gap-2 shadow-sm">
         <UserCog className="h-4 w-4" /> Staff tools
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
