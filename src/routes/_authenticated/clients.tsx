@@ -216,69 +216,121 @@ function ClientsPage() {
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface/60 text-xs uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 text-left font-medium">Workspace</th>
-                  <th className="px-4 py-3 text-left font-medium">Tier</th>
-                  <th className="px-4 py-3 text-left font-medium">Status</th>
-                  <th className="px-4 py-3 text-left font-medium">Term ends</th>
-                  <th className="px-4 py-3 text-left font-medium">Members</th>
-                  <th className="px-4 py-3 text-left font-medium">Pending</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(workspacesQ.data ?? []).map((w) => (
-                  <tr key={w.id} className="border-t border-border/60 hover:bg-elevated/40">
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-foreground">{w.name}</div>
-                      <div className="text-xs text-muted-foreground">
-                        /{w.slug} · {w.industry ?? "—"}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <TierBadge tier={w.access_tier} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={cn(
-                          "rounded-md px-2 py-0.5 text-xs font-medium capitalize ring-1",
-                          STATUS_TONE[w.account_status],
-                        )}
-                      >
-                        {w.account_status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {w.access_expires_at
-                        ? new Date(w.access_expires_at).toLocaleDateString()
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3 text-foreground">{w.member_count}</td>
-                    <td className="px-4 py-3">
-                      {w.invite_count > 0 ? (
-                        <span className="rounded-md bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/30">
-                          {w.invite_count}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">—</span>
+          <>
+            <div className="divide-y divide-border/60 md:hidden">
+              {(workspacesQ.data ?? []).map((w) => (
+                <article key={w.id} className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <button onClick={() => setSelectedWs(w)} className="min-w-0 text-left">
+                      <h3 className="truncate font-semibold text-foreground">{w.name}</h3>
+                      <p className="truncate text-xs text-muted-foreground">
+                        /{w.slug} · {w.industry ?? "Industry not set"}
+                      </p>
+                    </button>
+                    <button
+                      onClick={() => setSelectedWs(w)}
+                      className="min-h-10 min-w-10 rounded-lg border border-border p-2.5 text-muted-foreground"
+                      aria-label={`Manage ${w.name}`}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <TierBadge tier={w.access_tier} />
+                    <span
+                      className={cn(
+                        "rounded-md px-2 py-0.5 text-xs font-medium capitalize ring-1",
+                        STATUS_TONE[w.account_status],
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => setSelectedWs(w)}
-                        className="rounded-lg p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
-                      >
-                        <MoreHorizontal className="h-4 w-4" />
-                      </button>
-                    </td>
+                    >
+                      {w.account_status}
+                    </span>
+                  </div>
+                  <dl className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <dt className="text-muted-foreground">Members</dt>
+                      <dd className="mt-1 font-medium">{w.member_count}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Invites</dt>
+                      <dd className="mt-1 font-medium">{w.invite_count}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Ends</dt>
+                      <dd className="mt-1 truncate font-medium">
+                        {w.access_expires_at
+                          ? new Date(w.access_expires_at).toLocaleDateString()
+                          : "—"}
+                      </dd>
+                    </div>
+                  </dl>
+                </article>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full text-sm">
+                <thead className="bg-surface/60 text-xs uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium">Workspace</th>
+                    <th className="px-4 py-3 text-left font-medium">Tier</th>
+                    <th className="px-4 py-3 text-left font-medium">Status</th>
+                    <th className="px-4 py-3 text-left font-medium">Term ends</th>
+                    <th className="px-4 py-3 text-left font-medium">Members</th>
+                    <th className="px-4 py-3 text-left font-medium">Pending</th>
+                    <th className="px-4 py-3"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {(workspacesQ.data ?? []).map((w) => (
+                    <tr key={w.id} className="border-t border-border/60 hover:bg-elevated/40">
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-foreground">{w.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          /{w.slug} · {w.industry ?? "—"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <TierBadge tier={w.access_tier} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={cn(
+                            "rounded-md px-2 py-0.5 text-xs font-medium capitalize ring-1",
+                            STATUS_TONE[w.account_status],
+                          )}
+                        >
+                          {w.account_status}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {w.access_expires_at
+                          ? new Date(w.access_expires_at).toLocaleDateString()
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-foreground">{w.member_count}</td>
+                      <td className="px-4 py-3">
+                        {w.invite_count > 0 ? (
+                          <span className="rounded-md bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/30">
+                            {w.invite_count}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button
+                          onClick={() => setSelectedWs(w)}
+                          className="rounded-lg p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -355,6 +407,32 @@ function WorkspaceDrawer({
   const [tab, setTab] = useState<DrawerTab>("access");
   const impersonate = useImpersonateClient();
 
+  function exportSummary() {
+    const rows = [
+      ["Client", workspace.name],
+      ["Workspace", workspace.slug],
+      ["Industry", workspace.industry ?? ""],
+      ["Tier", TIER_LABEL[workspace.access_tier]],
+      ["Account status", workspace.account_status],
+      ["Agreement", workspace.agreement_term ?? ""],
+      ["Access starts", workspace.access_starts_at ?? ""],
+      ["Access expires", workspace.access_expires_at ?? ""],
+      ["Members", String(workspace.member_count)],
+      ["Pending invites", String(workspace.invite_count)],
+      ["Media items", String(workspace.media_count)],
+      ["Last activity", workspace.last_activity_at ?? ""],
+    ];
+    const csv = rows
+      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","))
+      .join("\n");
+    const href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = `${workspace.slug}-account-summary.csv`;
+    link.click();
+    URL.revokeObjectURL(href);
+  }
+
   return (
     <ModalShell title={workspace.name} onClose={onClose} wide>
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -368,13 +446,20 @@ function WorkspaceDrawer({
           {workspace.account_status}
         </span>
         <span className="text-xs text-muted-foreground">Timezone: {workspace.timezone}</span>
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={exportSummary}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface/60 px-3 py-1.5 text-xs text-foreground hover:bg-elevated"
+          >
+            Export summary
+          </button>
           <Link
             to="/home"
             onClick={() => {
               try {
                 localStorage.setItem("waveos.active-workspace", workspace.id);
-                impersonate.enable();
+                impersonate.enable(workspace.access_tier);
               } catch {
                 /* noop */
               }
@@ -1810,11 +1895,14 @@ function ModalShell({
   wide?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8" role="dialog">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:px-4 sm:py-8"
+      role="dialog"
+    >
       <div className="absolute inset-0 bg-background/70 backdrop-blur" onClick={onClose} />
       <div
         className={cn(
-          "surface-card relative w-full overflow-hidden p-6 max-h-[90vh] overflow-y-auto",
+          "surface-card relative h-[100dvh] w-full overflow-y-auto rounded-none p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:p-6",
           wide ? "max-w-2xl" : "max-w-lg",
         )}
       >
