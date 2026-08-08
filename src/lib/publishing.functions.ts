@@ -28,7 +28,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  */
 export const prepareMediaForPublishing = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z
       .object({
         workspace_id: z.string().uuid(),
@@ -117,7 +117,10 @@ export const prepareMediaForPublishing = createServerFn({ method: "POST" })
       if (signErr || !signed?.signedUrl) {
         await supabase
           .from("media_assets")
-          .update({ publishing_status: "failed", last_accessibility_check: new Date().toISOString() })
+          .update({
+            publishing_status: "failed",
+            last_accessibility_check: new Date().toISOString(),
+          })
           .eq("id", a.id);
         throw new Error(`sign_url_failed:${a.id}`);
       }

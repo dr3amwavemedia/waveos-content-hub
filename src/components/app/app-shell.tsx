@@ -35,6 +35,7 @@ import { useCurrentUser } from "@/hooks/use-waveos";
 import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { WorkspaceProvider, useWorkspace } from "./workspace-context";
 import { ImpersonationBanner } from "./impersonation-banner";
+import { AccountStatusBanner } from "./account-status-banner";
 
 import type { FeatureKey } from "@/lib/permissions";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -137,7 +138,7 @@ function Shell({ children }: { children: ReactNode }) {
   const { can, isLoading: permsLoading, access, isStaff } = usePermissions();
   const { data: user } = useCurrentUser();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const isOwner = Boolean(user?.isDreamWaveOwner);
+  const isOwner = Boolean(user?.isDreamWaveOwner && isStaff);
   const isTeamMember = isStaff && !isOwner;
   const isMediaManager = isTeamMember && user?.staffType === "media_manager";
   const isSales = isTeamMember && !isMediaManager;
@@ -170,6 +171,7 @@ function Shell({ children }: { children: ReactNode }) {
       : isLayer1
         ? LAYER1_MOBILE_NAV
         : filterByFeature(MOBILE_NAV);
+  const mobilePrimaryNav = mobileNav.filter((item) => item.label !== "More").slice(0, 4);
   const nav = [...clientNav, ...staffNav];
 
   return (
@@ -216,7 +218,7 @@ function Shell({ children }: { children: ReactNode }) {
             className="absolute inset-0 bg-background/70 backdrop-blur"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 w-72 border-r border-border bg-sidebar p-4">
+          <div className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-border bg-sidebar p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="flex items-center justify-between">
               <WaveLogo />
               <button
@@ -230,7 +232,10 @@ function Shell({ children }: { children: ReactNode }) {
             <div className="mt-4">
               <WorkspaceSwitcher />
             </div>
-            <div onClick={() => setMobileOpen(false)}>
+            <div
+              className="mt-2 min-h-0 flex-1 overflow-y-auto"
+              onClick={() => setMobileOpen(false)}
+            >
               <NavGroup items={nav} className="mt-2" />
             </div>
             <UserFooter />
@@ -241,16 +246,26 @@ function Shell({ children }: { children: ReactNode }) {
       {/* Main */}
       <main className="min-h-screen lg:pl-64">
         <ImpersonationBanner />
-        <div className="mx-auto max-w-7xl px-4 pb-24 pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
+        <AccountStatusBanner />
+        <div className="mx-auto max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
           {children}
         </div>
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-surface/95 px-2 py-2 backdrop-blur lg:hidden">
-        {mobileNav.map((item) => (
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-surface/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
+        {mobilePrimaryNav.map((item) => (
           <MobileNavLink key={item.to} item={item} />
         ))}
+        <button
+          type="button"
+          onClick={() => setMobileOpen(true)}
+          className="flex flex-1 flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium text-muted-foreground"
+          aria-label="Open all navigation"
+        >
+          <Menu className="h-5 w-5" />
+          More
+        </button>
       </nav>
     </div>
   );

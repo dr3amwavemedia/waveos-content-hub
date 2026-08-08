@@ -71,7 +71,7 @@ export function usePermissions(): WorkspacePermissions {
     const isStaff = !!user?.isStaff && !impersonate.on;
     const clientAccess: WorkspaceAccess | null = data
       ? {
-          tier: data.access_tier,
+          tier: impersonate.on && impersonate.tier ? impersonate.tier : data.access_tier,
           status: data.account_status,
           expiresAt: data.access_expires_at,
           overrides: (data.feature_overrides ?? {}) as WorkspaceAccess["overrides"],
@@ -99,5 +99,5 @@ export function usePermissions(): WorkspacePermissions {
       can: (f) => (clientAccess ? hasFeature(clientAccess, f) : false),
       visibility: (f) => (clientAccess ? featureVisibility(clientAccess, f) : "hidden"),
     };
-  }, [data, isLoading, user?.isStaff, impersonate.on]);
+  }, [data, isLoading, user?.isStaff, impersonate.on, impersonate.tier]);
 }

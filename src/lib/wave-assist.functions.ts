@@ -9,13 +9,15 @@ const MODEL = "google/gemini-2.5-flash";
  */
 export const waveAssist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: {
-    mode: "caption" | "hashtags" | "tone" | "translate";
-    input: string;
-    platform?: string;
-    targetLanguage?: string;
-    toneHint?: string;
-  }) => d)
+  .validator(
+    (d: {
+      mode: "caption" | "hashtags" | "tone" | "translate";
+      input: string;
+      platform?: string;
+      targetLanguage?: string;
+      toneHint?: string;
+    }) => d,
+  )
   .handler(async ({ data }) => {
     const key = process.env.LOVABLE_API_KEY;
     if (!key) throw new Error("AI gateway not configured");

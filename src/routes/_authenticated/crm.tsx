@@ -590,71 +590,57 @@ function CrmPage() {
             </button>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-left text-sm">
-              <thead className="bg-elevated/40 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3">Business</th>
-                  <th className="px-4 py-3">Stage</th>
-                  <th className="px-4 py-3">Priority</th>
-                  <th className="px-4 py-3">Owner</th>
-                  <th className="px-4 py-3">Value</th>
-                  <th className="px-4 py-3">Next follow-up</th>
-                  <th className="px-4 py-3">Contact</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filtered.map((account) => {
-                  const contact =
-                    account.crm_contacts?.find((c) => c.is_primary) ?? account.crm_contacts?.[0];
-                  return (
-                    <tr key={account.id} className="hover:bg-elevated/30">
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => setSelected(account)}
-                          className="font-medium hover:text-primary"
-                        >
-                          {account.business_name}
-                        </button>
-                        <div className="text-xs text-muted-foreground">
-                          {account.industry || "Industry not set"}
+          <>
+            <div className="divide-y divide-border md:hidden">
+              {filtered.map((account) => {
+                const contact =
+                  account.crm_contacts?.find((c) => c.is_primary) ?? account.crm_contacts?.[0];
+                return (
+                  <article key={account.id} className="space-y-3 p-4">
+                    <button onClick={() => setSelected(account)} className="block w-full text-left">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="truncate font-semibold text-foreground">
+                            {account.business_name}
+                          </h3>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {contact?.email ??
+                              account.email ??
+                              account.industry ??
+                              "No contact set"}
+                          </p>
                         </div>
-                      </td>
-                      <td className="px-4 py-3">
+                        <ArrowUpRight className="h-4 w-4 shrink-0 text-primary" />
+                      </div>
+                    </button>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <label className="space-y-1">
+                        <span className="text-muted-foreground">Stage</span>
                         <select
                           value={account.stage}
                           onChange={(e) =>
                             stageMutation.mutate({ id: account.id, stage: e.target.value as Stage })
                           }
-                          className="rounded-md border border-border bg-background px-2 py-1 text-xs"
+                          className="min-h-10 w-full rounded-md border border-border bg-background px-2"
                         >
-                          {STAGES.map((s) => (
-                            <option key={s} value={s}>
-                              {STAGE_LABEL[s]}
+                          {STAGES.map((value) => (
+                            <option key={value} value={value}>
+                              {STAGE_LABEL[value]}
                             </option>
                           ))}
                         </select>
-                      </td>
-                      <td className="px-4 py-3">
+                      </label>
+                      <label className="space-y-1">
+                        <span className="text-muted-foreground">Priority</span>
                         <select
                           value={account.priority}
-                          onChange={(event) =>
+                          onChange={(e) =>
                             priorityMutation.mutate({
                               id: account.id,
-                              priority: event.target.value as Priority,
+                              priority: e.target.value as Priority,
                             })
                           }
-                          disabled={priorityMutation.isPending}
-                          className={cn(
-                            "rounded-md border border-border bg-background px-2 py-1 text-xs font-medium capitalize disabled:opacity-50",
-                            account.priority === "urgent"
-                              ? "text-destructive"
-                              : account.priority === "high"
-                                ? "text-warning"
-                                : "text-foreground",
-                          )}
-                          aria-label={`Priority for ${account.business_name}`}
+                          className="min-h-10 w-full rounded-md border border-border bg-background px-2 capitalize"
                         >
                           {PRIORITIES.map((value) => (
                             <option key={value} value={value}>
@@ -662,58 +648,149 @@ function CrmPage() {
                             </option>
                           ))}
                         </select>
-                      </td>
-                      <td className="px-4 py-3">
-                        {staffQ.data?.isOwner ? (
+                      </label>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">
+                        {dateLabel(account.next_follow_up_at)}
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {money(account.estimated_value_cents)}
+                      </span>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[920px] text-left text-sm">
+                <thead className="bg-elevated/40 text-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="px-4 py-3">Business</th>
+                    <th className="px-4 py-3">Stage</th>
+                    <th className="px-4 py-3">Priority</th>
+                    <th className="px-4 py-3">Owner</th>
+                    <th className="px-4 py-3">Value</th>
+                    <th className="px-4 py-3">Next follow-up</th>
+                    <th className="px-4 py-3">Contact</th>
+                    <th className="px-4 py-3"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {filtered.map((account) => {
+                    const contact =
+                      account.crm_contacts?.find((c) => c.is_primary) ?? account.crm_contacts?.[0];
+                    return (
+                      <tr key={account.id} className="hover:bg-elevated/30">
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => setSelected(account)}
+                            className="font-medium hover:text-primary"
+                          >
+                            {account.business_name}
+                          </button>
+                          <div className="text-xs text-muted-foreground">
+                            {account.industry || "Industry not set"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
                           <select
-                            value={account.assigned_to ?? ""}
+                            value={account.stage}
                             onChange={(e) =>
-                              assignmentMutation.mutate({
+                              stageMutation.mutate({
                                 id: account.id,
-                                assignedTo: e.target.value || null,
+                                stage: e.target.value as Stage,
                               })
                             }
-                            className="max-w-40 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                            className="rounded-md border border-border bg-background px-2 py-1 text-xs"
                           >
-                            <option value="">Unassigned</option>
-                            {(staffQ.data.staff ?? []).map((member) => (
-                              <option key={member.id} value={member.id}>
-                                {member.name}
+                            {STAGES.map((s) => (
+                              <option key={s} value={s}>
+                                {STAGE_LABEL[s]}
                               </option>
                             ))}
                           </select>
-                        ) : (
-                          <span className="text-xs">
-                            {staffQ.data?.staff.find((member) => member.id === account.assigned_to)
-                              ?.name ?? "Unassigned"}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{money(account.estimated_value_cents)}</td>
-                      <td className="px-4 py-3">{dateLabel(account.next_follow_up_at)}</td>
-                      <td className="px-4 py-3">
-                        <div>
-                          {contact ? `${contact.first_name} ${contact.last_name ?? ""}` : "—"}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {contact?.email ?? account.email ?? ""}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => setSelected(account)}
-                          className="rounded-md p-2 hover:bg-elevated"
-                          aria-label={`Open ${account.business_name}`}
-                        >
-                          <ArrowUpRight className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <select
+                            value={account.priority}
+                            onChange={(event) =>
+                              priorityMutation.mutate({
+                                id: account.id,
+                                priority: event.target.value as Priority,
+                              })
+                            }
+                            disabled={priorityMutation.isPending}
+                            className={cn(
+                              "rounded-md border border-border bg-background px-2 py-1 text-xs font-medium capitalize disabled:opacity-50",
+                              account.priority === "urgent"
+                                ? "text-destructive"
+                                : account.priority === "high"
+                                  ? "text-warning"
+                                  : "text-foreground",
+                            )}
+                            aria-label={`Priority for ${account.business_name}`}
+                          >
+                            {PRIORITIES.map((value) => (
+                              <option key={value} value={value}>
+                                {value}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td className="px-4 py-3">
+                          {staffQ.data?.isOwner ? (
+                            <select
+                              value={account.assigned_to ?? ""}
+                              onChange={(e) =>
+                                assignmentMutation.mutate({
+                                  id: account.id,
+                                  assignedTo: e.target.value || null,
+                                })
+                              }
+                              className="max-w-40 rounded-md border border-border bg-background px-2 py-1 text-xs"
+                            >
+                              <option value="">Unassigned</option>
+                              {(staffQ.data.staff ?? []).map((member) => (
+                                <option key={member.id} value={member.id}>
+                                  {member.name}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="text-xs">
+                              {staffQ.data?.staff.find(
+                                (member) => member.id === account.assigned_to,
+                              )?.name ?? "Unassigned"}
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">{money(account.estimated_value_cents)}</td>
+                        <td className="px-4 py-3">{dateLabel(account.next_follow_up_at)}</td>
+                        <td className="px-4 py-3">
+                          <div>
+                            {contact ? `${contact.first_name} ${contact.last_name ?? ""}` : "—"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {contact?.email ?? account.email ?? ""}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => setSelected(account)}
+                            className="rounded-md p-2 hover:bg-elevated"
+                            aria-label={`Open ${account.business_name}`}
+                          >
+                            <ArrowUpRight className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </section>
 
@@ -888,7 +965,7 @@ function AddLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
     }
   }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <button
         className="absolute inset-0 bg-background/75 backdrop-blur"
         onClick={onClose}
@@ -896,7 +973,7 @@ function AddLeadModal({ onClose, onCreated }: { onClose: () => void; onCreated: 
       />
       <form
         onSubmit={submit}
-        className="surface-card relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto p-6"
+        className="surface-card relative z-10 h-[100dvh] w-full max-w-2xl overflow-y-auto rounded-none p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:p-6"
       >
         <div className="flex items-start justify-between">
           <div>
@@ -1053,7 +1130,7 @@ function AccountDrawer({
         onClick={onClose}
         aria-label="Close"
       />
-      <aside className="absolute inset-y-0 right-0 w-full max-w-xl overflow-y-auto border-l border-border bg-surface p-6 shadow-2xl">
+      <aside className="absolute inset-0 w-full overflow-y-auto bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl sm:inset-y-0 sm:left-auto sm:right-0 sm:max-w-xl sm:border-l sm:border-border sm:p-6">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-primary">CRM record</p>
