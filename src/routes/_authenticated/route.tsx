@@ -1,4 +1,5 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
+import { AlertTriangle, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app/app-shell";
 
@@ -102,6 +103,7 @@ export const Route = createFileRoute("/_authenticated")({
     return { user: data.user };
   },
   component: AuthenticatedLayout,
+  errorComponent: AuthenticatedError,
 });
 
 function AuthenticatedLayout() {
@@ -109,5 +111,41 @@ function AuthenticatedLayout() {
     <AppShell>
       <Outlet />
     </AppShell>
+  );
+}
+
+function AuthenticatedError({ error, reset }: { error: Error; reset: () => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
+      <div className="surface-card w-full max-w-lg p-6 text-center sm:p-8">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-warning/10">
+          <AlertTriangle className="h-6 w-6 text-warning" />
+        </div>
+        <h1 className="mt-4 text-xl font-semibold">WaveOS could not open this screen</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Your data was not changed. Try loading the screen again, or return to the overview.
+        </p>
+        {import.meta.env.DEV && (
+          <p className="mt-3 break-words rounded-lg border border-border bg-background/60 p-3 text-left font-mono text-xs text-muted-foreground">
+            {error.message}
+          </p>
+        )}
+        <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={reset}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            <RefreshCw className="h-4 w-4" /> Try again
+          </button>
+          <Link
+            to="/home"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-medium"
+          >
+            Return to overview
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }
