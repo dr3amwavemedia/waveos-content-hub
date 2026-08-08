@@ -507,11 +507,24 @@ function AccessTab({
   const deleteWorkspace = useMutation({
     mutationFn: async () => {
       const confirmation = window.prompt(
-        `Permanently delete this unused client workspace?\n\nThis is only allowed when it has no client work. Type ${workspace.name} to confirm.`,
+        `Permanently delete ${workspace.name}?\n\nThis removes the client workspace, access, content, approvals, invoices, deliveries, and related records. The person's login account is not deleted. Type ${workspace.name} to confirm.`,
       );
       if (confirmation === null) return false;
       if (confirmation !== workspace.name) throw new Error("Workspace name did not match.");
-      const { error } = await db.rpc("delete_empty_client_workspace", {
+
+      const { data: media, error: mediaError } = await supabase
+        .from("media_assets")
+        .select("storage_path")
+        .eq("workspace_id", workspace.id);
+      if (mediaError) throw mediaError;
+
+      const mediaPaths = (media ?? []).map((asset) => asset.storage_path).filter(Boolean);
+      if (mediaPaths.length > 0) {
+        const { error: storageError } = await supabase.storage.from("media").remove(mediaPaths);
+        if (storageError) throw storageError;
+      }
+
+      const { error } = await db.rpc("delete_client_workspace", {
         _workspace_id: workspace.id,
         _confirmation: confirmation,
       });
@@ -520,7 +533,7 @@ function AccessTab({
     },
     onSuccess: (deleted) => {
       if (!deleted) return;
-      toast.success("Unused client permanently deleted.");
+      toast.success("Client permanently deleted.");
       onDeleted();
     },
     onError: (e: unknown) => {
@@ -647,7 +660,7 @@ function AccessTab({
             ) : (
               <Trash2 className="h-3.5 w-3.5" />
             )}
-            Delete unused client
+            Delete client
           </button>
         )}
       </div>
@@ -656,22 +669,10 @@ function AccessTab({
 }
 
 function clientDeleteMessage(message: string) {
-  if (message.includes("client_has_linked_crm_lead")) return "Unlink the CRM lead first.";
-  if (message.includes("client_has_media")) return "Deletion blocked: this client has media files.";
-  if (message.includes("client_has_content")) return "Deletion blocked: this client has content.";
-  if (message.includes("client_has_deliveries"))
-    return "Deletion blocked: this client has deliveries.";
-  if (message.includes("client_has_invoices")) return "Deletion blocked: this client has invoices.";
-  if (message.includes("client_has_social_connections"))
-    return "Deletion blocked: this client has connected social accounts.";
-  if (message.includes("client_has_publishing_profile"))
-    return "Deletion blocked: this client has a publishing profile.";
-  if (message.includes("client_has_brand_profile"))
-    return "Deletion blocked: this client has a brand profile.";
-  if (message.includes("client_has_internal_notes"))
-    return "Deletion blocked: this client has internal notes.";
   if (message.includes("owner_required"))
     return "Only the WaveOS owner can permanently delete clients.";
+  if (message.includes("confirmation_name_mismatch")) return "Client name did not match.";
+  if (message.includes("client_not_found")) return "This client no longer exists.";
   return message;
 }
 
