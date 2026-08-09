@@ -145,7 +145,10 @@ export function useUploadAsset(workspaceId: string | null | undefined) {
       }
       return data as MediaAsset;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["media", "assets", workspaceId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["media", "assets", workspaceId] });
+      qc.invalidateQueries({ queryKey: ["your-content", "media", workspaceId] });
+    },
   });
 }
 
@@ -157,7 +160,10 @@ export function useDeleteAsset(workspaceId: string | null | undefined) {
       const { error } = await supabase.from("media_assets").delete().eq("id", asset.id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["media", "assets", workspaceId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["media", "assets", workspaceId] });
+      qc.invalidateQueries({ queryKey: ["your-content", "media", workspaceId] });
+    },
   });
 }
 

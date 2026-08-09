@@ -170,9 +170,7 @@ export function Layer1Overview() {
         .from("client_deliveries")
         .select("*")
         .eq("workspace_id", wsId!)
-        .order("is_pinned", { ascending: false })
-        .order("delivered_at", { ascending: false })
-        .limit(10);
+        .order("delivered_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Delivery[];
     },
@@ -229,6 +227,31 @@ export function Layer1Overview() {
       {/* Primary action */}
       <PrimaryActionBanner action={primaryAction} />
 
+      {/* Latest project */}
+      <section className="space-y-3">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
+              Latest project
+            </p>
+            <h2 className="mt-1 text-lg font-semibold text-foreground">Newest delivery</h2>
+          </div>
+          {primaryDelivery && (
+            <Link to="/deliveries" className="text-sm font-medium text-primary hover:underline">
+              View all content
+            </Link>
+          )}
+        </div>
+        {primaryDelivery ? (
+          <DeliveryCard delivery={primaryDelivery} />
+        ) : (
+          <PolishedEmpty
+            icon={Sparkles}
+            body="Dream Wave Media is preparing your content. Your newest project will appear here."
+          />
+        )}
+      </section>
+
       {/* Invoices */}
       <section id="invoices" className="scroll-mt-24 space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Invoices & Payments</h2>
@@ -241,9 +264,19 @@ export function Layer1Overview() {
 
       {/* Content */}
       <section id="your-content" className="scroll-mt-24 space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">Your Content</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-foreground">Your Content</h2>
+          <Link
+            to="/deliveries"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+          >
+            Open content library <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
         {primaryDelivery ? (
-          <DeliveryCard delivery={primaryDelivery} />
+          <p className="text-sm text-muted-foreground">
+            Every project and delivery link—including your newest—is saved in your content library.
+          </p>
         ) : (
           <PolishedEmpty
             icon={Sparkles}
@@ -472,7 +505,7 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
   );
 }
 
-function DeliveryCard({ delivery }: { delivery: Delivery }) {
+export function DeliveryCard({ delivery }: { delivery: Delivery }) {
   const provider = deliveryProvider(delivery.url);
   const kindLabel = DELIVERY_KIND_LABEL[delivery.kind];
   const delivered = formatDate(delivery.delivered_at);

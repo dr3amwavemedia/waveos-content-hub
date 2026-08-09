@@ -786,6 +786,8 @@ function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["client-deliveries", workspaceId] });
+      qc.invalidateQueries({ queryKey: ["your-content", workspaceId] });
+      qc.invalidateQueries({ queryKey: ["layer1", "deliveries", workspaceId] });
       toast.success("Delivery removed.");
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
@@ -906,6 +908,8 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["client-deliveries", workspaceId] });
+      qc.invalidateQueries({ queryKey: ["your-content", workspaceId] });
+      qc.invalidateQueries({ queryKey: ["layer1", "deliveries", workspaceId] });
       toast.success("Delivery added.");
       onDone();
     },

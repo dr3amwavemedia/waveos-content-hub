@@ -51,10 +51,9 @@ function HomeRoute() {
     );
   }
 
-  // Layer 1 project_client gets the premium client-facing overview.
-  // Staff, Layer 2 (growth_90), and Layer 3 (retainer_full) keep the
-  // existing growth dashboard unchanged.
-  if (!isStaff && !isLoading && access?.tier === "project_client") {
+  // Client projects and delivery links are universal across every tier.
+  // Tier-specific tools remain available through the client navigation.
+  if (!isStaff && !isLoading && access) {
     return <Layer1Overview />;
   }
   return <HomeDashboard />;

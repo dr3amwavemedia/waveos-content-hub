@@ -53,6 +53,14 @@ const GROWTH_90_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   "can_request_changes",
   "can_manage_brand_voice",
   "can_view_calendar_preview",
+  "can_view_media_library",
+  "can_upload_media",
+  "can_create_content",
+  "can_use_ai_tools",
+  "can_view_analytics",
+  "can_view_activity_log",
+  "can_invite_members",
+  "can_manage_workspace",
 ]);
 
 // Retainer gets everything by default.

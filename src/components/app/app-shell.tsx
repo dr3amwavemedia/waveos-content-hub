@@ -42,6 +42,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 
 interface NavItem {
   to: string;
+  hash?: string;
   label: string;
   icon: typeof Home;
   staffOnly?: boolean;
@@ -53,6 +54,7 @@ interface NavItem {
 
 const CLIENT_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
+  { to: "/deliveries", label: "Your Content", icon: Images },
   { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
@@ -100,6 +102,7 @@ const MEDIA_MANAGER_CLIENT_NAV = CLIENT_NAV.filter(
 
 const MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
+  { to: "/deliveries", label: "Your Content", icon: Images },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/create", label: "Create", icon: PenSquare, feature: "can_create_content" },
   { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
@@ -112,16 +115,16 @@ const MOBILE_NAV: NavItem[] = [
 const LAYER1_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
   { to: "/approvals", label: "Approvals", icon: CheckSquare },
-  { to: "/home#your-content", label: "Your Content", icon: Images },
-  { to: "/home#invoices", label: "Invoices & Payments", icon: FileText },
+  { to: "/deliveries", label: "Your Content", icon: Images },
+  { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
   { to: "/settings", label: "Your Information", icon: User },
   { to: "/feedback", label: "Contact Dream Wave", icon: MessageSquare },
 ];
 
 const LAYER1_MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
-  { to: "/home#your-content", label: "Content", icon: Images },
-  { to: "/home#invoices", label: "Invoices", icon: FileText },
+  { to: "/deliveries", label: "Content", icon: Images },
+  { to: "/home", hash: "invoices", label: "Invoices", icon: FileText },
   { to: "/settings", label: "Info", icon: User },
   { to: "/feedback", label: "Contact", icon: MessageSquare },
 ];
@@ -135,7 +138,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  const { can, isLoading: permsLoading, access, isStaff } = usePermissions();
+  const { can, visibility, isLoading: permsLoading, access, isStaff } = usePermissions();
   const { data: user } = useCurrentUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isOwner = Boolean(user?.isDreamWaveOwner && isStaff);
@@ -149,7 +152,7 @@ function Shell({ children }: { children: ReactNode }) {
       if (i.staffOnly) return isStaff;
       if (!i.feature) return true;
       if (permsLoading) return false;
-      return can(i.feature);
+      return isStaff ? can(i.feature) : visibility(i.feature) !== "hidden";
     });
 
   // Layer 1 (project_client) gets a simplified client-facing nav using
@@ -255,7 +258,7 @@ function Shell({ children }: { children: ReactNode }) {
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-surface/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
         {mobilePrimaryNav.map((item) => (
-          <MobileNavLink key={item.to} item={item} />
+          <MobileNavLink key={`${item.to}#${item.hash ?? ""}`} item={item} />
         ))}
         <button
           type="button"
@@ -279,9 +282,10 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
         const active = pathname === item.to || pathname.startsWith(item.to + "/");
         const Icon = item.icon;
         return (
-          <li key={item.to}>
+          <li key={`${item.to}#${item.hash ?? ""}`}>
             <Link
               to={item.to}
+              hash={item.hash}
               className={cn(
                 "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
                 active
@@ -314,6 +318,7 @@ function MobileNavLink({ item }: { item: NavItem }) {
   return (
     <Link
       to={item.to}
+      hash={item.hash}
       className={cn(
         "flex flex-1 flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium",
         active ? "text-primary" : "text-muted-foreground",
