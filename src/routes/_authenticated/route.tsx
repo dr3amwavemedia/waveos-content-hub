@@ -2,8 +2,9 @@ import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router"
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app/app-shell";
+import { getActingStaff } from "@/hooks/use-acting-staff";
 
-const TEAM_ALLOWED_ROUTES = ["/home", "/crm", "/approvals", "/vision-studio"];
+const TEAM_ALLOWED_ROUTES = ["/home", "/deliveries", "/crm", "/approvals", "/vision-studio"];
 const OUTLOOK_INTEGRATIONS_ENABLED = false;
 const MEDIA_MANAGER_ALLOWED_ROUTES = [
   ...TEAM_ALLOWED_ROUTES,
@@ -89,10 +90,13 @@ export const Route = createFileRoute("/_authenticated")({
       }>;
     }
 
+    const actingIdentity = actingAsStaff ? getActingStaff() : null;
     const roleNames = roleRows.map((role) => role.role);
-    const isOwner = roleNames.includes("dream_wave_owner");
-    const isTeamMember = roleNames.includes("dream_wave_team") && !isOwner;
-    const teamRole = roleRows.find((role) => role.role === "dream_wave_team");
+    const isOwner = !actingIdentity && roleNames.includes("dream_wave_owner");
+    const isTeamMember = Boolean(actingIdentity) || (roleNames.includes("dream_wave_team") && !isOwner);
+    const teamRole = actingIdentity
+      ? { staff_type: actingIdentity.staffType }
+      : roleRows.find((role) => role.role === "dream_wave_team");
     const allowedRoutes =
       teamRole?.staff_type === "media_manager" ? MEDIA_MANAGER_ALLOWED_ROUTES : TEAM_ALLOWED_ROUTES;
 

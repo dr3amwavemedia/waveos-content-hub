@@ -12,9 +12,9 @@ export type PreviewTier = "project_client" | "growth_90" | "retainer_full";
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
-function read(): boolean {
-  if (typeof window === "undefined") return false;
-  return sessionStorage.getItem(KEY) === "1";
+function readSnapshot(): string {
+  if (typeof window === "undefined") return "0:";
+  return `${sessionStorage.getItem(KEY) === "1" ? "1" : "0"}:${sessionStorage.getItem(TIER_KEY) ?? ""}`;
 }
 function subscribe(l: Listener) {
   listeners.add(l);
@@ -32,9 +32,10 @@ function notify() {
 }
 
 export function useImpersonateClient() {
-  const on = useSyncExternalStore(subscribe, read, () => false);
-  const tier =
-    typeof window === "undefined" ? null : (sessionStorage.getItem(TIER_KEY) as PreviewTier | null);
+  const snapshot = useSyncExternalStore(subscribe, readSnapshot, () => "0:");
+  const [enabled, savedTier] = snapshot.split(":");
+  const on = enabled === "1";
+  const tier = (savedTier || null) as PreviewTier | null;
   return {
     on,
     tier,
@@ -55,7 +56,7 @@ export function useImpersonateClient() {
       notify();
     },
     toggle() {
-      if (read()) {
+      if (readSnapshot().startsWith("1:")) {
         sessionStorage.removeItem(KEY);
         sessionStorage.removeItem(TIER_KEY);
       } else sessionStorage.setItem(KEY, "1");
