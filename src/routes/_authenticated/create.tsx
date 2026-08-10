@@ -32,10 +32,12 @@ import {
   useDeleteContentItem,
   useUpdateContentItem,
   useUpdateVariant,
+  useSyncPostVariants,
   type PostVariant,
   type SocialPlatform,
 } from "@/hooks/use-content";
 import { PenSquare } from "lucide-react";
+import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 
 export const Route = createFileRoute("/_authenticated/create")({
   component: () => (
@@ -55,11 +57,13 @@ function CreatePost() {
   const qc = useQueryClient();
 
   const workspaceId = activeWorkspace?.id ?? null;
+  const workspaceTimeZone = activeWorkspace?.timezone ?? "UTC";
   const [savedId, setSavedId] = useState<string | null>(search.id ?? null);
   const existing = useContentItem(search.id ?? savedId ?? null);
   const create = useCreateContentItem(workspaceId);
   const update = useUpdateContentItem();
   const updateVariant = useUpdateVariant();
+  const syncVariants = useSyncPostVariants();
   const del = useDeleteContentItem();
 
   const [title, setTitle] = useState("");
@@ -145,8 +149,10 @@ function CreatePost() {
     setTitle(it.title ?? "");
     setCaption(it.primary_caption ?? "");
     setPickedMedia(it.media_asset_ids ?? []);
-    setScheduledAt(it.scheduled_at ? it.scheduled_at.slice(0, 16) : "");
-    const vp = existing.data.variants.map((v) => v.platform);
+    setScheduledAt(
+      it.scheduled_at ? isoToDateTimeLocal(it.scheduled_at, workspaceTimeZone) : "",
+    );
+    const vp = existing.data.variants.filter((v) => v.enabled).map((v) => v.platform);
     if (vp.length) {
       setPlatforms(vp);
       setActivePlatform(vp[0]);
@@ -187,8 +193,16 @@ function CreatePost() {
           title: title || null,
           primary_caption: caption || null,
           media_asset_ids: pickedMedia,
-          scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+          scheduled_at: scheduledAt
+            ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone)
+            : null,
         },
+      });
+      await syncVariants.mutateAsync({
+        contentId: savedId,
+        workspaceId,
+        platforms,
+        primaryCaption: caption,
       });
       return savedId;
     }
@@ -197,7 +211,9 @@ function CreatePost() {
       primary_caption: caption,
       media_asset_ids: pickedMedia,
       platforms,
-      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      scheduled_at: scheduledAt
+        ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone)
+        : null,
     });
     setSavedId(item.id);
     return item.id;
@@ -251,7 +267,7 @@ function CreatePost() {
     if (!caption.trim()) return toast.error("Add a caption before scheduling");
     if (!platforms.length) return toast.error("Pick at least one platform");
     if (!scheduledAt) return toast.error("Choose a publish date and time");
-    const when = new Date(scheduledAt);
+    const when = new Date(zonedDateTimeToIso(scheduledAt, workspaceTimeZone));
     if (Number.isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
       return toast.error("Schedule time must be in the future");
     }
@@ -291,8 +307,8 @@ function CreatePost() {
       qc.invalidateQueries({ queryKey: ["content-items"] });
       qc.invalidateQueries({ queryKey: ["content-item", id] });
       if (res.failed === 0) toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
-      else toast.warning(`Published to ${res.success}, ${res.failed} failed — see Content for details`);
-      navigate({ to: "/content" });
+      else toast.warning(`Published to ${res.success}, ${res.failed} failed — open Posts to retry`);
+      navigate({ to: "/posts" });
     } catch (e) {
       toast.error((e as Error).message);
     } finally {

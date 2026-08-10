@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowRight, CalendarDays, CheckCircle2, Cloud, ImagePlus, Mail, PenSquare,
+  ArrowRight, CalendarDays, CheckCircle2, Cloud, FileText, ImagePlus, Mail, PenSquare,
   Share2, Sparkles, TrendingUp, Users, FolderOpen,
 } from "lucide-react";
 
@@ -163,32 +163,32 @@ function HomeDashboard() {
     </div>
 
     <div className="relative mt-6 grid grid-cols-3 gap-2 sm:gap-3">
-      <div className="rounded-2xl border border-border/70 bg-background/60 p-3 backdrop-blur sm:p-4">
+      <Link to="/posts" search={{ status: "published" }} className="rounded-2xl border border-border/70 bg-background/60 p-3 backdrop-blur transition-colors hover:border-primary/40 hover:bg-primary/10 sm:p-4">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs">
           Published
         </p>
         <p className="mt-2 text-2xl font-semibold text-foreground">
           {stats?.publishedCount ?? "—"}
         </p>
-      </div>
+      </Link>
 
-      <div className="rounded-2xl border border-border/70 bg-background/60 p-3 backdrop-blur sm:p-4">
+      <Link to="/posts" search={{ status: "scheduled" }} className="rounded-2xl border border-border/70 bg-background/60 p-3 backdrop-blur transition-colors hover:border-primary/40 hover:bg-primary/10 sm:p-4">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs">
           Scheduled
         </p>
         <p className="mt-2 text-2xl font-semibold text-foreground">
           {stats?.scheduledCount ?? "—"}
         </p>
-      </div>
+      </Link>
 
-      <div className="rounded-2xl border border-border/70 bg-background/60 p-3 backdrop-blur sm:p-4">
+      <Link to="/approvals" className="rounded-2xl border border-border/70 bg-background/60 p-3 backdrop-blur transition-colors hover:border-primary/40 hover:bg-primary/10 sm:p-4">
         <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground sm:text-xs">
           To review
         </p>
         <p className="mt-2 text-2xl font-semibold text-foreground">
           {stats?.awaitingCount ?? "—"}
         </p>
-      </div>
+      </Link>
     </div>
   </div>
 
@@ -263,6 +263,7 @@ function HomeDashboard() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <QuickAction to="/content" label="Upload content" icon={ImagePlus} description="Add photos or videos to your library." />
           <QuickAction to="/create" label="Create a post" icon={PenSquare} description="Build a post with per‑platform captions." />
+          <QuickAction to="/posts" label="View saved posts" icon={FileText} description="Reopen drafts and check publishing results." />
           <QuickAction to="/calendar" label="View calendar" icon={CalendarDays} description="See what's coming up next." />
           <QuickAction to="/social-accounts" label="Connect account" icon={Share2} description="Link Instagram, Facebook, and more." />
           <QuickAction to="/brand-voice" label="Refine brand voice" icon={Sparkles} description="Teach WaveOS how your brand sounds." />

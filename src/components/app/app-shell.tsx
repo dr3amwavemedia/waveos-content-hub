@@ -56,6 +56,7 @@ const CLIENT_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
   { to: "/deliveries", label: "Your Content", icon: Images },
   { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
+  { to: "/posts", label: "Posts", icon: FileText, feature: "can_create_content" },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
   { to: "/analytics", label: "Analytics", icon: BarChart3, feature: "can_view_analytics" },
@@ -105,6 +106,7 @@ const MOBILE_NAV: NavItem[] = [
   { to: "/deliveries", label: "Your Content", icon: Images },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/create", label: "Create", icon: PenSquare, feature: "can_create_content" },
+  { to: "/posts", label: "Posts", icon: FileText, feature: "can_create_content" },
   { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
   { to: "/settings", label: "More", icon: Settings },
 ];
