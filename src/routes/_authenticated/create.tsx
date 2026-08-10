@@ -9,6 +9,7 @@ import {
   FileText,
   ImagePlus,
   Loader2,
+  Plus,
   Send,
   Sparkles,
   Trash2,
@@ -59,7 +60,8 @@ function CreatePost() {
   const workspaceId = activeWorkspace?.id ?? null;
   const workspaceTimeZone = activeWorkspace?.timezone ?? "UTC";
   const [savedId, setSavedId] = useState<string | null>(search.id ?? null);
-  const existing = useContentItem(search.id ?? savedId ?? null);
+  const editingId = search.id ?? savedId ?? null;
+  const existing = useContentItem(editingId);
   const create = useCreateContentItem(workspaceId);
   const update = useUpdateContentItem();
   const updateVariant = useUpdateVariant();
@@ -328,6 +330,28 @@ function CreatePost() {
     navigate({ to: "/content" });
   }
 
+  function handleStartNew() {
+    const hasWork = Boolean(
+      savedId || title.trim() || caption.trim() || pickedMedia.length || scheduledAt,
+    );
+    if (hasWork && !confirm("Start a new post? Your saved draft will remain in Posts, but any changes you have not saved will be cleared.")) {
+      return;
+    }
+
+    if (draftStorageKey) window.localStorage.removeItem(draftStorageKey);
+    setSavedId(null);
+    setTitle("");
+    setCaption("");
+    setPlatforms(["instagram"]);
+    setPickedMedia([]);
+    setScheduledAt("");
+    setActivePlatform("instagram");
+    setShowLibrary(false);
+    setSaveStatus("idle");
+    navigate({ to: "/create", search: {}, replace: true });
+    toast.success("New post ready. Your previous saved draft is still available under Posts.");
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -347,6 +371,14 @@ function CreatePost() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={create.isPending || update.isPending || publishing !== null}
+            onClick={handleStartNew}
+            className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+          >
+            <Plus className="h-4 w-4" /> New post
+          </button>
           {savedId && (
             <button
               onClick={handleDelete}
