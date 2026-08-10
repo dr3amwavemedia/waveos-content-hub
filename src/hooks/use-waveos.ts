@@ -10,7 +10,7 @@ export interface WorkspaceSummary {
   industry: string | null;
   timezone: string;
   is_demo: boolean;
-  role: "owner" | "approver" | "viewer" | "staff";
+  role: "owner" | "admin" | "editor" | "approver" | "viewer" | "staff";
 }
 
 export interface CurrentUserContext {
@@ -130,7 +130,7 @@ async function loadWorkspaces(
     return {
       ...w,
       role: (previewWorkspaceId ? "viewer" : ctx.isStaff ? "staff" : (role ?? "viewer")) as
-        "owner" | "approver" | "viewer" | "staff",
+        "owner" | "admin" | "editor" | "approver" | "viewer" | "staff",
     };
   });
 }

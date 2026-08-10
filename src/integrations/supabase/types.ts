@@ -1986,6 +1986,14 @@ export type Database = {
         Args: { _confirmation: string; _workspace_id: string }
         Returns: string
       }
+      decide_content_approval: {
+        Args: {
+          _content_id: string
+          _decision: Database["public"]["Enums"]["approval_decision"]
+          _note?: string
+        }
+        Returns: Database["public"]["Enums"]["content_status"]
+      }
       get_client_member_directory: {
         Args: { _workspace_id: string }
         Returns: {
@@ -2162,6 +2170,14 @@ export type Database = {
         Returns: {
           raw_token: string
         }[]
+      }
+      submit_content_for_approval: {
+        Args: {
+          _content_id: string
+          _requested_action: string
+          _scheduled_at?: string
+        }
+        Returns: Database["public"]["Enums"]["content_status"]
       }
       revoke_invite: { Args: { _invite_id: string }; Returns: undefined }
       revoke_staff_role: {

@@ -235,8 +235,16 @@ export function useDeleteContentItem() {
 export function useSubmitForApproval() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (contentId: string) => {
-      const { error } = await supabase.from("content_items").update({ status: "in_review" }).eq("id", contentId);
+    mutationFn: async (input: {
+      contentId: string;
+      requestedAction: "publish_now" | "schedule";
+      scheduledAt?: string | null;
+    }) => {
+      const { error } = await supabase.rpc("submit_content_for_approval", {
+        _content_id: input.contentId,
+        _requested_action: input.requestedAction,
+        _scheduled_at: input.scheduledAt ?? undefined,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -255,31 +263,12 @@ export function useDecideApproval() {
       decision: ApprovalDecision;
       note?: string;
     }) => {
-      const { data: user } = await supabase.auth.getUser();
-      const nextStatus: ContentStatus =
-        input.decision === "approved"
-          ? "approved"
-          : input.decision === "changes_requested"
-            ? "changes_requested"
-            : input.decision === "rejected"
-              ? "draft"
-              : "in_review";
-      const { error } = await supabase.from("approvals").insert({
-        content_item_id: input.contentId,
-        workspace_id: input.workspaceId,
-        decision: input.decision,
-        note: input.note ?? null,
-        reviewer_id: user.user?.id,
-        decided_at: new Date().toISOString(),
+      const { error } = await supabase.rpc("decide_content_approval", {
+        _content_id: input.contentId,
+        _decision: input.decision,
+        _note: input.note,
       });
       if (error) throw error;
-      const patch: Partial<ContentItem> = { status: nextStatus };
-      if (input.decision === "approved") {
-        patch.approved_by = user.user?.id ?? null;
-        patch.approved_at = new Date().toISOString();
-      }
-      const { error: e2 } = await supabase.from("content_items").update(patch).eq("id", input.contentId);
-      if (e2) throw e2;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["content-items"] });
