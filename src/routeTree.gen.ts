@@ -35,6 +35,7 @@ import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedOutlookRouteImport } from './routes/_authenticated/outlook'
+import { Route as AuthenticatedPostsRouteImport } from './routes/_authenticated/posts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
@@ -183,6 +184,11 @@ const AuthenticatedOutlookRoute = AuthenticatedOutlookRouteImport.update({
   path: '/outlook',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPostsRoute = AuthenticatedPostsRouteImport.update({
+  id: '/posts',
+  path: '/posts',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -295,6 +301,7 @@ export interface FileRoutesByFullPath {
   '/home': typeof AuthenticatedHomeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/outlook': typeof AuthenticatedOutlookRoute
+  '/posts': typeof AuthenticatedPostsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
@@ -338,6 +345,7 @@ export interface FileRoutesByTo {
   '/home': typeof AuthenticatedHomeRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/outlook': typeof AuthenticatedOutlookRoute
+  '/posts': typeof AuthenticatedPostsRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
@@ -383,6 +391,7 @@ export interface FileRoutesById {
   '/_authenticated/home': typeof AuthenticatedHomeRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/outlook': typeof AuthenticatedOutlookRoute
+  '/_authenticated/posts': typeof AuthenticatedPostsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
@@ -428,6 +437,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/onboarding'
     | '/outlook'
+    | '/posts'
     | '/settings'
     | '/social-accounts'
     | '/staff-email'
@@ -471,6 +481,7 @@ export interface FileRouteTypes {
     | '/home'
     | '/onboarding'
     | '/outlook'
+    | '/posts'
     | '/settings'
     | '/social-accounts'
     | '/staff-email'
@@ -515,6 +526,7 @@ export interface FileRouteTypes {
     | '/_authenticated/home'
     | '/_authenticated/onboarding'
     | '/_authenticated/outlook'
+    | '/_authenticated/posts'
     | '/_authenticated/settings'
     | '/_authenticated/social-accounts'
     | '/_authenticated/staff-email'
@@ -744,6 +756,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOutlookRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/posts': {
+      id: '/_authenticated/posts'
+      path: '/posts'
+      fullPath: '/posts'
+      preLoaderRoute: typeof AuthenticatedPostsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -874,6 +893,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOutlookRoute: typeof AuthenticatedOutlookRoute
+  AuthenticatedPostsRoute: typeof AuthenticatedPostsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSocialAccountsRoute: typeof AuthenticatedSocialAccountsRoute
   AuthenticatedStaffEmailRoute: typeof AuthenticatedStaffEmailRoute
@@ -895,6 +915,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOutlookRoute: AuthenticatedOutlookRoute,
+  AuthenticatedPostsRoute: AuthenticatedPostsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSocialAccountsRoute: AuthenticatedSocialAccountsRoute,
   AuthenticatedStaffEmailRoute: AuthenticatedStaffEmailRoute,

@@ -82,6 +82,16 @@ async function publishNowAdmin(contentId: string) {
   let successCount = 0, failCount = 0;
   for (const v of variants) {
     const idempotencyKey = `${contentId}:${v.platform}`;
+    const { data: existing } = await supabaseAdmin
+      .from("publish_attempts")
+      .select("status")
+      .eq("idempotency_key", idempotencyKey)
+      .eq("platform", v.platform)
+      .maybeSingle();
+    if (existing?.status === "success") {
+      successCount++;
+      continue;
+    }
     const body = { post: v.caption || item.primary_caption || "", platforms: [v.platform], mediaUrls };
     const { data: attempt } = await supabaseAdmin.from("publish_attempts").upsert({
       content_item_id: contentId, workspace_id: item.workspace_id, platform: v.platform,
@@ -111,7 +121,7 @@ async function publishNowAdmin(contentId: string) {
   }
 
   await supabaseAdmin.from("content_items").update({
-    status: successCount > 0 ? "published" : "failed",
+    status: failCount === 0 ? "published" : "failed",
     published_at: successCount > 0 ? new Date().toISOString() : null,
   }).eq("id", contentId);
 

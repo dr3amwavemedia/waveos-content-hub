@@ -142,6 +142,85 @@ export function useUpdateVariant() {
   });
 }
 
+export function useSyncPostVariants() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      contentId,
+      workspaceId,
+      platforms,
+      primaryCaption,
+    }: {
+      contentId: string;
+      workspaceId: string;
+      platforms: SocialPlatform[];
+      primaryCaption: string;
+    }) => {
+      const { data: existing, error: readError } = await supabase
+        .from("post_variants")
+        .select("id,platform,enabled")
+        .eq("content_item_id", contentId);
+      if (readError) throw readError;
+
+      const existingPlatforms = new Set((existing ?? []).map((variant) => variant.platform));
+      const missing = platforms.filter((platform) => !existingPlatforms.has(platform));
+
+      if (missing.length) {
+        const { error } = await supabase.from("post_variants").insert(
+          missing.map((platform) => ({
+            content_item_id: contentId,
+            workspace_id: workspaceId,
+            platform,
+            caption: primaryCaption,
+            enabled: true,
+          })),
+        );
+        if (error) throw error;
+      }
+
+      if (platforms.length) {
+        const { error } = await supabase
+          .from("post_variants")
+          .update({ enabled: true })
+          .eq("content_item_id", contentId)
+          .in("platform", platforms);
+        if (error) throw error;
+      }
+
+      const removed = (existing ?? [])
+        .filter((variant) => !platforms.includes(variant.platform))
+        .map((variant) => variant.platform);
+      if (removed.length) {
+        const { error } = await supabase
+          .from("post_variants")
+          .update({ enabled: false })
+          .eq("content_item_id", contentId)
+          .in("platform", removed);
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: ["content-item", variables.contentId] });
+    },
+  });
+}
+
+export function usePublishAttempts(contentIds: string[]) {
+  return useQuery({
+    queryKey: ["publish-attempts", contentIds.join(",")],
+    enabled: contentIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("publish_attempts")
+        .select("*")
+        .in("content_item_id", contentIds)
+        .order("attempted_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
 export function useDeleteContentItem() {
   const qc = useQueryClient();
   return useMutation({

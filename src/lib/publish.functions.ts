@@ -142,7 +142,9 @@ export const publishContentItem = createServerFn({ method: "POST" })
       }
     }
 
-    const nextStatus = failCount === 0 ? "published" : successCount === 0 ? "failed" : "published"; // partial success still marks published; details in publish_attempts
+    // A partial result must remain recoverable. Successful attempts are kept
+    // and skipped by idempotency on retry; failed networks can be retried.
+    const nextStatus = failCount === 0 ? "published" : "failed";
 
     await supabase
       .from("content_items")
