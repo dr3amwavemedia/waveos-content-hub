@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { parseAyrsharePostResponse } from "@/lib/ayrshare-response";
 
 /**
  * Attempt to publish a content_item to all its enabled platforms via Ayrshare.
@@ -64,6 +65,7 @@ export const publishContentItem = createServerFn({ method: "POST" })
 
     let successCount = 0;
     let failCount = 0;
+    let pendingCount = 0;
 
     for (const v of variants) {
       const idempotencyKey = `${data.contentId}:${v.platform}`;
@@ -113,22 +115,35 @@ export const publishContentItem = createServerFn({ method: "POST" })
           body: JSON.stringify(body),
         });
         const json = (await res.json()) as Record<string, unknown>;
-        if (!res.ok) throw new Error(String(json.message ?? `HTTP ${res.status}`));
+        const result = parseAyrsharePostResponse(json, v.platform, res.status);
+        if (!result.accepted) {
+          await supabaseAdmin
+            .from("publish_attempts")
+            .update({
+              status: "failed",
+              ayrshare_post_id: result.ayrshareId,
+              error_code: result.errorCode,
+              error_message: result.errorMessage,
+              response_snapshot: json as never,
+              completed_at: new Date().toISOString(),
+            })
+            .eq("id", attempt!.id);
+          failCount++;
+          continue;
+        }
 
-        const postIds = json.postIds as
-          Array<{ platform: string; id?: string; postUrl?: string }> | undefined;
-        const first = postIds?.[0];
         await supabaseAdmin
           .from("publish_attempts")
           .update({
-            status: "success",
-            ayrshare_post_id: first?.id ?? null,
-            post_url: first?.postUrl ?? null,
+            status: result.pending ? "sending" : "success",
+            ayrshare_post_id: result.ayrshareId,
+            post_url: result.postUrl,
             response_snapshot: json as never,
-            completed_at: new Date().toISOString(),
+            completed_at: result.pending ? null : new Date().toISOString(),
           })
           .eq("id", attempt!.id);
-        successCount++;
+        if (result.pending) pendingCount++;
+        else successCount++;
       } catch (e) {
         await supabaseAdmin
           .from("publish_attempts")
@@ -144,7 +159,7 @@ export const publishContentItem = createServerFn({ method: "POST" })
 
     // A partial result must remain recoverable. Successful attempts are kept
     // and skipped by idempotency on retry; failed networks can be retried.
-    const nextStatus = failCount === 0 ? "published" : "failed";
+    const nextStatus = failCount > 0 ? "failed" : pendingCount > 0 ? "publishing" : "published";
 
     await supabase
       .from("content_items")
@@ -163,5 +178,5 @@ export const publishContentItem = createServerFn({ method: "POST" })
       safe_metadata: { success: successCount, failed: failCount } as never,
     });
 
-    return { success: successCount, failed: failCount };
+    return { success: successCount, failed: failCount, pending: pendingCount };
   });

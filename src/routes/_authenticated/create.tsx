@@ -306,7 +306,8 @@ function CreatePost() {
       const res = await publishFn({ data: { contentId: id } });
       qc.invalidateQueries({ queryKey: ["content-items"] });
       qc.invalidateQueries({ queryKey: ["content-item", id] });
-      if (res.failed === 0) toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
+      if (res.failed === 0 && res.pending === 0) toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
+      else if (res.failed === 0) toast.success(`Published to ${res.success}; ${res.pending} channel${res.pending === 1 ? " is" : "s are"} still processing`);
       else toast.warning(`Published to ${res.success}, ${res.failed} failed — open Posts to retry`);
       navigate({ to: "/posts" });
     } catch (e) {
