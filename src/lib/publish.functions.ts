@@ -30,7 +30,7 @@ export const refreshPublishAttemptDetails = createServerFn({ method: "POST" })
     if (!profile) throw new Error("Ayrshare profile missing for this workspace.");
 
     const response = await fetch(
-      `https://api.ayrshare.com/api/post/${encodeURIComponent(attempt.ayrshare_post_id)}`,
+      `https://api.ayrshare.com/api/history/${encodeURIComponent(attempt.ayrshare_post_id)}`,
       {
         headers: {
           Authorization: `Bearer ${apiKey}`,

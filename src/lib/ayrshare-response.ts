@@ -72,12 +72,16 @@ export function parseAyrsharePostResponse(
     ayrshareId: typeof json.id === "string" ? json.id : null,
     socialPostId: socialId,
     postUrl: typeof post?.postUrl === "string" ? post.postUrl : null,
-    errorCode: error?.code == null ? null : String(error.code),
+    errorCode: error?.code != null
+      ? String(error.code)
+      : typeof json.code === "string" || typeof json.code === "number"
+        ? String(json.code)
+        : null,
     errorMessage: error?.message
       ? `${error.message}${detail}`
       : topMessage
         ?? (!accepted
-          ? `Ayrshare rejected the ${platform} request (HTTP ${httpStatus}) without returning a detailed platform message. Check the media format and Ayrshare Action history for this attempt.`
+          ? `Ayrshare rejected the ${platform} request (HTTP ${httpStatus}) without returning a detailed platform message. This response does not identify the content, connection, or account as the cause.`
           : null),
   };
 }
