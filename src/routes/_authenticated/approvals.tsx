@@ -1,4 +1,5 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import {
   CheckSquare,
@@ -25,6 +26,7 @@ import {
   type ContentItem,
 } from "@/hooks/use-content";
 import { ClientCommunicationCenter } from "@/components/client-communication-center";
+import { publishContentItem } from "@/lib/publish.functions";
 
 export const Route = createFileRoute("/_authenticated/approvals")({
   beforeLoad: async () => {
@@ -188,11 +190,23 @@ function StatusPill({ status }: { status: ContentItem["status"] }) {
 }
 
 function ApprovalDetail({ item }: { item: ContentItem }) {
+  const { activeWorkspace } = useWorkspace();
+  const { data: user } = useCurrentUser();
   const decide = useDecideApproval();
+  const publishFn = useServerFn(publishContentItem);
   const comments = useComments(item.id);
   const add = useAddComment();
   const [note, setNote] = useState("");
   const [comment, setComment] = useState("");
+  const role = activeWorkspace?.role;
+  const canApprove = Boolean(user?.isStaff || role === "owner" || role === "admin" || role === "approver");
+  const metadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
+    ? item.metadata as Record<string, unknown>
+    : {};
+  const approvalRequest = metadata.approval_request && typeof metadata.approval_request === "object"
+    ? metadata.approval_request as Record<string, unknown>
+    : {};
+  const requestedAction = approvalRequest.action === "schedule" ? "schedule" : "publish_now";
 
   const captionPreview = useMemo(
     () => (item.primary_caption ?? "").slice(0, 800),
@@ -208,9 +222,18 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
         note: note.trim() || undefined,
       });
       setNote("");
+      if (decision === "approved" && requestedAction === "publish_now") {
+        const result = await publishFn({ data: { contentId: item.id } });
+        toast.success(
+          result.failed
+            ? `Approved and published to ${result.success}; ${result.failed} channel${result.failed === 1 ? "" : "s"} failed.`
+            : `Approved and published to ${result.success} channel${result.success === 1 ? "" : "s"}.`,
+        );
+        return;
+      }
       toast.success(
         decision === "approved"
-          ? "Approved"
+          ? requestedAction === "schedule" ? "Approved and scheduled" : "Approved"
           : decision === "changes_requested"
             ? "Changes requested"
             : "Rejected",
@@ -244,6 +267,10 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
           {captionPreview || "No caption written."}
         </div>
 
+        <div className="rounded-lg border border-primary/25 bg-primary/10 px-4 py-3 text-sm text-foreground">
+          Requested action: <span className="font-semibold">{requestedAction === "schedule" ? `Schedule for ${item.scheduled_at ? new Date(item.scheduled_at).toLocaleString() : "the selected time"}` : "Publish immediately after approval"}</span>
+        </div>
+
         <div className="space-y-2">
           <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Decision note (optional)
@@ -257,13 +284,13 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        {canApprove ? <div className="flex flex-wrap gap-2">
           <button
             disabled={decide.isPending}
             onClick={() => act("approved")}
             className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-950 hover:brightness-110"
           >
-            <ThumbsUp className="h-4 w-4" /> Approve
+            <ThumbsUp className="h-4 w-4" /> {requestedAction === "schedule" ? "Approve & schedule" : "Approve & publish"}
           </button>
           <button
             disabled={decide.isPending}
@@ -279,7 +306,11 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
           >
             <XCircle className="h-4 w-4" /> Reject
           </button>
-        </div>
+        </div> : (
+          <p className="rounded-lg border border-border bg-elevated p-3 text-sm text-muted-foreground">
+            This post is waiting for a client approver or Dream Wave Media admin.
+          </p>
+        )}
       </div>
 
       <div className="surface-card space-y-3 p-5">

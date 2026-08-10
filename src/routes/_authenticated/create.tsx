@@ -34,6 +34,7 @@ import {
   useUpdateContentItem,
   useUpdateVariant,
   useSyncPostVariants,
+  useSubmitForApproval,
   type PostVariant,
   type SocialPlatform,
 } from "@/hooks/use-content";
@@ -67,6 +68,7 @@ function CreatePost() {
   const updateVariant = useUpdateVariant();
   const syncVariants = useSyncPostVariants();
   const del = useDeleteContentItem();
+  const submitForApproval = useSubmitForApproval();
 
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
@@ -174,7 +176,8 @@ function CreatePost() {
     }
   }, [title, caption, platforms, pickedMedia, scheduledAt]);
   const status = existing.data?.item?.status ?? "draft";
-  const locked = status === "published" || status === "publishing";
+  const locked = status === "published" || status === "publishing" || status === "in_review";
+  const needsApproval = status !== "approved";
 
   if (!activeWorkspace) {
     return (
@@ -277,6 +280,18 @@ function CreatePost() {
     try {
       const id = await ensureSaved();
       if (!id) return;
+      if (needsApproval) {
+        await submitForApproval.mutateAsync({
+          contentId: id,
+          requestedAction: "schedule",
+          scheduledAt: when.toISOString(),
+        });
+        qc.invalidateQueries({ queryKey: ["content-items"] });
+        qc.invalidateQueries({ queryKey: ["content-item", id] });
+        toast.success("Sent to the client for schedule approval. An admin can approve it too.");
+        navigate({ to: "/approvals" });
+        return;
+      }
       await update.mutateAsync({
         id,
         patch: { status: "scheduled", scheduled_at: when.toISOString() },
@@ -295,11 +310,22 @@ function CreatePost() {
     if (!workspaceId) return;
     if (!caption.trim()) return toast.error("Add a caption before publishing");
     if (!platforms.length) return toast.error("Pick at least one platform");
-    if (!confirm("Publish this post to the selected channels right now?")) return;
     setPublishing("now");
     try {
       const id = await ensureSaved();
       if (!id) return;
+      if (needsApproval) {
+        await submitForApproval.mutateAsync({
+          contentId: id,
+          requestedAction: "publish_now",
+        });
+        qc.invalidateQueries({ queryKey: ["content-items"] });
+        qc.invalidateQueries({ queryKey: ["content-item", id] });
+        toast.success("Sent to the client for publishing approval. An admin can approve it too.");
+        navigate({ to: "/approvals" });
+        return;
+      }
+      if (!confirm("This post is approved. Publish it to the selected channels right now?")) return;
       // Self-service: mark approved so the publisher accepts it.
       await update.mutateAsync({
         id,
@@ -416,7 +442,7 @@ function CreatePost() {
             ) : (
               <CalendarClock className="h-4 w-4" />
             )}
-            Schedule later
+            {status === "in_review" ? "Waiting for approval" : needsApproval ? "Submit schedule" : "Schedule later"}
           </button>
           <button
             disabled={locked || publishing !== null || !caption.trim() || !platforms.length}
@@ -424,7 +450,7 @@ function CreatePost() {
             className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
           >
             {publishing === "now" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Publish now
+            {status === "in_review" ? "Waiting for approval" : needsApproval ? "Submit to publish" : "Publish now"}
           </button>
         </div>
       </div>
