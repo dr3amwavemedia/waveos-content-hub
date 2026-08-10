@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { parseAyrsharePostResponse } from "@/lib/ayrshare-response";
 
 /**
  * Cron endpoint (called by pg_cron every 5 minutes) that publishes items
@@ -79,7 +80,7 @@ async function publishNowAdmin(contentId: string) {
 
   await supabaseAdmin.from("content_items").update({ status: "publishing" }).eq("id", contentId);
 
-  let successCount = 0, failCount = 0;
+  let successCount = 0, failCount = 0, pendingCount = 0;
   for (const v of variants) {
     const idempotencyKey = `${contentId}:${v.platform}`;
     const { data: existing } = await supabaseAdmin
@@ -105,13 +106,23 @@ async function publishNowAdmin(contentId: string) {
         body: JSON.stringify(body),
       });
       const json = (await res.json()) as Record<string, unknown>;
-      if (!res.ok) throw new Error(String(json.message ?? res.status));
-      const first = (json.postIds as Array<{ id?: string; postUrl?: string }> | undefined)?.[0];
+      const result = parseAyrsharePostResponse(json, v.platform, res.status);
+      if (!result.accepted) {
+        await supabaseAdmin.from("publish_attempts").update({
+          status: "failed", ayrshare_post_id: result.ayrshareId,
+          error_code: result.errorCode, error_message: result.errorMessage,
+          response_snapshot: json as never, completed_at: new Date().toISOString(),
+        }).eq("id", attempt!.id);
+        failCount++;
+        continue;
+      }
       await supabaseAdmin.from("publish_attempts").update({
-        status: "success", ayrshare_post_id: first?.id ?? null, post_url: first?.postUrl ?? null,
-        response_snapshot: json as never, completed_at: new Date().toISOString(),
+        status: result.pending ? "sending" : "success",
+        ayrshare_post_id: result.ayrshareId, post_url: result.postUrl,
+        response_snapshot: json as never, completed_at: result.pending ? null : new Date().toISOString(),
       }).eq("id", attempt!.id);
-      successCount++;
+      if (result.pending) pendingCount++;
+      else successCount++;
     } catch (e) {
       await supabaseAdmin.from("publish_attempts").update({
         status: "failed", error_message: (e as Error).message, completed_at: new Date().toISOString(),
@@ -121,9 +132,9 @@ async function publishNowAdmin(contentId: string) {
   }
 
   await supabaseAdmin.from("content_items").update({
-    status: failCount === 0 ? "published" : "failed",
+    status: failCount > 0 ? "failed" : pendingCount > 0 ? "publishing" : "published",
     published_at: successCount > 0 ? new Date().toISOString() : null,
   }).eq("id", contentId);
 
-  return { successCount, failCount };
+  return { successCount, failCount, pendingCount };
 }
