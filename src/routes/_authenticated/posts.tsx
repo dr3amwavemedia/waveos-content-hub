@@ -280,6 +280,9 @@ function FailureDetails({
 
 function failureGuidance(message: string | null, platform: string) {
   const error = (message ?? "").toLowerCase();
+  if (/without returning a detailed platform message|does not identify the content/.test(error)) {
+    return `The provider did not identify a cause. Refresh the provider details below. If no additional reason appears, use the provider reference when contacting support rather than changing content that already works on ${platform}.`;
+  }
   if (/connect|account|profile|authorization|authori[sz]ed|token|permission/.test(error)) {
     return `Reconnect ${platform} under Social Accounts, confirm the correct profile is selected, then reopen this post and publish it again.`;
   }
