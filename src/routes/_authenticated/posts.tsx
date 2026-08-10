@@ -1,6 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { AlertCircle, CalendarClock, CheckCircle2, FileText, PenSquare, X } from "lucide-react";
+import { AlertCircle, CalendarClock, CheckCircle2, FileText, Loader2, PenSquare, RefreshCw, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { useWorkspace } from "@/components/app/workspace-context";
@@ -13,6 +16,7 @@ import {
 } from "@/hooks/use-content";
 import { cn } from "@/lib/utils";
 import { formatInTimeZone } from "@/lib/date-time";
+import { refreshPublishAttemptDetails } from "@/lib/publish.functions";
 import type { Database } from "@/integrations/supabase/types";
 
 type PostsFilter = "all" | "draft" | "scheduled" | "published" | "failed";
@@ -45,6 +49,27 @@ function PostsPage() {
   const items = useContentItems(activeWorkspace?.id ?? null, statuses);
   const attempts = usePublishAttempts((items.data ?? []).map((item) => item.id));
   const [selectedFailure, setSelectedFailure] = useState<PublishAttempt | null>(null);
+  const [refreshingAttemptId, setRefreshingAttemptId] = useState<string | null>(null);
+  const refreshAttempt = useServerFn(refreshPublishAttemptDetails);
+  const queryClient = useQueryClient();
+
+  async function handleRefresh(attempt: PublishAttempt) {
+    setRefreshingAttemptId(attempt.id);
+    try {
+      const result = await refreshAttempt({ data: { attemptId: attempt.id } });
+      await queryClient.invalidateQueries({ queryKey: ["publish-attempts"] });
+      setSelectedFailure(null);
+      if (result.status === "failed") {
+        toast.error(result.errorMessage || "Ayrshare still has not supplied a detailed Instagram reason.");
+      } else {
+        toast.success(result.status === "success" ? "Provider now reports this post as published." : "Provider reports that this post is still processing.");
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not refresh provider details.");
+    } finally {
+      setRefreshingAttemptId(null);
+    }
+  }
   const attemptsByItem = new Map<string, NonNullable<typeof attempts.data>>();
   for (const attempt of attempts.data ?? []) {
     const current = attemptsByItem.get(attempt.content_item_id) ?? [];
@@ -171,6 +196,8 @@ function PostsPage() {
           attempt={selectedFailure}
           timeZone={activeWorkspace.timezone}
           onClose={() => setSelectedFailure(null)}
+          onRefresh={() => handleRefresh(selectedFailure)}
+          isRefreshing={refreshingAttemptId === selectedFailure.id}
         />
       )}
     </div>
@@ -181,10 +208,14 @@ function FailureDetails({
   attempt,
   timeZone,
   onClose,
+  onRefresh,
+  isRefreshing,
 }: {
   attempt: PublishAttempt;
   timeZone: string;
   onClose: () => void;
+  onRefresh: () => void;
+  isRefreshing: boolean;
 }) {
   const platform = PLATFORM_LABEL[attempt.platform as SocialPlatform];
   const guidance = failureGuidance(attempt.error_message, platform);
@@ -225,8 +256,20 @@ function FailureDetails({
         <p className="mt-4 text-xs text-muted-foreground">
           Attempted {formatInTimeZone(attempt.attempted_at, timeZone, { dateStyle: "medium", timeStyle: "short" })} {timeZone}
         </p>
+        {attempt.ayrshare_post_id && (
+          <p className="mt-1 break-all text-xs text-muted-foreground">Provider reference: {attempt.ayrshare_post_id}</p>
+        )}
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Refresh provider details
+          </button>
           <Link to="/social-accounts" className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-elevated">Check social account</Link>
           <Link to="/create" search={{ id: attempt.content_item_id }} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open and retry post</Link>
         </div>

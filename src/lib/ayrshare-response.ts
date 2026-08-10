@@ -48,14 +48,22 @@ export function parseAyrsharePostResponse(
   const socialId = typeof post?.id === "string" ? post.id : null;
   const postStatus = String(post?.status ?? "").toLowerCase();
   const pending = socialId === "pending" || postStatus === "pending";
-  const accepted = Boolean(post && socialId !== "failed" && postStatus !== "error");
+  const historyStatus = String(json.status ?? "").toLowerCase();
+  const accepted = Boolean(
+    (post && socialId !== "failed" && postStatus !== "error")
+      || (!post && ["success", "published", "pending"].includes(historyStatus)),
+  );
 
   const errors = Array.isArray(json.errors)
     ? json.errors.map(asError).filter((entry): entry is AyrshareError => Boolean(entry))
     : [];
   const alternateError = asError(json.error) ?? asError(json.details) ?? asError(json.data);
   const error = errors.find((entry) => entry.platform === platform) ?? errors[0] ?? alternateError;
-  const topMessage = typeof json.message === "string" ? json.message : null;
+  const topMessage = typeof json.message === "string"
+    ? json.message
+    : typeof json.error === "string"
+      ? json.error
+      : null;
   const detail = error?.details ? ` ${error.details}` : "";
 
   return {
