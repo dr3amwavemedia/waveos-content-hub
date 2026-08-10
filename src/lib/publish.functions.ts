@@ -44,11 +44,13 @@ export const publishContentItem = createServerFn({ method: "POST" })
 
     // Long-lived signed URLs for media
     let mediaUrls: string[] = [];
+    let isVideo = false;
     if (item.media_asset_ids?.length) {
       const { data: assets } = await supabaseAdmin
         .from("media_assets")
-        .select("storage_path")
+        .select("storage_path,mime_type")
         .in("id", item.media_asset_ids);
+      isVideo = assets?.length === 1 && assets[0]?.mime_type?.startsWith("video/") === true;
       const paths = (assets ?? []).map((a) => a.storage_path);
       const signed = await Promise.all(
         paths.map(async (p) => {
@@ -85,6 +87,7 @@ export const publishContentItem = createServerFn({ method: "POST" })
         post: v.caption || item.primary_caption || "",
         platforms: [v.platform],
         mediaUrls,
+        ...(isVideo ? { isVideo: true } : {}),
       };
 
       const { data: attempt } = await supabaseAdmin

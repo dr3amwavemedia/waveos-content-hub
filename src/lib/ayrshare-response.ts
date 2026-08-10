@@ -15,6 +15,22 @@ type AyrshareError = {
   platform?: string;
 };
 
+function asError(value: unknown): AyrshareError | null {
+  if (typeof value === "string") return { message: value };
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  return {
+    code: typeof record.code === "string" || typeof record.code === "number" ? record.code : undefined,
+    message: typeof record.message === "string"
+      ? record.message
+      : typeof record.error === "string"
+        ? record.error
+        : undefined,
+    details: typeof record.details === "string" ? record.details : undefined,
+    platform: typeof record.platform === "string" ? record.platform : undefined,
+  };
+}
+
 type AyrsharePostId = {
   id?: string;
   platform?: string;
@@ -34,8 +50,11 @@ export function parseAyrsharePostResponse(
   const pending = socialId === "pending" || postStatus === "pending";
   const accepted = Boolean(post && socialId !== "failed" && postStatus !== "error");
 
-  const errors = Array.isArray(json.errors) ? (json.errors as AyrshareError[]) : [];
-  const error = errors.find((entry) => entry.platform === platform) ?? errors[0];
+  const errors = Array.isArray(json.errors)
+    ? json.errors.map(asError).filter((entry): entry is AyrshareError => Boolean(entry))
+    : [];
+  const alternateError = asError(json.error) ?? asError(json.details) ?? asError(json.data);
+  const error = errors.find((entry) => entry.platform === platform) ?? errors[0] ?? alternateError;
   const topMessage = typeof json.message === "string" ? json.message : null;
   const detail = error?.details ? ` ${error.details}` : "";
 
@@ -48,6 +67,9 @@ export function parseAyrsharePostResponse(
     errorCode: error?.code == null ? null : String(error.code),
     errorMessage: error?.message
       ? `${error.message}${detail}`
-      : topMessage ?? (!accepted ? `HTTP ${httpStatus}` : null),
+      : topMessage
+        ?? (!accepted
+          ? `Ayrshare rejected the ${platform} request (HTTP ${httpStatus}) without returning a detailed platform message. Check the media format and Ayrshare Action history for this attempt.`
+          : null),
   };
 }

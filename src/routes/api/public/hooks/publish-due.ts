@@ -65,9 +65,11 @@ async function publishNowAdmin(contentId: string) {
   if (!prof || !variants?.length) throw new Error("missing_prereqs");
 
   let mediaUrls: string[] = [];
+  let isVideo = false;
   if (item.media_asset_ids?.length) {
     const { data: assets } = await supabaseAdmin.from("media_assets")
-      .select("storage_path").in("id", item.media_asset_ids);
+      .select("storage_path,mime_type").in("id", item.media_asset_ids);
+    isVideo = assets?.length === 1 && assets[0]?.mime_type?.startsWith("video/") === true;
     const signed = await Promise.all(
       (assets ?? []).map(async (a) => {
         const { data: s } = await supabaseAdmin.storage.from("media")
@@ -93,7 +95,12 @@ async function publishNowAdmin(contentId: string) {
       successCount++;
       continue;
     }
-    const body = { post: v.caption || item.primary_caption || "", platforms: [v.platform], mediaUrls };
+    const body = {
+      post: v.caption || item.primary_caption || "",
+      platforms: [v.platform],
+      mediaUrls,
+      ...(isVideo ? { isVideo: true } : {}),
+    };
     const { data: attempt } = await supabaseAdmin.from("publish_attempts").upsert({
       content_item_id: contentId, workspace_id: item.workspace_id, platform: v.platform,
       status: "sending", idempotency_key: idempotencyKey,
