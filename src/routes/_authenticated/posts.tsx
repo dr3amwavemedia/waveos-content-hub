@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { AlertCircle, CalendarClock, CheckCircle2, FileText, PenSquare } from "lucide-react";
+import { useState } from "react";
+import { AlertCircle, CalendarClock, CheckCircle2, FileText, PenSquare, X } from "lucide-react";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { useWorkspace } from "@/components/app/workspace-context";
@@ -12,8 +13,10 @@ import {
 } from "@/hooks/use-content";
 import { cn } from "@/lib/utils";
 import { formatInTimeZone } from "@/lib/date-time";
+import type { Database } from "@/integrations/supabase/types";
 
 type PostsFilter = "all" | "draft" | "scheduled" | "published" | "failed";
+type PublishAttempt = Database["public"]["Tables"]["publish_attempts"]["Row"];
 
 export const Route = createFileRoute("/_authenticated/posts")({
   validateSearch: (search: Record<string, unknown>): { status?: PostsFilter } => {
@@ -41,6 +44,7 @@ function PostsPage() {
   const statuses = selected === "all" ? undefined : [selected as ContentStatus];
   const items = useContentItems(activeWorkspace?.id ?? null, statuses);
   const attempts = usePublishAttempts((items.data ?? []).map((item) => item.id));
+  const [selectedFailure, setSelectedFailure] = useState<PublishAttempt | null>(null);
   const attemptsByItem = new Map<string, NonNullable<typeof attempts.data>>();
   for (const attempt of attempts.data ?? []) {
     const current = attemptsByItem.get(attempt.content_item_id) ?? [];
@@ -124,23 +128,35 @@ function PostsPage() {
                   <div className="mt-4 border-t border-border pt-3">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Publishing results</p>
                     <div className="flex flex-wrap gap-2">
-                      {itemAttempts.map((attempt) => (
-                        <span
-                          key={attempt.id}
-                          title={attempt.error_message ?? undefined}
-                          className={cn(
-                            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1",
-                            attempt.status === "success"
-                              ? "bg-success/10 text-success ring-success/25"
-                              : attempt.status === "failed"
-                                ? "bg-destructive/10 text-destructive ring-destructive/25"
-                                : "bg-muted/20 text-muted-foreground ring-border",
-                          )}
-                        >
-                          {attempt.status === "success" ? <CheckCircle2 className="h-3.5 w-3.5" /> : attempt.status === "failed" ? <AlertCircle className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
-                          {PLATFORM_LABEL[attempt.platform as SocialPlatform]}: {attempt.status}
-                        </span>
-                      ))}
+                      {itemAttempts.map((attempt) => {
+                        const content = (
+                          <>
+                            {attempt.status === "success" ? <CheckCircle2 className="h-3.5 w-3.5" /> : attempt.status === "failed" ? <AlertCircle className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
+                            {PLATFORM_LABEL[attempt.platform as SocialPlatform]}: {attempt.status}
+                          </>
+                        );
+                        const classes = cn(
+                          "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs ring-1",
+                          attempt.status === "success"
+                            ? "bg-success/10 text-success ring-success/25"
+                            : attempt.status === "failed"
+                              ? "bg-destructive/10 text-destructive ring-destructive/25"
+                              : "bg-muted/20 text-muted-foreground ring-border",
+                        );
+                        return attempt.status === "failed" ? (
+                          <button
+                            key={attempt.id}
+                            type="button"
+                            onClick={() => setSelectedFailure(attempt)}
+                            className={cn(classes, "cursor-pointer transition-colors hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive")}
+                            aria-label={`View ${PLATFORM_LABEL[attempt.platform as SocialPlatform]} publishing error`}
+                          >
+                            {content}
+                          </button>
+                        ) : (
+                          <span key={attempt.id} className={classes}>{content}</span>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -149,8 +165,88 @@ function PostsPage() {
           })}
         </div>
       )}
+
+      {selectedFailure && (
+        <FailureDetails
+          attempt={selectedFailure}
+          timeZone={activeWorkspace.timezone}
+          onClose={() => setSelectedFailure(null)}
+        />
+      )}
     </div>
   );
+}
+
+function FailureDetails({
+  attempt,
+  timeZone,
+  onClose,
+}: {
+  attempt: PublishAttempt;
+  timeZone: string;
+  onClose: () => void;
+}) {
+  const platform = PLATFORM_LABEL[attempt.platform as SocialPlatform];
+  const guidance = failureGuidance(attempt.error_message, platform);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="publish-error-title"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="surface-card w-full max-w-lg p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Publishing failed</p>
+            <h2 id="publish-error-title" className="mt-1 text-xl font-semibold text-foreground">{platform}</h2>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-elevated hover:text-foreground" aria-label="Close publishing error">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-destructive/25 bg-destructive/10 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Provider response</p>
+          <p className="mt-2 break-words text-sm leading-6 text-foreground">
+            {attempt.error_message || "The publishing provider did not return a detailed error message."}
+          </p>
+          {attempt.error_code && <p className="mt-2 text-xs text-muted-foreground">Error code: {attempt.error_code}</p>}
+        </div>
+
+        <div className="mt-4">
+          <p className="text-sm font-semibold text-foreground">What to check</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">{guidance}</p>
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground">
+          Attempted {formatInTimeZone(attempt.attempted_at, timeZone, { dateStyle: "medium", timeStyle: "short" })} {timeZone}
+        </p>
+
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Link to="/social-accounts" className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-elevated">Check social account</Link>
+          <Link to="/create" search={{ id: attempt.content_item_id }} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open and retry post</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function failureGuidance(message: string | null, platform: string) {
+  const error = (message ?? "").toLowerCase();
+  if (/connect|account|profile|authorization|authori[sz]ed|token|permission/.test(error)) {
+    return `Reconnect ${platform} under Social Accounts, confirm the correct profile is selected, then reopen this post and publish it again.`;
+  }
+  if (/media|image|video|aspect|ratio|duration|size|format|resolution/.test(error)) {
+    return `Review ${platform}'s media requirements. Adjust the file format, dimensions, duration, or size, then reopen this post and retry.`;
+  }
+  if (/caption|text|character|hashtag|mention/.test(error)) {
+    return `Review the ${platform} caption for unsupported mentions, hashtags, links, or length, then retry the post.`;
+  }
+  return `Confirm ${platform} is connected and permitted to publish, review the provider response above, then reopen this post and retry. Networks that already succeeded will not be posted twice.`;
 }
 
 function StatusBadge({ status }: { status: ContentStatus }) {
