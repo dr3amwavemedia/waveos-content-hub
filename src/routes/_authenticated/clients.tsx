@@ -11,6 +11,7 @@ import {
   Loader2,
   MoreHorizontal,
   Pause,
+  Pencil,
   Play,
   Plus,
   RefreshCw,
@@ -32,6 +33,19 @@ type AccountStatus = Database["public"]["Enums"]["account_status"];
 type AgreementTerm = Database["public"]["Enums"]["agreement_term"];
 type DeliveryKind = Database["public"]["Enums"]["delivery_kind"];
 type InvoiceStatus = Database["public"]["Enums"]["invoice_status"];
+type InvoiceListItem = Pick<
+  Database["public"]["Tables"]["client_invoices"]["Row"],
+  | "id"
+  | "number"
+  | "description"
+  | "amount_cents"
+  | "currency"
+  | "status"
+  | "hosted_url"
+  | "issued_at"
+  | "due_at"
+  | "paid_at"
+>;
 type WorkspaceStatusLegacy = "onboarding" | "active" | "paused" | "archived";
 const SOCIAL_MANAGEMENT_FLAG = "social_management_access";
 
@@ -1033,6 +1047,16 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
 function InvoicesTab({ workspaceId }: { workspaceId: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceListItem | null>(null);
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingInvoice(null);
+  };
+  const refreshInvoices = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] }),
+      qc.invalidateQueries({ queryKey: ["layer1", "invoices", workspaceId] }),
+    ]);
   const q = useQuery({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
@@ -1044,7 +1068,7 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
         .eq("workspace_id", workspaceId)
         .order("issued_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as InvoiceListItem[];
     },
   });
 
@@ -1053,8 +1077,9 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
       const { error } = await supabase.from("client_invoices").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] });
+    onSuccess: async (_, id) => {
+      if (editingInvoice?.id === id) closeForm();
+      await refreshInvoices();
       toast.success("Invoice removed.");
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
@@ -1071,8 +1096,8 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] });
+    onSuccess: async () => {
+      await refreshInvoices();
       toast.success("Invoice status updated.");
     },
     onError: (e: unknown) =>
@@ -1083,13 +1108,35 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-3">
       <div className="flex justify-end">
         <button
-          onClick={() => setShowForm((s) => !s)}
+          onClick={() => {
+            if (showForm && !editingInvoice) {
+              closeForm();
+              return;
+            }
+            setEditingInvoice(null);
+            setShowForm(true);
+          }}
           className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:brightness-110"
         >
-          <Plus className="h-3.5 w-3.5" /> Add invoice
+          {showForm && !editingInvoice ? (
+            <>
+              <X className="h-3.5 w-3.5" /> Cancel new invoice
+            </>
+          ) : (
+            <>
+              <Plus className="h-3.5 w-3.5" /> Add invoice
+            </>
+          )}
         </button>
       </div>
-      {showForm && <InvoiceForm workspaceId={workspaceId} onDone={() => setShowForm(false)} />}
+      {showForm && (
+        <InvoiceForm
+          key={editingInvoice?.id ?? "new-invoice"}
+          workspaceId={workspaceId}
+          invoice={editingInvoice}
+          onDone={closeForm}
+        />
+      )}
       {q.isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
       ) : (q.data ?? []).length === 0 ? (
@@ -1135,6 +1182,18 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingInvoice(i);
+                    setShowForm(true);
+                  }}
+                  className="rounded-md p-1.5 text-primary hover:bg-primary/15"
+                  aria-label={`Edit ${i.number || "invoice"}`}
+                  title="Edit invoice"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
                 <select
                   value={i.status}
                   onChange={(event) =>
@@ -1192,69 +1251,118 @@ function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
   );
 }
 
-function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () => void }) {
-  const qc = useQueryClient();
-  const [number, setNumber] = useState("");
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("USD");
-  const [status, setStatus] = useState<InvoiceStatus>("unpaid");
-  const [hostedUrl, setHostedUrl] = useState("");
-  const [dueAt, setDueAt] = useState("");
+function dateInputToIso(value: string): string | null {
+  return value ? `${value}T12:00:00.000Z` : null;
+}
 
-  const create = useMutation({
+function InvoiceForm({
+  workspaceId,
+  invoice,
+  onDone,
+}: {
+  workspaceId: string;
+  invoice: InvoiceListItem | null;
+  onDone: () => void;
+}) {
+  const qc = useQueryClient();
+  const [number, setNumber] = useState(invoice?.number ?? "");
+  const [description, setDescription] = useState(invoice?.description ?? "");
+  const [amount, setAmount] = useState(
+    invoice?.amount_cents === null || invoice?.amount_cents === undefined
+      ? ""
+      : (invoice.amount_cents / 100).toFixed(2),
+  );
+  const [currency, setCurrency] = useState(invoice?.currency ?? "USD");
+  const [status, setStatus] = useState<InvoiceStatus>(invoice?.status ?? "unpaid");
+  const [hostedUrl, setHostedUrl] = useState(invoice?.hosted_url ?? "");
+  const [issuedAt, setIssuedAt] = useState(
+    invoice?.issued_at.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+  );
+  const [dueAt, setDueAt] = useState(invoice?.due_at?.slice(0, 10) ?? "");
+
+  const save = useMutation({
     mutationFn: async () => {
       const trimmedUrl = hostedUrl.trim();
       if (trimmedUrl && !isValidHttpsUrl(trimmedUrl)) {
         throw new Error(URL_VALIDATION_MESSAGE);
       }
-      const { data: auth } = await supabase.auth.getUser();
       const cents = amount ? Math.round(parseFloat(amount) * 100) : null;
-      const { data, error } = await supabase
-        .from("client_invoices")
-        .insert({
-          workspace_id: workspaceId,
-          number: number.trim() || null,
-          description: description.trim() || null,
-          amount_cents: cents,
-          currency: currency.trim().toUpperCase().slice(0, 3),
-          status,
-          hosted_url: trimmedUrl || null,
-          due_at: dueAt ? new Date(dueAt).toISOString() : null,
-          paid_at: status === "paid" ? new Date().toISOString() : null,
-          created_by: auth.user?.id ?? null,
-        })
-        .select("id")
-        .single();
+      const values = {
+        number: number.trim() || null,
+        description: description.trim() || null,
+        amount_cents: cents,
+        currency: currency.trim().toUpperCase(),
+        status,
+        hosted_url: trimmedUrl || null,
+        issued_at: dateInputToIso(issuedAt)!,
+        due_at: dateInputToIso(dueAt),
+        paid_at: status === "paid" ? (invoice?.paid_at ?? new Date().toISOString()) : null,
+      };
+
+      let result: { data: { id: string } | null; error: { message: string } | null };
+      if (invoice) {
+        result = await supabase
+          .from("client_invoices")
+          .update(values)
+          .eq("id", invoice.id)
+          .eq("workspace_id", workspaceId)
+          .select("id")
+          .single();
+      } else {
+        const { data: auth } = await supabase.auth.getUser();
+        result = await supabase
+          .from("client_invoices")
+          .insert({
+            workspace_id: workspaceId,
+            ...values,
+            created_by: auth.user?.id ?? null,
+          })
+          .select("id")
+          .single();
+      }
+      const { data, error } = result;
       if (error) {
         if (error.message.includes("client_invoices_hosted_url_https")) {
           throw new Error(URL_VALIDATION_MESSAGE);
         }
         throw error;
       }
-      if (!data?.id) throw new Error("The invoice was not saved. Please try again.");
+      if (!data?.id) throw new Error("The invoice changes were not saved. Please try again.");
     },
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] }),
         qc.invalidateQueries({ queryKey: ["layer1", "invoices", workspaceId] }),
       ]);
-      toast.success("Invoice added.");
+      toast.success(invoice ? "Invoice updated." : "Invoice added.");
       onDone();
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
   const hostedUrlValid = !hostedUrl.trim() || isValidHttpsUrl(hostedUrl);
+  const currencyValid = /^[A-Za-z]{3}$/.test(currency.trim());
+  const amountValid = !amount || (Number.isFinite(Number(amount)) && Number(amount) >= 0);
+  const canSave = hostedUrlValid && currencyValid && amountValid && Boolean(issuedAt);
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (hostedUrlValid) create.mutate();
+        if (canSave) save.mutate();
       }}
       className="space-y-3 rounded-lg border border-dashed border-border bg-surface/40 p-3"
     >
+      <div>
+        <p className="text-sm font-semibold text-foreground">
+          {invoice ? `Edit ${invoice.number || "invoice"}` : "New invoice"}
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {invoice
+            ? "Update the invoice details below. Clients will see the changes immediately."
+            : "Add an invoice to this client's account."}
+        </p>
+      </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Number">
           <input
@@ -1268,6 +1376,7 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
           <input
             type="number"
             step="0.01"
+            min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             className={inputCls}
@@ -1281,6 +1390,9 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
             maxLength={3}
             className={inputCls}
           />
+          {!currencyValid && (
+            <p className="mt-1 text-xs text-destructive">Use a three-letter currency code.</p>
+          )}
         </Field>
       </div>
       <Field label="Description">
@@ -1298,10 +1410,21 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
             onChange={(e) => setStatus(e.target.value as InvoiceStatus)}
             className={inputCls}
           >
-            {(["deposit", "paid", "unpaid"] as InvoiceStatus[]).map((s) => (
+            {(
+              ["deposit", "paid", "unpaid", "draft", "sent", "overdue", "void"] as InvoiceStatus[]
+            ).map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
+        </Field>
+        <Field label="Issued">
+          <input
+            type="date"
+            value={issuedAt}
+            onChange={(e) => setIssuedAt(e.target.value)}
+            className={inputCls}
+            required
+          />
         </Field>
         <Field label="Due">
           <input
@@ -1311,19 +1434,19 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
             className={inputCls}
           />
         </Field>
-        <Field label="Hosted URL">
-          <input
-            type="url"
-            value={hostedUrl}
-            onChange={(e) => setHostedUrl(e.target.value)}
-            className={inputCls}
-            placeholder="https://…"
-          />
-          {!hostedUrlValid && (
-            <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
-          )}
-        </Field>
       </div>
+      <Field label="Hosted URL">
+        <input
+          type="url"
+          value={hostedUrl}
+          onChange={(e) => setHostedUrl(e.target.value)}
+          className={inputCls}
+          placeholder="https://…"
+        />
+        {!hostedUrlValid && (
+          <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
+        )}
+      </Field>
       <div className="flex justify-end gap-2">
         <button
           type="button"
@@ -1334,11 +1457,11 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
         </button>
         <button
           type="submit"
-          disabled={!hostedUrlValid || create.isPending}
+          disabled={!canSave || save.isPending}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
         >
-          {create.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          Save
+          {save.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {invoice ? "Save changes" : "Add invoice"}
         </button>
       </div>
     </form>
