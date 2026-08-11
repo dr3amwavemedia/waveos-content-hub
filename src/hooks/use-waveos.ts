@@ -117,7 +117,7 @@ async function loadWorkspaces(
 
   let workspacesQuery = supabase
     .from("workspaces")
-    .select("id,name,slug,industry,timezone,is_demo,access_tier,approval_required")
+    .select("id,name,slug,industry,timezone,is_demo,access_tier,feature_overrides")
     .eq("is_archived", false)
     .order("name", { ascending: true });
 
@@ -125,20 +125,36 @@ async function loadWorkspaces(
     // Administrators need every client workspace so they can provide backup approval.
   } else if (ctx.staffType !== "media_manager" || previewWorkspaceId) {
     workspacesQuery = workspacesQuery.in("id", workspaceIds);
-  } else {
-    workspacesQuery = workspacesQuery.or(
-      "id.eq.11111111-1111-1111-1111-111111111111,access_tier.eq.social_management",
-    );
   }
 
   const { data: workspaces, error } = await workspacesQuery;
 
   if (error) throw error;
 
-  return (workspaces ?? []).map((w) => {
+  const visibleWorkspaces =
+    ctx.staffType === "media_manager" && !previewWorkspaceId
+      ? (workspaces ?? []).filter(
+          (workspace) =>
+            workspace.id === "11111111-1111-1111-1111-111111111111" ||
+            workspace.access_tier === "social_management",
+        )
+      : (workspaces ?? []);
+
+  return visibleWorkspaces.map((w) => {
     const role = membershipMap.get(w.id);
+    const featureOverrides =
+      w.feature_overrides && typeof w.feature_overrides === "object" && !Array.isArray(w.feature_overrides)
+        ? (w.feature_overrides as Record<string, unknown>)
+        : {};
     return {
-      ...w,
+      id: w.id,
+      name: w.name,
+      slug: w.slug,
+      industry: w.industry,
+      timezone: w.timezone,
+      is_demo: w.is_demo,
+      access_tier: w.access_tier,
+      approval_required: featureOverrides.automatic_content_approval !== true,
       role: (previewWorkspaceId ? "viewer" : ctx.isStaff ? "staff" : (role ?? "viewer")) as
         "owner" | "admin" | "editor" | "approver" | "viewer" | "staff",
     };

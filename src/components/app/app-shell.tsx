@@ -399,8 +399,12 @@ function WorkspaceSwitcher() {
     }
     return (
       <div className="mx-3 mt-2 rounded-xl border border-border bg-surface/60 p-3 text-xs text-muted-foreground">
-        <div className="mb-1 font-medium text-foreground">No workspace yet</div>
-        WaveOS is invite-only. Your Dream Wave Media account manager will send your activation link.
+        <div className="mb-1 font-medium text-foreground">
+          {user?.isStaff ? "Staff workspace unavailable" : "No workspace yet"}
+        </div>
+        {user?.isStaff
+          ? "Your staff account is active. Ask an admin to confirm access to the Dream Wave Media workspace."
+          : "WaveOS is invite-only. Your Dream Wave Media account manager will send your activation link."}
       </div>
     );
   }
@@ -480,7 +484,7 @@ function UserFooter() {
   const staffPosition = user?.isDreamWaveOwner
     ? "Admin"
     : user?.staffType === "media_manager"
-      ? "Social Media Manager"
+      ? "Social Manager"
       : user?.staffType === "sales"
         ? "Sales"
         : null;
