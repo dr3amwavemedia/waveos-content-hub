@@ -96,6 +96,7 @@ async function loadWorkspaces(
   ctx: CurrentUserContext,
   previewWorkspaceId: string | null,
 ): Promise<WorkspaceSummary[]> {
+  const staffWorkspaceId = "11111111-1111-1111-1111-111111111111";
   const { data: memberships } = await supabase
     .from("workspace_members")
     .select("workspace_id, role")
@@ -108,12 +109,12 @@ async function loadWorkspaces(
   const workspaceIds = previewWorkspaceId
     ? [previewWorkspaceId]
     : ctx.isDreamWaveOwner
-      ? []
+      ? [staffWorkspaceId]
       : ctx.isStaff && ctx.staffType !== "media_manager"
-        ? ["11111111-1111-1111-1111-111111111111"]
+        ? [staffWorkspaceId]
         : Array.from(membershipMap.keys());
 
-  if (!workspaceIds.length && !ctx.isDreamWaveOwner && ctx.staffType !== "media_manager") return [];
+  if (!workspaceIds.length && ctx.staffType !== "media_manager") return [];
 
   let workspacesQuery = supabase
     .from("workspaces")
@@ -121,9 +122,10 @@ async function loadWorkspaces(
     .eq("is_archived", false)
     .order("name", { ascending: true });
 
-  if (ctx.isDreamWaveOwner && !previewWorkspaceId) {
-    // Administrators need every client workspace so they can provide backup approval.
-  } else if (ctx.staffType !== "media_manager" || previewWorkspaceId) {
+  // Only Social Managers load the Tier 4 client pool. Admins and other staff
+  // stay in the Dream Wave Media workspace and enter an individual account
+  // through the explicit View action in the client/staff directory.
+  if (ctx.staffType !== "media_manager" || previewWorkspaceId) {
     workspacesQuery = workspacesQuery.in("id", workspaceIds);
   }
 
@@ -141,7 +143,7 @@ async function loadWorkspaces(
               ? (workspace.feature_overrides as Record<string, unknown>)
               : {};
           return (
-            workspace.id === "11111111-1111-1111-1111-111111111111" ||
+            workspace.id === staffWorkspaceId ||
             workspace.access_tier === "social_management" ||
             overrides.social_management_access === true
           );
@@ -151,7 +153,9 @@ async function loadWorkspaces(
   return visibleWorkspaces.map((w) => {
     const role = membershipMap.get(w.id);
     const featureOverrides =
-      w.feature_overrides && typeof w.feature_overrides === "object" && !Array.isArray(w.feature_overrides)
+      w.feature_overrides &&
+      typeof w.feature_overrides === "object" &&
+      !Array.isArray(w.feature_overrides)
         ? (w.feature_overrides as Record<string, unknown>)
         : {};
     return {

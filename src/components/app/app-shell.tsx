@@ -18,8 +18,6 @@ import {
   LogOut,
   Menu,
   X,
-  Check,
-  Plus,
   FileText,
   User,
   BriefcaseBusiness,
@@ -32,7 +30,6 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
 import { useCurrentUser } from "@/hooks/use-waveos";
-import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { WorkspaceProvider, useWorkspace } from "./workspace-context";
 import { ImpersonationBanner } from "./impersonation-banner";
 import { AccountStatusBanner } from "./account-status-banner";
@@ -253,7 +250,7 @@ function Shell({ children }: { children: ReactNode }) {
       {/* Main */}
       <main className="min-h-screen lg:pl-64">
         <ImpersonationBanner />
-        {isStaff && <ManagedClientBanner />}
+        {isMediaManager && <ManagedClientBanner />}
         <AccountStatusBanner />
         <div className="mx-auto max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
           {children}
@@ -280,9 +277,10 @@ function Shell({ children }: { children: ReactNode }) {
 }
 
 function ManagedClientBanner() {
+  const { data: user } = useCurrentUser();
   const { workspaces, activeWorkspace, setActiveWorkspaceId } = useWorkspace();
 
-  if (!activeWorkspace) return null;
+  if (!activeWorkspace || user?.staffType !== "media_manager") return null;
 
   const isStaffWorkspace = activeWorkspace.id === "11111111-1111-1111-1111-111111111111";
 
@@ -374,31 +372,10 @@ function MobileNavLink({ item }: { item: NavItem }) {
 }
 
 function WorkspaceSwitcher() {
-  const { workspaces, activeWorkspace, setActiveWorkspaceId } = useWorkspace();
+  const { workspaces, activeWorkspace } = useWorkspace();
   const { data: user } = useCurrentUser();
-  const impersonate = useImpersonateClient();
-  const [open, setOpen] = useState(false);
-  const navigate = useNavigate();
 
   if (!workspaces.length) {
-    if (user?.isDreamWaveOwner) {
-      return (
-        <div className="mx-3 mt-2">
-          <button
-            onClick={() => navigate({ to: "/onboarding" })}
-            className="flex w-full items-center gap-2 rounded-xl border border-dashed border-border bg-surface/60 p-3 text-left text-sm text-foreground transition-colors hover:bg-elevated"
-          >
-            <Plus className="h-4 w-4 text-primary" />
-            <span className="flex-1">
-              <span className="block font-medium">New client workspace</span>
-              <span className="block text-[11px] text-muted-foreground">
-                Provision a Dream Wave Media client
-              </span>
-            </span>
-          </button>
-        </div>
-      );
-    }
     return (
       <div className="mx-3 mt-2 rounded-xl border border-border bg-surface/60 p-3 text-xs text-muted-foreground">
         <div className="mb-1 font-medium text-foreground">
@@ -412,11 +389,8 @@ function WorkspaceSwitcher() {
   }
 
   return (
-    <div className="relative mx-3 mt-2">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface/60 px-3 py-2.5 text-left transition-colors hover:bg-elevated"
-      >
+    <div className="mx-3 mt-2">
+      <div className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface/60 px-3 py-2.5 text-left">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary/40 to-primary-glow/40 text-xs font-bold text-primary-foreground ring-1 ring-primary/30">
           {activeWorkspace?.name.slice(0, 2).toUpperCase() ?? "WS"}
         </div>
@@ -425,45 +399,16 @@ function WorkspaceSwitcher() {
             {activeWorkspace?.name ?? "Select workspace"}
           </div>
           <div className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">
-            {user?.isStaff && !impersonate.on
-              ? activeWorkspace?.id === "11111111-1111-1111-1111-111111111111"
-                ? "Staff workspace"
-                : "Managing client"
-              : (activeWorkspace?.role ?? "—")}
+            {user?.staffType === "media_manager" &&
+            activeWorkspace?.id !== "11111111-1111-1111-1111-111111111111"
+              ? "Managing client"
+              : user?.isStaff
+                ? "Staff account"
+                : "Your account"}
             {activeWorkspace?.is_demo && " · Demo"}
           </div>
         </div>
-        <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-      </button>
-      {open && (
-        <div className="absolute left-0 right-0 z-10 mt-2 overflow-hidden rounded-xl border border-border bg-popover shadow-2xl">
-          {workspaces.map((w) => (
-            <button
-              key={w.id}
-              onClick={() => {
-                setActiveWorkspaceId(w.id);
-                setOpen(false);
-              }}
-              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-foreground hover:bg-elevated"
-            >
-              <span className="truncate">{w.name}</span>
-              {w.id === activeWorkspace?.id && <Check className="ml-auto h-4 w-4 text-primary" />}
-            </button>
-          ))}
-          {user?.isDreamWaveOwner && !impersonate.on && (
-            <button
-              onClick={() => {
-                setOpen(false);
-                navigate({ to: "/onboarding" });
-              }}
-              className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-sm font-medium text-primary hover:bg-elevated"
-            >
-              <Plus className="h-4 w-4" />
-              New client workspace
-            </button>
-          )}
-        </div>
-      )}
+      </div>
     </div>
   );
 }
