@@ -1263,12 +1263,20 @@ function OverviewTab({
       if (!confirmed) return null;
       const { data, error } = await db.rpc("crm_convert_lead_to_client", {
         _account_id: account.id,
-        _access_tier: conversionTier,
+        _access_tier: conversionTier === "social_management" ? "retainer_full" : conversionTier,
         _agreement_term: conversionTerm || null,
         _timezone: "America/New_York",
       });
       if (error) throw error;
-      return (data as Array<{ workspace_id: string }> | null)?.[0] ?? null;
+      const created = (data as Array<{ workspace_id: string }> | null)?.[0] ?? null;
+      if (created && conversionTier === "social_management") {
+        const { error: flagError } = await supabase
+          .from("workspaces")
+          .update({ feature_overrides: { social_management_access: true } })
+          .eq("id", created.workspace_id);
+        if (flagError) throw flagError;
+      }
+      return created;
     },
     onSuccess: (created) => {
       if (!created) return;
@@ -1477,8 +1485,8 @@ function OverviewTab({
                 >
                   <option value="project_client">Project Client</option>
                   <option value="growth_90">Growth (90 days)</option>
-                  <option value="retainer_full">Retainer</option>
-                  <option value="social_management">Social Management</option>
+                  <option value="retainer_full">Tier 3 — Full access, client managed</option>
+                  <option value="social_management">Tier 4 — Full access + Social Manager</option>
                 </select>
                 <select
                   value={conversionTerm}
