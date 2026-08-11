@@ -282,12 +282,16 @@ function ManagedClientBanner() {
 
   if (!activeWorkspace) return null;
 
+  const isStaffWorkspace = activeWorkspace.id === "11111111-1111-1111-1111-111111111111";
+
   return (
     <div className="border-b border-primary/30 bg-primary/10 px-3 py-2 sm:px-6 lg:px-10">
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-sm text-foreground">
           <BriefcaseBusiness className="h-4 w-4 text-primary" />
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Managing client</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            {isStaffWorkspace ? "Staff workspace" : "Managing client"}
+          </span>
           <span className="font-semibold">{activeWorkspace.name}</span>
         </div>
         <label className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-background/60 px-3 py-1.5 text-xs font-semibold text-foreground">
@@ -299,7 +303,9 @@ function ManagedClientBanner() {
             className="max-w-48 bg-transparent text-sm font-medium outline-none"
           >
             {workspaces.map((workspace) => (
-              <option key={workspace.id} value={workspace.id}>{workspace.name}</option>
+              <option key={workspace.id} value={workspace.id}>
+                {workspace.name}
+              </option>
             ))}
           </select>
           <ChevronsUpDown className="h-4 w-4 text-primary" />
@@ -413,7 +419,11 @@ function WorkspaceSwitcher() {
             {activeWorkspace?.name ?? "Select workspace"}
           </div>
           <div className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">
-            {user?.isStaff && !impersonate.on ? "Managing client" : (activeWorkspace?.role ?? "—")}
+            {user?.isStaff && !impersonate.on
+              ? activeWorkspace?.id === "11111111-1111-1111-1111-111111111111"
+                ? "Staff workspace"
+                : "Managing client"
+              : (activeWorkspace?.role ?? "—")}
             {activeWorkspace?.is_demo && " · Demo"}
           </div>
         </div>
@@ -467,6 +477,13 @@ function UserFooter() {
 
   const displayName =
     [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "You";
+  const staffPosition = user?.isDreamWaveOwner
+    ? "Admin"
+    : user?.staffType === "media_manager"
+      ? "Social Media Manager"
+      : user?.staffType === "sales"
+        ? "Sales"
+        : null;
 
   return (
     <div className="border-t border-border/80 p-3">
@@ -476,7 +493,9 @@ function UserFooter() {
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium text-foreground">{displayName}</div>
-          <div className="truncate text-[10px] text-muted-foreground">{user?.email}</div>
+          <div className="truncate text-[10px] text-muted-foreground">
+            {staffPosition ? `${staffPosition} · Staff` : user?.email}
+          </div>
         </div>
         <NotificationsBell />
         <button

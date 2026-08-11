@@ -3,7 +3,8 @@
 // Anything checked here MUST also be enforced server-side; do not rely on this
 // module for security, only for UX.
 
-export type ClientAccessTier = "project_client" | "growth_90" | "retainer_full";
+export type ClientAccessTier =
+  "project_client" | "growth_90" | "retainer_full" | "social_management";
 export type AccountStatus = "pending" | "active" | "suspended" | "expired" | "archived";
 export type AgreementTerm = "one_time" | "90_day" | "6_month" | "12_month";
 
@@ -90,6 +91,7 @@ export function hasFeature(access: WorkspaceAccess, feature: FeatureKey): boolea
     case "growth_90":
       return GROWTH_90_FEATURES.has(feature);
     case "retainer_full":
+    case "social_management":
       return true;
   }
 }
@@ -117,6 +119,7 @@ export const TIER_LABELS: Record<ClientAccessTier, string> = {
   project_client: "Project Client",
   growth_90: "90-Day Growth",
   retainer_full: "Full Retainer",
+  social_management: "Social Management",
 };
 
 export const TERM_LABELS: Record<AgreementTerm, string> = {

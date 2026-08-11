@@ -62,6 +62,7 @@ export function ImpersonationBanner() {
           <option value="project_client">Layer 1 · Project</option>
           <option value="growth_90">Layer 2 · Growth</option>
           <option value="retainer_full">Layer 3 · Retainer</option>
+          <option value="social_management">Layer 4 · Social Management</option>
         </select>
         <button
           onClick={disable}
