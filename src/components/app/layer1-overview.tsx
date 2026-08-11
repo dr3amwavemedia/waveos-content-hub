@@ -155,7 +155,7 @@ export function Layer1Overview() {
         .select("*")
         .eq("workspace_id", wsId!)
         .order("issued_at", { ascending: false })
-        .limit(10);
+        .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Invoice[];
     },
@@ -179,15 +179,17 @@ export function Layer1Overview() {
   const primaryInvoice = useMemo<Invoice | null>(() => {
     const items = invoicesQ.data ?? [];
     const now = Date.now();
-    const overdue = items.find(
-      (i) =>
+    const overdue = items.find((i) => {
+      const awaitingPayment = i.status === "sent" || i.status === "unpaid";
+      return (
         i.status === "overdue" ||
-        (i.status === "sent" && i.due_at && new Date(i.due_at).getTime() < now),
-    );
+        (awaitingPayment && i.due_at && new Date(i.due_at).getTime() < now)
+      );
+    });
     if (overdue) return overdue;
-    const sent = items.find((i) => i.status === "sent");
-    if (sent) return sent;
-    return items.find((i) => i.status === "paid") ?? items[0] ?? null;
+    const awaitingPayment = items.find((i) => i.status === "sent" || i.status === "unpaid");
+    if (awaitingPayment) return awaitingPayment;
+    return items[0] ?? null;
   }, [invoicesQ.data]);
 
   const primaryDelivery = useMemo<Delivery | null>(() => {
@@ -254,9 +256,26 @@ export function Layer1Overview() {
 
       {/* Invoices */}
       <section id="invoices" className="scroll-mt-24 space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">Invoices & Payments</h2>
-        {primaryInvoice ? (
-          <InvoiceCard invoice={primaryInvoice} />
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 className="text-lg font-semibold text-foreground">Invoices & Payments</h2>
+          {(invoicesQ.data?.length ?? 0) > 1 && (
+            <span className="text-xs text-muted-foreground">
+              {invoicesQ.data!.length} invoices · newest first
+            </span>
+          )}
+        </div>
+        {invoicesQ.isLoading ? (
+          <div className="surface-card p-5 text-sm text-muted-foreground">Loading invoices…</div>
+        ) : invoicesQ.isError ? (
+          <div className="surface-card p-5 text-sm text-destructive">
+            Invoices could not be loaded. Refresh the page to try again.
+          </div>
+        ) : (invoicesQ.data ?? []).length > 0 ? (
+          <div className="space-y-3">
+            {invoicesQ.data!.map((invoice) => (
+              <InvoiceCard key={invoice.id} invoice={invoice} />
+            ))}
+          </div>
         ) : (
           <PolishedEmpty icon={FileText} body="You currently have no invoices requiring action." />
         )}
@@ -305,12 +324,12 @@ type PrimaryAction =
 function derivePrimaryAction(inv: Invoice | null, del: Delivery | null): PrimaryAction {
   const now = Date.now();
   if (inv) {
+    const awaitingPayment = inv.status === "sent" || inv.status === "unpaid";
     const isOverdue =
       inv.status === "overdue" ||
-      (inv.status === "sent" && inv.due_at && new Date(inv.due_at).getTime() < now);
+      (awaitingPayment && inv.due_at && new Date(inv.due_at).getTime() < now);
     if (isOverdue && isValidHttpsUrl(inv.hosted_url)) return { kind: "overdue", invoice: inv };
-    if (inv.status === "sent" && isValidHttpsUrl(inv.hosted_url))
-      return { kind: "pay", invoice: inv };
+    if (awaitingPayment && isValidHttpsUrl(inv.hosted_url)) return { kind: "pay", invoice: inv };
   }
   if (del && isValidHttpsUrl(del.url)) {
     // "Review" for early-stage kinds; "final" once it looks like a final delivery.
@@ -448,7 +467,7 @@ function InvoiceCard({ invoice }: { invoice: Invoice }) {
   const isPaid = invoice.status === "paid";
   const ctaLabel = isPaid
     ? "View Receipt"
-    : invoice.status === "sent" || invoice.status === "overdue"
+    : invoice.status === "sent" || invoice.status === "unpaid" || invoice.status === "overdue"
       ? "Make Payment"
       : "View Invoice";
   const canOpen = isValidHttpsUrl(invoice.hosted_url);

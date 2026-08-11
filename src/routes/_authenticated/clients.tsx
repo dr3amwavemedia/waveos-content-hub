@@ -1210,27 +1210,35 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
       }
       const { data: auth } = await supabase.auth.getUser();
       const cents = amount ? Math.round(parseFloat(amount) * 100) : null;
-      const { error } = await supabase.from("client_invoices").insert({
-        workspace_id: workspaceId,
-        number: number.trim() || null,
-        description: description.trim() || null,
-        amount_cents: cents,
-        currency: currency.trim().toUpperCase().slice(0, 3),
-        status,
-        hosted_url: trimmedUrl || null,
-        due_at: dueAt ? new Date(dueAt).toISOString() : null,
-        paid_at: status === "paid" ? new Date().toISOString() : null,
-        created_by: auth.user?.id ?? null,
-      });
+      const { data, error } = await supabase
+        .from("client_invoices")
+        .insert({
+          workspace_id: workspaceId,
+          number: number.trim() || null,
+          description: description.trim() || null,
+          amount_cents: cents,
+          currency: currency.trim().toUpperCase().slice(0, 3),
+          status,
+          hosted_url: trimmedUrl || null,
+          due_at: dueAt ? new Date(dueAt).toISOString() : null,
+          paid_at: status === "paid" ? new Date().toISOString() : null,
+          created_by: auth.user?.id ?? null,
+        })
+        .select("id")
+        .single();
       if (error) {
         if (error.message.includes("client_invoices_hosted_url_https")) {
           throw new Error(URL_VALIDATION_MESSAGE);
         }
         throw error;
       }
+      if (!data?.id) throw new Error("The invoice was not saved. Please try again.");
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] });
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] }),
+        qc.invalidateQueries({ queryKey: ["layer1", "invoices", workspaceId] }),
+      ]);
       toast.success("Invoice added.");
       onDone();
     },

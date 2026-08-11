@@ -55,6 +55,7 @@ interface NavItem {
 const CLIENT_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
   { to: "/deliveries", label: "Your Content", icon: Images },
+  { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
   { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
   { to: "/posts", label: "Posts", icon: FileText, feature: "can_create_content" },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
@@ -98,12 +99,13 @@ const TEAM_NAV: NavItem[] = [
 ];
 
 const MEDIA_MANAGER_CLIENT_NAV = CLIENT_NAV.filter(
-  (item) => item.to !== "/feedback" && item.to !== "/settings",
+  (item) => item.hash !== "invoices" && item.to !== "/feedback" && item.to !== "/settings",
 );
 
 const MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
   { to: "/deliveries", label: "Your Content", icon: Images },
+  { to: "/home", hash: "invoices", label: "Invoices", icon: FileText },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/create", label: "Create", icon: PenSquare, feature: "can_create_content" },
   { to: "/posts", label: "Posts", icon: FileText, feature: "can_create_content" },
