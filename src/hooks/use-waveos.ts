@@ -133,11 +133,19 @@ async function loadWorkspaces(
 
   const visibleWorkspaces =
     ctx.staffType === "media_manager" && !previewWorkspaceId
-      ? (workspaces ?? []).filter(
-          (workspace) =>
+      ? (workspaces ?? []).filter((workspace) => {
+          const overrides =
+            workspace.feature_overrides &&
+            typeof workspace.feature_overrides === "object" &&
+            !Array.isArray(workspace.feature_overrides)
+              ? (workspace.feature_overrides as Record<string, unknown>)
+              : {};
+          return (
             workspace.id === "11111111-1111-1111-1111-111111111111" ||
-            workspace.access_tier === "social_management",
-        )
+            workspace.access_tier === "social_management" ||
+            overrides.social_management_access === true
+          );
+        })
       : (workspaces ?? []);
 
   return visibleWorkspaces.map((w) => {
@@ -153,7 +161,8 @@ async function loadWorkspaces(
       industry: w.industry,
       timezone: w.timezone,
       is_demo: w.is_demo,
-      access_tier: w.access_tier,
+      access_tier:
+        featureOverrides.social_management_access === true ? "social_management" : w.access_tier,
       approval_required: featureOverrides.automatic_content_approval !== true,
       role: (previewWorkspaceId ? "viewer" : ctx.isStaff ? "staff" : (role ?? "viewer")) as
         "owner" | "admin" | "editor" | "approver" | "viewer" | "staff",

@@ -33,6 +33,24 @@ type AgreementTerm = Database["public"]["Enums"]["agreement_term"];
 type DeliveryKind = Database["public"]["Enums"]["delivery_kind"];
 type InvoiceStatus = Database["public"]["Enums"]["invoice_status"];
 type WorkspaceStatusLegacy = "onboarding" | "active" | "paused" | "archived";
+const SOCIAL_MANAGEMENT_FLAG = "social_management_access";
+
+function effectiveTier(
+  storedTier: ClientAccessTier,
+  overrides: Record<string, boolean> | null | undefined,
+): ClientAccessTier {
+  return overrides?.[SOCIAL_MANAGEMENT_FLAG] === true ? "social_management" : storedTier;
+}
+
+function tierStorage(tier: ClientAccessTier, current: Record<string, boolean> = {}) {
+  return {
+    access_tier: tier === "social_management" ? ("retainer_full" as const) : tier,
+    feature_overrides: {
+      ...current,
+      [SOCIAL_MANAGEMENT_FLAG]: tier === "social_management",
+    },
+  };
+}
 
 export const Route = createFileRoute("/_authenticated/clients")({
   beforeLoad: async () => {
@@ -149,13 +167,17 @@ function ClientsPage() {
       (invites ?? []).forEach((i) => bump(iCount, i.workspace_id));
       const mediaCount = new Map<string, number>();
       (media ?? []).forEach((m) => bump(mediaCount, m.workspace_id));
-      return (ws ?? []).map<ClientWorkspace>((w) => ({
-        ...w,
-        feature_overrides: (w.feature_overrides ?? {}) as Record<string, boolean>,
-        member_count: mCount.get(w.id) ?? 0,
-        invite_count: iCount.get(w.id) ?? 0,
-        media_count: mediaCount.get(w.id) ?? 0,
-      }));
+      return (ws ?? []).map<ClientWorkspace>((w) => {
+        const featureOverrides = (w.feature_overrides ?? {}) as Record<string, boolean>;
+        return {
+          ...w,
+          access_tier: effectiveTier(w.access_tier, featureOverrides),
+          feature_overrides: featureOverrides,
+          member_count: mCount.get(w.id) ?? 0,
+          invite_count: iCount.get(w.id) ?? 0,
+          media_count: mediaCount.get(w.id) ?? 0,
+        };
+      });
     },
   });
 
@@ -566,7 +588,7 @@ function AccessTab({
       const { error } = await supabase
         .from("workspaces")
         .update({
-          access_tier: tier,
+          ...tierStorage(tier, workspace.feature_overrides),
           account_status: status,
           agreement_term: term || null,
           access_starts_at: startsAt ? new Date(startsAt).toISOString() : null,
@@ -640,10 +662,8 @@ function AccessTab({
           >
             <option value="project_client">Project Client — profile + invoices only</option>
             <option value="growth_90">Growth (90 days) — review + brand voice</option>
-            <option value="retainer_full">Retainer — full platform</option>
-            <option value="social_management">
-              Social Management — full platform + staff management
-            </option>
+            <option value="retainer_full">Tier 3 — Full access, client managed</option>
+            <option value="social_management">Tier 4 — Full access + Social Manager</option>
           </select>
         </Field>
         <Field label="Account status">
@@ -1618,7 +1638,7 @@ function OnboardingModal({
           timezone,
           created_by: uid,
           status: "onboarding",
-          access_tier: tier,
+          ...tierStorage(tier),
           account_status: "pending",
           agreement_term: term || null,
           access_expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
@@ -1714,8 +1734,8 @@ function OnboardingModal({
             >
               <option value="project_client">Project Client</option>
               <option value="growth_90">Growth (90 days)</option>
-              <option value="retainer_full">Retainer</option>
-              <option value="social_management">Social Management</option>
+              <option value="retainer_full">Tier 3 — Full access, client managed</option>
+              <option value="social_management">Tier 4 — Full access + Social Manager</option>
             </select>
           </Field>
           <Field label="Agreement term">
