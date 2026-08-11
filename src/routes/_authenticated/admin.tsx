@@ -5,11 +5,14 @@ import { useState } from "react";
 import {
   CheckCircle2,
   Copy,
+  Eye,
   Loader2,
   MailPlus,
   KeyRound,
   History,
+  Pencil,
   RefreshCw,
+  Save,
   ShieldCheck,
   UserMinus,
   XCircle,
@@ -18,7 +21,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/app/empty-state";
-import { AdminIdentityLauncher } from "@/components/admin/admin-identity-launcher";
+import { useActingStaff } from "@/hooks/use-acting-staff";
 import { getIntegrationStatus } from "@/lib/ayrshare.functions";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -28,7 +31,7 @@ type StaffPosition = StaffType | "admin";
 
 const STAFF_TYPE_LABEL: Record<StaffType, string> = {
   sales: "Sales",
-  media_manager: "Media Manager",
+  media_manager: "Social Manager",
 };
 
 const db = supabase as unknown as {
@@ -78,9 +81,13 @@ export const Route = createFileRoute("/_authenticated/admin")({
 
 function AdminPage() {
   const qc = useQueryClient();
+  const acting = useActingStaff();
   const [email, setEmail] = useState("");
   const [staffType, setStaffType] = useState<StaffType>("sales");
   const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [editingStaff, setEditingStaff] = useState<StaffDirectoryRow | null>(null);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
 
   const staffQ = useQuery({
     queryKey: ["admin", "staff"],
@@ -212,6 +219,41 @@ function AdminPage() {
       toast.error(e instanceof Error ? e.message : "Could not update staff position."),
   });
 
+  const updateStaffInfo = useMutation({
+    mutationFn: async () => {
+      if (!editingStaff) return;
+      const { error } = await db.rpc("admin_update_staff_name", {
+        _target_user: editingStaff.user_id,
+        _first_name: editFirstName,
+        _last_name: editLastName || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditingStaff(null);
+      qc.invalidateQueries({ queryKey: ["admin", "staff"] });
+      qc.invalidateQueries({ queryKey: ["crm", "staff"] });
+      toast.success("Staff information updated.");
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not update staff information."),
+  });
+
+  const viewAsStaff = async (member: StaffDirectoryRow) => {
+    acting.enable({
+      userId: member.user_id,
+      email: member.email ?? "",
+      firstName: member.first_name,
+      lastName: member.last_name,
+      staffType: member.staff_type ?? "sales",
+    });
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ["waveos", "current-user"] }),
+      qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] }),
+    ]);
+    window.location.assign("/home");
+  };
+
   const sendPasswordReset = useMutation({
     mutationFn: async (targetEmail: string) => {
       const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
@@ -244,11 +286,10 @@ function AdminPage() {
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Invite employees by email and manage Dream Wave Team access. After an invitation is
-            accepted, an Admin can change that person between Admin, Sales, and Media Manager.
+            accepted, an Admin can change that person between Admin, Sales, and Social Manager.
             WaveOS always protects the final remaining Admin.
           </p>
         </div>
-        <AdminIdentityLauncher />
       </header>
 
       <div className="surface-card p-5">
@@ -277,7 +318,7 @@ function AdminPage() {
             className="rounded-lg border border-input bg-surface/60 px-3 py-2 text-sm text-foreground"
           >
             <option value="sales">Sales</option>
-            <option value="media_manager">Media Manager</option>
+            <option value="media_manager">Social Manager</option>
           </select>
           <button
             type="submit"
@@ -427,74 +468,133 @@ function AdminPage() {
           </div>
         ) : (
           <ul className="divide-y divide-border/60">
-            {staffQ.data!.map((s) => (
-              <li
-                key={`${s.user_id}-${s.role}`}
-                className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-3"
-              >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium text-foreground">
-                    {`${s.first_name ?? ""} ${s.last_name ?? ""}`.trim() ||
-                      s.email ||
-                      "Staff member"}
+            {staffQ.data!.map((s) => {
+              const displayName =
+                `${s.first_name ?? ""} ${s.last_name ?? ""}`.trim() || s.email || "Staff member";
+              const editing = editingStaff?.user_id === s.user_id;
+              return (
+                <li key={`${s.user_id}-${s.role}`} className="px-4 py-4 sm:px-5 sm:py-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <div className="truncate text-sm font-medium text-foreground">
+                          {displayName}
+                        </div>
+                        {s.role === "dream_wave_team" && (
+                          <button
+                            type="button"
+                            onClick={() => void viewAsStaff(s)}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          >
+                            <Eye className="h-3.5 w-3.5" /> View
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingStaff(editing ? null : s);
+                            setEditFirstName(s.first_name ?? "");
+                            setEditLastName(s.last_name ?? "");
+                          }}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          <Pencil className="h-3.5 w-3.5" /> Edit info
+                        </button>
+                      </div>
+                      {s.email && (
+                        <div className="truncate text-xs text-muted-foreground">{s.email}</div>
+                      )}
+                    </div>
+                    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:gap-3">
+                      <span
+                        className={
+                          "rounded-md px-2 py-0.5 text-xs font-medium ring-1 " +
+                          (s.role === "dream_wave_owner"
+                            ? "bg-primary/15 text-primary ring-primary/30"
+                            : "bg-elevated text-foreground ring-border")
+                        }
+                      >
+                        {s.role === "dream_wave_owner" ? "Admin" : "Team"}
+                      </span>
+                      <select
+                        value={
+                          s.role === "dream_wave_owner"
+                            ? "admin"
+                            : ((s.staff_type ?? "sales") as StaffType)
+                        }
+                        onChange={(e) =>
+                          changeStaffPosition.mutate({
+                            userId: s.user_id,
+                            position: e.target.value as StaffPosition,
+                          })
+                        }
+                        disabled={changeStaffPosition.isPending}
+                        className="min-h-10 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground sm:min-h-0 sm:flex-none"
+                        aria-label={`Staff position for ${s.email ?? s.user_id}`}
+                      >
+                        <option value="admin">Admin</option>
+                        <option value="sales">Sales</option>
+                        <option value="media_manager">Social Manager</option>
+                      </select>
+                      {s.email && (
+                        <button
+                          onClick={() => sendPasswordReset.mutate(s.email!)}
+                          disabled={sendPasswordReset.isPending}
+                          className="min-h-10 min-w-10 rounded-md p-2 text-primary hover:bg-primary/15 disabled:opacity-50 sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                          title={`Send password reset to ${s.email}`}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </button>
+                      )}
+                      {s.role === "dream_wave_team" && (
+                        <button
+                          onClick={() =>
+                            revoke.mutate({ userId: s.user_id, role: "dream_wave_team" })
+                          }
+                          className="min-h-10 min-w-10 rounded-md p-2 text-destructive hover:bg-destructive/15 sm:min-h-0 sm:min-w-0 sm:p-1.5"
+                          title="Revoke staff role"
+                        >
+                          <UserMinus className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {s.email && (
-                    <div className="truncate text-xs text-muted-foreground">{s.email}</div>
-                  )}
-                </div>
-                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end sm:gap-3">
-                  <span
-                    className={
-                      "rounded-md px-2 py-0.5 text-xs font-medium ring-1 " +
-                      (s.role === "dream_wave_owner"
-                        ? "bg-primary/15 text-primary ring-primary/30"
-                        : "bg-elevated text-foreground ring-border")
-                    }
-                  >
-                    {s.role === "dream_wave_owner" ? "Admin" : "Team"}
-                  </span>
-                  <select
-                    value={
-                      s.role === "dream_wave_owner"
-                        ? "admin"
-                        : ((s.staff_type ?? "sales") as StaffType)
-                    }
-                    onChange={(e) =>
-                      changeStaffPosition.mutate({
-                        userId: s.user_id,
-                        position: e.target.value as StaffPosition,
-                      })
-                    }
-                    disabled={changeStaffPosition.isPending}
-                    className="min-h-10 flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs text-foreground sm:min-h-0 sm:flex-none"
-                    aria-label={`Staff position for ${s.email ?? s.user_id}`}
-                  >
-                    <option value="admin">Admin</option>
-                    <option value="sales">Sales</option>
-                    <option value="media_manager">Media Manager</option>
-                  </select>
-                  {s.email && (
-                    <button
-                      onClick={() => sendPasswordReset.mutate(s.email!)}
-                      disabled={sendPasswordReset.isPending}
-                      className="min-h-10 min-w-10 rounded-md p-2 text-primary hover:bg-primary/15 disabled:opacity-50 sm:min-h-0 sm:min-w-0 sm:p-1.5"
-                      title={`Send password reset to ${s.email}`}
+                  {editing && (
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        updateStaffInfo.mutate();
+                      }}
+                      className="mt-3 grid gap-2 rounded-lg border border-primary/30 bg-primary/5 p-3 sm:grid-cols-[1fr_1fr_auto]"
                     >
-                      <KeyRound className="h-4 w-4" />
-                    </button>
+                      <input
+                        value={editFirstName}
+                        onChange={(event) => setEditFirstName(event.target.value)}
+                        placeholder="First name"
+                        className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      />
+                      <input
+                        value={editLastName}
+                        onChange={(event) => setEditLastName(event.target.value)}
+                        placeholder="Last name"
+                        className="rounded-lg border border-border bg-background px-3 py-2 text-sm"
+                      />
+                      <button
+                        disabled={!editFirstName.trim() || updateStaffInfo.isPending}
+                        className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                      >
+                        {updateStaffInfo.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Save className="h-3.5 w-3.5" />
+                        )}
+                        Save
+                      </button>
+                    </form>
                   )}
-                  {s.role === "dream_wave_team" && (
-                    <button
-                      onClick={() => revoke.mutate({ userId: s.user_id, role: "dream_wave_team" })}
-                      className="min-h-10 min-w-10 rounded-md p-2 text-destructive hover:bg-destructive/15 sm:min-h-0 sm:min-w-0 sm:p-1.5"
-                      title="Revoke staff role"
-                    >
-                      <UserMinus className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>

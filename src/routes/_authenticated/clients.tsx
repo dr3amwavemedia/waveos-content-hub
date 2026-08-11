@@ -11,6 +11,7 @@ import {
   Loader2,
   MoreHorizontal,
   Pause,
+  Pencil,
   Play,
   Plus,
   RefreshCw,
@@ -32,6 +33,32 @@ type AccountStatus = Database["public"]["Enums"]["account_status"];
 type AgreementTerm = Database["public"]["Enums"]["agreement_term"];
 type DeliveryKind = Database["public"]["Enums"]["delivery_kind"];
 type InvoiceStatus = Database["public"]["Enums"]["invoice_status"];
+type InvoiceListItem = Pick<
+  Database["public"]["Tables"]["client_invoices"]["Row"],
+  | "id"
+  | "number"
+  | "description"
+  | "amount_cents"
+  | "currency"
+  | "status"
+  | "hosted_url"
+  | "issued_at"
+  | "due_at"
+  | "paid_at"
+>;
+type CrmAccountRow = Database["public"]["Tables"]["crm_accounts"]["Row"];
+type CrmContactRow = Pick<
+  Database["public"]["Tables"]["crm_contacts"]["Row"],
+  | "id"
+  | "first_name"
+  | "last_name"
+  | "job_title"
+  | "email"
+  | "phone"
+  | "preferred_contact_method"
+  | "is_primary"
+>;
+type ClientCrmRecord = CrmAccountRow & { crm_contacts: CrmContactRow[] };
 type WorkspaceStatusLegacy = "onboarding" | "active" | "paused" | "archived";
 const SOCIAL_MANAGEMENT_FLAG = "social_management_access";
 
@@ -60,10 +87,8 @@ export const Route = createFileRoute("/_authenticated/clients")({
       .from("user_roles")
       .select("role")
       .eq("user_id", data.user.id);
-    const staff = (roles ?? []).some(
-      (r) => r.role === "dream_wave_owner" || r.role === "dream_wave_team",
-    );
-    if (!staff) throw redirect({ to: "/home" });
+    const isOwner = (roles ?? []).some((r) => r.role === "dream_wave_owner");
+    if (!isOwner) throw redirect({ to: "/home" });
   },
   component: ClientsPage,
   head: () => ({
@@ -109,6 +134,8 @@ const STATUS_TONE: Record<AccountStatus, string> = {
 
 // The delete RPC is added by this package's migration, before generated types refresh.
 const db = supabase as unknown as {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from: (table: string) => any;
   rpc: (
     fn: string,
     args?: Record<string, unknown>,
@@ -244,12 +271,18 @@ function ClientsPage() {
               {(workspacesQ.data ?? []).map((w) => (
                 <article key={w.id} className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-3">
-                    <button onClick={() => setSelectedWs(w)} className="min-w-0 text-left">
+                    <div className="min-w-0">
                       <h3 className="truncate font-semibold text-foreground">{w.name}</h3>
                       <p className="truncate text-xs text-muted-foreground">
                         /{w.slug} · {w.industry ?? "Industry not set"}
                       </p>
-                    </button>
+                      <button
+                        onClick={() => setSelectedWs(w)}
+                        className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> Edit info
+                      </button>
+                    </div>
                     <button
                       onClick={() => setSelectedWs(w)}
                       className="min-h-10 min-w-10 rounded-lg border border-border p-2.5 text-muted-foreground"
@@ -307,7 +340,15 @@ function ClientsPage() {
                   {(workspacesQ.data ?? []).map((w) => (
                     <tr key={w.id} className="border-t border-border/60 hover:bg-elevated/40">
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-foreground">{w.name}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-semibold text-foreground">{w.name}</div>
+                          <button
+                            onClick={() => setSelectedWs(w)}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                          >
+                            <Pencil className="h-3 w-3" /> Edit info
+                          </button>
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           /{w.slug} · {w.industry ?? "—"}
                         </div>
@@ -344,6 +385,7 @@ function ClientsPage() {
                         <button
                           onClick={() => setSelectedWs(w)}
                           className="rounded-lg p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
+                          aria-label={`Open ${w.name}`}
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </button>
@@ -409,7 +451,7 @@ function TierBadge({ tier }: { tier: ClientAccessTier }) {
 
 // ─── Drawer with tabs ─────────────────────────────────────────────────────
 
-type DrawerTab = "access" | "deliveries" | "invoices" | "invites";
+type DrawerTab = "info" | "access" | "deliveries" | "invoices" | "invites";
 
 function WorkspaceDrawer({
   workspace,
@@ -428,7 +470,7 @@ function WorkspaceDrawer({
   onDeleted: () => void;
   isOwner: boolean;
 }) {
-  const [tab, setTab] = useState<DrawerTab>("access");
+  const [tab, setTab] = useState<DrawerTab>("info");
   const impersonate = useImpersonateClient();
 
   function exportSummary() {
@@ -460,6 +502,13 @@ function WorkspaceDrawer({
   return (
     <ModalShell title={workspace.name} onClose={onClose} wide>
       <div className="mb-4 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setTab("info")}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/20"
+        >
+          <Pencil className="h-3.5 w-3.5" /> Edit info
+        </button>
         <TierBadge tier={workspace.access_tier} />
         <span
           className={cn(
@@ -492,24 +541,11 @@ function WorkspaceDrawer({
           >
             <Eye className="h-3.5 w-3.5" /> View as client
           </Link>
-          <Link
-            to="/home"
-            onClick={() => {
-              try {
-                localStorage.setItem("waveos.active-workspace", workspace.id);
-              } catch {
-                /* noop */
-              }
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface/60 px-3 py-1.5 text-xs text-foreground hover:bg-elevated"
-          >
-            Open
-          </Link>
         </div>
       </div>
 
       <div className="mb-4 flex gap-1 border-b border-border">
-        {(["access", "deliveries", "invoices", "invites"] as const).map((t) => (
+        {(["info", "access", "deliveries", "invoices", "invites"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -520,11 +556,12 @@ function WorkspaceDrawer({
                 : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
-            {t}
+            {t === "info" ? "Client info" : t}
           </button>
         ))}
       </div>
 
+      {tab === "info" && <ClientInfoTab workspace={workspace} onRefresh={onRefresh} />}
       {tab === "access" && (
         <AccessTab
           workspace={workspace}
@@ -538,6 +575,502 @@ function WorkspaceDrawer({
       {tab === "invoices" && <InvoicesTab workspaceId={workspace.id} />}
       {tab === "invites" && <InvitesTab workspace={workspace} onNewInvite={onNewInvite} />}
     </ModalShell>
+  );
+}
+
+// ─── Client information ──────────────────────────────────────────────────
+
+function ClientInfoTab({
+  workspace,
+  onRefresh,
+}: {
+  workspace: ClientWorkspace;
+  onRefresh: () => void;
+}) {
+  const qc = useQueryClient();
+  const [form, setForm] = useState({
+    name: workspace.name,
+    industry: workspace.industry ?? "",
+    timezone: workspace.timezone,
+    email: "",
+    phone: "",
+    website: "",
+    address1: "",
+    address2: "",
+    city: "",
+    state: "",
+    postalCode: "",
+    country: "US",
+    leadSource: "",
+    referralName: "",
+    services: "",
+    preferredContact: "",
+    priority: "normal",
+    estimatedValue: "",
+    nextFollowUp: "",
+    contactFirst: "",
+    contactLast: "",
+    contactTitle: "",
+    contactEmail: "",
+    contactPhone: "",
+    contactPreference: "",
+  });
+
+  const crmQ = useQuery({
+    queryKey: ["client-crm-record", workspace.id],
+    queryFn: async (): Promise<ClientCrmRecord | null> => {
+      const { data, error } = await db
+        .from("crm_accounts")
+        .select(
+          "*,crm_contacts(id,first_name,last_name,job_title,email,phone,preferred_contact_method,is_primary)",
+        )
+        .eq("linked_workspace_id", workspace.id)
+        .maybeSingle();
+      if (error) throw error;
+      return (data as ClientCrmRecord | null) ?? null;
+    },
+  });
+
+  useEffect(() => {
+    const account = crmQ.data;
+    if (!account) return;
+    const contact =
+      account.crm_contacts?.find((item) => item.is_primary) ?? account.crm_contacts?.[0];
+    setForm({
+      name: account.business_name,
+      industry: account.industry ?? workspace.industry ?? "",
+      timezone: workspace.timezone,
+      email: account.email ?? "",
+      phone: account.phone ?? "",
+      website: account.website ?? "",
+      address1: account.address_line1 ?? "",
+      address2: account.address_line2 ?? "",
+      city: account.city ?? "",
+      state: account.state ?? "",
+      postalCode: account.postal_code ?? "",
+      country: account.country ?? "US",
+      leadSource: account.lead_source ?? "",
+      referralName: account.referral_name ?? "",
+      services: account.interested_services?.join(", ") ?? "",
+      preferredContact: account.preferred_contact_method ?? "",
+      priority: account.priority,
+      estimatedValue:
+        account.estimated_value_cents == null ? "" : String(account.estimated_value_cents / 100),
+      nextFollowUp: account.next_follow_up_at?.slice(0, 16) ?? "",
+      contactFirst: contact?.first_name ?? "",
+      contactLast: contact?.last_name ?? "",
+      contactTitle: contact?.job_title ?? "",
+      contactEmail: contact?.email ?? "",
+      contactPhone: contact?.phone ?? "",
+      contactPreference: contact?.preferred_contact_method ?? "",
+    });
+  }, [crmQ.data, workspace.industry, workspace.name, workspace.timezone]);
+
+  const set = (key: keyof typeof form, value: string) =>
+    setForm((current) => ({ ...current, [key]: value }));
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const name = form.name.trim();
+      if (!name) throw new Error("Client name is required.");
+
+      const { error: nameError } = await db.rpc("admin_update_workspace_name", {
+        _workspace_id: workspace.id,
+        _name: name,
+      });
+      if (nameError) throw nameError;
+
+      const { error: workspaceError } = await supabase
+        .from("workspaces")
+        .update({
+          industry: form.industry.trim() || null,
+          timezone: form.timezone,
+        })
+        .eq("id", workspace.id);
+      if (workspaceError) throw workspaceError;
+
+      const account = crmQ.data;
+      if (!account) return;
+      const { data: auth } = await supabase.auth.getUser();
+      const { error: crmError } = await db
+        .from("crm_accounts")
+        .update({
+          business_name: name,
+          industry: form.industry.trim() || null,
+          email: form.email.trim() || null,
+          phone: form.phone.trim() || null,
+          website: form.website.trim() || null,
+          address_line1: form.address1.trim() || null,
+          address_line2: form.address2.trim() || null,
+          city: form.city.trim() || null,
+          state: form.state.trim() || null,
+          postal_code: form.postalCode.trim() || null,
+          country: form.country.trim() || "US",
+          lead_source: form.leadSource.trim() || null,
+          referral_name: form.referralName.trim() || null,
+          interested_services: form.services
+            .split(",")
+            .map((service) => service.trim())
+            .filter(Boolean),
+          preferred_contact_method: form.preferredContact.trim() || null,
+          priority: form.priority,
+          estimated_value_cents: form.estimatedValue
+            ? Math.round(Number(form.estimatedValue) * 100)
+            : null,
+          next_follow_up_at: form.nextFollowUp ? new Date(form.nextFollowUp).toISOString() : null,
+          updated_by: auth.user?.id ?? null,
+        })
+        .eq("id", account.id);
+      if (crmError) throw crmError;
+
+      const primary =
+        account.crm_contacts?.find((item) => item.is_primary) ?? account.crm_contacts?.[0];
+      if (primary) {
+        const { error } = await db
+          .from("crm_contacts")
+          .update({
+            first_name: form.contactFirst.trim() || primary.first_name,
+            last_name: form.contactLast.trim() || null,
+            job_title: form.contactTitle.trim() || null,
+            email: form.contactEmail.trim() || null,
+            phone: form.contactPhone.trim() || null,
+            preferred_contact_method: form.contactPreference.trim() || null,
+          })
+          .eq("id", primary.id);
+        if (error) throw error;
+      } else if (form.contactFirst.trim()) {
+        const { error } = await db.from("crm_contacts").insert({
+          account_id: account.id,
+          first_name: form.contactFirst.trim(),
+          last_name: form.contactLast.trim() || null,
+          job_title: form.contactTitle.trim() || null,
+          email: form.contactEmail.trim() || null,
+          phone: form.contactPhone.trim() || null,
+          preferred_contact_method: form.contactPreference.trim() || null,
+          is_primary: true,
+          created_by: auth.user?.id,
+        });
+        if (error) throw error;
+      }
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["client-crm-record", workspace.id] }),
+        qc.invalidateQueries({ queryKey: ["clients", "workspaces"] }),
+        qc.invalidateQueries({ queryKey: ["crm", "accounts"] }),
+        qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] }),
+      ]);
+      onRefresh();
+      toast.success("Client information updated.");
+    },
+    onError: (error: unknown) =>
+      toast.error(error instanceof Error ? error.message : "Could not update client information."),
+  });
+
+  if (crmQ.isLoading) {
+    return (
+      <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Loading client information…
+      </div>
+    );
+  }
+
+  const primaryContactId = crmQ.data
+    ? (crmQ.data.crm_contacts.find((contact) => contact.is_primary) ?? crmQ.data.crm_contacts[0])
+        ?.id
+    : null;
+
+  return (
+    <div className="space-y-5">
+      <section className="space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold text-foreground">Client profile</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The account name and workspace details used throughout WaveOS.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Client / business name">
+            <input
+              value={form.name}
+              onChange={(e) => set("name", e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Industry">
+            <input
+              value={form.industry}
+              onChange={(e) => set("industry", e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Timezone">
+            <input
+              value={form.timezone}
+              onChange={(e) => set("timezone", e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+          <Field label="Workspace URL">
+            <input value={`/${workspace.slug}`} readOnly className={cn(inputCls, "opacity-70")} />
+          </Field>
+        </div>
+      </section>
+
+      {crmQ.data ? (
+        <>
+          <section className="space-y-4 border-t border-border pt-5">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Lead information</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                This is the original CRM record linked during client conversion. Changes stay in
+                sync with the CRM.
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Business email">
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => set("email", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Business phone">
+                <input
+                  value={form.phone}
+                  onChange={(e) => set("phone", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Website">
+                <input
+                  value={form.website}
+                  onChange={(e) => set("website", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Preferred contact method">
+                <input
+                  value={form.preferredContact}
+                  onChange={(e) => set("preferredContact", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Address">
+                <input
+                  value={form.address1}
+                  onChange={(e) => set("address1", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Address line 2">
+                <input
+                  value={form.address2}
+                  onChange={(e) => set("address2", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="City">
+                <input
+                  value={form.city}
+                  onChange={(e) => set("city", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="State">
+                <input
+                  value={form.state}
+                  onChange={(e) => set("state", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Postal code">
+                <input
+                  value={form.postalCode}
+                  onChange={(e) => set("postalCode", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Country">
+                <input
+                  value={form.country}
+                  onChange={(e) => set("country", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Lead source">
+                <input
+                  value={form.leadSource}
+                  onChange={(e) => set("leadSource", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Referral name">
+                <input
+                  value={form.referralName}
+                  onChange={(e) => set("referralName", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Interested services">
+                <input
+                  value={form.services}
+                  onChange={(e) => set("services", e.target.value)}
+                  className={inputCls}
+                  placeholder="Brand story, reels, photography"
+                />
+              </Field>
+              <Field label="Estimated value ($)">
+                <input
+                  type="number"
+                  min="0"
+                  value={form.estimatedValue}
+                  onChange={(e) => set("estimatedValue", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Priority">
+                <select
+                  value={form.priority}
+                  onChange={(e) => set("priority", e.target.value)}
+                  className={inputCls}
+                >
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </Field>
+              <Field label="Next follow-up">
+                <input
+                  type="datetime-local"
+                  value={form.nextFollowUp}
+                  onChange={(e) => set("nextFollowUp", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+            </div>
+            <div className="grid gap-2 rounded-lg border border-border/70 bg-background/30 p-3 text-xs sm:grid-cols-3">
+              <span>
+                <strong className="text-foreground">CRM stage:</strong>{" "}
+                {crmQ.data.stage.replaceAll("_", " ")}
+              </span>
+              <span>
+                <strong className="text-foreground">Added:</strong>{" "}
+                {new Date(crmQ.data.created_at).toLocaleDateString()}
+              </span>
+              <span>
+                <strong className="text-foreground">Last contacted:</strong>{" "}
+                {crmQ.data.last_contacted_at
+                  ? new Date(crmQ.data.last_contacted_at).toLocaleString()
+                  : "—"}
+              </span>
+            </div>
+            {crmQ.data.social_links &&
+              typeof crmQ.data.social_links === "object" &&
+              !Array.isArray(crmQ.data.social_links) &&
+              Object.keys(crmQ.data.social_links).length > 0 && (
+                <div className="rounded-lg border border-border/70 bg-background/30 p-3 text-xs">
+                  <strong className="text-foreground">Social links</strong>
+                  <div className="mt-2 grid gap-1 sm:grid-cols-2">
+                    {Object.entries(crmQ.data.social_links).map(([platform, value]) => (
+                      <span key={platform} className="break-all text-muted-foreground">
+                        <span className="capitalize text-foreground">{platform}:</span>{" "}
+                        {typeof value === "string" ? value : JSON.stringify(value)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+          </section>
+
+          <section className="space-y-4 border-t border-border pt-5">
+            <h3 className="text-sm font-semibold text-foreground">Primary contact</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="First name">
+                <input
+                  value={form.contactFirst}
+                  onChange={(e) => set("contactFirst", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Last name">
+                <input
+                  value={form.contactLast}
+                  onChange={(e) => set("contactLast", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Job title">
+                <input
+                  value={form.contactTitle}
+                  onChange={(e) => set("contactTitle", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Contact preference">
+                <input
+                  value={form.contactPreference}
+                  onChange={(e) => set("contactPreference", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Email">
+                <input
+                  type="email"
+                  value={form.contactEmail}
+                  onChange={(e) => set("contactEmail", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Phone">
+                <input
+                  value={form.contactPhone}
+                  onChange={(e) => set("contactPhone", e.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+            </div>
+            {crmQ.data.crm_contacts.filter((contact) => contact.id !== primaryContactId).length >
+              0 && (
+              <div className="rounded-lg border border-border/70 bg-background/30 p-3">
+                <p className="text-xs font-semibold text-foreground">Additional contacts</p>
+                <ul className="mt-2 space-y-2 text-xs text-muted-foreground">
+                  {crmQ.data.crm_contacts
+                    .filter((contact) => contact.id !== primaryContactId)
+                    .map((contact) => (
+                      <li key={contact.id}>
+                        <span className="font-medium text-foreground">
+                          {contact.first_name} {contact.last_name ?? ""}
+                        </span>
+                        {contact.job_title ? ` · ${contact.job_title}` : ""}
+                        {contact.email ? ` · ${contact.email}` : ""}
+                        {contact.phone ? ` · ${contact.phone}` : ""}
+                      </li>
+                    ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        </>
+      ) : (
+        <div className="rounded-lg border border-border bg-background/30 p-4 text-sm text-muted-foreground">
+          No CRM lead is linked to this client. Workspace information can still be edited here.
+        </div>
+      )}
+
+      <div className="flex justify-end border-t border-border pt-4">
+        <button
+          type="button"
+          onClick={() => save.mutate()}
+          disabled={save.isPending || !form.name.trim()}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Save client info
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1033,6 +1566,16 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
 function InvoicesTab({ workspaceId }: { workspaceId: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [editingInvoice, setEditingInvoice] = useState<InvoiceListItem | null>(null);
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingInvoice(null);
+  };
+  const refreshInvoices = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] }),
+      qc.invalidateQueries({ queryKey: ["layer1", "invoices", workspaceId] }),
+    ]);
   const q = useQuery({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
@@ -1044,7 +1587,7 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
         .eq("workspace_id", workspaceId)
         .order("issued_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as InvoiceListItem[];
     },
   });
 
@@ -1053,8 +1596,9 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
       const { error } = await supabase.from("client_invoices").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] });
+    onSuccess: async (_, id) => {
+      if (editingInvoice?.id === id) closeForm();
+      await refreshInvoices();
       toast.success("Invoice removed.");
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
@@ -1071,8 +1615,8 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
         .eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] });
+    onSuccess: async () => {
+      await refreshInvoices();
       toast.success("Invoice status updated.");
     },
     onError: (e: unknown) =>
@@ -1083,13 +1627,35 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
     <div className="space-y-3">
       <div className="flex justify-end">
         <button
-          onClick={() => setShowForm((s) => !s)}
+          onClick={() => {
+            if (showForm && !editingInvoice) {
+              closeForm();
+              return;
+            }
+            setEditingInvoice(null);
+            setShowForm(true);
+          }}
           className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:brightness-110"
         >
-          <Plus className="h-3.5 w-3.5" /> Add invoice
+          {showForm && !editingInvoice ? (
+            <>
+              <X className="h-3.5 w-3.5" /> Cancel new invoice
+            </>
+          ) : (
+            <>
+              <Plus className="h-3.5 w-3.5" /> Add invoice
+            </>
+          )}
         </button>
       </div>
-      {showForm && <InvoiceForm workspaceId={workspaceId} onDone={() => setShowForm(false)} />}
+      {showForm && (
+        <InvoiceForm
+          key={editingInvoice?.id ?? "new-invoice"}
+          workspaceId={workspaceId}
+          invoice={editingInvoice}
+          onDone={closeForm}
+        />
+      )}
       {q.isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
       ) : (q.data ?? []).length === 0 ? (
@@ -1135,6 +1701,18 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingInvoice(i);
+                    setShowForm(true);
+                  }}
+                  className="rounded-md p-1.5 text-primary hover:bg-primary/15"
+                  aria-label={`Edit ${i.number || "invoice"}`}
+                  title="Edit invoice"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
                 <select
                   value={i.status}
                   onChange={(event) =>
@@ -1192,69 +1770,118 @@ function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
   );
 }
 
-function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () => void }) {
-  const qc = useQueryClient();
-  const [number, setNumber] = useState("");
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [currency, setCurrency] = useState("USD");
-  const [status, setStatus] = useState<InvoiceStatus>("unpaid");
-  const [hostedUrl, setHostedUrl] = useState("");
-  const [dueAt, setDueAt] = useState("");
+function dateInputToIso(value: string): string | null {
+  return value ? `${value}T12:00:00.000Z` : null;
+}
 
-  const create = useMutation({
+function InvoiceForm({
+  workspaceId,
+  invoice,
+  onDone,
+}: {
+  workspaceId: string;
+  invoice: InvoiceListItem | null;
+  onDone: () => void;
+}) {
+  const qc = useQueryClient();
+  const [number, setNumber] = useState(invoice?.number ?? "");
+  const [description, setDescription] = useState(invoice?.description ?? "");
+  const [amount, setAmount] = useState(
+    invoice?.amount_cents === null || invoice?.amount_cents === undefined
+      ? ""
+      : (invoice.amount_cents / 100).toFixed(2),
+  );
+  const [currency, setCurrency] = useState(invoice?.currency ?? "USD");
+  const [status, setStatus] = useState<InvoiceStatus>(invoice?.status ?? "unpaid");
+  const [hostedUrl, setHostedUrl] = useState(invoice?.hosted_url ?? "");
+  const [issuedAt, setIssuedAt] = useState(
+    invoice?.issued_at.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+  );
+  const [dueAt, setDueAt] = useState(invoice?.due_at?.slice(0, 10) ?? "");
+
+  const save = useMutation({
     mutationFn: async () => {
       const trimmedUrl = hostedUrl.trim();
       if (trimmedUrl && !isValidHttpsUrl(trimmedUrl)) {
         throw new Error(URL_VALIDATION_MESSAGE);
       }
-      const { data: auth } = await supabase.auth.getUser();
       const cents = amount ? Math.round(parseFloat(amount) * 100) : null;
-      const { data, error } = await supabase
-        .from("client_invoices")
-        .insert({
-          workspace_id: workspaceId,
-          number: number.trim() || null,
-          description: description.trim() || null,
-          amount_cents: cents,
-          currency: currency.trim().toUpperCase().slice(0, 3),
-          status,
-          hosted_url: trimmedUrl || null,
-          due_at: dueAt ? new Date(dueAt).toISOString() : null,
-          paid_at: status === "paid" ? new Date().toISOString() : null,
-          created_by: auth.user?.id ?? null,
-        })
-        .select("id")
-        .single();
+      const values = {
+        number: number.trim() || null,
+        description: description.trim() || null,
+        amount_cents: cents,
+        currency: currency.trim().toUpperCase(),
+        status,
+        hosted_url: trimmedUrl || null,
+        issued_at: dateInputToIso(issuedAt)!,
+        due_at: dateInputToIso(dueAt),
+        paid_at: status === "paid" ? (invoice?.paid_at ?? new Date().toISOString()) : null,
+      };
+
+      let result: { data: { id: string } | null; error: { message: string } | null };
+      if (invoice) {
+        result = await supabase
+          .from("client_invoices")
+          .update(values)
+          .eq("id", invoice.id)
+          .eq("workspace_id", workspaceId)
+          .select("id")
+          .single();
+      } else {
+        const { data: auth } = await supabase.auth.getUser();
+        result = await supabase
+          .from("client_invoices")
+          .insert({
+            workspace_id: workspaceId,
+            ...values,
+            created_by: auth.user?.id ?? null,
+          })
+          .select("id")
+          .single();
+      }
+      const { data, error } = result;
       if (error) {
         if (error.message.includes("client_invoices_hosted_url_https")) {
           throw new Error(URL_VALIDATION_MESSAGE);
         }
         throw error;
       }
-      if (!data?.id) throw new Error("The invoice was not saved. Please try again.");
+      if (!data?.id) throw new Error("The invoice changes were not saved. Please try again.");
     },
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] }),
         qc.invalidateQueries({ queryKey: ["layer1", "invoices", workspaceId] }),
       ]);
-      toast.success("Invoice added.");
+      toast.success(invoice ? "Invoice updated." : "Invoice added.");
       onDone();
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
   const hostedUrlValid = !hostedUrl.trim() || isValidHttpsUrl(hostedUrl);
+  const currencyValid = /^[A-Za-z]{3}$/.test(currency.trim());
+  const amountValid = !amount || (Number.isFinite(Number(amount)) && Number(amount) >= 0);
+  const canSave = hostedUrlValid && currencyValid && amountValid && Boolean(issuedAt);
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        if (hostedUrlValid) create.mutate();
+        if (canSave) save.mutate();
       }}
       className="space-y-3 rounded-lg border border-dashed border-border bg-surface/40 p-3"
     >
+      <div>
+        <p className="text-sm font-semibold text-foreground">
+          {invoice ? `Edit ${invoice.number || "invoice"}` : "New invoice"}
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {invoice
+            ? "Update the invoice details below. Clients will see the changes immediately."
+            : "Add an invoice to this client's account."}
+        </p>
+      </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Number">
           <input
@@ -1268,6 +1895,7 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
           <input
             type="number"
             step="0.01"
+            min="0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             className={inputCls}
@@ -1281,6 +1909,9 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
             maxLength={3}
             className={inputCls}
           />
+          {!currencyValid && (
+            <p className="mt-1 text-xs text-destructive">Use a three-letter currency code.</p>
+          )}
         </Field>
       </div>
       <Field label="Description">
@@ -1298,10 +1929,21 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
             onChange={(e) => setStatus(e.target.value as InvoiceStatus)}
             className={inputCls}
           >
-            {(["deposit", "paid", "unpaid"] as InvoiceStatus[]).map((s) => (
+            {(
+              ["deposit", "paid", "unpaid", "draft", "sent", "overdue", "void"] as InvoiceStatus[]
+            ).map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
+        </Field>
+        <Field label="Issued">
+          <input
+            type="date"
+            value={issuedAt}
+            onChange={(e) => setIssuedAt(e.target.value)}
+            className={inputCls}
+            required
+          />
         </Field>
         <Field label="Due">
           <input
@@ -1311,19 +1953,19 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
             className={inputCls}
           />
         </Field>
-        <Field label="Hosted URL">
-          <input
-            type="url"
-            value={hostedUrl}
-            onChange={(e) => setHostedUrl(e.target.value)}
-            className={inputCls}
-            placeholder="https://…"
-          />
-          {!hostedUrlValid && (
-            <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
-          )}
-        </Field>
       </div>
+      <Field label="Hosted URL">
+        <input
+          type="url"
+          value={hostedUrl}
+          onChange={(e) => setHostedUrl(e.target.value)}
+          className={inputCls}
+          placeholder="https://…"
+        />
+        {!hostedUrlValid && (
+          <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
+        )}
+      </Field>
       <div className="flex justify-end gap-2">
         <button
           type="button"
@@ -1334,11 +1976,11 @@ function InvoiceForm({ workspaceId, onDone }: { workspaceId: string; onDone: () 
         </button>
         <button
           type="submit"
-          disabled={!hostedUrlValid || create.isPending}
+          disabled={!canSave || save.isPending}
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground disabled:opacity-60"
         >
-          {create.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          Save
+          {save.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {invoice ? "Save changes" : "Add invoice"}
         </button>
       </div>
     </form>
