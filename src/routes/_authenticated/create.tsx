@@ -40,6 +40,7 @@ import {
 } from "@/hooks/use-content";
 import { PenSquare } from "lucide-react";
 import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
+import { useCurrentUser } from "@/hooks/use-waveos";
 
 export const Route = createFileRoute("/_authenticated/create")({
   component: () => (
@@ -47,13 +48,15 @@ export const Route = createFileRoute("/_authenticated/create")({
       <CreatePost />
     </RequireFeature>
   ),
-  validateSearch: (s: Record<string, unknown>): { id?: string } =>
-    typeof s.id === "string" ? { id: s.id } : {},
-  head: () => ({ meta: [{ title: "Create Post — WaveOS" }, { name: "robots", content: "noindex" }] }),
+  validateSearch: (s: Record<string, unknown>): { id?: string } => (typeof s.id === "string" ? { id: s.id } : {}),
+  head: () => ({
+    meta: [{ title: "Create Post — WaveOS" }, { name: "robots", content: "noindex" }],
+  }),
 });
 
 function CreatePost() {
   const { activeWorkspace } = useWorkspace();
+  const { data: user } = useCurrentUser();
   const navigate = useNavigate();
   const search = Route.useSearch();
   const qc = useQueryClient();
@@ -153,9 +156,7 @@ function CreatePost() {
     setTitle(it.title ?? "");
     setCaption(it.primary_caption ?? "");
     setPickedMedia(it.media_asset_ids ?? []);
-    setScheduledAt(
-      it.scheduled_at ? isoToDateTimeLocal(it.scheduled_at, workspaceTimeZone) : "",
-    );
+    setScheduledAt(it.scheduled_at ? isoToDateTimeLocal(it.scheduled_at, workspaceTimeZone) : "");
     const vp = existing.data.variants.filter((v) => v.enabled).map((v) => v.platform);
     if (vp.length) {
       setPlatforms(vp);
@@ -177,7 +178,8 @@ function CreatePost() {
   }, [title, caption, platforms, pickedMedia, scheduledAt]);
   const status = existing.data?.item?.status ?? "draft";
   const locked = status === "published" || status === "publishing" || status === "in_review";
-  const needsApproval = status !== "approved";
+  const isStaffWorkspace = Boolean(user?.isStaff && activeWorkspace?.id === "11111111-1111-1111-1111-111111111111");
+  const needsApproval = status !== "approved" && !isStaffWorkspace && activeWorkspace?.approval_required !== false;
 
   if (!activeWorkspace) {
     return (
@@ -198,9 +200,7 @@ function CreatePost() {
           title: title || null,
           primary_caption: caption || null,
           media_asset_ids: pickedMedia,
-          scheduled_at: scheduledAt
-            ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone)
-            : null,
+          scheduled_at: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
         },
       });
       await syncVariants.mutateAsync({
@@ -216,9 +216,7 @@ function CreatePost() {
       primary_caption: caption,
       media_asset_ids: pickedMedia,
       platforms,
-      scheduled_at: scheduledAt
-        ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone)
-        : null,
+      scheduled_at: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
     });
     setSavedId(item.id);
     return item.id;
@@ -334,8 +332,12 @@ function CreatePost() {
       const res = await publishFn({ data: { contentId: id } });
       qc.invalidateQueries({ queryKey: ["content-items"] });
       qc.invalidateQueries({ queryKey: ["content-item", id] });
-      if (res.failed === 0 && res.pending === 0) toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
-      else if (res.failed === 0) toast.success(`Published to ${res.success}; ${res.pending} channel${res.pending === 1 ? " is" : "s are"} still processing`);
+      if (res.failed === 0 && res.pending === 0)
+        toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
+      else if (res.failed === 0)
+        toast.success(
+          `Published to ${res.success}; ${res.pending} channel${res.pending === 1 ? " is" : "s are"} still processing`,
+        );
       else toast.warning(`Published to ${res.success}, ${res.failed} failed — open Posts to retry`);
       navigate({ to: "/posts" });
     } catch (e) {
@@ -357,10 +359,13 @@ function CreatePost() {
   }
 
   function handleStartNew() {
-    const hasWork = Boolean(
-      savedId || title.trim() || caption.trim() || pickedMedia.length || scheduledAt,
-    );
-    if (hasWork && !confirm("Start a new post? Your saved draft will remain in Posts, but any changes you have not saved will be cleared.")) {
+    const hasWork = Boolean(savedId || title.trim() || caption.trim() || pickedMedia.length || scheduledAt);
+    if (
+      hasWork &&
+      !confirm(
+        "Start a new post? Your saved draft will remain in Posts, but any changes you have not saved will be cleared.",
+      )
+    ) {
       return;
     }
 
@@ -442,7 +447,7 @@ function CreatePost() {
             ) : (
               <CalendarClock className="h-4 w-4" />
             )}
-            {status === "in_review" ? "Waiting for approval" : needsApproval ? "Submit schedule" : "Schedule later"}
+            {status === "in_review" ? "Waiting for approval" : needsApproval ? "Post approval" : "Schedule later"}
           </button>
           <button
             disabled={locked || publishing !== null || !caption.trim() || !platforms.length}
@@ -450,7 +455,7 @@ function CreatePost() {
             className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
           >
             {publishing === "now" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {status === "in_review" ? "Waiting for approval" : needsApproval ? "Submit to publish" : "Publish now"}
+            {status === "in_review" ? "Waiting for approval" : needsApproval ? "Send for approval" : "Publish now"}
           </button>
         </div>
       </div>

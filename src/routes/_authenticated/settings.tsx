@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Settings as SettingsIcon } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Settings as SettingsIcon, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { useWorkspace } from "@/components/app/workspace-context";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -11,13 +14,36 @@ export const Route = createFileRoute("/_authenticated/settings")({
 function SettingsPage() {
   const { data: user } = useCurrentUser();
   const { activeWorkspace } = useWorkspace();
+  const qc = useQueryClient();
+  const canManageApproval =
+    !user?.isStaff && (activeWorkspace?.role === "owner" || activeWorkspace?.role === "admin");
+  const automaticApproval = activeWorkspace?.approval_required === false;
+  const updateApproval = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      if (!activeWorkspace) throw new Error("No workspace selected.");
+      const { error } = await supabase.rpc("set_workspace_automatic_content_approval", {
+        _workspace_id: activeWorkspace.id,
+        _enabled: enabled,
+      });
+      if (error) throw error;
+    },
+    onSuccess: async (_, enabled) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] }),
+        qc.invalidateQueries({ queryKey: ["workspace-access", activeWorkspace?.id] }),
+      ]);
+      toast.success(
+        enabled ? "Automatic post approval is on." : "Post approval is required again.",
+      );
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not update approval settings."),
+  });
 
   return (
     <div className="space-y-8">
       <header>
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary">
-          Account
-        </p>
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary">Account</p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
           Settings
         </h1>
@@ -32,7 +58,10 @@ function SettingsPage() {
             You
           </h2>
           <dl className="mt-4 space-y-3 text-sm">
-            <Row label="Name" value={[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "—"} />
+            <Row
+              label="Name"
+              value={[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "—"}
+            />
             <Row label="Email" value={user?.email ?? "—"} />
             <Row
               label="Role"
@@ -60,17 +89,45 @@ function SettingsPage() {
         </div>
       </div>
 
+      {canManageApproval && (
+        <div className="surface-card flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Automatic post approval</h3>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                Turn this on during busy periods to let your Dream Wave Media manager schedule and
+                publish without waiting for individual approvals. You can turn it off anytime.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={automaticApproval}
+            disabled={updateApproval.isPending}
+            onClick={() => updateApproval.mutate(!automaticApproval)}
+            className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${automaticApproval ? "bg-primary" : "bg-elevated ring-1 ring-border"}`}
+          >
+            <span
+              className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${automaticApproval ? "translate-x-7" : "translate-x-1"}`}
+            />
+            <span className="sr-only">Automatic post approval</span>
+          </button>
+        </div>
+      )}
+
       <div className="surface-card flex items-start gap-4 p-6">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
           <SettingsIcon className="h-5 w-5" />
         </div>
         <div>
-          <h3 className="text-base font-semibold text-foreground">
-            More settings coming soon
-          </h3>
+          <h3 className="text-base font-semibold text-foreground">More settings coming soon</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Notification preferences, timezone, language, and workspace admin
-            tools land in later phases.
+            Notification preferences, timezone, language, and workspace admin tools land in later
+            phases.
           </p>
         </div>
       </div>

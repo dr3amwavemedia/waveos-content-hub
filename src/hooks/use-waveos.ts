@@ -10,6 +10,8 @@ export interface WorkspaceSummary {
   industry: string | null;
   timezone: string;
   is_demo: boolean;
+  access_tier: "project_client" | "growth_90" | "retainer_full" | "social_management";
+  approval_required: boolean;
   role: "owner" | "admin" | "editor" | "approver" | "viewer" | "staff";
 }
 
@@ -105,20 +107,28 @@ async function loadWorkspaces(
   // belongs to. During admin acting mode, ctx.userId is the selected staff id.
   const workspaceIds = previewWorkspaceId
     ? [previewWorkspaceId]
-    : ctx.isStaff && ctx.staffType !== "media_manager"
-      ? ["11111111-1111-1111-1111-111111111111"]
-      : Array.from(membershipMap.keys());
+    : ctx.isDreamWaveOwner
+      ? []
+      : ctx.isStaff && ctx.staffType !== "media_manager"
+        ? ["11111111-1111-1111-1111-111111111111"]
+        : Array.from(membershipMap.keys());
 
-  if (!workspaceIds.length && ctx.staffType !== "media_manager") return [];
+  if (!workspaceIds.length && !ctx.isDreamWaveOwner && ctx.staffType !== "media_manager") return [];
 
   let workspacesQuery = supabase
     .from("workspaces")
-    .select("id,name,slug,industry,timezone,is_demo")
+    .select("id,name,slug,industry,timezone,is_demo,access_tier,approval_required")
     .eq("is_archived", false)
     .order("name", { ascending: true });
 
-  if (ctx.staffType !== "media_manager" || previewWorkspaceId) {
+  if (ctx.isDreamWaveOwner && !previewWorkspaceId) {
+    // Administrators need every client workspace so they can provide backup approval.
+  } else if (ctx.staffType !== "media_manager" || previewWorkspaceId) {
     workspacesQuery = workspacesQuery.in("id", workspaceIds);
+  } else {
+    workspacesQuery = workspacesQuery.or(
+      "id.eq.11111111-1111-1111-1111-111111111111,access_tier.eq.social_management",
+    );
   }
 
   const { data: workspaces, error } = await workspacesQuery;

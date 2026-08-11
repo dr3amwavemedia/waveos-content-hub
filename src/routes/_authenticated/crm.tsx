@@ -1478,6 +1478,7 @@ function OverviewTab({
                   <option value="project_client">Project Client</option>
                   <option value="growth_90">Growth (90 days)</option>
                   <option value="retainer_full">Retainer</option>
+                  <option value="social_management">Social Management</option>
                 </select>
                 <select
                   value={conversionTerm}

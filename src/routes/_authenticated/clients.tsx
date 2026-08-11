@@ -79,6 +79,7 @@ const TIER_LABEL: Record<ClientAccessTier, string> = {
   project_client: "Project Client",
   growth_90: "Growth (90 days)",
   retainer_full: "Retainer",
+  social_management: "Social Management",
 };
 const STATUS_TONE: Record<AccountStatus, string> = {
   active: "bg-success/15 text-success ring-success/30",
@@ -375,6 +376,7 @@ function TierBadge({ tier }: { tier: ClientAccessTier }) {
     project_client: "bg-elevated text-foreground ring-border",
     growth_90: "bg-primary/12 text-primary ring-primary/30",
     retainer_full: "bg-success/15 text-success ring-success/30",
+    social_management: "bg-primary/15 text-primary ring-primary/30",
   };
   return (
     <span className={cn("rounded-md px-2 py-0.5 text-xs font-medium ring-1", tone[tier])}>
@@ -639,6 +641,9 @@ function AccessTab({
             <option value="project_client">Project Client — profile + invoices only</option>
             <option value="growth_90">Growth (90 days) — review + brand voice</option>
             <option value="retainer_full">Retainer — full platform</option>
+            <option value="social_management">
+              Social Management — full platform + staff management
+            </option>
           </select>
         </Field>
         <Field label="Account status">
@@ -1710,6 +1715,7 @@ function OnboardingModal({
               <option value="project_client">Project Client</option>
               <option value="growth_90">Growth (90 days)</option>
               <option value="retainer_full">Retainer</option>
+              <option value="social_management">Social Management</option>
             </select>
           </Field>
           <Field label="Agreement term">
