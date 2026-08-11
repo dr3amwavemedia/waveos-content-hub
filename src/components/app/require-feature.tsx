@@ -49,7 +49,7 @@ export function RequireFeature({
         </h2>
         <p className="mt-2 text-sm text-muted-foreground">
           {isStaff
-            ? "Choose a client workspace from the sidebar to continue."
+            ? "Your staff account is active, but no available staff or Social Management workspace could be loaded."
             : "Your Dream Wave Media account manager will send your activation link when your workspace is ready."}
         </p>
       </div>
