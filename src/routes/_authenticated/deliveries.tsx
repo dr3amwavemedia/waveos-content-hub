@@ -7,7 +7,7 @@ import { DeliveryCard } from "@/components/app/layer1-overview";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { EmptyState } from "@/components/app/empty-state";
 import { supabase } from "@/integrations/supabase/client";
-import { getSignedMediaUrl, type MediaAsset } from "@/hooks/use-media";
+import { getMediaPreviewUrl, type MediaAsset } from "@/hooks/use-media";
 import type { Database } from "@/integrations/supabase/types";
 
 type Delivery = Database["public"]["Tables"]["client_deliveries"]["Row"];
@@ -129,13 +129,13 @@ function MediaCard({ asset }: { asset: MediaAsset }) {
     let active = true;
     setUrl(null);
     setFailed(false);
-    getSignedMediaUrl(asset.storage_path, 3600)
+    getMediaPreviewUrl(asset, 3600)
       .then((signedUrl) => active && setUrl(signedUrl))
       .catch(() => active && setFailed(true));
     return () => {
       active = false;
     };
-  }, [asset.storage_path]);
+  }, [asset.id]);
 
   const KindIcon = isVideo ? Video : isImage ? ImageIcon : File;
 

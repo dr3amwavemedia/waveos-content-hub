@@ -14,7 +14,7 @@ export interface MediaAsset {
   workspace_id: string;
   folder_id: string | null;
   name: string;
-  storage_path: string;
+  storage_path: string | null;
   mime_type: string;
   size_bytes: number;
   width: number | null;
@@ -23,6 +23,12 @@ export interface MediaAsset {
   tags: string[];
   uploaded_by: string | null;
   created_at: string;
+  source_provider: "waveos" | "google_drive" | "dropbox";
+  external_file_id: string | null;
+  external_parent_id: string | null;
+  source_web_url: string | null;
+  thumbnail_url: string | null;
+  source_metadata: Record<string, unknown>;
 }
 
 export function useMediaFolders(workspaceId: string | null | undefined) {
@@ -156,7 +162,9 @@ export function useDeleteAsset(workspaceId: string | null | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (asset: MediaAsset) => {
-      await supabase.storage.from("media").remove([asset.storage_path]);
+      if (asset.storage_path) {
+        await supabase.storage.from("media").remove([asset.storage_path]);
+      }
       const { error } = await supabase.from("media_assets").delete().eq("id", asset.id);
       if (error) throw error;
     },
@@ -186,6 +194,14 @@ export async function getSignedMediaUrl(path: string, expiresIn = 3600) {
     .createSignedUrl(path, expiresIn);
   if (error) throw error;
   return data.signedUrl;
+}
+
+export async function getMediaPreviewUrl(asset: MediaAsset, expiresIn = 3600) {
+  if (asset.source_provider === "waveos") {
+    if (!asset.storage_path) throw new Error("Media file is missing its storage path.");
+    return getSignedMediaUrl(asset.storage_path, expiresIn);
+  }
+  return asset.thumbnail_url ?? asset.source_web_url;
 }
 
 async function probeMedia(file: File): Promise<{
