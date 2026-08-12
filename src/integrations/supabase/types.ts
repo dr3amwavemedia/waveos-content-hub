@@ -962,6 +962,97 @@ export type Database = {
           },
         ]
       }
+      external_media_connections: {
+        Row: {
+          access_token_encrypted: string
+          account_email: string | null
+          created_at: string
+          created_by: string | null
+          external_account_id: string
+          id: string
+          provider: string
+          refresh_token_encrypted: string | null
+          scopes: string
+          token_expires_at: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          access_token_encrypted: string
+          account_email?: string | null
+          created_at?: string
+          created_by?: string | null
+          external_account_id: string
+          id?: string
+          provider: string
+          refresh_token_encrypted?: string | null
+          scopes?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          access_token_encrypted?: string
+          account_email?: string | null
+          created_at?: string
+          created_by?: string | null
+          external_account_id?: string
+          id?: string
+          provider?: string
+          refresh_token_encrypted?: string | null
+          scopes?: string
+          token_expires_at?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_media_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_media_oauth_states: {
+        Row: {
+          code_verifier: string
+          created_at: string
+          expires_at: string
+          provider: string
+          state: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          code_verifier: string
+          created_at?: string
+          expires_at: string
+          provider: string
+          state: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          code_verifier?: string
+          created_at?: string
+          expires_at?: string
+          provider?: string
+          state?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_media_oauth_states_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invites: {
         Row: {
           accepted_at: string | null
@@ -1038,6 +1129,8 @@ export type Database = {
           archived_at: string | null
           created_at: string
           duration_seconds: number | null
+          external_file_id: string | null
+          external_parent_id: string | null
           folder_id: string | null
           height: number | null
           id: string
@@ -1051,8 +1144,12 @@ export type Database = {
           publishing_url_created_at: string | null
           publishing_url_expires_at: string | null
           size_bytes: number
-          storage_path: string
+          source_metadata: Json
+          source_provider: string
+          source_web_url: string | null
+          storage_path: string | null
           tags: string[]
+          thumbnail_url: string | null
           updated_at: string
           uploaded_by: string | null
           width: number | null
@@ -1062,6 +1159,8 @@ export type Database = {
           archived_at?: string | null
           created_at?: string
           duration_seconds?: number | null
+          external_file_id?: string | null
+          external_parent_id?: string | null
           folder_id?: string | null
           height?: number | null
           id?: string
@@ -1075,8 +1174,12 @@ export type Database = {
           publishing_url_created_at?: string | null
           publishing_url_expires_at?: string | null
           size_bytes?: number
-          storage_path: string
+          source_metadata?: Json
+          source_provider?: string
+          source_web_url?: string | null
+          storage_path?: string | null
           tags?: string[]
+          thumbnail_url?: string | null
           updated_at?: string
           uploaded_by?: string | null
           width?: number | null
@@ -1086,6 +1189,8 @@ export type Database = {
           archived_at?: string | null
           created_at?: string
           duration_seconds?: number | null
+          external_file_id?: string | null
+          external_parent_id?: string | null
           folder_id?: string | null
           height?: number | null
           id?: string
@@ -1099,8 +1204,12 @@ export type Database = {
           publishing_url_created_at?: string | null
           publishing_url_expires_at?: string | null
           size_bytes?: number
-          storage_path?: string
+          source_metadata?: Json
+          source_provider?: string
+          source_web_url?: string | null
+          storage_path?: string | null
           tags?: string[]
+          thumbnail_url?: string | null
           updated_at?: string
           uploaded_by?: string | null
           width?: number | null
