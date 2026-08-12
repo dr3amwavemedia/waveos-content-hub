@@ -70,14 +70,31 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
             };
           });
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-          const { data, error } = await supabaseAdmin
-            .from("media_assets")
-            .upsert(rows as never, {
-              onConflict: "workspace_id,source_provider,external_file_id",
-            })
-            .select("id,name");
-          if (error) return json({ error: error.message }, 500);
-          return json({ imported: data ?? [] });
+          const uniqueRows = [...new Map(rows.map((row) => [row.external_file_id, row])).values()];
+          const imported: Array<{ id: string; name: string }> = [];
+
+          // Do not rely on an ON CONFLICT target here. Some deployed WaveOS
+          // databases still have the original partial unique index, which
+          // PostgreSQL cannot infer from PostgREST's standard upsert request.
+          for (const row of uniqueRows) {
+            const { data: existing, error: lookupError } = await supabaseAdmin
+              .from("media_assets")
+              .select("id")
+              .eq("workspace_id", workspaceId)
+              .eq("source_provider", provider)
+              .eq("external_file_id", row.external_file_id)
+              .maybeSingle();
+            if (lookupError) return json({ error: lookupError.message }, 500);
+
+            const query = existing?.id
+              ? supabaseAdmin.from("media_assets").update(row as never).eq("id", existing.id)
+              : supabaseAdmin.from("media_assets").insert(row as never);
+            const { data: saved, error: saveError } = await query.select("id,name").single();
+            if (saveError) return json({ error: saveError.message }, 500);
+            imported.push(saved as { id: string; name: string });
+          }
+
+          return json({ imported });
         }
 
         if (body.action !== "list") return json({ error: "invalid_action" }, 400);
