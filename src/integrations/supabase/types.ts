@@ -1051,13 +1051,7 @@ export type Database = {
           publishing_url_created_at: string | null
           publishing_url_expires_at: string | null
           size_bytes: number
-          storage_path: string | null
-          source_provider: string
-          external_file_id: string | null
-          external_parent_id: string | null
-          source_web_url: string | null
-          thumbnail_url: string | null
-          source_metadata: Json
+          storage_path: string
           tags: string[]
           updated_at: string
           uploaded_by: string | null
@@ -1081,13 +1075,7 @@ export type Database = {
           publishing_url_created_at?: string | null
           publishing_url_expires_at?: string | null
           size_bytes?: number
-          storage_path?: string | null
-          source_provider?: string
-          external_file_id?: string | null
-          external_parent_id?: string | null
-          source_web_url?: string | null
-          thumbnail_url?: string | null
-          source_metadata?: Json
+          storage_path: string
           tags?: string[]
           updated_at?: string
           uploaded_by?: string | null
@@ -1111,13 +1099,7 @@ export type Database = {
           publishing_url_created_at?: string | null
           publishing_url_expires_at?: string | null
           size_bytes?: number
-          storage_path?: string | null
-          source_provider?: string
-          external_file_id?: string | null
-          external_parent_id?: string | null
-          source_web_url?: string | null
-          thumbnail_url?: string | null
-          source_metadata?: Json
+          storage_path?: string
           tags?: string[]
           updated_at?: string
           uploaded_by?: string | null
@@ -1743,7 +1725,6 @@ export type Database = {
           is_demo: boolean
           last_activity_at: string | null
           name: string
-          approval_required: boolean
           require_fresh_social_login: boolean
           service_area: string | null
           service_tier: string | null
@@ -1774,7 +1755,6 @@ export type Database = {
           is_demo?: boolean
           last_activity_at?: string | null
           name: string
-          approval_required?: boolean
           require_fresh_social_login?: boolean
           service_area?: string | null
           service_tier?: string | null
@@ -1805,7 +1785,6 @@ export type Database = {
           is_demo?: boolean
           last_activity_at?: string | null
           name?: string
-          approval_required?: boolean
           require_fresh_social_login?: boolean
           service_area?: string | null
           service_tier?: string | null
@@ -1836,7 +1815,8 @@ export type Database = {
           status: Database["public"]["Enums"]["invite_status"] | null
           workspace_id: string | null
           workspace_role:
-            Database["public"]["Enums"]["workspace_member_role"] | null
+            | Database["public"]["Enums"]["workspace_member_role"]
+            | null
         }
         Insert: {
           accepted_at?: string | null
@@ -1854,7 +1834,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["invite_status"] | null
           workspace_id?: string | null
           workspace_role?:
-            Database["public"]["Enums"]["workspace_member_role"] | null
+            | Database["public"]["Enums"]["workspace_member_role"]
+            | null
         }
         Update: {
           accepted_at?: string | null
@@ -1872,7 +1853,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["invite_status"] | null
           workspace_id?: string | null
           workspace_role?:
-            Database["public"]["Enums"]["workspace_member_role"] | null
+            | Database["public"]["Enums"]["workspace_member_role"]
+            | null
         }
         Relationships: [
           {
@@ -2000,17 +1982,13 @@ export type Database = {
         }
         Returns: string
       }
-      delete_empty_client_workspace: {
+      delete_client_workspace: {
         Args: { _confirmation: string; _workspace_id: string }
         Returns: string
       }
-      decide_content_approval: {
-        Args: {
-          _content_id: string
-          _decision: Database["public"]["Enums"]["approval_decision"]
-          _note?: string
-        }
-        Returns: Database["public"]["Enums"]["content_status"]
+      delete_empty_client_workspace: {
+        Args: { _confirmation: string; _workspace_id: string }
+        Returns: string
       }
       get_client_member_directory: {
         Args: { _workspace_id: string }
@@ -2189,14 +2167,6 @@ export type Database = {
           raw_token: string
         }[]
       }
-      submit_content_for_approval: {
-        Args: {
-          _content_id: string
-          _requested_action: string
-          _scheduled_at?: string
-        }
-        Returns: Database["public"]["Enums"]["content_status"]
-      }
       revoke_invite: { Args: { _invite_id: string }; Returns: undefined }
       revoke_staff_role: {
         Args: {
@@ -2208,10 +2178,6 @@ export type Database = {
       set_staff_position: {
         Args: { _position: string; _target_user: string }
         Returns: undefined
-      }
-      set_workspace_automatic_content_approval: {
-        Args: { _enabled: boolean; _workspace_id: string }
-        Returns: boolean
       }
       set_staff_type: {
         Args: {
@@ -2227,7 +2193,11 @@ export type Database = {
     }
     Enums: {
       account_status:
-        "pending" | "active" | "suspended" | "expired" | "archived"
+        | "pending"
+        | "active"
+        | "suspended"
+        | "expired"
+        | "archived"
       agreement_term: "one_time" | "90_day" | "6_month" | "12_month"
       app_role:
         | "dream_wave_owner"
@@ -2236,9 +2206,11 @@ export type Database = {
         | "client_approver"
         | "client_viewer"
       approval_decision:
-        "pending" | "approved" | "changes_requested" | "rejected"
-      client_access_tier:
-        "project_client" | "growth_90" | "retainer_full" | "social_management"
+        | "pending"
+        | "approved"
+        | "changes_requested"
+        | "rejected"
+      client_access_tier: "project_client" | "growth_90" | "retainer_full"
       content_status:
         | "draft"
         | "in_review"
@@ -2272,9 +2244,19 @@ export type Database = {
         | "other"
       invite_status: "pending" | "accepted" | "expired" | "revoked"
       invoice_status:
-        "draft" | "sent" | "paid" | "overdue" | "void" | "deposit" | "unpaid"
+        | "draft"
+        | "sent"
+        | "paid"
+        | "overdue"
+        | "void"
+        | "deposit"
+        | "unpaid"
       media_publishing_status:
-        "none" | "preparing" | "ready" | "expired" | "failed"
+        | "none"
+        | "preparing"
+        | "ready"
+        | "expired"
+        | "failed"
       notification_kind:
         | "invite_accepted"
         | "content_submitted"
@@ -2288,7 +2270,12 @@ export type Database = {
         | "account_disconnected"
         | "generic"
       publish_status:
-        "queued" | "sending" | "success" | "partial" | "failed" | "skipped"
+        | "queued"
+        | "sending"
+        | "success"
+        | "partial"
+        | "failed"
+        | "skipped"
       social_platform:
         | "instagram"
         | "facebook"
@@ -2304,7 +2291,11 @@ export type Database = {
       staff_type: "sales" | "media_manager"
       vision_deck_status: "draft" | "ready" | "archived"
       workspace_member_role:
-        "owner" | "approver" | "viewer" | "admin" | "editor"
+        | "owner"
+        | "approver"
+        | "viewer"
+        | "admin"
+        | "editor"
       workspace_status: "onboarding" | "active" | "paused" | "archived"
     }
     CompositeTypes: {
@@ -2321,12 +2312,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2348,12 +2339,13 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2372,12 +2364,13 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2396,12 +2389,13 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2414,11 +2408,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -2445,12 +2439,7 @@ export const Constants = {
         "changes_requested",
         "rejected",
       ],
-      client_access_tier: [
-        "project_client",
-        "growth_90",
-        "retainer_full",
-        "social_management",
-      ],
+      client_access_tier: ["project_client", "growth_90", "retainer_full"],
       content_status: [
         "draft",
         "in_review",
