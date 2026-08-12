@@ -44,12 +44,16 @@ import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-c
 import { Route as VisionTokenRouteImport } from './routes/vision/$token'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as ApiExternalMediaProviderRouteImport } from './routes/api/external-media/$provider'
 import { Route as ApiOutlookCalendarRouteImport } from './routes/api/outlook/calendar'
 import { Route as ApiOutlookCallbackRouteImport } from './routes/api/outlook/callback'
 import { Route as ApiOutlookContactsRouteImport } from './routes/api/outlook/contacts'
 import { Route as ApiOutlookMailRouteImport } from './routes/api/outlook/mail'
 import { Route as ApiOutlookOauthRouteImport } from './routes/api/outlook/oauth'
 import { Route as ApiPublicVisionAssetRouteImport } from './routes/api/public/vision-asset'
+import { Route as ApiExternalMediaProviderCallbackRouteImport } from './routes/api/external-media/$provider.callback'
+import { Route as ApiExternalMediaProviderFilesRouteImport } from './routes/api/external-media/$provider.files'
+import { Route as ApiPublicExternalMediaAssetIdRouteImport } from './routes/api/public/external-media/$assetId'
 import { Route as ApiPublicHooksAyrshareRouteImport } from './routes/api/public/hooks/ayrshare'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 
@@ -233,6 +237,12 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiExternalMediaProviderRoute =
+  ApiExternalMediaProviderRouteImport.update({
+    id: '/api/external-media/$provider',
+    path: '/api/external-media/$provider',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiOutlookCalendarRoute = ApiOutlookCalendarRouteImport.update({
   id: '/api/outlook/calendar',
   path: '/api/outlook/calendar',
@@ -263,6 +273,24 @@ const ApiPublicVisionAssetRoute = ApiPublicVisionAssetRouteImport.update({
   path: '/api/public/vision-asset',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiExternalMediaProviderCallbackRoute =
+  ApiExternalMediaProviderCallbackRouteImport.update({
+    id: '/callback',
+    path: '/callback',
+    getParentRoute: () => ApiExternalMediaProviderRoute,
+  } as any)
+const ApiExternalMediaProviderFilesRoute =
+  ApiExternalMediaProviderFilesRouteImport.update({
+    id: '/files',
+    path: '/files',
+    getParentRoute: () => ApiExternalMediaProviderRoute,
+  } as any)
+const ApiPublicExternalMediaAssetIdRoute =
+  ApiPublicExternalMediaAssetIdRouteImport.update({
+    id: '/api/public/external-media/$assetId',
+    path: '/api/public/external-media/$assetId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksAyrshareRoute = ApiPublicHooksAyrshareRouteImport.update({
   id: '/api/public/hooks/ayrshare',
   path: '/api/public/hooks/ayrshare',
@@ -310,12 +338,16 @@ export interface FileRoutesByFullPath {
   '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/external-media/$provider': typeof ApiExternalMediaProviderRouteWithChildren
   '/api/outlook/calendar': typeof ApiOutlookCalendarRoute
   '/api/outlook/callback': typeof ApiOutlookCallbackRoute
   '/api/outlook/contacts': typeof ApiOutlookContactsRoute
   '/api/outlook/mail': typeof ApiOutlookMailRoute
   '/api/outlook/oauth': typeof ApiOutlookOauthRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
+  '/api/external-media/$provider/callback': typeof ApiExternalMediaProviderCallbackRoute
+  '/api/external-media/$provider/files': typeof ApiExternalMediaProviderFilesRoute
+  '/api/public/external-media/$assetId': typeof ApiPublicExternalMediaAssetIdRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -354,12 +386,16 @@ export interface FileRoutesByTo {
   '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/external-media/$provider': typeof ApiExternalMediaProviderRouteWithChildren
   '/api/outlook/calendar': typeof ApiOutlookCalendarRoute
   '/api/outlook/callback': typeof ApiOutlookCallbackRoute
   '/api/outlook/contacts': typeof ApiOutlookContactsRoute
   '/api/outlook/mail': typeof ApiOutlookMailRoute
   '/api/outlook/oauth': typeof ApiOutlookOauthRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
+  '/api/external-media/$provider/callback': typeof ApiExternalMediaProviderCallbackRoute
+  '/api/external-media/$provider/files': typeof ApiExternalMediaProviderFilesRoute
+  '/api/public/external-media/$assetId': typeof ApiPublicExternalMediaAssetIdRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -400,12 +436,16 @@ export interface FileRoutesById {
   '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/api/external-media/$provider': typeof ApiExternalMediaProviderRouteWithChildren
   '/api/outlook/calendar': typeof ApiOutlookCalendarRoute
   '/api/outlook/callback': typeof ApiOutlookCallbackRoute
   '/api/outlook/contacts': typeof ApiOutlookContactsRoute
   '/api/outlook/mail': typeof ApiOutlookMailRoute
   '/api/outlook/oauth': typeof ApiOutlookOauthRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
+  '/api/external-media/$provider/callback': typeof ApiExternalMediaProviderCallbackRoute
+  '/api/external-media/$provider/files': typeof ApiExternalMediaProviderFilesRoute
+  '/api/public/external-media/$assetId': typeof ApiPublicExternalMediaAssetIdRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
@@ -446,12 +486,16 @@ export interface FileRouteTypes {
     | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/external-media/$provider'
     | '/api/outlook/calendar'
     | '/api/outlook/callback'
     | '/api/outlook/contacts'
     | '/api/outlook/mail'
     | '/api/outlook/oauth'
     | '/api/public/vision-asset'
+    | '/api/external-media/$provider/callback'
+    | '/api/external-media/$provider/files'
+    | '/api/public/external-media/$assetId'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
   fileRoutesByTo: FileRoutesByTo
@@ -490,12 +534,16 @@ export interface FileRouteTypes {
     | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/external-media/$provider'
     | '/api/outlook/calendar'
     | '/api/outlook/callback'
     | '/api/outlook/contacts'
     | '/api/outlook/mail'
     | '/api/outlook/oauth'
     | '/api/public/vision-asset'
+    | '/api/external-media/$provider/callback'
+    | '/api/external-media/$provider/files'
+    | '/api/public/external-media/$assetId'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
   id:
@@ -535,12 +583,16 @@ export interface FileRouteTypes {
     | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/api/external-media/$provider'
     | '/api/outlook/calendar'
     | '/api/outlook/callback'
     | '/api/outlook/contacts'
     | '/api/outlook/mail'
     | '/api/outlook/oauth'
     | '/api/public/vision-asset'
+    | '/api/external-media/$provider/callback'
+    | '/api/external-media/$provider/files'
+    | '/api/public/external-media/$assetId'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
   fileRoutesById: FileRoutesById
@@ -562,12 +614,14 @@ export interface RootRouteChildren {
   VisionTokenRoute: typeof VisionTokenRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
+  ApiExternalMediaProviderRoute: typeof ApiExternalMediaProviderRouteWithChildren
   ApiOutlookCalendarRoute: typeof ApiOutlookCalendarRoute
   ApiOutlookCallbackRoute: typeof ApiOutlookCallbackRoute
   ApiOutlookContactsRoute: typeof ApiOutlookContactsRoute
   ApiOutlookMailRoute: typeof ApiOutlookMailRoute
   ApiOutlookOauthRoute: typeof ApiOutlookOauthRoute
   ApiPublicVisionAssetRoute: typeof ApiPublicVisionAssetRoute
+  ApiPublicExternalMediaAssetIdRoute: typeof ApiPublicExternalMediaAssetIdRoute
   ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
 }
@@ -819,6 +873,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/external-media/$provider': {
+      id: '/api/external-media/$provider'
+      path: '/api/external-media/$provider'
+      fullPath: '/api/external-media/$provider'
+      preLoaderRoute: typeof ApiExternalMediaProviderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/outlook/calendar': {
       id: '/api/outlook/calendar'
       path: '/api/outlook/calendar'
@@ -859,6 +920,27 @@ declare module '@tanstack/react-router' {
       path: '/api/public/vision-asset'
       fullPath: '/api/public/vision-asset'
       preLoaderRoute: typeof ApiPublicVisionAssetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/external-media/$provider/callback': {
+      id: '/api/external-media/$provider/callback'
+      path: '/callback'
+      fullPath: '/api/external-media/$provider/callback'
+      preLoaderRoute: typeof ApiExternalMediaProviderCallbackRouteImport
+      parentRoute: typeof ApiExternalMediaProviderRoute
+    }
+    '/api/external-media/$provider/files': {
+      id: '/api/external-media/$provider/files'
+      path: '/files'
+      fullPath: '/api/external-media/$provider/files'
+      preLoaderRoute: typeof ApiExternalMediaProviderFilesRouteImport
+      parentRoute: typeof ApiExternalMediaProviderRoute
+    }
+    '/api/public/external-media/$assetId': {
+      id: '/api/public/external-media/$assetId'
+      path: '/api/public/external-media/$assetId'
+      fullPath: '/api/public/external-media/$assetId'
+      preLoaderRoute: typeof ApiPublicExternalMediaAssetIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/ayrshare': {
@@ -925,6 +1007,23 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface ApiExternalMediaProviderRouteChildren {
+  ApiExternalMediaProviderCallbackRoute: typeof ApiExternalMediaProviderCallbackRoute
+  ApiExternalMediaProviderFilesRoute: typeof ApiExternalMediaProviderFilesRoute
+}
+
+const ApiExternalMediaProviderRouteChildren: ApiExternalMediaProviderRouteChildren =
+  {
+    ApiExternalMediaProviderCallbackRoute:
+      ApiExternalMediaProviderCallbackRoute,
+    ApiExternalMediaProviderFilesRoute: ApiExternalMediaProviderFilesRoute,
+  }
+
+const ApiExternalMediaProviderRouteWithChildren =
+  ApiExternalMediaProviderRoute._addFileChildren(
+    ApiExternalMediaProviderRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
@@ -943,12 +1042,14 @@ const rootRouteChildren: RootRouteChildren = {
   VisionTokenRoute: VisionTokenRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
+  ApiExternalMediaProviderRoute: ApiExternalMediaProviderRouteWithChildren,
   ApiOutlookCalendarRoute: ApiOutlookCalendarRoute,
   ApiOutlookCallbackRoute: ApiOutlookCallbackRoute,
   ApiOutlookContactsRoute: ApiOutlookContactsRoute,
   ApiOutlookMailRoute: ApiOutlookMailRoute,
   ApiOutlookOauthRoute: ApiOutlookOauthRoute,
   ApiPublicVisionAssetRoute: ApiPublicVisionAssetRoute,
+  ApiPublicExternalMediaAssetIdRoute: ApiPublicExternalMediaAssetIdRoute,
   ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
 }

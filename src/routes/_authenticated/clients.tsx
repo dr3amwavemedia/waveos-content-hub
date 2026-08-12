@@ -1160,7 +1160,9 @@ function AccessTab({
         .eq("workspace_id", workspace.id);
       if (mediaError) throw mediaError;
 
-      const mediaPaths = (media ?? []).map((asset) => asset.storage_path).filter(Boolean);
+      const mediaPaths = (media ?? [])
+        .map((asset) => asset.storage_path)
+        .filter((path): path is string => Boolean(path));
       if (mediaPaths.length > 0) {
         const { error: storageError } = await supabase.storage.from("media").remove(mediaPaths);
         if (storageError) throw storageError;

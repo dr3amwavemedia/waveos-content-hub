@@ -6,6 +6,7 @@ import {
   Calendar as CalendarIcon,
   CalendarClock,
   Check,
+  Cloud,
   FileText,
   ImagePlus,
   Loader2,
@@ -23,8 +24,17 @@ import { publishContentItem } from "@/lib/publish.functions";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/app/empty-state";
 import { useWorkspace } from "@/components/app/workspace-context";
-import { getSignedMediaUrl, useMediaAssets } from "@/hooks/use-media";
+import { getMediaPreviewUrl, useMediaAssets } from "@/hooks/use-media";
 import type { MediaAsset } from "@/hooks/use-media";
+import {
+  getExternalMediaStatus,
+  getGooglePickerToken,
+  importExternalMedia,
+  listExternalMedia,
+  startExternalMediaConnection,
+  type ExternalMediaProvider,
+  type ExternalProviderFile,
+} from "@/hooks/use-external-media";
 import {
   ALL_PLATFORMS,
   PLATFORM_LABEL,
@@ -806,7 +816,7 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!asset) return;
-    void getSignedMediaUrl(asset.storage_path, 600).then(setUrl);
+    void getMediaPreviewUrl(asset, 600).then(setUrl);
   }, [asset?.id]);
   if (!asset) return <div className="aspect-square rounded-lg border border-border bg-elevated" />;
   return (
@@ -844,12 +854,13 @@ function MediaPicker({
   const [search, setSearch] = useState("");
   const assets = useMediaAssets(workspaceId, { search: search || undefined });
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [source, setSource] = useState<"waveos" | ExternalMediaProvider>("waveos");
 
   useEffect(() => {
     (async () => {
       const items = assets.data ?? [];
       const entries = await Promise.all(
-        items.map(async (a) => [a.id, await getSignedMediaUrl(a.storage_path, 600)] as const),
+        items.map(async (a) => [a.id, (await getMediaPreviewUrl(a, 600)) ?? ""] as const),
       );
       setUrls(Object.fromEntries(entries));
     })();
@@ -868,6 +879,27 @@ function MediaPicker({
           </button>
         </div>
         <div className="border-b border-border p-4">
+          <div className="mb-3 flex flex-wrap gap-2">
+            {([
+              ["waveos", "WaveOS"],
+              ["google_drive", "Google Drive"],
+              ["dropbox", "Dropbox"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setSource(value)}
+                className={cn(
+                  "rounded-full border px-3 py-1.5 text-xs font-medium",
+                  source === value
+                    ? "border-primary/40 bg-primary/15 text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -876,7 +908,18 @@ function MediaPicker({
           />
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-4">
-          {assets.isLoading ? (
+          {source !== "waveos" ? (
+            <ExternalProviderPicker
+              provider={source}
+              workspaceId={workspaceId}
+              query={search}
+              selected={selected}
+              onImported={(ids) => {
+                setSelected((current) => Array.from(new Set([...current, ...ids])));
+                void assets.refetch();
+              }}
+            />
+          ) : assets.isLoading ? (
             <div className="flex items-center justify-center py-16 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
             </div>
@@ -931,4 +974,321 @@ function MediaPicker({
       </div>
     </div>
   );
+}
+
+function ExternalProviderPicker({
+  provider,
+  workspaceId,
+  query,
+  selected,
+  onImported,
+}: {
+  provider: ExternalMediaProvider;
+  workspaceId: string;
+  query: string;
+  selected: string[];
+  onImported: (ids: string[]) => void;
+}) {
+  const [files, setFiles] = useState<ExternalProviderFile[]>([]);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [connected, setConnected] = useState(false);
+  const [configured, setConfigured] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const providerLabel = provider === "google_drive" ? "Google Drive" : "Dropbox";
+
+  useEffect(() => {
+    let active = true;
+    const timeout = window.setTimeout(async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const status = await getExternalMediaStatus(provider, workspaceId);
+        if (!active) return;
+        setConnected(status.connected);
+        setConfigured(status.configured);
+        if (!status.connected) {
+          setFiles([]);
+          return;
+        }
+        const result = await listExternalMedia(provider, workspaceId, query);
+        if (active) setFiles(result.files);
+      } catch (reason) {
+        if (active) setError(reason instanceof Error ? reason.message : "Could not load files.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, 300);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [provider, workspaceId, query]);
+
+  async function connect() {
+    try {
+      const result = await startExternalMediaConnection(provider, workspaceId);
+      window.location.assign(result.url);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Connection failed.");
+    }
+  }
+
+  async function addChosen() {
+    const picked = files.filter((file) => chosen.includes(file.id));
+    if (!picked.length) return;
+    setImporting(true);
+    try {
+      const result = await importExternalMedia(provider, workspaceId, picked);
+      onImported(result.imported.map((item) => item.id).filter((id) => !selected.includes(id)));
+      setChosen([]);
+      toast.success(`Added ${result.imported.length} item${result.imported.length === 1 ? "" : "s"} from ${providerLabel}.`);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Could not add external media.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading {providerLabel}…
+      </div>
+    );
+  }
+  if (!configured || !connected) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+          <Cloud className="h-6 w-6" />
+        </div>
+        <div>
+          <p className="font-semibold text-foreground">
+            {!configured ? `${providerLabel} needs developer setup` : `Connect ${providerLabel}`}
+          </p>
+          <p className="mt-1 max-w-md text-xs text-muted-foreground">
+            {!configured
+              ? "Add the provider credentials to the protected deployment settings first."
+              : "Your originals stay in your account. WaveOS only saves the files you choose as references."}
+          </p>
+        </div>
+        {configured && (
+          <button
+            type="button"
+            onClick={connect}
+            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            Connect {providerLabel}
+          </button>
+        )}
+      </div>
+    );
+  }
+  if (error) {
+    return <div className="py-16 text-center text-sm text-destructive">{error}</div>;
+  }
+  if (provider === "google_drive") {
+    return (
+      <GoogleDrivePicker
+        workspaceId={workspaceId}
+        selected={selected}
+        onImported={onImported}
+      />
+    );
+  }
+  return (
+    <div className="space-y-4">
+      {files.length === 0 ? (
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          No compatible photos or videos found.
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+          {files.map((file) => {
+            const isChosen = chosen.includes(file.id);
+            return (
+              <button
+                key={file.id}
+                type="button"
+                onClick={() =>
+                  setChosen((current) =>
+                    isChosen ? current.filter((id) => id !== file.id) : [...current, file.id],
+                  )
+                }
+                className={cn(
+                  "group relative aspect-square overflow-hidden rounded-lg border bg-elevated",
+                  isChosen ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/40",
+                )}
+              >
+                {file.thumbnailUrl ? (
+                  <img src={file.thumbnailUrl} alt={file.name} className="h-full w-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-2 text-center text-[10px] text-muted-foreground">
+                    <Cloud className="h-5 w-5" />
+                    <span className="line-clamp-2">{file.name}</span>
+                  </div>
+                )}
+                {isChosen && (
+                  <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Check className="h-3 w-3" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {chosen.length > 0 && (
+        <div className="sticky bottom-0 flex justify-end border-t border-border bg-surface/95 pt-3 backdrop-blur">
+          <button
+            type="button"
+            onClick={addChosen}
+            disabled={importing}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {importing && <Loader2 className="h-4 w-4 animate-spin" />}
+            Add {chosen.length} to this post
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GoogleDrivePicker({
+  workspaceId,
+  selected,
+  onImported,
+}: {
+  workspaceId: string;
+  selected: string[];
+  onImported: (ids: string[]) => void;
+}) {
+  const [opening, setOpening] = useState(false);
+
+  async function openPicker() {
+    setOpening(true);
+    try {
+      const config = await getGooglePickerToken(workspaceId);
+      await loadGooglePickerScript();
+      const googleApi = (window as unknown as { google?: GooglePickerGlobal }).google;
+      if (!googleApi?.picker) throw new Error("Google Picker did not load.");
+      const view = new googleApi.picker.View(googleApi.picker.ViewId.DOCS_IMAGES_AND_VIDEOS);
+      const picker = new googleApi.picker.PickerBuilder()
+        .enableFeature(googleApi.picker.Feature.MULTISELECT_ENABLED)
+        .setDeveloperKey(config.apiKey)
+        .setAppId(config.appId)
+        .setOAuthToken(config.accessToken)
+        .setOrigin(window.location.origin)
+        .setSelectableMimeTypes(
+          "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm",
+        )
+        .addView(view)
+        .setCallback(async (data: GooglePickerResult) => {
+          if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
+          try {
+            const files: ExternalProviderFile[] = data.docs.map((doc) => ({
+              id: doc.id,
+              name: doc.name,
+              mimeType: doc.mimeType,
+              sizeBytes: Number(doc.sizeBytes ?? 0),
+              thumbnailUrl: null,
+              webUrl: doc.url ?? null,
+              parentId: doc.parentId ?? null,
+            }));
+            const imported = await importExternalMedia("google_drive", workspaceId, files);
+            onImported(imported.imported.map((item) => item.id).filter((id) => !selected.includes(id)));
+            toast.success(
+              `Added ${imported.imported.length} item${imported.imported.length === 1 ? "" : "s"} from Google Drive.`,
+            );
+          } catch (reason) {
+            toast.error(reason instanceof Error ? reason.message : "Could not add Google Drive media.");
+          }
+        })
+        .build();
+      picker.setVisible(true);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Google Picker could not open.");
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <Cloud className="h-6 w-6" />
+      </div>
+      <div>
+        <p className="font-semibold text-foreground">Choose from Google Drive</p>
+        <p className="mt-1 max-w-md text-xs text-muted-foreground">
+          Google opens its secure picker so WaveOS only receives the files you select.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={openPicker}
+        disabled={opening}
+        className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+      >
+        {opening && <Loader2 className="h-4 w-4 animate-spin" />}
+        Open Google Picker
+      </button>
+    </div>
+  );
+}
+
+type GooglePickerResult = {
+  action: string;
+  docs?: Array<{
+    id: string;
+    name: string;
+    mimeType: string;
+    sizeBytes?: number | string;
+    url?: string;
+    parentId?: string;
+  }>;
+};
+
+type GooglePickerBuilder = {
+  enableFeature: (feature: string) => GooglePickerBuilder;
+  setDeveloperKey: (value: string) => GooglePickerBuilder;
+  setAppId: (value: string) => GooglePickerBuilder;
+  setOAuthToken: (value: string) => GooglePickerBuilder;
+  setOrigin: (value: string) => GooglePickerBuilder;
+  setSelectableMimeTypes: (value: string) => GooglePickerBuilder;
+  addView: (value: unknown) => GooglePickerBuilder;
+  setCallback: (value: (data: GooglePickerResult) => void) => GooglePickerBuilder;
+  build: () => { setVisible: (visible: boolean) => void };
+};
+
+type GooglePickerGlobal = {
+  picker: {
+    View: new (viewId: string) => unknown;
+    PickerBuilder: new () => GooglePickerBuilder;
+    ViewId: { DOCS_IMAGES_AND_VIDEOS: string };
+    Feature: { MULTISELECT_ENABLED: string };
+    Action: { PICKED: string };
+  };
+};
+
+let googlePickerLoader: Promise<void> | null = null;
+function loadGooglePickerScript() {
+  if ((window as unknown as { google?: GooglePickerGlobal }).google?.picker) return Promise.resolve();
+  if (googlePickerLoader) return googlePickerLoader;
+  googlePickerLoader = new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://apis.google.com/js/api.js";
+    script.async = true;
+    script.onload = () => {
+      const gapi = (window as unknown as { gapi?: { load: (name: string, callback: () => void) => void } }).gapi;
+      if (!gapi) return reject(new Error("Google API did not load."));
+      gapi.load("picker", resolve);
+    };
+    script.onerror = () => reject(new Error("Google Picker could not be downloaded."));
+    document.head.appendChild(script);
+  });
+  return googlePickerLoader;
 }

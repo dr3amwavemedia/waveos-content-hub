@@ -92,6 +92,9 @@ export const prepareMediaForPublishing = createServerFn({ method: "POST" })
     }> = [];
 
     for (const a of assets) {
+      if ((a as { source_provider?: string }).source_provider && (a as { source_provider?: string }).source_provider !== "waveos") {
+        throw new Error(`external_asset_resolves_at_publish_time:${a.id}`);
+      }
       const path = a.private_storage_path ?? a.storage_path;
       if (!path) throw new Error(`asset_missing_path:${a.id}`);
 

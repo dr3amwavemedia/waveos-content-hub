@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { EmptyState } from "@/components/app/empty-state";
 import {
-  getSignedMediaUrl,
+  getMediaPreviewUrl,
   useCreateFolder,
   useDeleteAsset,
   useMediaAssets,
@@ -376,7 +376,7 @@ function AssetCard({ asset, onClick }: { asset: MediaAsset; onClick: () => void 
   const started = useRef(false);
   if (!started.current) {
     started.current = true;
-    getSignedMediaUrl(asset.storage_path, 3600)
+    getMediaPreviewUrl(asset, 3600)
       .then(setUrl)
       .catch(() => setUrl(null));
   }
@@ -486,7 +486,7 @@ function AssetPreview({
   const started = useRef(false);
   if (!started.current) {
     started.current = true;
-    getSignedMediaUrl(asset.storage_path, 3600)
+    getMediaPreviewUrl(asset, 3600)
       .then(setUrl)
       .catch(() => setUrl(null));
   }

@@ -137,19 +137,11 @@ export const publishContentItem = createServerFn({ method: "POST" })
     if (item.media_asset_ids?.length) {
       const { data: assets } = await supabaseAdmin
         .from("media_assets")
-        .select("storage_path,mime_type")
+        .select("id,workspace_id,name,storage_path,mime_type,size_bytes,source_provider,external_file_id,source_web_url")
         .in("id", item.media_asset_ids);
       isVideo = assets?.length === 1 && assets[0]?.mime_type?.startsWith("video/") === true;
-      const paths = (assets ?? []).map((a) => a.storage_path);
-      const signed = await Promise.all(
-        paths.map(async (p) => {
-          const { data: s } = await supabaseAdmin.storage
-            .from("media")
-            .createSignedUrl(p, 60 * 60 * 24 * 7);
-          return s?.signedUrl ?? null;
-        }),
-      );
-      mediaUrls = signed.filter(Boolean) as string[];
+      const { resolveMediaAssetUrl } = await import("@/lib/external-media.server");
+      mediaUrls = await Promise.all((assets ?? []).map((asset) => resolveMediaAssetUrl(asset)));
     }
 
     await supabase.from("content_items").update({ status: "publishing" }).eq("id", data.contentId);

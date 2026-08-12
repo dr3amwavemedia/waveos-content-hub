@@ -1051,7 +1051,13 @@ export type Database = {
           publishing_url_created_at: string | null
           publishing_url_expires_at: string | null
           size_bytes: number
-          storage_path: string
+          storage_path: string | null
+          source_provider: string
+          external_file_id: string | null
+          external_parent_id: string | null
+          source_web_url: string | null
+          thumbnail_url: string | null
+          source_metadata: Json
           tags: string[]
           updated_at: string
           uploaded_by: string | null
@@ -1075,7 +1081,13 @@ export type Database = {
           publishing_url_created_at?: string | null
           publishing_url_expires_at?: string | null
           size_bytes?: number
-          storage_path: string
+          storage_path?: string | null
+          source_provider?: string
+          external_file_id?: string | null
+          external_parent_id?: string | null
+          source_web_url?: string | null
+          thumbnail_url?: string | null
+          source_metadata?: Json
           tags?: string[]
           updated_at?: string
           uploaded_by?: string | null
@@ -1099,7 +1111,13 @@ export type Database = {
           publishing_url_created_at?: string | null
           publishing_url_expires_at?: string | null
           size_bytes?: number
-          storage_path?: string
+          storage_path?: string | null
+          source_provider?: string
+          external_file_id?: string | null
+          external_parent_id?: string | null
+          source_web_url?: string | null
+          thumbnail_url?: string | null
+          source_metadata?: Json
           tags?: string[]
           updated_at?: string
           uploaded_by?: string | null
