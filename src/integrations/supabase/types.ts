@@ -2091,6 +2091,14 @@ export type Database = {
         }
         Returns: string
       }
+      decide_content_approval: {
+        Args: {
+          _content_id: string
+          _decision: Database["public"]["Enums"]["approval_decision"]
+          _note?: string
+        }
+        Returns: Database["public"]["Enums"]["content_status"]
+      }
       delete_client_workspace: {
         Args: { _confirmation: string; _workspace_id: string }
         Returns: string
@@ -2294,6 +2302,14 @@ export type Database = {
           _target_user: string
         }
         Returns: undefined
+      }
+      submit_content_for_approval: {
+        Args: {
+          _content_id: string
+          _requested_action: string
+          _scheduled_at?: string
+        }
+        Returns: Database["public"]["Enums"]["content_status"]
       }
       workspace_role: {
         Args: { _user_id: string; _workspace_id: string }
