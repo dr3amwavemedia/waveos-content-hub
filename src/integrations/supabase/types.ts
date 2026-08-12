@@ -1821,6 +1821,7 @@ export type Database = {
           account_status: Database["public"]["Enums"]["account_status"]
           activated_at: string | null
           agreement_term: Database["public"]["Enums"]["agreement_term"] | null
+          approval_required: boolean
           created_at: string
           created_by: string | null
           crm_external_id: string | null
@@ -1851,6 +1852,7 @@ export type Database = {
           account_status?: Database["public"]["Enums"]["account_status"]
           activated_at?: string | null
           agreement_term?: Database["public"]["Enums"]["agreement_term"] | null
+          approval_required?: boolean
           created_at?: string
           created_by?: string | null
           crm_external_id?: string | null
@@ -1881,6 +1883,7 @@ export type Database = {
           account_status?: Database["public"]["Enums"]["account_status"]
           activated_at?: string | null
           agreement_term?: Database["public"]["Enums"]["agreement_term"] | null
+          approval_required?: boolean
           created_at?: string
           created_by?: string | null
           crm_external_id?: string | null
@@ -1995,6 +1998,10 @@ export type Database = {
       admin_update_workspace_name: {
         Args: { _name: string; _workspace_id: string }
         Returns: undefined
+      }
+      can_staff_manage_workspace: {
+        Args: { _user_id: string; _workspace_id: string }
+        Returns: boolean
       }
       create_brand_workspace: {
         Args: {
@@ -2303,6 +2310,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_workspace_automatic_content_approval: {
+        Args: { _enabled: boolean; _workspace_id: string }
+        Returns: boolean
+      }
       submit_content_for_approval: {
         Args: {
           _content_id: string
@@ -2335,7 +2346,11 @@ export type Database = {
         | "approved"
         | "changes_requested"
         | "rejected"
-      client_access_tier: "project_client" | "growth_90" | "retainer_full"
+      client_access_tier:
+        | "project_client"
+        | "growth_90"
+        | "retainer_full"
+        | "social_management"
       content_status:
         | "draft"
         | "in_review"
@@ -2564,7 +2579,12 @@ export const Constants = {
         "changes_requested",
         "rejected",
       ],
-      client_access_tier: ["project_client", "growth_90", "retainer_full"],
+      client_access_tier: [
+        "project_client",
+        "growth_90",
+        "retainer_full",
+        "social_management",
+      ],
       content_status: [
         "draft",
         "in_review",
