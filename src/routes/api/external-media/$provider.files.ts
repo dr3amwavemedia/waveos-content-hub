@@ -46,6 +46,25 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
           return json({ accessToken, clientId, appId, apiKey });
         }
 
+        if (body.action === "preview_url" && provider === "google_drive") {
+          const assetId = typeof body.assetId === "string" ? body.assetId : "";
+          if (!assetId) return json({ error: "asset_required" }, 400);
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data: asset, error } = await supabaseAdmin
+            .from("media_assets")
+            .select("id")
+            .eq("id", assetId)
+            .eq("workspace_id", workspaceId)
+            .eq("source_provider", "google_drive")
+            .maybeSingle();
+          if (error) return json({ error: error.message }, 500);
+          if (!asset) return json({ error: "asset_not_found" }, 404);
+          const { createExternalRelayUrl } = await import("@/lib/external-media.server");
+          const url = new URL(await createExternalRelayUrl(asset.id, 60 * 60));
+          if (body.mode === "thumbnail") url.searchParams.set("preview", "thumbnail");
+          return json({ url: url.toString() });
+        }
+
         if (body.action === "import") {
           const files = Array.isArray(body.files) ? body.files : [];
           if (!files.length || files.length > 20) return json({ error: "invalid_files" }, 400);
@@ -53,11 +72,14 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
             const file = entry as Partial<ProviderFile>;
             if (!file.id || !file.name || !file.mimeType)
               throw new Error("invalid_external_file");
+            const mimeType = externalMediaMimeType(file.name, file.mimeType);
+            if (!/^(image|video)\//i.test(mimeType))
+              throw new Error("invalid_external_file");
             return {
               workspace_id: workspaceId,
               name: file.name,
               storage_path: null,
-              mime_type: file.mimeType,
+              mime_type: mimeType,
               size_bytes: Number(file.sizeBytes ?? 0),
               tags: [],
               uploaded_by: auth.user.id,
@@ -198,4 +220,32 @@ function dropboxMimeType(extension: string) {
     avi: "video/x-msvideo",
   };
   return types[extension] ?? null;
+}
+
+function externalMediaMimeType(name: string, mimeType: string) {
+  if (/^(image|video)\//i.test(mimeType)) return mimeType;
+  const extension = name.split(".").pop()?.toLowerCase() ?? "";
+  const types: Record<string, string> = {
+    avif: "image/avif",
+    bmp: "image/bmp",
+    gif: "image/gif",
+    heic: "image/heic",
+    heif: "image/heif",
+    jpeg: "image/jpeg",
+    jpg: "image/jpeg",
+    png: "image/png",
+    tif: "image/tiff",
+    tiff: "image/tiff",
+    webp: "image/webp",
+    "3gp": "video/3gpp",
+    avi: "video/x-msvideo",
+    m4v: "video/x-m4v",
+    mkv: "video/x-matroska",
+    mov: "video/quicktime",
+    mp4: "video/mp4",
+    mpeg: "video/mpeg",
+    mpg: "video/mpeg",
+    webm: "video/webm",
+  };
+  return types[extension] ?? mimeType;
 }

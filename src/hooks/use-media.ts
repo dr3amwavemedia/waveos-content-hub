@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getExternalMediaPreviewUrl } from "@/hooks/use-external-media";
 
 export interface MediaFolder {
   id: string;
@@ -196,10 +197,23 @@ export async function getSignedMediaUrl(path: string, expiresIn = 3600) {
   return data.signedUrl;
 }
 
-export async function getMediaPreviewUrl(asset: MediaAsset, expiresIn = 3600) {
+export async function getMediaPreviewUrl(
+  asset: MediaAsset,
+  expiresIn = 3600,
+  mode: "thumbnail" | "content" = "content",
+) {
   if (asset.source_provider === "waveos") {
     if (!asset.storage_path) throw new Error("Media file is missing its storage path.");
     return getSignedMediaUrl(asset.storage_path, expiresIn);
+  }
+  if (asset.source_provider === "google_drive") {
+    const result = await getExternalMediaPreviewUrl(
+      "google_drive",
+      asset.workspace_id,
+      asset.id,
+      mode,
+    );
+    return result.url;
   }
   return asset.thumbnail_url ?? asset.source_web_url;
 }

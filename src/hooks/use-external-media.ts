@@ -70,6 +70,20 @@ export function getGooglePickerToken(workspaceId: string) {
   }>("google_drive", "/files", { action: "picker_token", workspaceId });
 }
 
+export function getExternalMediaPreviewUrl(
+  provider: ExternalMediaProvider,
+  workspaceId: string,
+  assetId: string,
+  mode: "thumbnail" | "content",
+) {
+  return providerRequest<{ url: string }>(provider, "/files", {
+    action: "preview_url",
+    workspaceId,
+    assetId,
+    mode,
+  });
+}
+
 export function importExternalMedia(
   provider: ExternalMediaProvider,
   workspaceId: string,
