@@ -1089,7 +1089,7 @@ function ExternalProviderPicker({
   if (error) {
     return <div className="py-16 text-center text-sm text-destructive">{error}</div>;
   }
-  if (provider === "google_drive") {
+  if (provider === "google_drive" && window.matchMedia("(min-width: 768px)").matches) {
     return (
       <GoogleDrivePicker
         workspaceId={workspaceId}
