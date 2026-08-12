@@ -1175,16 +1175,21 @@ function GoogleDrivePicker({
       await loadGooglePickerScript();
       const googleApi = (window as unknown as { google?: GooglePickerGlobal }).google;
       if (!googleApi?.picker) throw new Error("Google Picker did not load.");
-      const view = new googleApi.picker.View(googleApi.picker.ViewId.DOCS_IMAGES_AND_VIDEOS);
+      const selectableMediaTypes =
+        "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm";
+      const view = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(false)
+        .setEnableDrives(true)
+        .setMode(googleApi.picker.DocsViewMode.LIST)
+        .setMimeTypes(selectableMediaTypes);
       const picker = new googleApi.picker.PickerBuilder()
         .enableFeature(googleApi.picker.Feature.MULTISELECT_ENABLED)
         .setDeveloperKey(config.apiKey)
         .setAppId(config.appId)
         .setOAuthToken(config.accessToken)
         .setOrigin(window.location.origin)
-        .setSelectableMimeTypes(
-          "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm",
-        )
+        .setSelectableMimeTypes(selectableMediaTypes)
         .addView(view)
         .setCallback(async (data: GooglePickerResult) => {
           if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
@@ -1266,12 +1271,27 @@ type GooglePickerBuilder = {
 
 type GooglePickerGlobal = {
   picker: {
-    View: new (viewId: string) => unknown;
+    DocsView: new (viewId: string) => {
+      setIncludeFolders: (included: boolean) => GoogleDocsView;
+      setSelectFolderEnabled: (enabled: boolean) => GoogleDocsView;
+      setEnableDrives: (enabled: boolean) => GoogleDocsView;
+      setMode: (mode: string) => GoogleDocsView;
+      setMimeTypes: (value: string) => GoogleDocsView;
+    };
     PickerBuilder: new () => GooglePickerBuilder;
-    ViewId: { DOCS_IMAGES_AND_VIDEOS: string };
+    ViewId: { DOCS: string };
+    DocsViewMode: { LIST: string };
     Feature: { MULTISELECT_ENABLED: string };
     Action: { PICKED: string };
   };
+};
+
+type GoogleDocsView = {
+  setIncludeFolders: (included: boolean) => GoogleDocsView;
+  setSelectFolderEnabled: (enabled: boolean) => GoogleDocsView;
+  setEnableDrives: (enabled: boolean) => GoogleDocsView;
+  setMode: (mode: string) => GoogleDocsView;
+  setMimeTypes: (value: string) => GoogleDocsView;
 };
 
 let googlePickerLoader: Promise<void> | null = null;
