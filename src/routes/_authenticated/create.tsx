@@ -1175,12 +1175,19 @@ function GoogleDrivePicker({
       await loadGooglePickerScript();
       const googleApi = (window as unknown as { google?: GooglePickerGlobal }).google;
       if (!googleApi?.picker) throw new Error("Google Picker did not load.");
-      const selectableMediaTypes =
-        "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm";
+      const selectableMediaTypes = new Set([
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+        "video/mp4",
+        "video/quicktime",
+        "video/webm",
+      ]);
       const view = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
         .setIncludeFolders(true)
         .setSelectFolderEnabled(false)
-        .setEnableDrives(true)
+        .setEnableDrives(false)
         .setMode(googleApi.picker.DocsViewMode.LIST);
       const picker = new googleApi.picker.PickerBuilder()
         .enableFeature(googleApi.picker.Feature.MULTISELECT_ENABLED)
@@ -1188,12 +1195,16 @@ function GoogleDrivePicker({
         .setAppId(config.appId)
         .setOAuthToken(config.accessToken)
         .setOrigin(window.location.origin)
-        .setSelectableMimeTypes(selectableMediaTypes)
         .addView(view)
         .setCallback(async (data: GooglePickerResult) => {
           if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
           try {
-            const files: ExternalProviderFile[] = data.docs.map((doc) => ({
+            const supportedDocs = data.docs.filter((doc) => selectableMediaTypes.has(doc.mimeType));
+            if (!supportedDocs.length) {
+              toast.error("Choose an image or video file to add to this post.");
+              return;
+            }
+            const files: ExternalProviderFile[] = supportedDocs.map((doc) => ({
               id: doc.id,
               name: doc.name,
               mimeType: doc.mimeType,
@@ -1262,7 +1273,6 @@ type GooglePickerBuilder = {
   setAppId: (value: string) => GooglePickerBuilder;
   setOAuthToken: (value: string) => GooglePickerBuilder;
   setOrigin: (value: string) => GooglePickerBuilder;
-  setSelectableMimeTypes: (value: string) => GooglePickerBuilder;
   addView: (value: unknown) => GooglePickerBuilder;
   setCallback: (value: (data: GooglePickerResult) => void) => GooglePickerBuilder;
   build: () => { setVisible: (visible: boolean) => void };
