@@ -376,7 +376,7 @@ function AssetCard({ asset, onClick }: { asset: MediaAsset; onClick: () => void 
   const started = useRef(false);
   if (!started.current) {
     started.current = true;
-    getMediaPreviewUrl(asset, 3600)
+    getMediaPreviewUrl(asset, 3600, "thumbnail")
       .then(setUrl)
       .catch(() => setUrl(null));
   }
@@ -386,12 +386,10 @@ function AssetCard({ asset, onClick }: { asset: MediaAsset; onClick: () => void 
       onClick={onClick}
       className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-elevated text-left transition-all hover:border-border-strong hover:shadow-[var(--shadow-glow)]"
     >
-      {url ? (
-        isVideo ? (
-          <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
-        ) : (
-          <img src={url} alt={asset.name} className="h-full w-full object-cover" />
-        )
+      {url && (asset.source_provider === "google_drive" || !isVideo) ? (
+        <img src={url} alt={asset.name} className="h-full w-full object-cover" loading="lazy" />
+      ) : url && isVideo ? (
+        <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />

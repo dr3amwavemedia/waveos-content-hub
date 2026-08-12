@@ -11,6 +11,7 @@ export const Route = createFileRoute("/api/public/external-media/$assetId")({
 
 async function relayExternalMedia(request: Request, assetId: string, headOnly: boolean) {
   const url = new URL(request.url);
+  const thumbnailOnly = url.searchParams.get("preview") === "thumbnail";
   const expires = url.searchParams.get("expires") ?? "";
   const signature = url.searchParams.get("signature") ?? "";
   const { verifyExternalRelay, getExternalConnection, externalAccessToken } = await import(
@@ -21,7 +22,7 @@ async function relayExternalMedia(request: Request, assetId: string, headOnly: b
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: asset } = await supabaseAdmin
     .from("media_assets")
-    .select("id,workspace_id,name,mime_type,size_bytes,source_provider,external_file_id")
+    .select("id,workspace_id,name,mime_type,size_bytes,source_provider,external_file_id,thumbnail_url")
     .eq("id", assetId)
     .maybeSingle();
   if (!asset || asset.source_provider !== "google_drive" || !asset.external_file_id)
@@ -38,6 +39,36 @@ async function relayExternalMedia(request: Request, assetId: string, headOnly: b
   const connection = await getExternalConnection(asset.workspace_id, "google_drive");
   if (!connection) return new Response("connection_required", { status: 409 });
   const accessToken = await externalAccessToken(connection);
+  if (thumbnailOnly) {
+    let thumbnailLink = asset.thumbnail_url;
+    if (!thumbnailLink) {
+      const metadataResponse = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(asset.external_file_id)}?fields=thumbnailLink`,
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+      const metadata = (await metadataResponse.json().catch(() => ({}))) as {
+        thumbnailLink?: string;
+      };
+      if (!metadataResponse.ok || !metadata.thumbnailLink)
+        return new Response("thumbnail_unavailable", { status: 404 });
+      thumbnailLink = metadata.thumbnailLink;
+    }
+    const thumbnailResponse = await fetch(thumbnailLink, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!thumbnailResponse.ok || (!headOnly && !thumbnailResponse.body))
+      return new Response("thumbnail_unavailable", { status: 502 });
+    const thumbnailHeaders = new Headers({
+      "Content-Type": thumbnailResponse.headers.get("content-type") ?? "image/jpeg",
+      "Cache-Control": "private, max-age=1800",
+    });
+    const thumbnailLength = thumbnailResponse.headers.get("content-length");
+    if (thumbnailLength) thumbnailHeaders.set("Content-Length", thumbnailLength);
+    return new Response(headOnly ? null : thumbnailResponse.body, {
+      status: 200,
+      headers: thumbnailHeaders,
+    });
+  }
   const providerResponse = await fetch(
     `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(asset.external_file_id)}?alt=media`,
     {

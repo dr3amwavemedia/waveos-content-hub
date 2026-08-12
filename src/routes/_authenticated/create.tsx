@@ -816,12 +816,12 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!asset) return;
-    void getMediaPreviewUrl(asset, 600).then(setUrl);
+    void getMediaPreviewUrl(asset, 600, "thumbnail").then(setUrl);
   }, [asset?.id]);
   if (!asset) return <div className="aspect-square rounded-lg border border-border bg-elevated" />;
   return (
     <div className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-elevated">
-      {url && asset.mime_type.startsWith("image/") ? (
+      {url && (asset.source_provider === "google_drive" || asset.mime_type.startsWith("image/")) ? (
         <img src={url} alt={asset.name} className="h-full w-full object-cover" loading="lazy" />
       ) : url && asset.mime_type.startsWith("video/") ? (
         <video src={url} className="h-full w-full object-cover" muted />
@@ -860,7 +860,7 @@ function MediaPicker({
     (async () => {
       const items = assets.data ?? [];
       const entries = await Promise.all(
-        items.map(async (a) => [a.id, (await getMediaPreviewUrl(a, 600)) ?? ""] as const),
+        items.map(async (a) => [a.id, (await getMediaPreviewUrl(a, 600, "thumbnail")) ?? ""] as const),
       );
       setUrls(Object.fromEntries(entries));
     })();
@@ -940,7 +940,7 @@ function MediaPicker({
                       isSel ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/40",
                     )}
                   >
-                    {urls[a.id] && a.mime_type.startsWith("image/") ? (
+                    {urls[a.id] && (a.source_provider === "google_drive" || a.mime_type.startsWith("image/")) ? (
                       <img src={urls[a.id]} alt={a.name} className="h-full w-full object-cover" loading="lazy" />
                     ) : urls[a.id] && a.mime_type.startsWith("video/") ? (
                       <video src={urls[a.id]} className="h-full w-full object-cover" muted />
@@ -1175,15 +1175,6 @@ function GoogleDrivePicker({
       await loadGooglePickerScript();
       const googleApi = (window as unknown as { google?: GooglePickerGlobal }).google;
       if (!googleApi?.picker) throw new Error("Google Picker did not load.");
-      const selectableMediaTypes = new Set([
-        "image/jpeg",
-        "image/png",
-        "image/webp",
-        "image/gif",
-        "video/mp4",
-        "video/quicktime",
-        "video/webm",
-      ]);
       const view = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
         .setIncludeFolders(true)
         .setSelectFolderEnabled(false)
@@ -1199,7 +1190,7 @@ function GoogleDrivePicker({
         .setCallback(async (data: GooglePickerResult) => {
           if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
           try {
-            const supportedDocs = data.docs.filter((doc) => selectableMediaTypes.has(doc.mimeType));
+            const supportedDocs = data.docs.filter(isGoogleDriveMedia);
             if (!supportedDocs.length) {
               toast.error("Choose an image or video file to add to this post.");
               return;
@@ -1207,9 +1198,9 @@ function GoogleDrivePicker({
             const files: ExternalProviderFile[] = supportedDocs.map((doc) => ({
               id: doc.id,
               name: doc.name,
-              mimeType: doc.mimeType,
+              mimeType: googleDriveMediaMimeType(doc),
               sizeBytes: Number(doc.sizeBytes ?? 0),
-              thumbnailUrl: null,
+              thumbnailUrl: doc.thumbnails?.find((thumbnail) => thumbnail.url)?.url ?? null,
               webUrl: doc.url ?? null,
               parentId: doc.parentId ?? null,
             }));
@@ -1255,6 +1246,38 @@ function GoogleDrivePicker({
   );
 }
 
+function isGoogleDriveMedia(doc: { name: string; mimeType: string }) {
+  return /^(image|video)\//i.test(googleDriveMediaMimeType(doc));
+}
+
+function googleDriveMediaMimeType(doc: { name: string; mimeType: string }) {
+  if (/^(image|video)\//i.test(doc.mimeType)) return doc.mimeType;
+  const extension = doc.name.split(".").pop()?.toLowerCase() ?? "";
+  const types: Record<string, string> = {
+    avif: "image/avif",
+    bmp: "image/bmp",
+    gif: "image/gif",
+    heic: "image/heic",
+    heif: "image/heif",
+    jpeg: "image/jpeg",
+    jpg: "image/jpeg",
+    png: "image/png",
+    tif: "image/tiff",
+    tiff: "image/tiff",
+    webp: "image/webp",
+    "3gp": "video/3gpp",
+    avi: "video/x-msvideo",
+    m4v: "video/x-m4v",
+    mkv: "video/x-matroska",
+    mov: "video/quicktime",
+    mp4: "video/mp4",
+    mpeg: "video/mpeg",
+    mpg: "video/mpeg",
+    webm: "video/webm",
+  };
+  return types[extension] ?? doc.mimeType;
+}
+
 type GooglePickerResult = {
   action: string;
   docs?: Array<{
@@ -1264,6 +1287,7 @@ type GooglePickerResult = {
     sizeBytes?: number | string;
     url?: string;
     parentId?: string;
+    thumbnails?: Array<{ url?: string }>;
   }>;
 };
 
