@@ -1181,8 +1181,7 @@ function GoogleDrivePicker({
         .setIncludeFolders(true)
         .setSelectFolderEnabled(false)
         .setEnableDrives(true)
-        .setMode(googleApi.picker.DocsViewMode.LIST)
-        .setMimeTypes(selectableMediaTypes);
+        .setMode(googleApi.picker.DocsViewMode.LIST);
       const picker = new googleApi.picker.PickerBuilder()
         .enableFeature(googleApi.picker.Feature.MULTISELECT_ENABLED)
         .setDeveloperKey(config.apiKey)
