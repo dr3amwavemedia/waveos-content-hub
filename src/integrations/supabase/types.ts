@@ -1751,6 +1751,56 @@ export type Database = {
           },
         ]
       }
+      workspace_frameio_sources: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          frameio_account_id: string | null
+          frameio_project_id: string | null
+          frameio_share_id: string | null
+          label: string
+          share_url: string
+          sync_error: string | null
+          sync_status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          frameio_account_id?: string | null
+          frameio_project_id?: string | null
+          frameio_share_id?: string | null
+          label?: string
+          share_url: string
+          sync_error?: string | null
+          sync_status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          frameio_account_id?: string | null
+          frameio_project_id?: string | null
+          frameio_share_id?: string | null
+          label?: string
+          share_url?: string
+          sync_error?: string | null
+          sync_status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_frameio_sources_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_internal_notes: {
         Row: {
           notes: string
