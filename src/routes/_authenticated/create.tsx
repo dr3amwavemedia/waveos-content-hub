@@ -1081,6 +1081,12 @@ function FrameioProviderPicker({
                 className={cn("group relative aspect-square overflow-hidden rounded-lg border bg-elevated", isChosen ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/40")}
               >
                 {file.thumbnailUrl ? <img src={file.thumbnailUrl} alt={file.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center p-2 text-center text-[10px] text-muted-foreground">{file.name}</div>}
+                <span
+                  title={file.name}
+                  className="absolute inset-x-0 bottom-0 truncate bg-background/85 px-2 py-1.5 text-left text-[11px] font-medium text-foreground backdrop-blur-sm"
+                >
+                  {file.name}
+                </span>
                 {isChosen && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" /></span>}
               </button>
             );
