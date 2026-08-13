@@ -57,7 +57,7 @@ export function useWorkspaceBranding(workspaceId: string | undefined) {
       return {
         workspaceId: workspaceId!,
         logoPath,
-        logoUrl: workspaceLogoUrl(logoPath),
+        logoUrl: await workspaceLogoUrl(logoPath),
         accentColor:
           typeof data?.accent_color === "string"
             ? data.accent_color
