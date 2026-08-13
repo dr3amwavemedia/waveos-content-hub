@@ -27,6 +27,7 @@ import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { cn } from "@/lib/utils";
 import { isValidHttpsUrl, URL_VALIDATION_MESSAGE } from "@/lib/url-validation";
 import type { Database } from "@/integrations/supabase/types";
+import { syncFrameioWorkspaceShare } from "@/hooks/use-frameio";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -451,7 +452,7 @@ function TierBadge({ tier }: { tier: ClientAccessTier }) {
 
 // ─── Drawer with tabs ─────────────────────────────────────────────────────
 
-type DrawerTab = "info" | "access" | "deliveries" | "invoices" | "invites";
+type DrawerTab = "info" | "access" | "media" | "deliveries" | "invoices" | "invites";
 
 function WorkspaceDrawer({
   workspace,
@@ -545,7 +546,7 @@ function WorkspaceDrawer({
       </div>
 
       <div className="mb-4 flex gap-1 border-b border-border">
-        {(["info", "access", "deliveries", "invoices", "invites"] as const).map((t) => (
+        {(["info", "access", "media", "deliveries", "invoices", "invites"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -571,11 +572,168 @@ function WorkspaceDrawer({
           isOwner={isOwner}
         />
       )}
+      {tab === "media" && <WorkspaceMediaSourcesTab workspaceId={workspace.id} />}
       {tab === "deliveries" && <DeliveriesTab workspaceId={workspace.id} />}
       {tab === "invoices" && <InvoicesTab workspaceId={workspace.id} />}
       {tab === "invites" && <InvitesTab workspace={workspace} onNewInvite={onNewInvite} />}
     </ModalShell>
   );
+}
+
+function WorkspaceMediaSourcesTab({ workspaceId }: { workspaceId: string }) {
+  const qc = useQueryClient();
+  const [shareUrl, setShareUrl] = useState("");
+  const [label, setLabel] = useState("Frame.io media");
+  const sourceQ = useQuery({
+    queryKey: ["workspace-frameio-source", workspaceId],
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("workspace_frameio_sources")
+        .select("share_url,label,sync_status,sync_error,updated_at")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as {
+        share_url: string;
+        label: string;
+        sync_status: "pending" | "ready" | "error";
+        sync_error: string | null;
+        updated_at: string;
+      } | null;
+    },
+  });
+
+  useEffect(() => {
+    setShareUrl(sourceQ.data?.share_url ?? "");
+    setLabel(sourceQ.data?.label ?? "Frame.io media");
+  }, [sourceQ.data?.share_url, sourceQ.data?.label, workspaceId]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      const url = normalizeFrameIoShareUrl(shareUrl);
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await db.from("workspace_frameio_sources").upsert({
+        workspace_id: workspaceId,
+        share_url: url,
+        label: label.trim() || "Frame.io media",
+        sync_status: "pending",
+        sync_error: null,
+        frameio_account_id: null,
+        frameio_project_id: null,
+        frameio_share_id: null,
+        assigned_by: auth.user?.id ?? null,
+      });
+      if (error) throw error;
+      await syncFrameioWorkspaceShare(workspaceId);
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["workspace-frameio-source", workspaceId] });
+      toast.success("Frame.io Share assigned and ready for this client.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not assign Frame.io Share."),
+  });
+
+  const remove = useMutation({
+    mutationFn: async () => {
+      const { error } = await db
+        .from("workspace_frameio_sources")
+        .delete()
+        .eq("workspace_id", workspaceId);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["workspace-frameio-source", workspaceId] });
+      toast.success("Frame.io Share removed.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not remove Frame.io Share."),
+  });
+
+  if (sourceQ.isLoading) return <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />;
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+        <h3 className="text-sm font-semibold text-foreground">Curated Frame.io media</h3>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          Paste the Share link approved for this client. They will not be able to connect a
+          Frame.io account or replace this source.
+        </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Gallery name">
+          <input
+            value={label}
+            onChange={(event) => setLabel(event.target.value)}
+            maxLength={120}
+            className={inputCls}
+            placeholder="Latest campaign media"
+          />
+        </Field>
+        <Field label="Frame.io Share link">
+          <input
+            value={shareUrl}
+            onChange={(event) => setShareUrl(event.target.value)}
+            className={inputCls}
+            placeholder="https://f.io/..."
+            inputMode="url"
+          />
+        </Field>
+      </div>
+      {sourceQ.data && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <span className="rounded-full border border-border bg-elevated px-2.5 py-1 capitalize">
+            {sourceQ.data.sync_status === "pending" ? "Awaiting Frame.io sync" : sourceQ.data.sync_status}
+          </span>
+          {sourceQ.data.sync_error && <span className="text-destructive">{sourceQ.data.sync_error}</span>}
+          <a
+            href={sourceQ.data.share_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-primary hover:underline"
+          >
+            <ExternalLink className="h-3 w-3" /> Open Share
+          </a>
+        </div>
+      )}
+      <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+        <button
+          type="button"
+          onClick={() => save.mutate()}
+          disabled={save.isPending || !shareUrl.trim()}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          Assign Frame.io Share
+        </button>
+        {sourceQ.data && (
+          <button
+            type="button"
+            onClick={() => confirm("Remove this client's Frame.io source?") && remove.mutate()}
+            disabled={remove.isPending}
+            className="inline-flex items-center gap-2 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-2 text-sm font-medium text-destructive disabled:opacity-50"
+          >
+            <Trash2 className="h-4 w-4" /> Remove
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function normalizeFrameIoShareUrl(value: string) {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new Error("Paste a valid Frame.io Share link.");
+  }
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  if (url.protocol !== "https:" || !["f.io", "frame.io", "next.frame.io"].includes(host))
+    throw new Error("Use an HTTPS link from Frame.io or f.io.");
+  url.hash = "";
+  return url.toString();
 }
 
 // ─── Client information ──────────────────────────────────────────────────

@@ -24,7 +24,7 @@ export interface MediaAsset {
   tags: string[];
   uploaded_by: string | null;
   created_at: string;
-  source_provider: "waveos" | "google_drive" | "dropbox";
+  source_provider: "waveos" | "google_drive" | "dropbox" | "frameio";
   external_file_id: string | null;
   external_parent_id: string | null;
   source_web_url: string | null;
@@ -206,15 +206,16 @@ export async function getMediaPreviewUrl(
     if (!asset.storage_path) throw new Error("Media file is missing its storage path.");
     return getSignedMediaUrl(asset.storage_path, expiresIn);
   }
-  if (asset.source_provider === "google_drive") {
+  if (asset.source_provider === "google_drive" || asset.source_provider === "dropbox") {
     const result = await getExternalMediaPreviewUrl(
-      "google_drive",
+      asset.source_provider,
       asset.workspace_id,
       asset.id,
       mode,
     );
     return result.url;
   }
+  if (asset.source_provider === "frameio") return asset.thumbnail_url ?? asset.source_web_url;
   return asset.thumbnail_url ?? asset.source_web_url;
 }
 

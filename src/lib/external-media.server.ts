@@ -273,6 +273,7 @@ export async function resolveMediaAssetUrl(asset: {
   size_bytes: number;
   source_provider?: string | null;
   external_file_id?: string | null;
+  external_parent_id?: string | null;
   source_web_url?: string | null;
 }) {
   const provider = asset.source_provider ?? "waveos";
@@ -286,10 +287,37 @@ export async function resolveMediaAssetUrl(asset: {
     return data.signedUrl;
   }
   if (
-    (provider !== "google_drive" && provider !== "dropbox") ||
+    (provider !== "google_drive" && provider !== "dropbox" && provider !== "frameio") ||
     !asset.external_file_id
   ) {
     throw new Error(`asset_source_invalid:${asset.id}`);
+  }
+  if (provider === "frameio") {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("workspace_frameio_sources" as never)
+      .select("frameio_account_id,frameio_share_id,sync_status")
+      .eq("workspace_id", asset.workspace_id)
+      .maybeSingle();
+    const source = data as unknown as {
+      frameio_account_id: string | null;
+      frameio_share_id: string | null;
+      sync_status: string;
+    } | null;
+    if (
+      !source?.frameio_account_id ||
+      !source.frameio_share_id ||
+      source.sync_status !== "ready" ||
+      asset.external_parent_id !== source.frameio_share_id
+    ) throw new Error("frameio_share_access_revoked");
+    const { frameioFileOriginalUrl, listFrameioShareFiles } = await import("@/lib/frameio.server");
+    const currentFiles = await listFrameioShareFiles(
+      source.frameio_account_id,
+      source.frameio_share_id,
+    );
+    if (!currentFiles.some((file) => file.id === asset.external_file_id))
+      throw new Error("frameio_file_removed_from_share");
+    return frameioFileOriginalUrl(source.frameio_account_id, asset.external_file_id);
   }
   return createExternalPublishingUrl({
     ...asset,

@@ -36,6 +36,12 @@ import {
   type ExternalProviderFile,
 } from "@/hooks/use-external-media";
 import {
+  getFrameioWorkspaceStatus,
+  importFrameioWorkspaceMedia,
+  listFrameioWorkspaceMedia,
+  type FrameioProviderFile,
+} from "@/hooks/use-frameio";
+import {
   ALL_PLATFORMS,
   PLATFORM_LABEL,
   useContentItem,
@@ -854,7 +860,7 @@ function MediaPicker({
   const [search, setSearch] = useState("");
   const assets = useMediaAssets(workspaceId, { search: search || undefined });
   const [urls, setUrls] = useState<Record<string, string>>({});
-  const [source, setSource] = useState<"waveos" | ExternalMediaProvider>("waveos");
+  const [source, setSource] = useState<"waveos" | ExternalMediaProvider | "frameio">("waveos");
 
   useEffect(() => {
     (async () => {
@@ -884,6 +890,7 @@ function MediaPicker({
               ["waveos", "WaveOS"],
               ["google_drive", "Google Drive"],
               ["dropbox", "Dropbox"],
+              ["frameio", "Frame.io"],
             ] as const).map(([value, label]) => (
               <button
                 key={value}
@@ -908,7 +915,17 @@ function MediaPicker({
           />
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-4">
-          {source !== "waveos" ? (
+          {source === "frameio" ? (
+            <FrameioProviderPicker
+              workspaceId={workspaceId}
+              query={search}
+              selected={selected}
+              onImported={(ids) => {
+                setSelected((current) => Array.from(new Set([...current, ...ids])));
+                void assets.refetch();
+              }}
+            />
+          ) : source !== "waveos" ? (
             <ExternalProviderPicker
               provider={source}
               workspaceId={workspaceId}
@@ -972,6 +989,104 @@ function MediaPicker({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FrameioProviderPicker({
+  workspaceId,
+  query,
+  selected,
+  onImported,
+}: {
+  workspaceId: string;
+  query: string;
+  selected: string[];
+  onImported: (ids: string[]) => void;
+}) {
+  const [files, setFiles] = useState<FrameioProviderFile[]>([]);
+  const [chosen, setChosen] = useState<string[]>([]);
+  const [label, setLabel] = useState("Frame.io media");
+  const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const timeout = window.setTimeout(async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const status = await getFrameioWorkspaceStatus(workspaceId);
+        if (!active) return;
+        setReady(status.connected);
+        setLabel(status.label ?? "Frame.io media");
+        if (!status.connected) return setFiles([]);
+        const result = await listFrameioWorkspaceMedia(workspaceId, query);
+        if (active) {
+          setFiles(result.files);
+          setLabel(result.label);
+        }
+      } catch (reason) {
+        if (active) setError(reason instanceof Error ? reason.message : "Could not load Frame.io media.");
+      } finally {
+        if (active) setLoading(false);
+      }
+    }, 300);
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+    };
+  }, [workspaceId, query]);
+
+  async function addChosen() {
+    setImporting(true);
+    try {
+      const result = await importFrameioWorkspaceMedia(workspaceId, chosen);
+      onImported(result.imported.map((item) => item.id).filter((id) => !selected.includes(id)));
+      setChosen([]);
+      toast.success(`Added ${result.imported.length} item${result.imported.length === 1 ? "" : "s"} from Frame.io.`);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Could not add Frame.io media.");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  if (loading)
+    return <div className="flex items-center justify-center py-16 text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Frame.io…</div>;
+  if (!ready)
+    return <div className="py-16 text-center text-sm text-muted-foreground">Your Dream Wave team has not assigned a ready Frame.io gallery yet.</div>;
+  if (error) return <div className="py-16 text-center text-sm text-destructive">{error}</div>;
+  return (
+    <div className="space-y-4">
+      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      {files.length ? (
+        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+          {files.map((file) => {
+            const isChosen = chosen.includes(file.id);
+            return (
+              <button
+                key={file.id}
+                type="button"
+                onClick={() => setChosen((current) => isChosen ? current.filter((id) => id !== file.id) : [...current, file.id])}
+                className={cn("group relative aspect-square overflow-hidden rounded-lg border bg-elevated", isChosen ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/40")}
+              >
+                {file.thumbnailUrl ? <img src={file.thumbnailUrl} alt={file.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center p-2 text-center text-[10px] text-muted-foreground">{file.name}</div>}
+                {isChosen && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" /></span>}
+              </button>
+            );
+          })}
+        </div>
+      ) : <div className="py-16 text-center text-sm text-muted-foreground">No matching photos or videos in this Frame.io Share.</div>}
+      {chosen.length > 0 && (
+        <div className="sticky bottom-0 flex justify-end border-t border-border bg-surface/95 pt-3 backdrop-blur">
+          <button type="button" onClick={addChosen} disabled={importing} className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+            {importing && <Loader2 className="h-4 w-4 animate-spin" />} Add {chosen.length} to this post
+          </button>
+        </div>
+      )}
     </div>
   );
 }

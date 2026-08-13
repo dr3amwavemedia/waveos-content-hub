@@ -22,6 +22,10 @@ GOOGLE_DRIVE_APP_ID=<Google Cloud project number>
 
 DROPBOX_APP_KEY=<Dropbox app key>
 DROPBOX_APP_SECRET=<Dropbox app secret>
+
+FRAMEIO_CLIENT_ID=<Adobe OAuth Web App client ID>
+FRAMEIO_CLIENT_SECRET=<Adobe OAuth Web App client secret>
+FRAMEIO_REDIRECT_URI=https://waveos.dreamwavemedia.co/api/frameio/callback
 ```
 
 `OUTLOOK_TOKEN_ENCRYPTION_KEY` is accepted as a temporary fallback for token

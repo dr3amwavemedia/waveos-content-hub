@@ -36,6 +36,8 @@ import { AccountStatusBanner } from "./account-status-banner";
 
 import type { FeatureKey } from "@/lib/permissions";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useWorkspaceBranding, workspaceThemeStyle } from "@/hooks/use-workspace-branding";
+import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
 
 interface NavItem {
   to: string;
@@ -141,6 +143,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 function Shell({ children }: { children: ReactNode }) {
   const { can, visibility, isLoading: permsLoading, access, isStaff } = usePermissions();
   const { data: user } = useCurrentUser();
+  const { activeWorkspace } = useWorkspace();
+  const branding = useWorkspaceBranding(activeWorkspace?.id);
   const [mobileOpen, setMobileOpen] = useState(false);
   const isOwner = Boolean(user?.isDreamWaveOwner && isStaff);
   const isTeamMember = isStaff && !isOwner;
@@ -179,7 +183,10 @@ function Shell({ children }: { children: ReactNode }) {
   const nav = [...clientNav, ...staffNav];
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div
+      className="min-h-screen bg-background text-foreground"
+      style={workspaceThemeStyle(branding.data?.accentColor)}
+    >
       {/* Sidebar — desktop */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-sidebar lg:flex">
         <div className="px-5 py-5">
@@ -374,6 +381,7 @@ function MobileNavLink({ item }: { item: NavItem }) {
 function WorkspaceSwitcher() {
   const { workspaces, activeWorkspace } = useWorkspace();
   const { data: user } = useCurrentUser();
+  const branding = useWorkspaceBranding(activeWorkspace?.id);
 
   if (!workspaces.length) {
     return (
@@ -391,9 +399,17 @@ function WorkspaceSwitcher() {
   return (
     <div className="mx-3 mt-2">
       <div className="flex w-full items-center gap-3 rounded-xl border border-border bg-surface/60 px-3 py-2.5 text-left">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary/40 to-primary-glow/40 text-xs font-bold text-primary-foreground ring-1 ring-primary/30">
-          {activeWorkspace?.name.slice(0, 2).toUpperCase() ?? "WS"}
-        </div>
+        {branding.data?.logoUrl ? (
+          <WorkspaceBrandmark
+            logoUrl={branding.data.logoUrl}
+            name={activeWorkspace?.name ?? "Workspace"}
+            className="h-8 w-8 rounded-lg shadow-none"
+          />
+        ) : (
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary/40 to-primary-glow/40 text-xs font-bold text-primary-foreground ring-1 ring-primary/30">
+            {activeWorkspace?.name.slice(0, 2).toUpperCase() ?? "WS"}
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-semibold text-foreground">
             {activeWorkspace?.name ?? "Select workspace"}
