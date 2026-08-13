@@ -4,7 +4,7 @@ import { Image, Loader2, Palette, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
-import { DEFAULT_WORKSPACE_ACCENT, useWorkspaceBranding, workspaceThemeStyle } from "@/hooks/use-workspace-branding";
+import { DEFAULT_WORKSPACE_ACCENT, useWorkspaceBranding, workspaceBrandingError, workspaceThemeStyle } from "@/hooks/use-workspace-branding";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,7 +49,7 @@ export function ClientBrandingEditor({ workspaceId, workspaceName }: { workspace
       setPendingLogo(null);
       toast.success(`${workspaceName} branding updated.`);
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not update branding."),
+    onError: (error) => toast.error(workspaceBrandingError(error)),
   });
 
   const previewUrl = pendingLogo ? URL.createObjectURL(pendingLogo) : branding.data?.logoUrl;

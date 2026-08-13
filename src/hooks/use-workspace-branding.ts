@@ -12,6 +12,20 @@ export type WorkspaceBranding = {
   accentColor: string;
 };
 
+export function workspaceBrandingError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === "object" && error && "message" in error
+        ? String(error.message)
+        : "";
+  if (message.includes("workspace_branding") || message.includes("schema cache"))
+    return "Workspace branding is still being activated. Please try again after the latest database update finishes.";
+  if (message.toLowerCase().includes("row-level security") || message.toLowerCase().includes("permission"))
+    return "Your account does not have permission to change this workspace's branding.";
+  return message || "Could not update workspace branding.";
+}
+
 const db = supabase as unknown as {
   // workspace_branding is added by the pending migration and will be included
   // the next time generated Supabase types are refreshed.
