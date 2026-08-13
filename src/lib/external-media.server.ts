@@ -307,9 +307,8 @@ export async function resolveMediaAssetUrl(asset: {
     if (
       !source?.frameio_account_id ||
       !source.frameio_share_id ||
-      source.sync_status !== "ready" ||
-      asset.external_parent_id !== source.frameio_share_id
-    ) throw new Error("frameio_share_access_revoked");
+      source.sync_status !== "ready"
+    ) throw new Error("frameio_share_not_ready");
     const { frameioFileOriginalUrl, listFrameioShareFiles } = await import("@/lib/frameio.server");
     const currentFiles = await listFrameioShareFiles(
       source.frameio_account_id,
