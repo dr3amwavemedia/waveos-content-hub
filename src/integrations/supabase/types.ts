@@ -1053,6 +1053,66 @@ export type Database = {
           },
         ]
       }
+      frameio_oauth_states: {
+        Row: {
+          created_at: string
+          expires_at: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      frameio_service_connections: {
+        Row: {
+          access_token_encrypted: string
+          account_email: string | null
+          connected_by: string | null
+          created_at: string
+          external_user_id: string
+          id: boolean
+          refresh_token_encrypted: string
+          scopes: string
+          token_expires_at: string
+          updated_at: string
+        }
+        Insert: {
+          access_token_encrypted: string
+          account_email?: string | null
+          connected_by?: string | null
+          created_at?: string
+          external_user_id: string
+          id?: boolean
+          refresh_token_encrypted: string
+          scopes?: string
+          token_expires_at: string
+          updated_at?: string
+        }
+        Update: {
+          access_token_encrypted?: string
+          account_email?: string | null
+          connected_by?: string | null
+          created_at?: string
+          external_user_id?: string
+          id?: boolean
+          refresh_token_encrypted?: string
+          scopes?: string
+          token_expires_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invites: {
         Row: {
           accepted_at: string | null
@@ -1746,6 +1806,56 @@ export type Database = {
             foreignKeyName: "webhook_events_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspace_frameio_sources: {
+        Row: {
+          assigned_by: string | null
+          created_at: string
+          frameio_account_id: string | null
+          frameio_project_id: string | null
+          frameio_share_id: string | null
+          label: string
+          share_url: string
+          sync_error: string | null
+          sync_status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string
+          frameio_account_id?: string | null
+          frameio_project_id?: string | null
+          frameio_share_id?: string | null
+          label?: string
+          share_url: string
+          sync_error?: string | null
+          sync_status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string
+          frameio_account_id?: string | null
+          frameio_project_id?: string | null
+          frameio_share_id?: string | null
+          label?: string
+          share_url?: string
+          sync_error?: string | null
+          sync_status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_frameio_sources_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
