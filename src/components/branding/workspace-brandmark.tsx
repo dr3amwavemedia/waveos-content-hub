@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Building2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -11,6 +12,10 @@ export function WorkspaceBrandmark({
   name: string;
   className?: string;
 }) {
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => setImageFailed(false), [logoUrl]);
+
   return (
     <div
       className={cn(
@@ -18,8 +23,13 @@ export function WorkspaceBrandmark({
         className,
       )}
     >
-      {logoUrl ? (
-        <img src={logoUrl} alt={`${name} logo`} className="h-full w-full object-contain p-2" />
+      {logoUrl && !imageFailed ? (
+        <img
+          src={logoUrl}
+          alt={`${name} logo`}
+          className="h-full w-full object-contain p-2"
+          onError={() => setImageFailed(true)}
+        />
       ) : (
         <Building2 className="h-6 w-6 text-primary" aria-hidden="true" />
       )}

@@ -30,10 +30,10 @@ export function ClientBrandingEditor({ workspaceId, workspaceName }: { workspace
         if (!/^image\/(png|jpeg|webp)$/.test(pendingLogo.type)) throw new Error("Use a PNG, JPG, or WebP logo.");
         if (pendingLogo.size > 5 * 1024 * 1024) throw new Error("Logo must be smaller than 5 MB.");
         const extension = pendingLogo.name.split(".").pop()?.toLowerCase() || "png";
-        logoPath = `${workspaceId}/logo.${extension}`;
+        logoPath = `${workspaceId}/logo-${crypto.randomUUID()}.${extension}`;
         const { error } = await supabase.storage.from("workspace-branding").upload(logoPath, pendingLogo, {
           contentType: pendingLogo.type,
-          upsert: true,
+          upsert: false,
         });
         if (error) throw error;
       }
