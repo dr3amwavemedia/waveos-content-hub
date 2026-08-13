@@ -15,6 +15,7 @@ import {
 import {
   DEFAULT_WORKSPACE_ACCENT,
   useWorkspaceBranding,
+  workspaceThemeStyle,
 } from "@/hooks/use-workspace-branding";
 import {
   disconnectFrameioService,
@@ -293,7 +294,7 @@ function WorkspaceBrandingEditor({
   const previewUrl = pendingLogo ? URL.createObjectURL(pendingLogo) : branding.data?.logoUrl;
 
   return (
-    <section className="surface-card overflow-hidden">
+    <section className="surface-card overflow-hidden" style={workspaceThemeStyle(accentColor)}>
       <div className="border-b border-border bg-gradient-to-r from-primary/15 via-transparent to-transparent p-6">
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
@@ -347,6 +348,18 @@ function WorkspaceBrandingEditor({
                 aria-label="Brand accent hex value"
               />
             </span>
+            <span className="flex flex-wrap gap-2" aria-label="Suggested brand colors">
+              {["#4DB8FF", "#8B5CF6", "#E8B86D", "#F43F5E", "#22C55E", "#F8FAFC"].map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setAccentColor(color)}
+                  className="h-7 w-7 rounded-full border border-white/20 ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary"
+                  style={{ backgroundColor: color }}
+                  aria-label={`Use ${color}`}
+                />
+              ))}
+            </span>
           </label>
           <div className="flex justify-end sm:col-span-2">
             <button
@@ -359,6 +372,9 @@ function WorkspaceBrandingEditor({
               Save workspace style
             </button>
           </div>
+          <p className="text-right text-xs text-muted-foreground sm:col-span-2">
+            The preview changes immediately. Select Save to apply it throughout this workspace.
+          </p>
         </div>
       </div>
     </section>
