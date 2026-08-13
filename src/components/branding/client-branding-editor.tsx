@@ -4,7 +4,7 @@ import { Image, Loader2, Palette, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
-import { DEFAULT_WORKSPACE_ACCENT, useWorkspaceBranding } from "@/hooks/use-workspace-branding";
+import { DEFAULT_WORKSPACE_ACCENT, useWorkspaceBranding, workspaceThemeStyle } from "@/hooks/use-workspace-branding";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -54,7 +54,7 @@ export function ClientBrandingEditor({ workspaceId, workspaceName }: { workspace
 
   const previewUrl = pendingLogo ? URL.createObjectURL(pendingLogo) : branding.data?.logoUrl;
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" style={workspaceThemeStyle(accentColor)}>
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <div className="flex items-start gap-3">
           <Palette className="mt-0.5 h-5 w-5 text-primary" />
@@ -82,6 +82,18 @@ export function ClientBrandingEditor({ workspaceId, workspaceName }: { workspace
               <input type="color" value={accentColor} onChange={(event) => setAccentColor(event.target.value)} className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent p-0" aria-label="Brand accent color" />
               <input value={accentColor} onChange={(event) => setAccentColor(event.target.value)} maxLength={7} className="min-w-0 flex-1 bg-transparent font-mono text-sm uppercase text-foreground outline-none" aria-label="Brand accent hex value" />
             </span>
+            <span className="flex flex-wrap gap-2" aria-label="Suggested brand colors">
+              {["#4DB8FF", "#8B5CF6", "#E8B86D", "#F43F5E", "#22C55E", "#F8FAFC"].map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setAccentColor(color)}
+                  className="h-7 w-7 rounded-full border border-white/20 ring-offset-2 ring-offset-background transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary"
+                  style={{ backgroundColor: color }}
+                  aria-label={`Use ${color}`}
+                />
+              ))}
+            </span>
           </label>
         </div>
       </div>
@@ -90,6 +102,7 @@ export function ClientBrandingEditor({ workspaceId, workspaceName }: { workspace
           {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Save client branding
         </button>
       </div>
+      <p className="text-right text-xs text-muted-foreground">The preview changes immediately. Select Save to apply it to this client's workspace.</p>
     </div>
   );
 }
