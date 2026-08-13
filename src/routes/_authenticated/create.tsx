@@ -357,7 +357,14 @@ function CreatePost() {
       else toast.warning(`Published to ${res.success}, ${res.failed} failed — open Posts to retry`);
       navigate({ to: "/posts" });
     } catch (e) {
-      toast.error((e as Error).message);
+      const message = (e as Error).message;
+      if (message === "frameio_share_not_ready") {
+        toast.error("Frame.io media is not ready. Re-sync the assigned Frame.io Share and try again.");
+      } else if (message === "frameio_file_removed_from_share") {
+        toast.error("This file is no longer in the assigned Frame.io Share. Pick it again or choose another file.");
+      } else {
+        toast.error(message);
+      }
     } finally {
       setPublishing(null);
     }
