@@ -41,3 +41,21 @@ CREATE POLICY "Dream Wave staff assign Frame.io source"
 CREATE TRIGGER update_workspace_frameio_sources_updated_at
   BEFORE UPDATE ON public.workspace_frameio_sources
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+ALTER TABLE public.media_assets
+  DROP CONSTRAINT IF EXISTS media_assets_source_provider_check;
+ALTER TABLE public.media_assets
+  DROP CONSTRAINT IF EXISTS media_assets_source_consistency;
+ALTER TABLE public.media_assets
+  ADD CONSTRAINT media_assets_source_provider_check
+    CHECK (source_provider IN ('waveos', 'google_drive', 'dropbox', 'frameio')),
+  ADD CONSTRAINT media_assets_source_consistency CHECK (
+    (source_provider = 'waveos' AND storage_path IS NOT NULL AND external_file_id IS NULL)
+    OR
+    (source_provider IN ('google_drive', 'dropbox', 'frameio') AND storage_path IS NULL AND external_file_id IS NOT NULL)
+  );
+
+DROP INDEX IF EXISTS public.media_assets_external_source_idx;
+CREATE UNIQUE INDEX media_assets_external_source_idx
+  ON public.media_assets(workspace_id, source_provider, external_file_id)
+  WHERE source_provider IN ('google_drive', 'dropbox', 'frameio');

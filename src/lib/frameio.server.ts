@@ -82,3 +82,106 @@ export async function frameioAccessToken() {
   if (updateError) throw updateError;
   return tokens.access_token;
 }
+
+type FrameioPage<T> = { data?: T[]; links?: { next?: string | null } };
+
+async function frameioGet<T>(path: string, experimental = false) {
+  const response = await fetch(`https://api.frame.io${path}`, {
+    headers: {
+      Authorization: `Bearer ${await frameioAccessToken()}`,
+      ...(experimental ? { "api-version": "experimental" } : {}),
+    },
+  });
+  const result = (await response.json()) as T;
+  if (!response.ok) throw new Error(`frameio_api_${response.status}`);
+  return result;
+}
+
+async function frameioPages<T>(path: string) {
+  const items: T[] = [];
+  let next: string | null = path;
+  for (let page = 0; next && page < 20; page += 1) {
+    const result: FrameioPage<T> = await frameioGet<FrameioPage<T>>(next);
+    items.push(...(Array.isArray(result.data) ? result.data : []));
+    next = typeof result.links?.next === "string" ? result.links.next : null;
+  }
+  return items;
+}
+
+const comparableShareUrl = (value: string) => {
+  const url = new URL(value);
+  url.hash = "";
+  url.search = "";
+  return url.toString().replace(/\/$/, "").toLowerCase();
+};
+
+export async function resolveFrameioShare(shareUrl: string) {
+  const accounts = await frameioPages<{ id: string }>("/v4/accounts?page_size=100");
+  const target = comparableShareUrl(shareUrl);
+  for (const account of accounts) {
+    const projects = await frameioPages<{ id: string }>(
+      `/v4/accounts/${encodeURIComponent(account.id)}/projects?page_size=100`,
+    );
+    for (const project of projects) {
+      const shares = await frameioPages<{
+        id: string;
+        short_url: string;
+        enabled: boolean;
+        downloading_enabled: boolean;
+      }>(
+        `/v4/accounts/${encodeURIComponent(account.id)}/projects/${encodeURIComponent(project.id)}/shares?page_size=100`,
+      );
+      const share = shares.find((item) => comparableShareUrl(item.short_url) === target);
+      if (share) {
+        if (!share.enabled) throw new Error("frameio_share_disabled");
+        if (!share.downloading_enabled) throw new Error("frameio_share_downloads_required");
+        return { accountId: account.id, projectId: project.id, shareId: share.id };
+      }
+    }
+  }
+  throw new Error("frameio_share_not_found");
+}
+
+export type FrameioFile = {
+  id: string;
+  name: string;
+  mediaType: string;
+  sizeBytes: number;
+  thumbnailUrl: string | null;
+  viewUrl: string | null;
+};
+
+export async function listFrameioShareFiles(accountId: string, shareId: string) {
+  const result = await frameioGet<FrameioPage<Record<string, unknown>>>(
+    `/v4/accounts/${encodeURIComponent(accountId)}/shares/${encodeURIComponent(shareId)}/assets?page_size=100&include=media_links.thumbnail`,
+    true,
+  );
+  return (result.data ?? [])
+    .map((entry): FrameioFile | null => {
+      const links = (entry.media_links ?? {}) as Record<string, Record<string, unknown> | undefined>;
+      const mediaType = String(entry.media_type ?? "application/octet-stream");
+      if (!/^(image|video)\//.test(mediaType) || entry.type !== "file") return null;
+      return {
+        id: String(entry.id ?? ""),
+        name: String(entry.name ?? "Untitled"),
+        mediaType,
+        sizeBytes: Number(entry.file_size ?? 0),
+        thumbnailUrl:
+          typeof links.thumbnail?.url === "string" ? links.thumbnail.url : null,
+        viewUrl: typeof entry.view_url === "string" ? entry.view_url : null,
+      };
+    })
+    .filter((file): file is FrameioFile => Boolean(file?.id));
+}
+
+export async function frameioFileOriginalUrl(accountId: string, fileId: string) {
+  const result = await frameioGet<{ data?: Record<string, unknown> }>(
+    `/v4/accounts/${encodeURIComponent(accountId)}/files/${encodeURIComponent(fileId)}?include=media_links.original`,
+    true,
+  );
+  const data = result.data ?? {};
+  const links = (data.media_links ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  const url = links.original?.inline_url ?? links.original?.download_url;
+  if (typeof url !== "string") throw new Error("frameio_file_not_ready");
+  return url;
+}

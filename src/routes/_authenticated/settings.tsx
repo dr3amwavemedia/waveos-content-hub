@@ -16,6 +16,11 @@ import {
   DEFAULT_WORKSPACE_ACCENT,
   useWorkspaceBranding,
 } from "@/hooks/use-workspace-branding";
+import {
+  disconnectFrameioService,
+  getFrameioServiceStatus,
+  startFrameioServiceConnection,
+} from "@/hooks/use-frameio";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -144,6 +149,8 @@ function SettingsPage() {
         />
       )}
 
+      {user?.isDreamWaveOwner && <FrameioServiceConnectionCard />}
+
       {activeWorkspace && (
         <section className="space-y-4">
           <div>
@@ -180,6 +187,58 @@ function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function FrameioServiceConnectionCard() {
+  const qc = useQueryClient();
+  const status = useQuery({
+    queryKey: ["frameio-service-status"],
+    queryFn: getFrameioServiceStatus,
+  });
+  const connect = useMutation({
+    mutationFn: startFrameioServiceConnection,
+    onSuccess: ({ url }) => window.location.assign(url),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Frame.io connection failed."),
+  });
+  const disconnect = useMutation({
+    mutationFn: disconnectFrameioService,
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["frameio-service-status"] });
+      toast.success("Dream Wave Frame.io disconnected.");
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not disconnect Frame.io."),
+  });
+  const connected = status.data?.connected === true;
+  return (
+    <section className="surface-card flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-start gap-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+          <Cloud className="h-5 w-5" />
+        </div>
+        <div>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-semibold text-foreground">Dream Wave Frame.io</h2>
+            {connected && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+          </div>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            One protected company connection powers the curated Shares assigned to client workspaces.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {status.isLoading ? "Checking connection…" : connected ? status.data?.email || "Connected" : status.data?.configured === false ? "Developer credentials needed" : "Not connected"}
+          </p>
+        </div>
+      </div>
+      {connected ? (
+        <button type="button" onClick={() => disconnect.mutate()} disabled={disconnect.isPending} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50">
+          {disconnect.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />} Disconnect
+        </button>
+      ) : (
+        <button type="button" onClick={() => connect.mutate()} disabled={status.isLoading || status.data?.configured === false || connect.isPending} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+          {connect.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />} Connect Frame.io
+        </button>
+      )}
+    </section>
   );
 }
 

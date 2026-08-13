@@ -27,6 +27,7 @@ import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { cn } from "@/lib/utils";
 import { isValidHttpsUrl, URL_VALIDATION_MESSAGE } from "@/lib/url-validation";
 import type { Database } from "@/integrations/supabase/types";
+import { syncFrameioWorkspaceShare } from "@/hooks/use-frameio";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -623,10 +624,11 @@ function WorkspaceMediaSourcesTab({ workspaceId }: { workspaceId: string }) {
         assigned_by: auth.user?.id ?? null,
       });
       if (error) throw error;
+      await syncFrameioWorkspaceShare(workspaceId);
     },
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["workspace-frameio-source", workspaceId] });
-      toast.success("Frame.io Share assigned to this client.");
+      toast.success("Frame.io Share assigned and ready for this client.");
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Could not assign Frame.io Share."),

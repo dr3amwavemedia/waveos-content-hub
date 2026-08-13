@@ -26,6 +26,7 @@ import { STATUS_LABELS } from "@/lib/permissions";
 import type { Database } from "@/integrations/supabase/types";
 import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
 import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
+import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
 
 type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
 type Delivery = Database["public"]["Tables"]["client_deliveries"]["Row"];
@@ -179,6 +180,17 @@ export function Layer1Overview() {
     },
   });
 
+  const frameioQ = useQuery({
+    queryKey: ["layer1", "frameio", wsId],
+    enabled: !!wsId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const status = await getFrameioWorkspaceStatus(wsId!);
+      if (!status.connected) return null;
+      return listFrameioWorkspaceMedia(wsId!, "");
+    },
+  });
+
   const primaryInvoice = useMemo<Invoice | null>(() => {
     const items = invoicesQ.data ?? [];
     const now = Date.now();
@@ -240,6 +252,39 @@ export function Layer1Overview() {
 
       {/* Primary action */}
       <PrimaryActionBanner action={primaryAction} />
+
+      {frameioQ.data && frameioQ.data.files.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">Frame.io</p>
+              <h2 className="mt-1 text-lg font-semibold text-foreground">{frameioQ.data.label}</h2>
+            </div>
+            <Link to="/create" className="text-sm font-medium text-primary hover:underline">
+              Create a post
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            {frameioQ.data.files.slice(0, 6).map((file) => (
+              <a
+                key={file.id}
+                href={file.viewUrl ?? "#"}
+                target={file.viewUrl ? "_blank" : undefined}
+                rel={file.viewUrl ? "noopener noreferrer" : undefined}
+                className="group relative aspect-square overflow-hidden rounded-2xl border border-border bg-elevated"
+                aria-label={`Open ${file.name} in Frame.io`}
+              >
+                {file.thumbnailUrl ? (
+                  <img src={file.thumbnailUrl} alt={file.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                ) : (
+                  <div className="flex h-full items-center justify-center p-3 text-center text-xs text-muted-foreground">{file.name}</div>
+                )}
+                <span className="absolute inset-x-0 bottom-0 truncate bg-background/80 px-2 py-1.5 text-[10px] text-foreground backdrop-blur">{file.name}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Latest project */}
       <section className="space-y-3">

@@ -24,7 +24,7 @@ export interface MediaAsset {
   tags: string[];
   uploaded_by: string | null;
   created_at: string;
-  source_provider: "waveos" | "google_drive" | "dropbox";
+  source_provider: "waveos" | "google_drive" | "dropbox" | "frameio";
   external_file_id: string | null;
   external_parent_id: string | null;
   source_web_url: string | null;
@@ -215,6 +215,7 @@ export async function getMediaPreviewUrl(
     );
     return result.url;
   }
+  if (asset.source_provider === "frameio") return asset.thumbnail_url ?? asset.source_web_url;
   return asset.thumbnail_url ?? asset.source_web_url;
 }
 

@@ -13,6 +13,9 @@ import { EmptyState } from "@/components/app/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Layer1Overview } from "@/components/app/layer1-overview";
+import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
+import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
+import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
 
 export const Route = createFileRoute("/_authenticated/home")({
   component: HomeRoute,
@@ -64,6 +67,7 @@ function HomeDashboard() {
   const { data: user } = useCurrentUser();
   const { activeWorkspace } = useWorkspace();
   const wsId = activeWorkspace?.id;
+  const branding = useWorkspaceBranding(wsId);
   const greeting = getGreeting();
   const firstName = user?.firstName?.split(" ")[0] ?? "there";
 
@@ -99,13 +103,24 @@ function HomeDashboard() {
   });
 
   const stats = statsQ.data;
+  const frameioQ = useQuery({
+    queryKey: ["home", "frameio", wsId],
+    enabled: !!wsId,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const status = await getFrameioWorkspaceStatus(wsId!);
+      return status.connected ? listFrameioWorkspaceMedia(wsId!, "") : null;
+    },
+  });
   const isDemo = activeWorkspace?.is_demo ?? false;
   const isEmpty = !stats || (stats.mediaCount === 0 && stats.memberCount <= 1);
 
   return (
     <div className="space-y-8">
       <header className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 sm:flex sm:flex-wrap sm:justify-between">
-        <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-4">
+          <WorkspaceBrandmark logoUrl={branding.data?.logoUrl} name={activeWorkspace?.name ?? "Workspace"} />
+          <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
             {activeWorkspace?.name ?? "WaveOS"}
           </p>
@@ -115,6 +130,7 @@ function HomeDashboard() {
           <p className="mt-1 text-sm text-muted-foreground">
             Here's what's happening in your workspace.
           </p>
+          </div>
         </div>
         <Link
           to="/create"
@@ -124,6 +140,19 @@ function HomeDashboard() {
           Create post
         </Link>
       </header>
+
+      {frameioQ.data && frameioQ.data.files.length > 0 && (
+        <Section title={frameioQ.data.label} subtitle="Media curated for your brand by Dream Wave.">
+          <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+            {frameioQ.data.files.slice(0, 6).map((file) => (
+              <a key={file.id} href={file.viewUrl ?? "#"} target={file.viewUrl ? "_blank" : undefined} rel={file.viewUrl ? "noopener noreferrer" : undefined} className="relative aspect-square overflow-hidden rounded-2xl border border-border bg-elevated">
+                {file.thumbnailUrl ? <img src={file.thumbnailUrl} alt={file.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center p-2 text-center text-xs text-muted-foreground">{file.name}</div>}
+                <span className="absolute inset-x-0 bottom-0 truncate bg-background/80 px-2 py-1.5 text-[10px] text-foreground backdrop-blur">{file.name}</span>
+              </a>
+            ))}
+          </div>
+        </Section>
+      )}
 
      <section className="space-y-4">
   <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/15 via-card to-card p-5 shadow-[var(--shadow-glow)] sm:p-7">
