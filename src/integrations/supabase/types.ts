@@ -1053,6 +1053,66 @@ export type Database = {
           },
         ]
       }
+      frameio_oauth_states: {
+        Row: {
+          created_at: string
+          expires_at: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          state?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      frameio_service_connections: {
+        Row: {
+          access_token_encrypted: string
+          account_email: string | null
+          connected_by: string | null
+          created_at: string
+          external_user_id: string
+          id: boolean
+          refresh_token_encrypted: string
+          scopes: string
+          token_expires_at: string
+          updated_at: string
+        }
+        Insert: {
+          access_token_encrypted: string
+          account_email?: string | null
+          connected_by?: string | null
+          created_at?: string
+          external_user_id: string
+          id?: boolean
+          refresh_token_encrypted: string
+          scopes?: string
+          token_expires_at: string
+          updated_at?: string
+        }
+        Update: {
+          access_token_encrypted?: string
+          account_email?: string | null
+          connected_by?: string | null
+          created_at?: string
+          external_user_id?: string
+          id?: boolean
+          refresh_token_encrypted?: string
+          scopes?: string
+          token_expires_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invites: {
         Row: {
           accepted_at: string | null
