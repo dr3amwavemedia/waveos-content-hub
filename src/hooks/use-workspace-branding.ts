@@ -33,9 +33,12 @@ const db = supabase as unknown as {
   from: (table: string) => any;
 };
 
-export function workspaceLogoUrl(path: string | null) {
+export async function workspaceLogoUrl(path: string | null) {
   if (!path) return null;
-  return supabase.storage.from("workspace-branding").getPublicUrl(path).data.publicUrl;
+  const { data } = await supabase.storage
+    .from("workspace-branding")
+    .createSignedUrl(path, 60 * 60);
+  return data?.signedUrl ?? null;
 }
 
 export function useWorkspaceBranding(workspaceId: string | undefined) {
@@ -54,7 +57,7 @@ export function useWorkspaceBranding(workspaceId: string | undefined) {
       return {
         workspaceId: workspaceId!,
         logoPath,
-        logoUrl: workspaceLogoUrl(logoPath),
+        logoUrl: await workspaceLogoUrl(logoPath),
         accentColor:
           typeof data?.accent_color === "string"
             ? data.accent_color
