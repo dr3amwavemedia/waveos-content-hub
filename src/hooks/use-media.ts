@@ -206,9 +206,9 @@ export async function getMediaPreviewUrl(
     if (!asset.storage_path) throw new Error("Media file is missing its storage path.");
     return getSignedMediaUrl(asset.storage_path, expiresIn);
   }
-  if (asset.source_provider === "google_drive") {
+  if (asset.source_provider === "google_drive" || asset.source_provider === "dropbox") {
     const result = await getExternalMediaPreviewUrl(
-      "google_drive",
+      asset.source_provider,
       asset.workspace_id,
       asset.id,
       mode,

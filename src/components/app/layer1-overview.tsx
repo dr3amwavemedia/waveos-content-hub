@@ -24,6 +24,8 @@ import { useWorkspace } from "@/components/app/workspace-context";
 import { isValidHttpsUrl } from "@/lib/url-validation";
 import { STATUS_LABELS } from "@/lib/permissions";
 import type { Database } from "@/integrations/supabase/types";
+import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
+import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
 
 type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
 type Delivery = Database["public"]["Tables"]["client_deliveries"]["Row"];
@@ -114,6 +116,7 @@ export function Layer1Overview() {
   const { data: user } = useCurrentUser();
   const { activeWorkspace } = useWorkspace();
   const wsId = activeWorkspace?.id;
+  const branding = useWorkspaceBranding(wsId);
 
   const firstName = user?.firstName?.split(" ")[0] ?? null;
 
@@ -208,23 +211,32 @@ export function Layer1Overview() {
   return (
     <div className="space-y-8">
       {/* Welcome */}
-      <header className="space-y-3">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          {projectName}
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-          {firstName ? `Welcome back, ${firstName}.` : "Welcome back."}
-        </h1>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Everything related to your Dream Wave Media project is organized below.
-        </p>
+      <header className="flex items-start gap-4 sm:items-center sm:gap-5">
+        <WorkspaceBrandmark
+          logoUrl={branding.data?.logoUrl}
+          name={projectName}
+          className="h-16 w-16 sm:h-20 sm:w-20"
+        />
+        <div className="min-w-0 space-y-2">
+          <p className="truncate text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+            {projectName}
+          </p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            {firstName ? `Welcome back, ${firstName}.` : "Welcome back."}
+          </h1>
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+            Everything related to your Dream Wave Media project is organized below.
+          </p>
+        </div>
+      </header>
+      <div>
         {statusLabel && (
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-elevated/60 px-3 py-1 text-xs text-muted-foreground">
             <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px] shadow-primary" />
             Project status: <span className="font-medium text-foreground">{statusLabel}</span>
           </div>
         )}
-      </header>
+      </div>
 
       {/* Primary action */}
       <PrimaryActionBanner action={primaryAction} />

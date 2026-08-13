@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Cloud, ExternalLink, Loader2, Settings as SettingsIcon, ShieldCheck, Unplug } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CheckCircle2, Cloud, ExternalLink, Image, Loader2, Palette, Settings as SettingsIcon, ShieldCheck, Unplug, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { useWorkspace } from "@/components/app/workspace-context";
@@ -11,6 +12,15 @@ import {
   startExternalMediaConnection,
   type ExternalMediaProvider,
 } from "@/hooks/use-external-media";
+import {
+  DEFAULT_WORKSPACE_ACCENT,
+  useWorkspaceBranding,
+} from "@/hooks/use-workspace-branding";
+
+const db = supabase as unknown as {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from: (table: string) => any;
+};
 
 export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
@@ -23,6 +33,8 @@ function SettingsPage() {
   const qc = useQueryClient();
   const canManageApproval =
     !user?.isStaff && (activeWorkspace?.role === "owner" || activeWorkspace?.role === "admin");
+  const canManageBranding =
+    Boolean(user?.isStaff) || activeWorkspace?.role === "owner" || activeWorkspace?.role === "admin";
   const automaticApproval = activeWorkspace?.approval_required === false;
   const updateApproval = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -125,6 +137,13 @@ function SettingsPage() {
         </div>
       )}
 
+      {activeWorkspace && canManageBranding && (
+        <WorkspaceBrandingEditor
+          workspaceId={activeWorkspace.id}
+          workspaceName={activeWorkspace.name}
+        />
+      )}
+
       {activeWorkspace && (
         <section className="space-y-4">
           <div>
@@ -161,6 +180,129 @@ function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function WorkspaceBrandingEditor({
+  workspaceId,
+  workspaceName,
+}: {
+  workspaceId: string;
+  workspaceName: string;
+}) {
+  const qc = useQueryClient();
+  const branding = useWorkspaceBranding(workspaceId);
+  const [accentColor, setAccentColor] = useState(DEFAULT_WORKSPACE_ACCENT);
+  const [pendingLogo, setPendingLogo] = useState<File | null>(null);
+
+  useEffect(() => {
+    setAccentColor(branding.data?.accentColor ?? DEFAULT_WORKSPACE_ACCENT);
+    setPendingLogo(null);
+  }, [branding.data?.accentColor, workspaceId]);
+
+  const save = useMutation({
+    mutationFn: async () => {
+      if (!/^#[0-9a-f]{6}$/i.test(accentColor)) throw new Error("Choose a valid brand color.");
+      let logoPath = branding.data?.logoPath ?? null;
+      if (pendingLogo) {
+        if (!/^image\/(png|jpeg|webp)$/.test(pendingLogo.type))
+          throw new Error("Use a PNG, JPG, or WebP logo.");
+        if (pendingLogo.size > 5 * 1024 * 1024) throw new Error("Logo must be smaller than 5 MB.");
+        const extension = pendingLogo.name.split(".").pop()?.toLowerCase() || "png";
+        logoPath = `${workspaceId}/logo.${extension}`;
+        const { error: uploadError } = await supabase.storage
+          .from("workspace-branding")
+          .upload(logoPath, pendingLogo, { contentType: pendingLogo.type, upsert: true });
+        if (uploadError) throw uploadError;
+      }
+      const { error } = await db.from("workspace_branding").upsert({
+        workspace_id: workspaceId,
+        logo_path: logoPath,
+        accent_color: accentColor.toUpperCase(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["workspace-branding", workspaceId] });
+      setPendingLogo(null);
+      toast.success("Workspace branding updated.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not update workspace branding."),
+  });
+
+  const previewUrl = pendingLogo ? URL.createObjectURL(pendingLogo) : branding.data?.logoUrl;
+
+  return (
+    <section className="surface-card overflow-hidden">
+      <div className="border-b border-border bg-gradient-to-r from-primary/15 via-transparent to-transparent p-6">
+        <div className="flex items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+            <Palette className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">Workspace identity</h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Give {workspaceName} a private, recognizable welcome while keeping the WaveOS luxury foundation.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div className="grid gap-6 p-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+        <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl border border-primary/25 bg-elevated shadow-[var(--shadow-glow)]">
+          {previewUrl ? (
+            <img src={previewUrl} alt={`${workspaceName} logo preview`} className="h-full w-full object-contain p-3" />
+          ) : (
+            <Image className="h-8 w-8 text-primary" />
+          )}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Client logo</span>
+            <span className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-elevated px-4 py-3 text-sm font-medium text-foreground hover:border-primary/40">
+              <Upload className="h-4 w-4 text-primary" />
+              {pendingLogo ? pendingLogo.name : branding.data?.logoPath ? "Replace logo" : "Upload logo"}
+            </span>
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              onChange={(event) => setPendingLogo(event.target.files?.[0] ?? null)}
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Brand accent</span>
+            <span className="flex items-center gap-3 rounded-xl border border-border bg-elevated px-3 py-2">
+              <input
+                type="color"
+                value={accentColor}
+                onChange={(event) => setAccentColor(event.target.value)}
+                className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent p-0"
+                aria-label="Brand accent color"
+              />
+              <input
+                value={accentColor}
+                onChange={(event) => setAccentColor(event.target.value)}
+                maxLength={7}
+                className="min-w-0 flex-1 bg-transparent font-mono text-sm uppercase text-foreground outline-none"
+                aria-label="Brand accent hex value"
+              />
+            </span>
+          </label>
+          <div className="flex justify-end sm:col-span-2">
+            <button
+              type="button"
+              onClick={() => save.mutate()}
+              disabled={save.isPending || branding.isLoading}
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] disabled:opacity-50"
+            >
+              {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Save workspace style
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

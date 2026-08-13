@@ -65,6 +65,33 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
           return json({ url: url.toString() });
         }
 
+        if (body.action === "preview_url" && provider === "dropbox") {
+          const assetId = typeof body.assetId === "string" ? body.assetId : "";
+          if (!assetId) return json({ error: "asset_required" }, 400);
+          const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const { data: asset, error } = await supabaseAdmin
+            .from("media_assets")
+            .select("external_file_id")
+            .eq("id", assetId)
+            .eq("workspace_id", workspaceId)
+            .eq("source_provider", "dropbox")
+            .maybeSingle();
+          if (error) return json({ error: error.message }, 500);
+          if (!asset?.external_file_id) return json({ error: "asset_not_found" }, 404);
+          const response = await fetch("https://api.dropboxapi.com/2/files/get_temporary_link", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ path: asset.external_file_id }),
+          });
+          const result = (await response.json()) as Record<string, unknown>;
+          if (!response.ok || typeof result.link !== "string")
+            return json({ error: "dropbox_preview_unavailable" }, 502);
+          return json({ url: result.link });
+        }
+
         if (body.action === "import") {
           const files = Array.isArray(body.files) ? body.files : [];
           if (!files.length || files.length > 20) return json({ error: "invalid_files" }, 400);
