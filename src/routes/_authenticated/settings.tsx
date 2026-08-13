@@ -270,10 +270,10 @@ function WorkspaceBrandingEditor({
           throw new Error("Use a PNG, JPG, or WebP logo.");
         if (pendingLogo.size > 5 * 1024 * 1024) throw new Error("Logo must be smaller than 5 MB.");
         const extension = pendingLogo.name.split(".").pop()?.toLowerCase() || "png";
-        logoPath = `${workspaceId}/logo.${extension}`;
+        logoPath = `${workspaceId}/logo-${crypto.randomUUID()}.${extension}`;
         const { error: uploadError } = await supabase.storage
           .from("workspace-branding")
-          .upload(logoPath, pendingLogo, { contentType: pendingLogo.type, upsert: true });
+          .upload(logoPath, pendingLogo, { contentType: pendingLogo.type, upsert: false });
         if (uploadError) throw uploadError;
       }
       const { error } = await db.from("workspace_branding").upsert({
