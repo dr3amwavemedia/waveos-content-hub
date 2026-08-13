@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { isValidHttpsUrl, URL_VALIDATION_MESSAGE } from "@/lib/url-validation";
 import type { Database } from "@/integrations/supabase/types";
 import { syncFrameioWorkspaceShare } from "@/hooks/use-frameio";
+import { ClientBrandingEditor } from "@/components/branding/client-branding-editor";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -452,7 +453,7 @@ function TierBadge({ tier }: { tier: ClientAccessTier }) {
 
 // ─── Drawer with tabs ─────────────────────────────────────────────────────
 
-type DrawerTab = "info" | "access" | "media" | "deliveries" | "invoices" | "invites";
+type DrawerTab = "info" | "branding" | "access" | "media" | "deliveries" | "invoices" | "invites";
 
 function WorkspaceDrawer({
   workspace,
@@ -546,7 +547,7 @@ function WorkspaceDrawer({
       </div>
 
       <div className="mb-4 flex gap-1 border-b border-border">
-        {(["info", "access", "media", "deliveries", "invoices", "invites"] as const).map((t) => (
+        {(["info", "branding", "access", "media", "deliveries", "invoices", "invites"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -563,6 +564,7 @@ function WorkspaceDrawer({
       </div>
 
       {tab === "info" && <ClientInfoTab workspace={workspace} onRefresh={onRefresh} />}
+      {tab === "branding" && <ClientBrandingEditor workspaceId={workspace.id} workspaceName={workspace.name} />}
       {tab === "access" && (
         <AccessTab
           workspace={workspace}
@@ -631,7 +633,7 @@ function WorkspaceMediaSourcesTab({ workspaceId }: { workspaceId: string }) {
       toast.success("Frame.io Share assigned and ready for this client.");
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Could not assign Frame.io Share."),
+      toast.error(frameioAssignmentMessage(error)),
   });
 
   const remove = useMutation({
@@ -720,6 +722,19 @@ function WorkspaceMediaSourcesTab({ workspaceId }: { workspaceId: string }) {
       </div>
     </div>
   );
+}
+
+function frameioAssignmentMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("frameio_not_connected"))
+    return "Connect the Dream Wave Frame.io account in Settings first.";
+  if (message.includes("frameio_share_downloads_required"))
+    return "Turn on Downloads for this Frame.io Share, then try again.";
+  if (message.includes("frameio_share_not_found"))
+    return "WaveOS could not find that Share. Confirm the link belongs to the connected Frame.io account.";
+  if (message.includes("workspace_frameio_sources"))
+    return "The Frame.io database update has not deployed yet. Redeploy the latest main branch.";
+  return message || "Could not assign Frame.io Share.";
 }
 
 function normalizeFrameIoShareUrl(value: string) {
