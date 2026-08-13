@@ -1811,6 +1811,38 @@ export type Database = {
           },
         ]
       }
+      workspace_branding: {
+        Row: {
+          accent_color: string
+          created_at: string
+          logo_path: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          accent_color?: string
+          created_at?: string
+          logo_path?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          accent_color?: string
+          created_at?: string
+          logo_path?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_branding_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_frameio_sources: {
         Row: {
           assigned_by: string | null
