@@ -15,6 +15,7 @@ import {
 import {
   DEFAULT_WORKSPACE_ACCENT,
   useWorkspaceBranding,
+  workspaceBrandingError,
   workspaceThemeStyle,
 } from "@/hooks/use-workspace-branding";
 import {
@@ -287,8 +288,7 @@ function WorkspaceBrandingEditor({
       setPendingLogo(null);
       toast.success("Workspace branding updated.");
     },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Could not update workspace branding."),
+    onError: (error) => toast.error(workspaceBrandingError(error)),
   });
 
   const previewUrl = pendingLogo ? URL.createObjectURL(pendingLogo) : branding.data?.logoUrl;
