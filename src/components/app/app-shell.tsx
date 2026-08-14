@@ -158,7 +158,7 @@ function Shell({ children }: { children: ReactNode }) {
   const filterByFeature = (items: NavItem[]) =>
     items.filter((i) => {
       if (i.ownerOnly) return isOwner;
-      if (i.mediaOnly) return isOwner || isMediaManager || isCrew;
+      if (i.mediaOnly) return isOwner || isCrew;
       if (i.staffOnly) return isStaff;
       if (!i.feature) return true;
       if (permsLoading) return false;
