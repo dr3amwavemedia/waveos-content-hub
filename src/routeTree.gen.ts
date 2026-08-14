@@ -25,6 +25,7 @@ import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-c
 import { Route as ApiFrameioRouteImport } from './routes/api/frameio'
 import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
 import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
+import { Route as AuthenticatedVisionBoardBoardIdRouteImport } from './routes/_authenticated/vision-board.$boardId'
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
@@ -143,6 +144,12 @@ const AuthenticatedVisionBoardRoute = AuthenticatedVisionBoardRouteImport.update
   path: '/vision-board',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedVisionBoardBoardIdRoute =
+  AuthenticatedVisionBoardBoardIdRouteImport.update({
+    id: '/vision-board/$boardId',
+    path: '/vision-board/$boardId',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedVisionStudioRoute =
   AuthenticatedVisionStudioRouteImport.update({
     id: '/vision-studio',
@@ -371,6 +378,7 @@ export interface FileRoutesByFullPath {
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRoute
+  '/vision-board/$boardId': typeof AuthenticatedVisionBoardBoardIdRoute
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
@@ -425,6 +433,7 @@ export interface FileRoutesByTo {
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRoute
+  '/vision-board/$boardId': typeof AuthenticatedVisionBoardBoardIdRoute
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
@@ -481,6 +490,7 @@ export interface FileRoutesById {
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
   '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
   '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRoute
+  '/_authenticated/vision-board/$boardId': typeof AuthenticatedVisionBoardBoardIdRoute
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
@@ -537,6 +547,7 @@ export interface FileRouteTypes {
     | '/staff-email'
     | '/videographer'
     | '/vision-board'
+    | '/vision-board/$boardId'
     | '/vision-studio'
     | '/api/frameio'
     | '/social-connections/callback'
@@ -591,6 +602,7 @@ export interface FileRouteTypes {
     | '/staff-email'
     | '/videographer'
     | '/vision-board'
+    | '/vision-board/$boardId'
     | '/vision-studio'
     | '/api/frameio'
     | '/social-connections/callback'
@@ -646,6 +658,7 @@ export interface FileRouteTypes {
     | '/_authenticated/staff-email'
     | '/_authenticated/videographer'
     | '/_authenticated/vision-board'
+    | '/_authenticated/vision-board/$boardId'
     | '/_authenticated/vision-studio'
     | '/api/frameio'
     | '/social-connections/callback'
@@ -812,6 +825,13 @@ declare module '@tanstack/react-router' {
       path: '/vision-board'
       fullPath: '/vision-board'
       preLoaderRoute: typeof AuthenticatedVisionBoardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/vision-board/$boardId': {
+      id: '/_authenticated/vision-board/$boardId'
+      path: '/vision-board/$boardId'
+      fullPath: '/vision-board/$boardId'
+      preLoaderRoute: typeof AuthenticatedVisionBoardBoardIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/vision-studio': {
@@ -1079,6 +1099,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
   AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRoute
+  AuthenticatedVisionBoardBoardIdRoute: typeof AuthenticatedVisionBoardBoardIdRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
@@ -1103,6 +1124,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
   AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRoute,
+  AuthenticatedVisionBoardBoardIdRoute: AuthenticatedVisionBoardBoardIdRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedApprovalsRoute: AuthenticatedApprovalsRoute,
