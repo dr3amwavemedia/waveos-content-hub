@@ -2,7 +2,7 @@ import { useMemo, useSyncExternalStore } from "react";
 
 const KEY = "waveos.acting-staff";
 
-type StaffType = "sales" | "media_manager" | null;
+type StaffType = "sales" | "media_manager" | "crew" | null;
 
 export interface ActingStaffIdentity {
   userId: string;
