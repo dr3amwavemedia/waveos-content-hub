@@ -3,7 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   CalendarDays,
   Camera,
-  Check,
   CheckCircle2,
   ChevronRight,
   Circle,
