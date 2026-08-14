@@ -11,7 +11,6 @@ import {
   LayoutPanelTop,
   Map,
   Plus,
-  Sparkles,
   Upload,
   X,
 } from "lucide-react";
