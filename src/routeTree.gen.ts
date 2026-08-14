@@ -22,6 +22,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as VisionTokenRouteImport } from './routes/vision/$token'
 import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
 import { Route as ApiFrameioRouteImport } from './routes/api/frameio'
+import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
@@ -124,6 +125,11 @@ const ApiFrameioRoute = ApiFrameioRouteImport.update({
   id: '/api/frameio',
   path: '/api/frameio',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedVideographerRoute = AuthenticatedVideographerRouteImport.update({
+  id: '/videographer',
+  path: '/videographer',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedVisionStudioRoute =
   AuthenticatedVisionStudioRouteImport.update({
@@ -351,6 +357,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
@@ -402,6 +409,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
@@ -455,6 +463,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
@@ -508,6 +517,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/social-accounts'
     | '/staff-email'
+    | '/videographer'
     | '/vision-studio'
     | '/api/frameio'
     | '/social-connections/callback'
@@ -559,6 +569,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/social-accounts'
     | '/staff-email'
+    | '/videographer'
     | '/vision-studio'
     | '/api/frameio'
     | '/social-connections/callback'
@@ -611,6 +622,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/social-accounts'
     | '/_authenticated/staff-email'
+    | '/_authenticated/videographer'
     | '/_authenticated/vision-studio'
     | '/api/frameio'
     | '/social-connections/callback'
@@ -755,6 +767,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/frameio'
       preLoaderRoute: typeof ApiFrameioRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/videographer': {
+      id: '/_authenticated/videographer'
+      path: '/videographer'
+      fullPath: '/videographer'
+      preLoaderRoute: typeof AuthenticatedVideographerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/vision-studio': {
       id: '/_authenticated/vision-studio'
@@ -1019,6 +1038,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
@@ -1041,6 +1061,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedApprovalsRoute: AuthenticatedApprovalsRoute,
