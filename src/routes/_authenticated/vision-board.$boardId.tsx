@@ -49,7 +49,7 @@ function VisionBoardEditor() {
   const { data: user, isLoading } = useCurrentUser();
   const { boardId: routeBoardId } = Route.useParams();
   const navigate = useNavigate();
-  const canUseBoard = Boolean(user?.isDreamWaveOwner || (user?.staffType === "media_manager" || user?.staffType === "crew"));
+  const canUseBoard = Boolean(user?.isDreamWaveOwner || user?.staffType === "crew");
   const [projectName, setProjectName] = useState("Untitled production");
   const [pages, setPages] = useState<StoryboardPage[]>([]);
   const [loaded, setLoaded] = useState(false);
