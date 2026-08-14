@@ -1,5 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChangeEvent, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Camera,
   Copy,
@@ -135,6 +135,22 @@ function VisionBoard() {
 
   return (
     <div className="space-y-6">
+      <nav className="flex w-fit items-center gap-1 rounded-xl border border-border bg-surface p-1" aria-label="Production sections">
+        <Link
+          to="/videographer"
+          className="rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-elevated hover:text-foreground"
+        >
+          Dashboard
+        </Link>
+        <Link
+          to="/vision-board"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+        >
+          <LayoutPanelTop className="h-4 w-4" />
+          Vision Board
+        </Link>
+      </nav>
+
       <header className="rounded-2xl border border-border bg-surface p-5 shadow-sm sm:p-6">
         <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
           <div className="min-w-0 flex-1">
@@ -262,17 +278,17 @@ function StoryboardCard({
       <div className="space-y-4 p-5">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,.8fr)]">
           <Field label="Scene title">
-            <input value={page.sceneTitle} onChange={(event) => onChange({ sceneTitle: event.target.value })} placeholder="e.g. Exterior arrival" className="field-input" />
+            <input value={page.sceneTitle} onChange={(event) => onChange({ sceneTitle: event.target.value })} placeholder="e.g. Exterior arrival" className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary" />
           </Field>
           <Field label="Location" icon={<MapPin className="h-3.5 w-3.5" />}>
-            <input value={page.location} onChange={(event) => onChange({ location: event.target.value })} placeholder="Location or set" className="field-input" />
+            <input value={page.location} onChange={(event) => onChange({ location: event.target.value })} placeholder="Location or set" className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary" />
           </Field>
         </div>
         <Field label="Scene description">
-          <textarea value={page.description} onChange={(event) => onChange({ description: event.target.value })} rows={3} placeholder="What happens in this scene?" className="field-input resize-none" />
+          <textarea value={page.description} onChange={(event) => onChange({ description: event.target.value })} rows={3} placeholder="What happens in this scene?" className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary resize-none" />
         </Field>
         <Field label="Shot description">
-          <textarea value={page.shotDescription} onChange={(event) => onChange({ shotDescription: event.target.value })} rows={3} placeholder="Framing, camera movement, lens, lighting, audio, and creative notes…" className="field-input resize-none" />
+          <textarea value={page.shotDescription} onChange={(event) => onChange({ shotDescription: event.target.value })} rows={3} placeholder="Framing, camera movement, lens, lighting, audio, and creative notes…" className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary resize-none" />
         </Field>
       </div>
 
@@ -286,7 +302,7 @@ function StoryboardCard({
   );
 }
 
-function Field({ label, icon, children }: { label: string; icon?: React.ReactNode; children: React.ReactNode }) {
+function Field({ label, icon, children }: { label: string; icon?: ReactNode; children: ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
