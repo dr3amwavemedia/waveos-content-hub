@@ -22,6 +22,7 @@ import {
   User,
   BriefcaseBusiness,
   Mail,
+  Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
@@ -46,6 +47,7 @@ interface NavItem {
   icon: typeof Home;
   staffOnly?: boolean;
   ownerOnly?: boolean;
+  mediaOnly?: boolean;
   // When set, the nav item is only shown if the active workspace can access
   // this feature. Undefined = universal (always shown to any workspace member).
   feature?: FeatureKey;
@@ -77,6 +79,7 @@ const CLIENT_NAV: NavItem[] = [
 const OUTLOOK_INTEGRATIONS_ENABLED = false;
 
 const STAFF_NAV: NavItem[] = [
+  { to: "/videographer", label: "Production", icon: Camera, staffOnly: true, mediaOnly: true },
   { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
   ...(OUTLOOK_INTEGRATIONS_ENABLED
     ? [
@@ -154,6 +157,7 @@ function Shell({ children }: { children: ReactNode }) {
   const filterByFeature = (items: NavItem[]) =>
     items.filter((i) => {
       if (i.ownerOnly) return isOwner;
+      if (i.mediaOnly) return isOwner || isMediaManager;
       if (i.staffOnly) return isStaff;
       if (!i.feature) return true;
       if (permsLoading) return false;
