@@ -20,6 +20,7 @@ import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VisionTokenRouteImport } from './routes/vision/$token'
+import { Route as StoryboardTokenRouteImport } from './routes/storyboard.$token'
 import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
 import { Route as ApiFrameioRouteImport } from './routes/api/frameio'
 import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
@@ -114,6 +115,11 @@ const IndexRoute = IndexRouteImport.update({
 const VisionTokenRoute = VisionTokenRouteImport.update({
   id: '/vision/$token',
   path: '/vision/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StoryboardTokenRoute = StoryboardTokenRouteImport.update({
+  id: '/storyboard/$token',
+  path: '/storyboard/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SocialConnectionsCallbackRoute =
@@ -369,6 +375,7 @@ export interface FileRoutesByFullPath {
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/vision/$token': typeof VisionTokenRoute
+  '/storyboard/$token': typeof StoryboardTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/external-media/$provider': typeof ApiExternalMediaProviderRouteWithChildren
@@ -422,6 +429,7 @@ export interface FileRoutesByTo {
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/vision/$token': typeof VisionTokenRoute
+  '/storyboard/$token': typeof StoryboardTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/external-media/$provider': typeof ApiExternalMediaProviderRouteWithChildren
@@ -477,6 +485,7 @@ export interface FileRoutesById {
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/vision/$token': typeof VisionTokenRoute
+  '/storyboard/$token': typeof StoryboardTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/external-media/$provider': typeof ApiExternalMediaProviderRouteWithChildren
@@ -532,6 +541,7 @@ export interface FileRouteTypes {
     | '/api/frameio'
     | '/social-connections/callback'
     | '/vision/$token'
+    | '/storyboard/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/external-media/$provider'
@@ -585,6 +595,7 @@ export interface FileRouteTypes {
     | '/api/frameio'
     | '/social-connections/callback'
     | '/vision/$token'
+    | '/storyboard/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/external-media/$provider'
@@ -639,6 +650,7 @@ export interface FileRouteTypes {
     | '/api/frameio'
     | '/social-connections/callback'
     | '/vision/$token'
+    | '/storyboard/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/external-media/$provider'
@@ -673,6 +685,7 @@ export interface RootRouteChildren {
   ApiFrameioRoute: typeof ApiFrameioRouteWithChildren
   SocialConnectionsCallbackRoute: typeof SocialConnectionsCallbackRoute
   VisionTokenRoute: typeof VisionTokenRoute
+  StoryboardTokenRoute: typeof StoryboardTokenRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiExternalMediaProviderRoute: typeof ApiExternalMediaProviderRouteWithChildren
@@ -764,6 +777,13 @@ declare module '@tanstack/react-router' {
       path: '/vision/$token'
       fullPath: '/vision/$token'
       preLoaderRoute: typeof VisionTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/storyboard/$token': {
+      id: '/storyboard/$token'
+      path: '/storyboard/$token'
+      fullPath: '/storyboard/$token'
+      preLoaderRoute: typeof StoryboardTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/social-connections/callback': {
@@ -1155,6 +1175,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFrameioRoute: ApiFrameioRouteWithChildren,
   SocialConnectionsCallbackRoute: SocialConnectionsCallbackRoute,
   VisionTokenRoute: VisionTokenRoute,
+  StoryboardTokenRoute: StoryboardTokenRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiExternalMediaProviderRoute: ApiExternalMediaProviderRouteWithChildren,
