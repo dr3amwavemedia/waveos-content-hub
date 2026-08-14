@@ -53,7 +53,7 @@ const DEFAULT_STORYBOARD: StoryBeat[] = [
 
 function VideographerDashboard() {
   const { data: user, isLoading } = useCurrentUser();
-  const canUseDashboard = Boolean(user?.isDreamWaveOwner || (user?.staffType === "media_manager" || user?.staffType === "crew"));
+  const canUseDashboard = Boolean(user?.isDreamWaveOwner || user?.staffType === "crew");
   const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST);
   const [storyboard, setStoryboard] = useState(DEFAULT_STORYBOARD);
   const [newItem, setNewItem] = useState("");

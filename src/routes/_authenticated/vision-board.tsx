@@ -32,7 +32,7 @@ const db = supabase as unknown as { from: (table: string) => any };
 function VisionBoardLibrary() {
   const { data: user, isLoading: userLoading } = useCurrentUser();
   const [filter, setFilter] = useState<"all" | "draft" | "published">("all");
-  const canUseBoard = Boolean(user?.isDreamWaveOwner || (user?.staffType === "media_manager" || user?.staffType === "crew"));
+  const canUseBoard = Boolean(user?.isDreamWaveOwner || user?.staffType === "crew");
 
   const boards = useQuery({
     queryKey: ["production-vision-boards", user?.userId],
