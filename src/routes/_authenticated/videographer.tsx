@@ -57,28 +57,33 @@ function VideographerDashboard() {
   const [storyboard, setStoryboard] = useState(DEFAULT_STORYBOARD);
   const [newItem, setNewItem] = useState("");
   const [newBeat, setNewBeat] = useState("");
+  const [dashboardLoaded, setDashboardLoaded] = useState(false);
   const dashboardStorageKey = `waveos.videographer-dashboard.v1.${user?.userId ?? "loading"}`;
 
   useEffect(() => {
     if (!user?.userId) return;
+    setDashboardLoaded(false);
     try {
       const saved = window.localStorage.getItem(dashboardStorageKey);
-      if (!saved) return;
-      const parsed = JSON.parse(saved) as {
-        checklist?: ChecklistItem[];
-        storyboard?: StoryBeat[];
-      };
-      if (Array.isArray(parsed.checklist)) setChecklist(parsed.checklist);
-      if (Array.isArray(parsed.storyboard)) setStoryboard(parsed.storyboard);
+      if (saved) {
+        const parsed = JSON.parse(saved) as {
+          checklist?: ChecklistItem[];
+          storyboard?: StoryBeat[];
+        };
+        if (Array.isArray(parsed.checklist)) setChecklist(parsed.checklist);
+        if (Array.isArray(parsed.storyboard)) setStoryboard(parsed.storyboard);
+      }
     } catch {
       // Keep the safe defaults when saved dashboard data cannot be read.
+    } finally {
+      setDashboardLoaded(true);
     }
   }, [dashboardStorageKey, user?.userId]);
 
   useEffect(() => {
-    if (!user?.userId) return;
+    if (!user?.userId || !dashboardLoaded) return;
     window.localStorage.setItem(dashboardStorageKey, JSON.stringify({ checklist, storyboard }));
-  }, [checklist, storyboard, dashboardStorageKey, user?.userId]);
+  }, [checklist, storyboard, dashboardLoaded, dashboardStorageKey, user?.userId]);
 
   const completed = checklist.filter((item) => item.done).length;
   const progress = checklist.length ? Math.round((completed / checklist.length) * 100) : 0;
