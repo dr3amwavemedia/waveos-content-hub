@@ -8,9 +8,9 @@ import {
   Circle,
   Clock3,
   Images,
+  LayoutPanelTop,
   Map,
   Plus,
-  Sparkles,
   Upload,
   X,
 } from "lucide-react";
@@ -162,6 +162,22 @@ function VideographerDashboard() {
         </Link>
       </header>
 
+      <nav className="flex w-fit items-center gap-1 rounded-xl border border-border bg-surface p-1" aria-label="Production sections">
+        <Link
+          to="/videographer"
+          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+        >
+          Dashboard
+        </Link>
+        <Link
+          to="/vision-board"
+          className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-elevated hover:text-foreground"
+        >
+          <LayoutPanelTop className="h-4 w-4" />
+          Vision Board
+        </Link>
+      </nav>
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <QuickAction
           to="/content"
@@ -176,10 +192,10 @@ function VideographerDashboard() {
           detail="Review shoots and deadlines"
         />
         <QuickAction
-          to="/vision-studio"
-          icon={Sparkles}
-          title="Vision Studio"
-          detail="Build the visual direction"
+          to="/vision-board"
+          icon={LayoutPanelTop}
+          title="Vision Board"
+          detail="Build the storyboard"
         />
         <QuickAction
           to="/deliveries"
@@ -373,7 +389,7 @@ function QuickAction({
   title,
   detail,
 }: {
-  to: "/content" | "/calendar" | "/vision-studio" | "/deliveries";
+  to: "/content" | "/calendar" | "/vision-board" | "/deliveries";
   icon: typeof Camera;
   title: string;
   detail: string;
