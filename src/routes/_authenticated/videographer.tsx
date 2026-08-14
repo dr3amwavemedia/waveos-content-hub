@@ -17,6 +17,7 @@ import {
 
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { cn } from "@/lib/utils";
+import { ProductionProjectsPanel } from "@/components/production/production-projects-panel";
 
 export const Route = createFileRoute("/_authenticated/videographer")({
   component: VideographerDashboard,
@@ -187,6 +188,8 @@ function VideographerDashboard() {
           detail="Review client-ready media"
         />
       </section>
+
+      <ProductionProjectsPanel />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
         <section className="rounded-2xl border border-border bg-surface shadow-sm">
