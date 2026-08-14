@@ -8,7 +8,7 @@ import {
   Loader2,
   Plus,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { supabase } from "@/integrations/supabase/client";
@@ -189,7 +189,7 @@ function VisionBoardLibrary() {
   );
 }
 
-function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button type="button" onClick={onClick} className={active ? "rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground" : "rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-muted-foreground hover:text-foreground"}>
       {children}
