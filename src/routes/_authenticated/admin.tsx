@@ -26,12 +26,13 @@ import { getIntegrationStatus } from "@/lib/ayrshare.functions";
 import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
-type StaffType = "sales" | "media_manager";
+type StaffType = "sales" | "media_manager" | "crew";
 type StaffPosition = StaffType | "admin";
 
 const STAFF_TYPE_LABEL: Record<StaffType, string> = {
   sales: "Sales",
   media_manager: "Social Manager",
+  crew: "Crew",
 };
 
 const db = supabase as unknown as {
@@ -319,6 +320,7 @@ function AdminPage() {
           >
             <option value="sales">Sales</option>
             <option value="media_manager">Social Manager</option>
+            <option value="crew">Crew — Production only</option>
           </select>
           <button
             type="submit"
@@ -535,6 +537,7 @@ function AdminPage() {
                         <option value="admin">Admin</option>
                         <option value="sales">Sales</option>
                         <option value="media_manager">Social Manager</option>
+            <option value="crew">Crew — Production only</option>
                       </select>
                       {s.email && (
                         <button
