@@ -5,14 +5,19 @@ import {
   Copy,
   ImagePlus,
   LayoutPanelTop,
+  Loader2,
   MapPin,
   Plus,
+  Save,
+  Send,
+  Share2,
   Trash2,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useCurrentUser } from "@/hooks/use-waveos";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/vision-board")({
   component: VisionBoard,
@@ -27,6 +32,8 @@ type StoryboardPage = {
   shotDescription: string;
   image: string | null;
 };
+
+const db = supabase as unknown as { from: (table: string) => any };
 
 const newPage = (number: number): StoryboardPage => ({
   id: crypto.randomUUID(),
@@ -44,6 +51,10 @@ function VisionBoard() {
   const [projectName, setProjectName] = useState("Untitled production");
   const [pages, setPages] = useState<StoryboardPage[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const [boardId, setBoardId] = useState<string | null>(null);
+  const [publicToken, setPublicToken] = useState<string | null>(null);
+  const [status, setStatus] = useState<"draft" | "published">("draft");
+  const [saving, setSaving] = useState(false);
   const storageKey = `waveos.vision-board.v1.${user?.userId ?? "loading"}`;
 
   useEffect(() => {
@@ -51,9 +62,18 @@ function VisionBoard() {
     try {
       const saved = window.localStorage.getItem(storageKey);
       if (saved) {
-        const parsed = JSON.parse(saved) as { projectName?: string; pages?: StoryboardPage[] };
+        const parsed = JSON.parse(saved) as {
+          projectName?: string;
+          pages?: StoryboardPage[];
+          boardId?: string;
+          publicToken?: string;
+          status?: "draft" | "published";
+        };
         setProjectName(parsed.projectName || "Untitled production");
         setPages(Array.isArray(parsed.pages) && parsed.pages.length ? parsed.pages : [newPage(1)]);
+        setBoardId(parsed.boardId ?? null);
+        setPublicToken(parsed.publicToken ?? null);
+        setStatus(parsed.status ?? "draft");
       } else {
         setPages([newPage(1)]);
       }
@@ -67,11 +87,11 @@ function VisionBoard() {
   useEffect(() => {
     if (!loaded || !user?.userId) return;
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify({ projectName, pages }));
+      window.localStorage.setItem(storageKey, JSON.stringify({ projectName, pages, boardId, publicToken, status }));
     } catch {
       toast.error("This board is too large for browser storage. Try smaller images.");
     }
-  }, [loaded, pages, projectName, storageKey, user?.userId]);
+  }, [boardId, loaded, pages, projectName, publicToken, status, storageKey, user?.userId]);
 
   if (isLoading) {
     return <div className="py-20 text-center text-sm text-muted-foreground">Loading vision board…</div>;
@@ -133,6 +153,64 @@ function VisionBoard() {
     event.target.value = "";
   }
 
+  async function saveBoard(nextStatus: "draft" | "published") {
+    if (!user?.userId || saving) return null;
+    setSaving(true);
+    const payload = {
+      project_name: projectName.trim() || "Untitled production",
+      pages,
+      status: nextStatus,
+      published_at: nextStatus === "published" ? new Date().toISOString() : null,
+      created_by: user.userId,
+    };
+
+    const query = boardId
+      ? db.from("production_vision_boards").update(payload).eq("id", boardId)
+      : db.from("production_vision_boards").insert(payload);
+    const { data, error } = await query.select("id, public_token, status").single();
+    setSaving(false);
+
+    if (error) {
+      toast.error(error.message || "The vision board could not be saved.");
+      return null;
+    }
+
+    setBoardId(data.id);
+    setPublicToken(data.public_token);
+    setStatus(data.status);
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify({
+        projectName,
+        pages,
+        boardId: data.id,
+        publicToken: data.public_token,
+        status: data.status,
+      }));
+    } catch {
+      // Database save succeeded even if this device cannot cache another copy.
+    }
+    toast.success(nextStatus === "published" ? "Vision board published" : "Draft saved");
+    return data.public_token as string;
+  }
+
+  function boardUrl(token = publicToken) {
+    return token ? `${window.location.origin}/storyboard/${token}` : "";
+  }
+
+  async function shareBoard() {
+    if (!publicToken || status !== "published") {
+      toast.error("Publish the vision board before sharing it.");
+      return;
+    }
+    const url = boardUrl();
+    if (navigator.share) {
+      await navigator.share({ title: projectName, text: `${projectName} storyboard`, url });
+      return;
+    }
+    await navigator.clipboard.writeText(url);
+    toast.success("Published link copied");
+  }
+
   return (
     <div className="space-y-6">
       <nav className="flex w-fit items-center gap-1 rounded-xl border border-border bg-surface p-1" aria-label="Production sections">
@@ -169,14 +247,24 @@ function VisionBoard() {
               Build the visual story scene by scene. Your board saves automatically on this device.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => addPage()}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground"
-          >
-            <Plus className="h-4 w-4" />
-            Add storyboard page
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => saveBoard("draft")} disabled={saving} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground disabled:opacity-50">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Save draft
+            </button>
+            <button type="button" onClick={() => saveBoard("published")} disabled={saving} className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+              <Send className="h-4 w-4" />
+              Publish
+            </button>
+            <button type="button" onClick={shareBoard} disabled={!publicToken || status !== "published"} className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary disabled:cursor-not-allowed disabled:opacity-40">
+              <Share2 className="h-4 w-4" />
+              Share
+            </button>
+            <button type="button" onClick={() => addPage()} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground">
+              <Plus className="h-4 w-4" />
+              Add page
+            </button>
+          </div>
         </div>
       </header>
 
@@ -204,6 +292,34 @@ function VisionBoard() {
         <Plus className="h-5 w-5" />
         Add another scene
       </button>
+
+      <section className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-surface p-5 shadow-sm sm:flex-row sm:items-center">
+        <div>
+          <h2 className="font-semibold text-foreground">Finished building the storyboard?</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Save a working draft, then publish it to create a view-only client link.
+          </p>
+          {publicToken && status === "published" && (
+            <a href={boardUrl()} target="_blank" rel="noreferrer" className="mt-2 block break-all text-xs font-medium text-primary hover:underline">
+              {boardUrl()}
+            </a>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => saveBoard("draft")} disabled={saving} className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2.5 text-sm font-semibold text-foreground disabled:opacity-50">
+            <Save className="h-4 w-4" />
+            Save draft
+          </button>
+          <button type="button" onClick={() => saveBoard("published")} disabled={saving} className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+            <Send className="h-4 w-4" />
+            Publish link
+          </button>
+          <button type="button" onClick={shareBoard} disabled={!publicToken || status !== "published"} className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2.5 text-sm font-semibold text-primary disabled:opacity-40">
+            <Share2 className="h-4 w-4" />
+            Share
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
