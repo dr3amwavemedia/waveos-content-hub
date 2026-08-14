@@ -152,12 +152,13 @@ function Shell({ children }: { children: ReactNode }) {
   const isOwner = Boolean(user?.isDreamWaveOwner && isStaff);
   const isTeamMember = isStaff && !isOwner;
   const isMediaManager = isTeamMember && user?.staffType === "media_manager";
-  const isSales = isTeamMember && !isMediaManager;
+  const isCrew = isTeamMember && user?.staffType === "crew";
+  const isSales = isTeamMember && !isMediaManager && !isCrew;
 
   const filterByFeature = (items: NavItem[]) =>
     items.filter((i) => {
       if (i.ownerOnly) return isOwner;
-      if (i.mediaOnly) return isOwner || isMediaManager;
+      if (i.mediaOnly) return isOwner || isMediaManager || isCrew;
       if (i.staffOnly) return isStaff;
       if (!i.feature) return true;
       if (permsLoading) return false;
@@ -168,16 +169,24 @@ function Shell({ children }: { children: ReactNode }) {
   // existing routes only. Staff always keep the full nav.
   const isLayer1 = !isStaff && access?.tier === "project_client";
 
-  const clientNav = isSales
-    ? TEAM_NAV.slice(0, 1)
+  const clientNav = isCrew
+    ? []
+    : isSales
+      ? TEAM_NAV.slice(0, 1)
     : isMediaManager
       ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV)
       : isLayer1
         ? LAYER1_NAV
         : filterByFeature(CLIENT_NAV);
-  const staffNav = isStaff ? filterByFeature(STAFF_NAV) : [];
-  const mobileNav = isSales
-    ? TEAM_NAV
+  const staffNav = isStaff
+    ? isCrew
+      ? filterByFeature(STAFF_NAV.filter((item) => item.to === "/videographer"))
+      : filterByFeature(STAFF_NAV)
+    : [];
+  const mobileNav = isCrew
+    ? filterByFeature(STAFF_NAV.filter((item) => item.to === "/videographer"))
+    : isSales
+      ? TEAM_NAV
     : isMediaManager
       ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV).slice(0, 5)
       : isLayer1
@@ -454,7 +463,9 @@ function UserFooter() {
       ? "Social Manager"
       : user?.staffType === "sales"
         ? "Sales"
-        : null;
+        : user?.staffType === "crew"
+          ? "Crew"
+          : null;
 
   return (
     <div className="border-t border-border/80 p-3">

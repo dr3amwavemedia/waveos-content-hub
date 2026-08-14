@@ -6,6 +6,7 @@ import { getActingStaff } from "@/hooks/use-acting-staff";
 
 const TEAM_ALLOWED_ROUTES = ["/home", "/deliveries", "/crm", "/approvals", "/vision-studio"];
 const OUTLOOK_INTEGRATIONS_ENABLED = false;
+const CREW_ALLOWED_ROUTES = ["/videographer", "/vision-board"];
 const MEDIA_MANAGER_ALLOWED_ROUTES = [
   ...TEAM_ALLOWED_ROUTES,
   "/content",
@@ -58,7 +59,7 @@ export const Route = createFileRoute("/_authenticated")({
 
     let roleRows: Array<{
       role: string;
-      staff_type: "sales" | "media_manager" | null;
+      staff_type: "sales" | "media_manager" | "crew" | null;
     }> = [];
 
     const { data: roles, error: rolesError } = await db
@@ -86,7 +87,7 @@ export const Route = createFileRoute("/_authenticated")({
     } else {
       roleRows = (roles ?? []) as Array<{
         role: string;
-        staff_type: "sales" | "media_manager" | null;
+        staff_type: "sales" | "media_manager" | "crew" | null;
       }>;
     }
 
@@ -97,11 +98,15 @@ export const Route = createFileRoute("/_authenticated")({
     const teamRole = actingIdentity
       ? { staff_type: actingIdentity.staffType }
       : roleRows.find((role) => role.role === "dream_wave_team");
-    const allowedRoutes =
-      teamRole?.staff_type === "media_manager" ? MEDIA_MANAGER_ALLOWED_ROUTES : TEAM_ALLOWED_ROUTES;
+    const isCrew = teamRole?.staff_type === "crew";
+    const allowedRoutes = isCrew
+      ? CREW_ALLOWED_ROUTES
+      : teamRole?.staff_type === "media_manager"
+        ? MEDIA_MANAGER_ALLOWED_ROUTES
+        : TEAM_ALLOWED_ROUTES;
 
     if (isTeamMember && !isStaffRouteAllowed(location.pathname, allowedRoutes)) {
-      throw redirect({ to: "/home" });
+      throw redirect({ to: isCrew ? "/videographer" : "/home" });
     }
 
     return { user: data.user };

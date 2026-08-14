@@ -2570,7 +2570,7 @@ export type Database = {
         | "bluesky"
         | "gmb"
         | "snapchat"
-      staff_type: "sales" | "media_manager"
+      staff_type: "sales" | "media_manager" | "crew"
       vision_deck_status: "draft" | "ready" | "archived"
       workspace_member_role:
         | "owner"
@@ -2812,7 +2812,7 @@ export const Constants = {
         "gmb",
         "snapchat",
       ],
-      staff_type: ["sales", "media_manager"],
+      staff_type: ["sales", "media_manager", "crew"],
       vision_deck_status: ["draft", "ready", "archived"],
       workspace_member_role: ["owner", "approver", "viewer", "admin", "editor"],
       workspace_status: ["onboarding", "active", "paused", "archived"],

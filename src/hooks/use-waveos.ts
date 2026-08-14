@@ -23,7 +23,7 @@ export interface CurrentUserContext {
   avatarUrl: string | null;
   isStaff: boolean;
   isDreamWaveOwner: boolean;
-  staffType: "sales" | "media_manager" | null;
+  staffType: "sales" | "media_manager" | "crew" | null;
   roles: string[];
   actingAsStaff: boolean;
   actualUserId: string;
@@ -52,7 +52,7 @@ async function loadContext(): Promise<CurrentUserContext> {
   ]);
   const roleRows = (roles ?? []) as Array<{
     role: string;
-    staff_type: "sales" | "media_manager" | null;
+    staff_type: "sales" | "media_manager" | "crew" | null;
   }>;
   const roleList = roleRows.map((role) => role.role);
   const actualOwner = roleList.includes("dream_wave_owner");
@@ -85,7 +85,7 @@ async function loadContext(): Promise<CurrentUserContext> {
     isDreamWaveOwner: actualOwner,
     staffType: actualOwner
       ? null
-      : ((teamRole?.staff_type as "sales" | "media_manager" | null) ?? "sales"),
+      : ((teamRole?.staff_type as "sales" | "media_manager" | "crew" | null) ?? "sales"),
     roles: roleList,
     actingAsStaff: false,
     actualUserId: user.id,

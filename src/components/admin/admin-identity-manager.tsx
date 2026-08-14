@@ -12,7 +12,7 @@ const db = supabase as unknown as {
   rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: Error | null }>;
 };
 
-type StaffType = "sales" | "media_manager" | null;
+type StaffType = "sales" | "media_manager" | "crew" | null;
 type StaffRow = {
   user_id: string;
   email: string | null;
@@ -172,7 +172,7 @@ export function AdminIdentityManager() {
               <div key={member.user_id} className="flex items-center gap-2 rounded-lg border border-border/70 p-2">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{`${member.first_name ?? ""} ${member.last_name ?? ""}`.trim() || member.email || "Staff member"}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">{member.email} · {member.staff_type === "media_manager" ? "Media Manager" : "Sales"}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">{member.email} · {member.staff_type === "media_manager" ? "Media Manager" : member.staff_type === "crew" ? "Crew" : "Sales"}</p>
                 </div>
                 <button
                   onClick={() => void startActing(member)}
