@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useActingStaff } from "@/hooks/use-acting-staff";
+import { accountDisplayName } from "@/lib/identity-display";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,8 +172,11 @@ export function AdminIdentityManager() {
             {editableStaff.map((member) => (
               <div key={member.user_id} className="flex items-center gap-2 rounded-lg border border-border/70 p-2">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{`${member.first_name ?? ""} ${member.last_name ?? ""}`.trim() || member.email || "Staff member"}</p>
+                  <p className="truncate text-sm font-medium">{accountDisplayName({ firstName: member.first_name, lastName: member.last_name, email: member.email, fallback: "Staff member" })}</p>
                   <p className="truncate text-[11px] text-muted-foreground">{member.email} · {member.staff_type === "media_manager" ? "Media Manager" : member.staff_type === "crew" ? "Crew" : "Sales"}</p>
+                  {!member.first_name?.trim() && !member.last_name?.trim() && (
+                    <p className="mt-1 text-[10px] font-medium text-warning">Name needs identification</p>
+                  )}
                 </div>
                 <button
                   onClick={() => void startActing(member)}
