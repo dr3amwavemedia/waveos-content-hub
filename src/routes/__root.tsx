@@ -159,6 +159,22 @@ function RootComponent() {
       // Router loaders and queries call Supabase. Run them after the auth
       // callback completes to avoid blocking the client auth lock.
       window.setTimeout(() => {
+        if (event === "SIGNED_IN") {
+          const device_category = /iPad|Tablet/i.test(navigator.userAgent)
+            ? "tablet"
+            : /Android|iPhone|iPod|Mobile/i.test(navigator.userAgent)
+              ? "mobile"
+              : "desktop";
+          // The database derives user, email, session, and timestamp from the
+          // signed JWT. A unique session constraint makes refreshes harmless.
+          void (supabase as unknown as {
+            from: (table: string) => {
+              insert: (values: { device_category: string }) => Promise<{ error: { code?: string } | null }>;
+            };
+          }).from("user_login_events").insert({ device_category }).then(({ error }) => {
+            if (error && error.code !== "23505") console.warn("Login activity was not recorded");
+          });
+        }
         router.invalidate();
         if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
       }, 0);
