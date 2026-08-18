@@ -170,7 +170,9 @@ function Shell({ children }: { children: ReactNode }) {
   const isLayer1 = !isStaff && access?.tier === "project_client";
 
   const clientNav = isCrew
-    ? []
+    ? CLIENT_NAV.filter((item) =>
+        ["/deliveries", "/content", "/calendar"].includes(item.to) && !item.hash,
+      )
     : isSales
       ? TEAM_NAV.slice(0, 1)
     : isMediaManager
