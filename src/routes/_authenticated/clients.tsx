@@ -230,10 +230,13 @@ function ClientsPage() {
       (invites ?? []).forEach((i) => bump(iCount, i.workspace_id));
       const mediaCount = new Map<string, number>();
       (media ?? []).forEach((m) => bump(mediaCount, m.workspace_id));
-      return (ws ?? []).map<ClientWorkspace>((w) => {
+      return (ws ?? []).map<ClientWorkspace>((row) => {
+        const w = row as unknown as ClientWorkspace;
         const featureOverrides = (w.feature_overrides ?? {}) as Record<string, boolean>;
         return {
           ...w,
+          wedding_display_name: w.wedding_display_name ?? null,
+          wedding_theme: w.wedding_theme === "gold" ? "gold" : "olive",
           access_tier: effectiveTier(w.access_tier, featureOverrides),
           feature_overrides: featureOverrides,
           member_count: mCount.get(w.id) ?? 0,
@@ -241,6 +244,7 @@ function ClientsPage() {
           media_count: mediaCount.get(w.id) ?? 0,
         };
       });
+
     },
   });
 
