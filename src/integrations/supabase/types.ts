@@ -2590,6 +2590,7 @@ export type Database = {
         | "growth_90"
         | "retainer_full"
         | "social_management"
+        | "wedding_client"
       content_status:
         | "draft"
         | "in_review"
@@ -2823,6 +2824,7 @@ export const Constants = {
         "growth_90",
         "retainer_full",
         "social_management",
+        "wedding_client",
       ],
       content_status: [
         "draft",

@@ -1,0 +1,1 @@
+ALTER TYPE public.client_access_tier ADD VALUE IF NOT EXISTS 'wedding_client';
