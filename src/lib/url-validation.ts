@@ -13,5 +13,11 @@ export function isValidHttpsUrl(raw: string | null | undefined): boolean {
   }
 }
 
+export function normalizeHttpsUrl(raw: string | null | undefined): string {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) return "";
+  return /^https:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 export const URL_VALIDATION_MESSAGE =
   "Enter a full https:// link (Frame.io, Pixieset, Google Drive, Dropbox, Vimeo, YouTube, etc.).";

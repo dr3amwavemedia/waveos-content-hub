@@ -33,7 +33,7 @@ function toLocalInput(iso: string) {
 import { EmptyState } from "@/components/app/empty-state";
 import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { cn } from "@/lib/utils";
-import { isValidHttpsUrl, URL_VALIDATION_MESSAGE } from "@/lib/url-validation";
+import { isValidHttpsUrl, normalizeHttpsUrl, URL_VALIDATION_MESSAGE } from "@/lib/url-validation";
 import type { Database } from "@/integrations/supabase/types";
 import { syncFrameioWorkspaceShare } from "@/hooks/use-frameio";
 import { ClientBrandingEditor } from "@/components/branding/client-branding-editor";
@@ -639,6 +639,7 @@ function WorkspaceDrawer({
         {(["info", "branding", "access", "media", "deliveries", "contracts", "invoices", "invites"] as const).map((t) => (
           <button
             key={t}
+            type="button"
             onClick={() => setTab(t)}
             className={cn(
               "border-b-2 px-3 py-2 text-xs font-medium capitalize -mb-px transition-colors",
@@ -2001,9 +2002,10 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
   });
   const create = useMutation({
     mutationFn: async () => {
-      const url = hostedUrl.trim();
+      const url = normalizeHttpsUrl(hostedUrl);
       if (!isValidHttpsUrl(url)) throw new Error(URL_VALIDATION_MESSAGE);
-      const { data: auth } = await supabase.auth.getUser();
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw new Error("Your session expired. Please sign in again.");
       const { data, error } = await db.from("client_contracts").insert({
         workspace_id: workspaceId,
         title: title.trim(),
@@ -2013,7 +2015,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
         status: "sent",
         sent_at: new Date().toISOString(),
         expires_at: dateInputToIso(expiresAt),
-        created_by: auth.user?.id,
+        created_by: auth.user.id,
       }).select("id").single();
       if (error) throw error;
       await tryEmail(() => sendWorkspaceEmail({
@@ -2041,6 +2043,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
       if (error) throw error;
     },
     onSuccess: refresh,
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not update the contract."),
   });
   const remove = useMutation({
     mutationFn: async (id: string) => {
@@ -2048,32 +2051,36 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
       if (error) throw error;
     },
     onSuccess: async () => { await refresh(); toast.success("Contract removed."); },
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not remove the contract."),
   });
   const inputCls = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
 
   return <div className="space-y-3">
     <div className="flex items-center justify-between gap-3">
       <p className="text-xs text-muted-foreground">Connect a Bloom.io or other secure signing link.</p>
-      <button onClick={() => setShowForm((value) => !value)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">
+      <button type="button" onClick={() => setShowForm((value) => !value)} className="inline-flex min-h-12 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">
         {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}{showForm ? "Cancel" : "Add contract"}
       </button>
     </div>
     {showForm && <form onSubmit={(event) => { event.preventDefault(); create.mutate(); }} className="grid gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:grid-cols-2">
       <Field label="Contract title"><input required minLength={2} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Media services agreement" className={inputCls} /></Field>
-      <Field label="Bloom contract link"><input required type="url" value={hostedUrl} onChange={(event) => setHostedUrl(event.target.value)} placeholder="https://...bloom.io/..." className={inputCls} /></Field>
+      <Field label="Bloom contract link">
+        <input required type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" value={hostedUrl} onChange={(event) => setHostedUrl(event.target.value)} onBlur={() => setHostedUrl(normalizeHttpsUrl(hostedUrl))} placeholder="bloom.io/your-contract" className={inputCls} />
+        {hostedUrl && !isValidHttpsUrl(normalizeHttpsUrl(hostedUrl)) && <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>}
+      </Field>
       <Field label="Description"><input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Optional client note" className={inputCls} /></Field>
       <Field label="Expires"><input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className={inputCls} /></Field>
-      <button disabled={create.isPending || title.trim().length < 2 || !isValidHttpsUrl(hostedUrl)} className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:col-span-2">
+      <button type="submit" disabled={create.isPending || title.trim().length < 2 || !hostedUrl.trim()} className="min-h-12 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:col-span-2">
         {create.isPending ? "Adding…" : "Add contract link"}
       </button>
     </form>}
-    {q.isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : (q.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No contracts yet.</p> :
+    {q.isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : q.isError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3"><p className="text-sm font-medium text-destructive">Contracts could not be loaded.</p><p className="mt-1 text-xs text-muted-foreground">{q.error instanceof Error ? q.error.message : "Please try again."}</p><button type="button" onClick={() => q.refetch()} className="mt-2 min-h-10 rounded-lg border border-border px-3 text-xs font-semibold">Try again</button></div> : (q.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No contracts yet.</p> :
       <ul className="space-y-2">{q.data?.map((contract) => <li key={contract.id} className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/40 p-3 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{contract.title}</p>{contract.description && <p className="mt-1 text-xs text-muted-foreground">{contract.description}</p>}
           <a href={contract.hosted_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-primary"><ExternalLink className="h-3.5 w-3.5" />Open {contract.provider === "bloom" ? "in Bloom" : "contract"}</a></div>
         <div className="flex items-center gap-2"><select value={contract.status} onChange={(event) => updateStatus.mutate({ id: contract.id, status: event.target.value as ContractStatus })} className="min-h-10 rounded-lg border border-border bg-background px-2 text-xs capitalize">
           {(["draft","sent","viewed","signed","declined","expired","void"] as ContractStatus[]).map((status) => <option key={status} value={status}>{status}</option>)}</select>
-          <button onClick={() => confirm("Remove this contract link?") && remove.mutate(contract.id)} className="flex h-10 w-10 items-center justify-center rounded-lg text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></button></div>
+          <button type="button" onClick={() => confirm("Remove this contract link?") && remove.mutate(contract.id)} className="flex h-10 w-10 items-center justify-center rounded-lg text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></button></div>
       </li>)}</ul>}
   </div>;
 }
