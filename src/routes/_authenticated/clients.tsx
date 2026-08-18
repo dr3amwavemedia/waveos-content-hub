@@ -202,7 +202,7 @@ function ClientsPage() {
       let ws: Record<string, unknown>[] | null = null;
       const first = await supabase
         .from("workspaces")
-        .select(`${BASE_COLS},wedding_display_name,wedding_theme`)
+        .select(`${BASE_COLS},wedding_display_name,wedding_theme,wedding_scheduling_url`)
         .order("created_at", { ascending: false });
       if (first.error) {
         const fallback = await supabase
@@ -239,6 +239,8 @@ function ClientsPage() {
           ...w,
           wedding_display_name: w.wedding_display_name ?? null,
           wedding_theme: w.wedding_theme === "gold" ? "gold" : "olive",
+          wedding_scheduling_url: w.wedding_scheduling_url ?? null,
+
           access_tier: effectiveTier(w.access_tier, featureOverrides),
           feature_overrides: featureOverrides,
           member_count: mCount.get(w.id) ?? 0,
