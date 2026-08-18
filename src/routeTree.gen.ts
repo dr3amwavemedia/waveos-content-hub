@@ -23,10 +23,9 @@ import { Route as VisionTokenRouteImport } from './routes/vision/$token'
 import { Route as StoryboardTokenRouteImport } from './routes/storyboard.$token'
 import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
 import { Route as ApiFrameioRouteImport } from './routes/api/frameio'
-import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
-import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
-import { Route as AuthenticatedVisionBoardBoardIdRouteImport } from './routes/_authenticated/vision-board.$boardId'
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
+import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
+import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -56,6 +55,7 @@ import { Route as ApiOutlookCalendarRouteImport } from './routes/api/outlook/cal
 import { Route as ApiFrameioMediaRouteImport } from './routes/api/frameio.media'
 import { Route as ApiFrameioCallbackRouteImport } from './routes/api/frameio.callback'
 import { Route as ApiExternalMediaProviderRouteImport } from './routes/api/external-media/$provider'
+import { Route as AuthenticatedVisionBoardBoardIdRouteImport } from './routes/_authenticated/vision-board.$boardId'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
@@ -134,26 +134,22 @@ const ApiFrameioRoute = ApiFrameioRouteImport.update({
   path: '/api/frameio',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedVideographerRoute = AuthenticatedVideographerRouteImport.update({
-  id: '/videographer',
-  path: '/videographer',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedVisionBoardRoute = AuthenticatedVisionBoardRouteImport.update({
-  id: '/vision-board',
-  path: '/vision-board',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedVisionBoardBoardIdRoute =
-  AuthenticatedVisionBoardBoardIdRouteImport.update({
-    id: '/vision-board/$boardId',
-    path: '/vision-board/$boardId',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedVisionStudioRoute =
   AuthenticatedVisionStudioRouteImport.update({
     id: '/vision-studio',
     path: '/vision-studio',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVisionBoardRoute =
+  AuthenticatedVisionBoardRouteImport.update({
+    id: '/vision-board',
+    path: '/vision-board',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVideographerRoute =
+  AuthenticatedVideographerRouteImport.update({
+    id: '/videographer',
+    path: '/videographer',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedStaffEmailRoute = AuthenticatedStaffEmailRouteImport.update({
@@ -305,6 +301,12 @@ const ApiExternalMediaProviderRoute =
     path: '/api/external-media/$provider',
     getParentRoute: () => rootRouteImport,
   } as any)
+const AuthenticatedVisionBoardBoardIdRoute =
+  AuthenticatedVisionBoardBoardIdRouteImport.update({
+    id: '/$boardId',
+    path: '/$boardId',
+    getParentRoute: () => AuthenticatedVisionBoardRoute,
+  } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -377,15 +379,15 @@ export interface FileRoutesByFullPath {
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/videographer': typeof AuthenticatedVideographerRoute
-  '/vision-board': typeof AuthenticatedVisionBoardRoute
-  '/vision-board/$boardId': typeof AuthenticatedVisionBoardBoardIdRoute
+  '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
-  '/vision/$token': typeof VisionTokenRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
+  '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/vision-board/$boardId': typeof AuthenticatedVisionBoardBoardIdRoute
   '/api/external-media/$provider': typeof ApiExternalMediaProviderRouteWithChildren
   '/api/frameio/callback': typeof ApiFrameioCallbackRoute
   '/api/frameio/media': typeof ApiFrameioMediaRoute
@@ -432,15 +434,15 @@ export interface FileRoutesByTo {
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/videographer': typeof AuthenticatedVideographerRoute
-  '/vision-board': typeof AuthenticatedVisionBoardRoute
-  '/vision-board/$boardId': typeof AuthenticatedVisionBoardBoardIdRoute
+  '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
-  '/vision/$token': typeof VisionTokenRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
+  '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/vision-board/$boardId': typeof AuthenticatedVisionBoardBoardIdRoute
   '/api/external-media/$provider': typeof ApiExternalMediaProviderRouteWithChildren
   '/api/frameio/callback': typeof ApiFrameioCallbackRoute
   '/api/frameio/media': typeof ApiFrameioMediaRoute
@@ -489,15 +491,15 @@ export interface FileRoutesById {
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
   '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
-  '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRoute
-  '/_authenticated/vision-board/$boardId': typeof AuthenticatedVisionBoardBoardIdRoute
+  '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
-  '/vision/$token': typeof VisionTokenRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
+  '/vision/$token': typeof VisionTokenRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
+  '/_authenticated/vision-board/$boardId': typeof AuthenticatedVisionBoardBoardIdRoute
   '/api/external-media/$provider': typeof ApiExternalMediaProviderRouteWithChildren
   '/api/frameio/callback': typeof ApiFrameioCallbackRoute
   '/api/frameio/media': typeof ApiFrameioMediaRoute
@@ -547,14 +549,14 @@ export interface FileRouteTypes {
     | '/staff-email'
     | '/videographer'
     | '/vision-board'
-    | '/vision-board/$boardId'
     | '/vision-studio'
     | '/api/frameio'
     | '/social-connections/callback'
-    | '/vision/$token'
     | '/storyboard/$token'
+    | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/vision-board/$boardId'
     | '/api/external-media/$provider'
     | '/api/frameio/callback'
     | '/api/frameio/media'
@@ -602,14 +604,14 @@ export interface FileRouteTypes {
     | '/staff-email'
     | '/videographer'
     | '/vision-board'
-    | '/vision-board/$boardId'
     | '/vision-studio'
     | '/api/frameio'
     | '/social-connections/callback'
-    | '/vision/$token'
     | '/storyboard/$token'
+    | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/vision-board/$boardId'
     | '/api/external-media/$provider'
     | '/api/frameio/callback'
     | '/api/frameio/media'
@@ -658,14 +660,14 @@ export interface FileRouteTypes {
     | '/_authenticated/staff-email'
     | '/_authenticated/videographer'
     | '/_authenticated/vision-board'
-    | '/_authenticated/vision-board/$boardId'
     | '/_authenticated/vision-studio'
     | '/api/frameio'
     | '/social-connections/callback'
-    | '/vision/$token'
     | '/storyboard/$token'
+    | '/vision/$token'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
+    | '/_authenticated/vision-board/$boardId'
     | '/api/external-media/$provider'
     | '/api/frameio/callback'
     | '/api/frameio/media'
@@ -697,8 +699,8 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ApiFrameioRoute: typeof ApiFrameioRouteWithChildren
   SocialConnectionsCallbackRoute: typeof SocialConnectionsCallbackRoute
-  VisionTokenRoute: typeof VisionTokenRoute
   StoryboardTokenRoute: typeof StoryboardTokenRoute
+  VisionTokenRoute: typeof VisionTokenRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiExternalMediaProviderRoute: typeof ApiExternalMediaProviderRouteWithChildren
@@ -813,11 +815,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFrameioRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/videographer': {
-      id: '/_authenticated/videographer'
-      path: '/videographer'
-      fullPath: '/videographer'
-      preLoaderRoute: typeof AuthenticatedVideographerRouteImport
+    '/_authenticated/vision-studio': {
+      id: '/_authenticated/vision-studio'
+      path: '/vision-studio'
+      fullPath: '/vision-studio'
+      preLoaderRoute: typeof AuthenticatedVisionStudioRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/vision-board': {
@@ -827,18 +829,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVisionBoardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/vision-board/$boardId': {
-      id: '/_authenticated/vision-board/$boardId'
-      path: '/vision-board/$boardId'
-      fullPath: '/vision-board/$boardId'
-      preLoaderRoute: typeof AuthenticatedVisionBoardBoardIdRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/vision-studio': {
-      id: '/_authenticated/vision-studio'
-      path: '/vision-studio'
-      fullPath: '/vision-studio'
-      preLoaderRoute: typeof AuthenticatedVisionStudioRouteImport
+    '/_authenticated/videographer': {
+      id: '/_authenticated/videographer'
+      path: '/videographer'
+      fullPath: '/videographer'
+      preLoaderRoute: typeof AuthenticatedVideographerRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/staff-email': {
@@ -1044,6 +1039,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExternalMediaProviderRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/vision-board/$boardId': {
+      id: '/_authenticated/vision-board/$boardId'
+      path: '/$boardId'
+      fullPath: '/vision-board/$boardId'
+      preLoaderRoute: typeof AuthenticatedVisionBoardBoardIdRouteImport
+      parentRoute: typeof AuthenticatedVisionBoardRoute
+    }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
       path: '/.mcp/invoke-tool/$tool'
@@ -1096,10 +1098,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AuthenticatedRouteRouteChildren {
-  AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
-  AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRoute
+interface AuthenticatedVisionBoardRouteChildren {
   AuthenticatedVisionBoardBoardIdRoute: typeof AuthenticatedVisionBoardBoardIdRoute
+}
+
+const AuthenticatedVisionBoardRouteChildren: AuthenticatedVisionBoardRouteChildren =
+  {
+    AuthenticatedVisionBoardBoardIdRoute: AuthenticatedVisionBoardBoardIdRoute,
+  }
+
+const AuthenticatedVisionBoardRouteWithChildren =
+  AuthenticatedVisionBoardRoute._addFileChildren(
+    AuthenticatedVisionBoardRouteChildren,
+  )
+
+interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
@@ -1118,13 +1131,12 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSocialAccountsRoute: typeof AuthenticatedSocialAccountsRoute
   AuthenticatedStaffEmailRoute: typeof AuthenticatedStaffEmailRoute
+  AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
+  AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRouteWithChildren
   AuthenticatedVisionStudioRoute: typeof AuthenticatedVisionStudioRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
-  AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRoute,
-  AuthenticatedVisionBoardBoardIdRoute: AuthenticatedVisionBoardBoardIdRoute,
   AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedApprovalsRoute: AuthenticatedApprovalsRoute,
@@ -1143,6 +1155,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSocialAccountsRoute: AuthenticatedSocialAccountsRoute,
   AuthenticatedStaffEmailRoute: AuthenticatedStaffEmailRoute,
+  AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
+  AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRouteWithChildren,
   AuthenticatedVisionStudioRoute: AuthenticatedVisionStudioRoute,
 }
 
@@ -1196,8 +1210,8 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ApiFrameioRoute: ApiFrameioRouteWithChildren,
   SocialConnectionsCallbackRoute: SocialConnectionsCallbackRoute,
-  VisionTokenRoute: VisionTokenRoute,
   StoryboardTokenRoute: StoryboardTokenRoute,
+  VisionTokenRoute: VisionTokenRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiExternalMediaProviderRoute: ApiExternalMediaProviderRouteWithChildren,

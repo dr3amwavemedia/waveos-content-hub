@@ -1495,6 +1495,42 @@ export type Database = {
           },
         ]
       }
+      production_vision_boards: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          pages: Json
+          project_name: string
+          public_token: string
+          published_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          pages?: Json
+          project_name?: string
+          public_token?: string
+          published_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          pages?: Json
+          project_name?: string
+          public_token?: string
+          published_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2570,7 +2606,7 @@ export type Database = {
         | "bluesky"
         | "gmb"
         | "snapchat"
-      staff_type: "sales" | "media_manager" | "crew"
+      staff_type: "sales" | "media_manager"
       vision_deck_status: "draft" | "ready" | "archived"
       workspace_member_role:
         | "owner"
@@ -2812,7 +2848,7 @@ export const Constants = {
         "gmb",
         "snapchat",
       ],
-      staff_type: ["sales", "media_manager", "crew"],
+      staff_type: ["sales", "media_manager"],
       vision_deck_status: ["draft", "ready", "archived"],
       workspace_member_role: ["owner", "approver", "viewer", "admin", "editor"],
       workspace_status: ["onboarding", "active", "paused", "archived"],

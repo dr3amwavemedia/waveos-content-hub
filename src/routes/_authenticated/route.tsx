@@ -6,7 +6,13 @@ import { getActingStaff } from "@/hooks/use-acting-staff";
 
 const TEAM_ALLOWED_ROUTES = ["/home", "/deliveries", "/crm", "/approvals", "/vision-studio"];
 const OUTLOOK_INTEGRATIONS_ENABLED = false;
-const CREW_ALLOWED_ROUTES = ["/videographer", "/vision-board"];
+const CREW_ALLOWED_ROUTES = [
+  "/videographer",
+  "/vision-board",
+  "/calendar",
+  "/content",
+  "/deliveries",
+];
 const MEDIA_MANAGER_ALLOWED_ROUTES = [
   ...TEAM_ALLOWED_ROUTES,
   "/content",
