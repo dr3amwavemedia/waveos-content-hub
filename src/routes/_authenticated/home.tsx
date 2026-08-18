@@ -44,7 +44,7 @@ function HomeRoute() {
             sends you an invite, your workspace will appear here automatically.
           </p>
           <a
-            href="mailto:hello@dreamwavemedia.co?subject=WaveOS%20access%20request"
+            href="mailto:dr3amwavemedia@outlook.com?subject=WaveOS%20access%20request"
             className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
           >
             Contact Dream Wave Media

@@ -180,6 +180,21 @@ export function Layer1Overview() {
     },
   });
 
+  const approvalsQ = useQuery({
+    queryKey: ["layer1", "approvals", wsId],
+    enabled: !!wsId,
+    staleTime: 30_000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("content_items")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", wsId!)
+        .in("status", ["in_review", "changes_requested"]);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   const frameioQ = useQuery({
     queryKey: ["layer1", "frameio", wsId],
     enabled: !!wsId,
@@ -252,6 +267,12 @@ export function Layer1Overview() {
 
       {/* Primary action */}
       <PrimaryActionBanner action={primaryAction} />
+
+      <AttentionCenter
+        approvalCount={approvalsQ.data ?? 0}
+        invoice={primaryInvoice}
+        delivery={primaryDelivery}
+      />
 
       {frameioQ.data && frameioQ.data.files.length > 0 && (
         <section className="space-y-3">
@@ -367,6 +388,104 @@ export function Layer1Overview() {
         <ContactCard />
       </section>
     </div>
+  );
+}
+
+function AttentionCenter({
+  approvalCount,
+  invoice,
+  delivery,
+}: {
+  approvalCount: number;
+  invoice: Invoice | null;
+  delivery: Delivery | null;
+}) {
+  const invoiceNeedsAction =
+    invoice?.status === "sent" || invoice?.status === "unpaid" || invoice?.status === "overdue";
+
+  const items = [
+    approvalCount > 0
+      ? {
+          to: "/approvals" as const,
+          label: `${approvalCount} ${approvalCount === 1 ? "approval" : "approvals"} waiting`,
+          detail: "Review content and respond",
+          icon: CheckCircle2,
+        }
+      : null,
+    invoiceNeedsAction
+      ? {
+          to: "/home" as const,
+          hash: "invoices",
+          label: "Invoice needs attention",
+          detail: invoice?.number ? `Invoice ${invoice.number}` : "View payment details",
+          icon: FileText,
+        }
+      : null,
+    delivery
+      ? {
+          to: "/deliveries" as const,
+          label: "Latest delivery is available",
+          detail: delivery.title,
+          icon: Film,
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    to: "/approvals" | "/home" | "/deliveries";
+    hash?: string;
+    label: string;
+    detail: string;
+    icon: typeof Film;
+  }>;
+
+  return (
+    <section className="space-y-3" aria-labelledby="attention-heading">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">At a glance</p>
+          <h2 id="attention-heading" className="mt-1 text-lg font-semibold text-foreground">
+            Needs your attention
+          </h2>
+        </div>
+        <Link
+          to="/feedback"
+          className="inline-flex min-h-11 items-center justify-center rounded-full border border-border bg-elevated px-4 text-sm font-semibold text-foreground"
+        >
+          Request something
+        </Link>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {items.length ? (
+          items.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={`${item.to}-${item.label}`}
+                to={item.to}
+                hash={item.hash}
+                className="flex min-h-20 items-center gap-3 rounded-2xl border border-border bg-elevated/50 p-4 transition-colors hover:border-primary/40 hover:bg-elevated"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <Icon className="h-5 w-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-foreground">{item.label}</span>
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">{item.detail}</span>
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              </Link>
+            );
+          })
+        ) : (
+          <div className="flex min-h-20 items-center gap-3 rounded-2xl border border-success/25 bg-success/5 p-4 sm:col-span-3">
+            <CheckCircle2 className="h-6 w-6 text-success" />
+            <div>
+              <p className="text-sm font-semibold text-foreground">You’re all caught up</p>
+              <p className="text-xs text-muted-foreground">No approvals or payments need action.</p>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
