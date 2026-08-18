@@ -23,6 +23,7 @@ import { Route as VisionTokenRouteImport } from './routes/vision/$token'
 import { Route as StoryboardTokenRouteImport } from './routes/storyboard.$token'
 import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
 import { Route as ApiFrameioRouteImport } from './routes/api/frameio'
+import { Route as AuthenticatedWeddingContentRouteImport } from './routes/_authenticated/wedding-content'
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
 import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
 import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
@@ -134,6 +135,12 @@ const ApiFrameioRoute = ApiFrameioRouteImport.update({
   path: '/api/frameio',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedWeddingContentRoute =
+  AuthenticatedWeddingContentRouteImport.update({
+    id: '/wedding-content',
+    path: '/wedding-content',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedVisionStudioRoute =
   AuthenticatedVisionStudioRouteImport.update({
     id: '/vision-studio',
@@ -381,6 +388,7 @@ export interface FileRoutesByFullPath {
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
+  '/wedding-content': typeof AuthenticatedWeddingContentRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
@@ -436,6 +444,7 @@ export interface FileRoutesByTo {
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
+  '/wedding-content': typeof AuthenticatedWeddingContentRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
@@ -493,6 +502,7 @@ export interface FileRoutesById {
   '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
   '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
+  '/_authenticated/wedding-content': typeof AuthenticatedWeddingContentRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
@@ -550,6 +560,7 @@ export interface FileRouteTypes {
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
+    | '/wedding-content'
     | '/api/frameio'
     | '/social-connections/callback'
     | '/storyboard/$token'
@@ -605,6 +616,7 @@ export interface FileRouteTypes {
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
+    | '/wedding-content'
     | '/api/frameio'
     | '/social-connections/callback'
     | '/storyboard/$token'
@@ -661,6 +673,7 @@ export interface FileRouteTypes {
     | '/_authenticated/videographer'
     | '/_authenticated/vision-board'
     | '/_authenticated/vision-studio'
+    | '/_authenticated/wedding-content'
     | '/api/frameio'
     | '/social-connections/callback'
     | '/storyboard/$token'
@@ -814,6 +827,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/frameio'
       preLoaderRoute: typeof ApiFrameioRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/wedding-content': {
+      id: '/_authenticated/wedding-content'
+      path: '/wedding-content'
+      fullPath: '/wedding-content'
+      preLoaderRoute: typeof AuthenticatedWeddingContentRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/vision-studio': {
       id: '/_authenticated/vision-studio'
@@ -1134,6 +1154,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
   AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRouteWithChildren
   AuthenticatedVisionStudioRoute: typeof AuthenticatedVisionStudioRoute
+  AuthenticatedWeddingContentRoute: typeof AuthenticatedWeddingContentRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -1158,6 +1179,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
   AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRouteWithChildren,
   AuthenticatedVisionStudioRoute: AuthenticatedVisionStudioRoute,
+  AuthenticatedWeddingContentRoute: AuthenticatedWeddingContentRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
