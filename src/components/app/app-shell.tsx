@@ -300,8 +300,15 @@ function Shell({ children }: { children: ReactNode }) {
         {isMediaManager && <ManagedClientBanner />}
         <AccountStatusBanner />
         <div className="mx-auto max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
-          {children}
+          {isWeddingClient && pathname !== "/home" ? (
+            <div className="surface-card p-8 text-center text-sm text-muted-foreground">
+              Taking you back to your wedding overview…
+            </div>
+          ) : (
+            children
+          )}
         </div>
+
       </main>
 
       {/* Mobile bottom nav */}
