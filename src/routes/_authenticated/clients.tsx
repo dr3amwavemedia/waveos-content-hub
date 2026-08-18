@@ -130,6 +130,8 @@ interface ClientWorkspace {
   created_at: string;
   wedding_display_name: string | null;
   wedding_theme: string;
+  wedding_scheduling_url: string | null;
+
   member_count: number;
   invite_count: number;
   media_count: number;
@@ -1334,6 +1336,10 @@ function AccessTab({
   );
   const [weddingDisplayName, setWeddingDisplayName] = useState(workspace.wedding_display_name ?? workspace.name);
   const [weddingTheme, setWeddingTheme] = useState(workspace.wedding_theme === "gold" ? "gold" : "olive");
+  const [weddingSchedulingUrl, setWeddingSchedulingUrl] = useState(
+    workspace.wedding_scheduling_url ?? "",
+  );
+
   const notesQ = useQuery({
     queryKey: ["workspace-internal-notes", workspace.id],
     queryFn: async () => {
