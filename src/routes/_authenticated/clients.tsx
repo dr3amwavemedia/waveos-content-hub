@@ -22,6 +22,14 @@ import {
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { WEDDING_STAGES } from "@/components/app/wedding-theme";
+
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 import { EmptyState } from "@/components/app/empty-state";
 import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { cn } from "@/lib/utils";
@@ -131,6 +139,14 @@ interface ClientWorkspace {
   wedding_display_name: string | null;
   wedding_theme: string;
   wedding_scheduling_url: string | null;
+  wedding_date: string | null;
+  wedding_venue: string | null;
+  wedding_city: string | null;
+  wedding_state: string | null;
+  wedding_location: string | null;
+  wedding_meeting_at: string | null;
+  wedding_stage: string | null;
+  wedding_welcome_message: string | null;
 
   member_count: number;
   invite_count: number;
@@ -202,7 +218,9 @@ function ClientsPage() {
       let ws: Record<string, unknown>[] | null = null;
       const first = await supabase
         .from("workspaces")
-        .select(`${BASE_COLS},wedding_display_name,wedding_theme,wedding_scheduling_url`)
+        .select(
+          `${BASE_COLS},wedding_display_name,wedding_theme,wedding_scheduling_url,wedding_date,wedding_venue,wedding_city,wedding_state,wedding_location,wedding_meeting_at,wedding_stage,wedding_welcome_message`,
+        )
         .order("created_at", { ascending: false });
       if (first.error) {
         const fallback = await supabase
@@ -240,6 +258,14 @@ function ClientsPage() {
           wedding_display_name: w.wedding_display_name ?? null,
           wedding_theme: w.wedding_theme === "gold" ? "gold" : "olive",
           wedding_scheduling_url: w.wedding_scheduling_url ?? null,
+          wedding_date: w.wedding_date ?? null,
+          wedding_venue: w.wedding_venue ?? null,
+          wedding_city: w.wedding_city ?? null,
+          wedding_state: w.wedding_state ?? null,
+          wedding_location: w.wedding_location ?? null,
+          wedding_meeting_at: w.wedding_meeting_at ?? null,
+          wedding_stage: w.wedding_stage ?? null,
+          wedding_welcome_message: w.wedding_welcome_message ?? null,
 
           access_tier: effectiveTier(w.access_tier, featureOverrides),
           feature_overrides: featureOverrides,
@@ -1341,6 +1367,16 @@ function AccessTab({
   const [weddingSchedulingUrl, setWeddingSchedulingUrl] = useState(
     workspace.wedding_scheduling_url ?? "",
   );
+  const [weddingDate, setWeddingDate] = useState(workspace.wedding_date?.slice(0, 10) ?? "");
+  const [weddingVenue, setWeddingVenue] = useState(workspace.wedding_venue ?? "");
+  const [weddingCity, setWeddingCity] = useState(workspace.wedding_city ?? "");
+  const [weddingState, setWeddingState] = useState(workspace.wedding_state ?? "");
+  const [weddingLocation, setWeddingLocation] = useState(workspace.wedding_location ?? "");
+  const [weddingMeetingAt, setWeddingMeetingAt] = useState(
+    workspace.wedding_meeting_at ? toLocalInput(workspace.wedding_meeting_at) : "",
+  );
+  const [weddingStage, setWeddingStage] = useState(workspace.wedding_stage ?? "");
+  const [weddingWelcome, setWeddingWelcome] = useState(workspace.wedding_welcome_message ?? "");
 
   const notesQ = useQuery({
     queryKey: ["workspace-internal-notes", workspace.id],
@@ -1377,7 +1413,20 @@ function AccessTab({
                 ? weddingSchedulingUrl.trim()
                 : null
               : workspace.wedding_scheduling_url,
-
+          ...(tier === "wedding_client"
+            ? {
+                wedding_date: weddingDate || null,
+                wedding_venue: weddingVenue.trim() || null,
+                wedding_city: weddingCity.trim() || null,
+                wedding_state: weddingState.trim() || null,
+                wedding_location: weddingLocation.trim() || null,
+                wedding_meeting_at: weddingMeetingAt
+                  ? new Date(weddingMeetingAt).toISOString()
+                  : null,
+                wedding_stage: weddingStage || null,
+                wedding_welcome_message: weddingWelcome.trim() || null,
+              }
+            : {}),
         })
         .eq("id", workspace.id);
       if (error) throw error;
@@ -1511,6 +1560,37 @@ function AccessTab({
               </select>
             </Field>
           </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Wedding date">
+              <input type="date" value={weddingDate} onChange={(e) => setWeddingDate(e.target.value)} className={inputCls} />
+            </Field>
+            <Field label="Wedding stage">
+              <select value={weddingStage} onChange={(e) => setWeddingStage(e.target.value)} className={inputCls}>
+                <option value="">Not set</option>
+                {WEDDING_STAGES.map((stage) => (
+                  <option key={stage.value} value={stage.value}>{stage.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Venue name">
+              <input value={weddingVenue} maxLength={160} onChange={(e) => setWeddingVenue(e.target.value)} placeholder="The Ringling Museum" className={inputCls} />
+            </Field>
+            <Field label="City">
+              <input value={weddingCity} maxLength={120} onChange={(e) => setWeddingCity(e.target.value)} placeholder="Sarasota" className={inputCls} />
+            </Field>
+            <Field label="State">
+              <input value={weddingState} maxLength={120} onChange={(e) => setWeddingState(e.target.value)} placeholder="Florida" className={inputCls} />
+            </Field>
+            <Field label="Creative Strategy Meeting date & time (optional)">
+              <input type="datetime-local" value={weddingMeetingAt} onChange={(e) => setWeddingMeetingAt(e.target.value)} className={inputCls} />
+            </Field>
+          </div>
+          <Field label="Full location or address (optional)">
+            <input value={weddingLocation} maxLength={400} onChange={(e) => setWeddingLocation(e.target.value)} placeholder="5401 Bay Shore Rd, Sarasota, Florida" className={inputCls} />
+          </Field>
+          <Field label="Short welcome message (optional)">
+            <textarea value={weddingWelcome} maxLength={600} rows={3} onChange={(e) => setWeddingWelcome(e.target.value)} placeholder="We can't wait for October." className={inputCls} />
+          </Field>
           <Field label="Creative strategy scheduling link (https)">
             <input
               value={weddingSchedulingUrl}

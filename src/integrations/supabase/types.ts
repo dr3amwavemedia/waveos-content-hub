@@ -2082,9 +2082,17 @@ export type Database = {
           timezone: string
           updated_at: string
           website: string | null
+          wedding_city: string | null
+          wedding_date: string | null
           wedding_display_name: string | null
+          wedding_location: string | null
+          wedding_meeting_at: string | null
           wedding_scheduling_url: string | null
+          wedding_stage: string | null
+          wedding_state: string | null
           wedding_theme: string
+          wedding_venue: string | null
+          wedding_welcome_message: string | null
         }
         Insert: {
           access_expires_at?: string | null
@@ -2116,9 +2124,17 @@ export type Database = {
           timezone?: string
           updated_at?: string
           website?: string | null
+          wedding_city?: string | null
+          wedding_date?: string | null
           wedding_display_name?: string | null
+          wedding_location?: string | null
+          wedding_meeting_at?: string | null
           wedding_scheduling_url?: string | null
+          wedding_stage?: string | null
+          wedding_state?: string | null
           wedding_theme?: string
+          wedding_venue?: string | null
+          wedding_welcome_message?: string | null
         }
         Update: {
           access_expires_at?: string | null
@@ -2150,9 +2166,17 @@ export type Database = {
           timezone?: string
           updated_at?: string
           website?: string | null
+          wedding_city?: string | null
+          wedding_date?: string | null
           wedding_display_name?: string | null
+          wedding_location?: string | null
+          wedding_meeting_at?: string | null
           wedding_scheduling_url?: string | null
+          wedding_stage?: string | null
+          wedding_state?: string | null
           wedding_theme?: string
+          wedding_venue?: string | null
+          wedding_welcome_message?: string | null
         }
         Relationships: []
       }
