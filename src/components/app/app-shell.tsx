@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Home,
+  Heart,
   Images,
   Calendar,
   PenSquare,
