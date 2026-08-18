@@ -7,7 +7,7 @@ import { useSyncExternalStore } from "react";
 const KEY = "waveos.view-as-client";
 const TIER_KEY = "waveos.preview-client-tier";
 
-export type PreviewTier = "project_client" | "growth_90" | "retainer_full" | "social_management";
+export type PreviewTier = "project_client" | "growth_90" | "retainer_full" | "social_management" | "wedding_client";
 
 type Listener = () => void;
 const listeners = new Set<Listener>();

@@ -10,7 +10,7 @@ export interface WorkspaceSummary {
   industry: string | null;
   timezone: string;
   is_demo: boolean;
-  access_tier: "project_client" | "growth_90" | "retainer_full" | "social_management";
+  access_tier: "project_client" | "growth_90" | "retainer_full" | "social_management" | "wedding_client";
   approval_required: boolean;
   role: "owner" | "admin" | "editor" | "approver" | "viewer" | "staff";
 }

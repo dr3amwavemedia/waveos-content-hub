@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { StatCard } from "@/components/app/stat-card";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Layer1Overview } from "@/components/app/layer1-overview";
+import { WeddingOverview } from "@/components/app/wedding-overview";
 import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
 import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
 import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
@@ -57,6 +58,7 @@ function HomeRoute() {
   // Client projects and delivery links are universal across every tier.
   // Tier-specific tools remain available through the client navigation.
   if (!isStaff && !isLoading && access) {
+    if (access.tier === "wedding_client") return <WeddingOverview />;
     return <Layer1Overview />;
   }
   return <HomeDashboard />;

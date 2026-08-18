@@ -29,10 +29,10 @@ import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
 import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
 import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
 
-type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
+export type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
 type Delivery = Database["public"]["Tables"]["client_deliveries"]["Row"];
 type DeliveryKind = Database["public"]["Enums"]["delivery_kind"];
-type Contract = {
+export type Contract = {
   id: string;
   title: string;
   description: string | null;
@@ -678,7 +678,7 @@ function PrimaryActionBanner({ action }: { action: PrimaryAction }) {
   );
 }
 
-function ContractCard({ contract }: { contract: Contract }) {
+export function ContractCard({ contract }: { contract: Contract }) {
   const signed = contract.status === "signed";
   const expired = contract.status === "expired" || contract.status === "void";
   const canOpen = isValidHttpsUrl(contract.hosted_url);
@@ -706,7 +706,7 @@ function ContractCard({ contract }: { contract: Contract }) {
   );
 }
 
-function InvoiceCard({ invoice }: { invoice: Invoice }) {
+export function InvoiceCard({ invoice }: { invoice: Invoice }) {
   const amount = formatMoney(invoice.amount_cents, invoice.currency);
   const due = formatDate(invoice.due_at);
   const issued = formatDate(invoice.issued_at);
