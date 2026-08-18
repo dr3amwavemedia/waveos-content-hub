@@ -70,7 +70,7 @@ const CLIENT_NAV: NavItem[] = [
   },
   { to: "/brand-voice", label: "Brand Voice", icon: Sparkles, feature: "can_manage_brand_voice" },
   { to: "/approvals", label: "Approvals", icon: CheckSquare },
-  { to: "/feedback", label: "Feedback", icon: MessageSquare, feature: "can_contact_support" },
+  { to: "/feedback", label: "Request Something", icon: MessageSquare, feature: "can_contact_support" },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -124,7 +124,7 @@ const LAYER1_NAV: NavItem[] = [
   { to: "/deliveries", label: "Your Content", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
   { to: "/settings", label: "Your Information", icon: User },
-  { to: "/feedback", label: "Contact Dream Wave", icon: MessageSquare },
+  { to: "/feedback", label: "Request Something", icon: MessageSquare },
 ];
 
 const LAYER1_MOBILE_NAV: NavItem[] = [
