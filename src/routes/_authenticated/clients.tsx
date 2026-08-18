@@ -85,6 +85,15 @@ type ClientCrmRecord = CrmAccountRow & { crm_contacts: CrmContactRow[] };
 type WorkspaceStatusLegacy = "onboarding" | "active" | "paused" | "archived";
 const SOCIAL_MANAGEMENT_FLAG = "social_management_access";
 
+function readableError(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+}
+
 function effectiveTier(
   storedTier: ClientAccessTier,
   overrides: Record<string, boolean> | null | undefined,
@@ -2032,7 +2041,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
       await refresh();
       toast.success("Contract link added.");
     },
-    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not add contract."),
+    onError: (error: unknown) => toast.error(readableError(error, "Could not add contract.")),
   });
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: ContractStatus }) => {
@@ -2043,7 +2052,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
       if (error) throw error;
     },
     onSuccess: refresh,
-    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not update the contract."),
+    onError: (error: unknown) => toast.error(readableError(error, "Could not update the contract.")),
   });
   const remove = useMutation({
     mutationFn: async (id: string) => {
@@ -2051,7 +2060,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
       if (error) throw error;
     },
     onSuccess: async () => { await refresh(); toast.success("Contract removed."); },
-    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not remove the contract."),
+    onError: (error: unknown) => toast.error(readableError(error, "Could not remove the contract.")),
   });
   const inputCls = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
 
@@ -2074,7 +2083,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
         {create.isPending ? "Adding…" : "Add contract link"}
       </button>
     </form>}
-    {q.isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : q.isError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3"><p className="text-sm font-medium text-destructive">Contracts could not be loaded.</p><p className="mt-1 text-xs text-muted-foreground">{q.error instanceof Error ? q.error.message : "Please try again."}</p><button type="button" onClick={() => q.refetch()} className="mt-2 min-h-10 rounded-lg border border-border px-3 text-xs font-semibold">Try again</button></div> : (q.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No contracts yet.</p> :
+    {q.isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : q.isError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3"><p className="text-sm font-medium text-destructive">Contracts could not be loaded.</p><p className="mt-1 text-xs text-muted-foreground">{readableError(q.error, "Please try again.")}</p><button type="button" onClick={() => q.refetch()} className="mt-2 min-h-10 rounded-lg border border-border px-3 text-xs font-semibold">Try again</button></div> : (q.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No contracts yet.</p> :
       <ul className="space-y-2">{q.data?.map((contract) => <li key={contract.id} className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/40 p-3 sm:flex-row sm:items-center">
         <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{contract.title}</p>{contract.description && <p className="mt-1 text-xs text-muted-foreground">{contract.description}</p>}
           <a href={contract.hosted_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-primary"><ExternalLink className="h-3.5 w-3.5" />Open {contract.provider === "bloom" ? "in Bloom" : "contract"}</a></div>
