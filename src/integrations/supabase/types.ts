@@ -2082,6 +2082,8 @@ export type Database = {
           timezone: string
           updated_at: string
           website: string | null
+          wedding_display_name: string | null
+          wedding_theme: string
         }
         Insert: {
           access_expires_at?: string | null
@@ -2113,6 +2115,8 @@ export type Database = {
           timezone?: string
           updated_at?: string
           website?: string | null
+          wedding_display_name?: string | null
+          wedding_theme?: string
         }
         Update: {
           access_expires_at?: string | null
@@ -2144,6 +2148,8 @@ export type Database = {
           timezone?: string
           updated_at?: string
           website?: string | null
+          wedding_display_name?: string | null
+          wedding_theme?: string
         }
         Relationships: []
       }
