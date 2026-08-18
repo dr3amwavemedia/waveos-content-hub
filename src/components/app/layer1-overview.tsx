@@ -22,6 +22,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { isValidHttpsUrl } from "@/lib/url-validation";
+import { cn } from "@/lib/utils";
 import { STATUS_LABELS } from "@/lib/permissions";
 import type { Database } from "@/integrations/supabase/types";
 import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
@@ -31,6 +32,21 @@ import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/us
 type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
 type Delivery = Database["public"]["Tables"]["client_deliveries"]["Row"];
 type DeliveryKind = Database["public"]["Enums"]["delivery_kind"];
+type Contract = {
+  id: string;
+  title: string;
+  description: string | null;
+  provider: "bloom" | "other";
+  hosted_url: string;
+  status: "draft" | "sent" | "viewed" | "signed" | "declined" | "expired" | "void";
+  sent_at: string | null;
+  signed_at: string | null;
+  expires_at: string | null;
+};
+const externalDb = supabase as unknown as {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from: (table: string) => any;
+};
 
 // Dream Wave Media contact fallback. Displayed to Layer 1 clients only.
 const DREAM_WAVE_CONTACT = {
@@ -162,6 +178,21 @@ export function Layer1Overview() {
         .order("created_at", { ascending: false });
       if (error) throw error;
       return (data ?? []) as Invoice[];
+    },
+  });
+
+  const contractsQ = useQuery({
+    queryKey: ["layer1", "contracts", wsId],
+    enabled: !!wsId,
+    staleTime: 30_000,
+    queryFn: async (): Promise<Contract[]> => {
+      const { data, error } = await externalDb
+        .from("client_contracts")
+        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at")
+        .eq("workspace_id", wsId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -330,6 +361,18 @@ export function Layer1Overview() {
             body="Dream Wave Media is preparing your content. Your newest project will appear here."
           />
         )}
+      </section>
+
+      {/* Contracts */}
+      <section id="contracts" className="scroll-mt-24 space-y-3">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h2 className="text-lg font-semibold text-foreground">Contracts & Agreements</h2>
+          {(contractsQ.data?.length ?? 0) > 1 && <span className="text-xs text-muted-foreground">{contractsQ.data!.length} contracts</span>}
+        </div>
+        {contractsQ.isLoading ? <div className="surface-card p-5 text-sm text-muted-foreground">Loading contracts…</div> : contractsQ.isError ?
+          <div className="surface-card p-5 text-sm text-destructive">Contracts could not be loaded. Refresh the page to try again.</div> :
+          (contractsQ.data ?? []).length > 0 ? <div className="space-y-3">{contractsQ.data?.map((contract) => <ContractCard key={contract.id} contract={contract} />)}</div> :
+          <PolishedEmpty icon={FileText} body="You currently have no contracts requiring action." />}
       </section>
 
       {/* Invoices */}
@@ -631,6 +674,34 @@ function PrimaryActionBanner({ action }: { action: PrimaryAction }) {
           </Link>
         )}
       </div>
+    </div>
+  );
+}
+
+function ContractCard({ contract }: { contract: Contract }) {
+  const signed = contract.status === "signed";
+  const expired = contract.status === "expired" || contract.status === "void";
+  const canOpen = isValidHttpsUrl(contract.hosted_url);
+  return (
+    <div className="surface-card space-y-4 p-5 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-base font-semibold text-foreground sm:text-lg">{contract.title}</h3>
+          {contract.description && <p className="mt-1 text-sm text-muted-foreground">{contract.description}</p>}
+        </div>
+        <span className={cn("rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ring-inset", signed ? "bg-success/15 text-success ring-success/30" : expired ? "bg-muted/20 text-muted-foreground ring-border" : "bg-primary/15 text-primary ring-primary/30")}>
+          {contract.status}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+        {contract.sent_at && <span>Sent {formatDate(contract.sent_at)}</span>}
+        {contract.signed_at && <span>Signed {formatDate(contract.signed_at)}</span>}
+        {contract.expires_at && !signed && <span>Expires {formatDate(contract.expires_at)}</span>}
+      </div>
+      {canOpen && !expired && <a href={contract.hosted_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 sm:w-auto">
+        {signed ? "View signed contract" : "View & sign contract"}<ExternalLink className="h-4 w-4" />
+      </a>}
+      <p className="text-xs text-muted-foreground">Signing and certification are completed securely by {contract.provider === "bloom" ? "Bloom.io" : "the contract provider"}.</p>
     </div>
   );
 }
