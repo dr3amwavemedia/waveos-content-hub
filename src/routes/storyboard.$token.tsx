@@ -25,7 +25,9 @@ type PublishedBoard = {
   published_at: string | null;
 };
 
-const db = supabase as unknown as { from: (table: string) => any };
+const db = supabase as unknown as {
+  rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
+};
 
 function PublishedStoryboard() {
   const { token } = Route.useParams();
@@ -34,21 +36,18 @@ function PublishedStoryboard() {
 
   useEffect(() => {
     let active = true;
-    db.from("production_vision_boards")
-      .select("project_name, pages, published_at")
-      .eq("public_token", token)
-      .eq("status", "published")
-      .maybeSingle()
-      .then(({ data }: { data: PublishedBoard | null }) => {
-        if (active) {
-          setBoard(data);
-          setLoading(false);
-        }
-      });
+    // Token-scoped lookup: only the holder of this share link can read the board.
+    db.rpc("get_public_vision_board", { _public_token: token }).then(({ data }) => {
+      if (!active) return;
+      const row = Array.isArray(data) ? (data[0] as PublishedBoard | undefined) : null;
+      setBoard(row ?? null);
+      setLoading(false);
+    });
     return () => {
       active = false;
     };
   }, [token]);
+
 
   if (loading) {
     return (

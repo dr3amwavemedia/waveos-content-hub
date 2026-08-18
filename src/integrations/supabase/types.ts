@@ -2083,6 +2083,7 @@ export type Database = {
           updated_at: string
           website: string | null
           wedding_display_name: string | null
+          wedding_scheduling_url: string | null
           wedding_theme: string
         }
         Insert: {
@@ -2116,6 +2117,7 @@ export type Database = {
           updated_at?: string
           website?: string | null
           wedding_display_name?: string | null
+          wedding_scheduling_url?: string | null
           wedding_theme?: string
         }
         Update: {
@@ -2149,6 +2151,7 @@ export type Database = {
           updated_at?: string
           website?: string | null
           wedding_display_name?: string | null
+          wedding_scheduling_url?: string | null
           wedding_theme?: string
         }
         Relationships: []
@@ -2378,6 +2381,14 @@ export type Database = {
           workspace_id: string
           workspace_name: string
           workspace_role: Database["public"]["Enums"]["workspace_member_role"]
+        }[]
+      }
+      get_public_vision_board: {
+        Args: { _public_token: string }
+        Returns: {
+          pages: Json
+          project_name: string
+          published_at: string
         }[]
       }
       get_public_vision_deck: {

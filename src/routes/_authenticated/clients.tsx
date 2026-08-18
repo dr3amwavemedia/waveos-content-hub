@@ -130,6 +130,8 @@ interface ClientWorkspace {
   created_at: string;
   wedding_display_name: string | null;
   wedding_theme: string;
+  wedding_scheduling_url: string | null;
+
   member_count: number;
   invite_count: number;
   media_count: number;
@@ -187,16 +189,34 @@ function ClientsPage() {
     },
   });
 
+  const [weddingColumnsMissing, setWeddingColumnsMissing] = useState(false);
+
   const workspacesQ = useQuery({
     queryKey: ["clients", "workspaces"],
     queryFn: async () => {
-      const { data: ws, error } = await supabase
+      const BASE_COLS =
+        "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at";
+      // Wedding columns are optional: if the Layer 5 migration has not reached
+      // this environment yet, the client list must still load.
+      let missing = false;
+      let ws: Record<string, unknown>[] | null = null;
+      const first = await supabase
         .from("workspaces")
-        .select(
-          "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at,wedding_display_name,wedding_theme",
-        )
+        .select(`${BASE_COLS},wedding_display_name,wedding_theme,wedding_scheduling_url`)
         .order("created_at", { ascending: false });
-      if (error) throw error;
+      if (first.error) {
+        const fallback = await supabase
+          .from("workspaces")
+          .select(BASE_COLS)
+          .order("created_at", { ascending: false });
+        if (fallback.error) throw fallback.error;
+        missing = true;
+        ws = (fallback.data ?? []) as unknown as Record<string, unknown>[];
+      } else {
+        ws = (first.data ?? []) as unknown as Record<string, unknown>[];
+      }
+      setWeddingColumnsMissing(missing);
+
       const [{ data: members }, { data: invites }, { data: media }] = await Promise.all([
         supabase.from("workspace_members").select("workspace_id"),
         supabase.from("invites_admin").select("workspace_id").eq("status", "pending"),
@@ -212,10 +232,15 @@ function ClientsPage() {
       (invites ?? []).forEach((i) => bump(iCount, i.workspace_id));
       const mediaCount = new Map<string, number>();
       (media ?? []).forEach((m) => bump(mediaCount, m.workspace_id));
-      return (ws ?? []).map<ClientWorkspace>((w) => {
+      return (ws ?? []).map<ClientWorkspace>((row) => {
+        const w = row as unknown as ClientWorkspace;
         const featureOverrides = (w.feature_overrides ?? {}) as Record<string, boolean>;
         return {
           ...w,
+          wedding_display_name: w.wedding_display_name ?? null,
+          wedding_theme: w.wedding_theme === "gold" ? "gold" : "olive",
+          wedding_scheduling_url: w.wedding_scheduling_url ?? null,
+
           access_tier: effectiveTier(w.access_tier, featureOverrides),
           feature_overrides: featureOverrides,
           member_count: mCount.get(w.id) ?? 0,
@@ -223,6 +248,7 @@ function ClientsPage() {
           media_count: mediaCount.get(w.id) ?? 0,
         };
       });
+
     },
   });
 
@@ -270,12 +296,32 @@ function ClientsPage() {
         </button>
       </header>
 
+      {weddingColumnsMissing && (
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
+          Wedding portal settings are awaiting a database migration. All clients below are still
+          shown using their standard workspace fields.
+        </div>
+      )}
+      {workspacesQ.isError && (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          <p className="font-semibold">The client list could not be loaded.</p>
+          <p className="mt-1 break-words font-mono text-xs">
+            {workspacesQ.error instanceof Error ? workspacesQ.error.message : "Unknown error"}
+          </p>
+        </div>
+      )}
+
       <div className="surface-card overflow-hidden">
         {workspacesQ.isLoading ? (
           <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading workspaces…
           </div>
+        ) : workspacesQ.isError ? (
+          <div className="p-6 text-sm text-muted-foreground">
+            Client list unavailable — see the error above.
+          </div>
         ) : (workspacesQ.data ?? []).length === 0 ? (
+
           <div className="p-6">
             <EmptyState
               icon={Users2}
@@ -1292,6 +1338,10 @@ function AccessTab({
   );
   const [weddingDisplayName, setWeddingDisplayName] = useState(workspace.wedding_display_name ?? workspace.name);
   const [weddingTheme, setWeddingTheme] = useState(workspace.wedding_theme === "gold" ? "gold" : "olive");
+  const [weddingSchedulingUrl, setWeddingSchedulingUrl] = useState(
+    workspace.wedding_scheduling_url ?? "",
+  );
+
   const notesQ = useQuery({
     queryKey: ["workspace-internal-notes", workspace.id],
     queryFn: async () => {
@@ -1321,6 +1371,13 @@ function AccessTab({
           access_expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           wedding_display_name: tier === "wedding_client" ? weddingDisplayName.trim() || workspace.name : workspace.wedding_display_name,
           wedding_theme: tier === "wedding_client" ? weddingTheme : workspace.wedding_theme,
+          wedding_scheduling_url:
+            tier === "wedding_client"
+              ? weddingSchedulingUrl.trim().startsWith("https://")
+                ? weddingSchedulingUrl.trim()
+                : null
+              : workspace.wedding_scheduling_url,
+
         })
         .eq("id", workspace.id);
       if (error) throw error;
@@ -1437,7 +1494,7 @@ function AccessTab({
         </Field>
       </div>
 
-      {tier === "wedding_client" && (
+      {tier === "wedding_client" && isOwner && (
         <div className="space-y-4 rounded-2xl border border-primary/25 bg-primary/[0.06] p-4">
           <div>
             <p className="text-sm font-semibold text-foreground">Wedding portal</p>
@@ -1445,7 +1502,7 @@ function AccessTab({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Couple / client display name">
-              <input value={weddingDisplayName} onChange={(e) => setWeddingDisplayName(e.target.value)} placeholder="Jean & Alex" className={inputCls} />
+              <input value={weddingDisplayName} maxLength={120} onChange={(e) => setWeddingDisplayName(e.target.value)} placeholder="Jean & Alex" className={inputCls} />
             </Field>
             <Field label="Wedding theme">
               <select value={weddingTheme} onChange={(e) => setWeddingTheme(e.target.value)} className={inputCls}>
@@ -1454,12 +1511,24 @@ function AccessTab({
               </select>
             </Field>
           </div>
+          <Field label="Creative strategy scheduling link (https)">
+            <input
+              value={weddingSchedulingUrl}
+              onChange={(e) => setWeddingSchedulingUrl(e.target.value)}
+              placeholder="https://calendly.com/dreamwave/strategy"
+              className={inputCls}
+            />
+          </Field>
+          <p className="text-xs text-muted-foreground">
+            Portal status: {status === "active" ? "Active — private wedding experience is open." : "Awaiting activation — the couple sees the private welcome screen only."}
+          </p>
           <button type="button" disabled={toggleWeddingPortal.isPending} onClick={() => toggleWeddingPortal.mutate()} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold disabled:opacity-60", status === "active" ? "bg-success/15 text-success ring-1 ring-success/30" : "bg-primary text-primary-foreground")}>
-            {status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            {status === "active" ? "Deactivate wedding portal" : "Accept deposit & activate portal"}
+            {toggleWeddingPortal.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {toggleWeddingPortal.isPending ? "Updating…" : status === "active" ? "Deactivate wedding portal" : "Accept deposit & activate portal"}
           </button>
         </div>
       )}
+
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Agreement term">

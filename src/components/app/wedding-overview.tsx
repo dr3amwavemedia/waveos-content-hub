@@ -26,13 +26,16 @@ export function WeddingOverview() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("workspaces")
-        .select("name,account_status,wedding_display_name,wedding_theme")
+        .select(
+          "name,account_status,wedding_display_name,wedding_theme,wedding_scheduling_url",
+        )
         .eq("id", wsId!)
         .single();
       if (error) throw error;
       return data;
     },
   });
+
 
   const isActive = workspaceQ.data?.account_status === "active";
   const invoicesQ = useQuery({
@@ -78,18 +81,55 @@ export function WeddingOverview() {
     || workspaceQ.data?.name
     || "Your Wedding";
 
+  const schedulingUrl =
+    typeof workspaceQ.data?.wedding_scheduling_url === "string" &&
+    workspaceQ.data.wedding_scheduling_url.startsWith("https://")
+      ? workspaceQ.data.wedding_scheduling_url
+      : null;
+
   if (!isActive) {
     return (
-      <div className="mx-auto max-w-2xl rounded-[2rem] border bg-white p-8 text-center shadow-sm sm:p-12" style={{ borderColor: palette.border }}>
-        <Heart className="mx-auto h-10 w-10" style={{ color: palette.accent }} />
-        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.25em]" style={{ color: palette.accent }}>Dream Wave Weddings</p>
-        <h1 className="mt-3 text-4xl font-serif text-stone-900 sm:text-5xl">{displayName}</h1>
-        <p className="mx-auto mt-5 max-w-lg leading-7 text-stone-600">
-          Your wedding portal is currently inactive. Dream Wave Media will let you know as soon as everything is ready for you.
+      <div
+        className="relative isolate mx-auto max-w-3xl overflow-hidden rounded-[2rem] border px-6 py-16 text-center text-white shadow-2xl sm:px-12 sm:py-24"
+        style={{
+          borderColor: palette.border,
+          background: `linear-gradient(140deg, #11160d 0%, ${palette.ink} 55%, #17130a 100%)`,
+          paddingBottom: "max(4rem, env(safe-area-inset-bottom))",
+        }}
+      >
+        <div className="absolute -left-24 -top-24 h-72 w-72 rounded-full opacity-40 blur-3xl" style={{ background: palette.accent }} />
+        <div className="absolute -bottom-28 -right-16 h-80 w-80 rounded-full bg-white/15 blur-3xl" />
+        <div
+          className="absolute inset-0 opacity-15"
+          style={{ backgroundImage: "radial-gradient(circle at center, white 1px, transparent 1px)", backgroundSize: "26px 26px" }}
+        />
+        <Sparkles className="absolute left-6 top-6 h-5 w-5 text-white/60 motion-safe:animate-pulse" />
+        <Sparkles className="absolute bottom-8 right-8 h-4 w-4 text-white/50 motion-safe:animate-pulse" />
+        <div className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-white/20 bg-white/10 backdrop-blur">
+          <Heart className="h-7 w-7 text-white" />
+        </div>
+        <p className="relative mt-6 text-xs font-semibold uppercase tracking-[0.3em] text-white/75">
+          Welcome to the Dream Wave family
+        </p>
+        <h1 className="relative mx-auto mt-5 max-w-4xl break-words font-serif text-5xl leading-[0.95] tracking-tight sm:text-7xl">
+          {displayName}
+        </h1>
+        <div className="relative mx-auto mt-8 h-px max-w-xs bg-gradient-to-r from-transparent via-white/70 to-transparent" />
+        <p className="relative mx-auto mt-8 max-w-xl text-base leading-8 text-white/80 sm:text-lg">
+          Your private wedding experience is being prepared by hand. Every detail — your films, your
+          moments, your story — is being set in place before we open the doors.
+        </p>
+        <span className="relative mt-9 inline-flex min-h-12 items-center gap-2 rounded-full border border-white/25 bg-white/10 px-6 text-sm font-semibold tracking-wide text-white backdrop-blur">
+          <ShieldCheck className="h-4 w-4" /> Invitation accepted
+        </span>
+        <p className="relative mt-6 text-sm text-white/60">
+          We’ll welcome you inside the moment everything is ready.
         </p>
       </div>
     );
   }
+
+
 
   return (
     <div className="space-y-8 rounded-[2rem] p-1 text-stone-900" style={{ background: palette.wash }}>
@@ -120,7 +160,15 @@ export function WeddingOverview() {
               <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">Now that your deposit has been accepted, our next step is shaping the look, emotion, and energy of your wedding story together.</p>
             </div>
           </div>
-          <a href="mailto:dr3amwavemedia@outlook.com?subject=Wedding%20Creative%20Strategy%20Meeting" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5" style={{ background: palette.accent }}>Schedule with Dream Wave <ArrowRight className="h-4 w-4" /></a>
+          <a
+            href={schedulingUrl ?? "mailto:dr3amwavemedia@outlook.com?subject=Wedding%20Creative%20Strategy%20Meeting"}
+            {...(schedulingUrl ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+            className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white shadow-lg transition-transform motion-safe:hover:-translate-y-0.5"
+            style={{ background: palette.accent }}
+          >
+            Schedule meeting <ArrowRight className="h-4 w-4" />
+          </a>
+
         </div>
       </section>
 
