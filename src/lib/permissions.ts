@@ -87,7 +87,12 @@ export function hasFeature(access: WorkspaceAccess, feature: FeatureKey): boolea
 
   switch (access.tier) {
     case "wedding_client":
-      return access.status === "active" && feature === "can_view_invoices";
+      return (
+        feature === "can_view_profile" ||
+        feature === "can_view_invoices" ||
+        feature === "can_contact_support" ||
+        (access.status === "active" && feature === "can_view_deliveries")
+      );
     case "project_client":
       return PROJECT_CLIENT_FEATURES.has(feature);
     case "growth_90":

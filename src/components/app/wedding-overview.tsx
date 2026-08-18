@@ -1,11 +1,14 @@
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   ArrowRight,
   CalendarDays,
+  CheckCircle2,
+  Circle,
   Clock,
   Film,
   Heart,
+  LockKeyhole,
   Mail,
   MapPin,
   MessageCircle,
@@ -46,7 +49,7 @@ export function WeddingOverview() {
 
   const invoicesQ = useQuery({
     queryKey: ["wedding", "invoices", wsId],
-    enabled: !!wsId && isActive,
+    enabled: !!wsId,
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -62,7 +65,7 @@ export function WeddingOverview() {
 
   const contractsQ = useQuery({
     queryKey: ["wedding", "contracts", wsId],
-    enabled: !!wsId && isActive,
+    enabled: !!wsId,
     staleTime: 30_000,
     queryFn: async (): Promise<Contract[]> => {
       const { data, error } = await externalDb
@@ -70,7 +73,7 @@ export function WeddingOverview() {
         .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at")
         .eq("workspace_id", wsId!)
         .order("created_at", { ascending: false });
-      if (error) return [];
+      if (error) throw error;
       return data ?? [];
     },
   });
@@ -99,51 +102,84 @@ export function WeddingOverview() {
   }
 
   if (!isActive) {
+    const contractSigned = contractsQ.data?.some((contract) => contract.status === "signed") ?? false;
+    const paymentComplete =
+      invoicesQ.data?.some((invoice) => invoice.status === "paid") || stageIndex >= 1;
+    const checklist = [
+      { label: "Your invitation is accepted", complete: true },
+      { label: "Review and sign your contract", complete: contractSigned },
+      { label: "Complete your deposit payment", complete: Boolean(paymentComplete) },
+    ];
+
     return (
-      <div
-        className="mx-auto w-full max-w-2xl overflow-hidden rounded-[2rem] border shadow-sm"
-        style={{ borderColor: palette.border, background: palette.wash }}
-      >
-        <div
-          className="px-6 pt-12 pb-10 text-center sm:px-10"
-          style={{
-            background: `radial-gradient(120% 80% at 50% 0%, ${palette.soft} 0%, transparent 70%)`,
-          }}
+      <div className="mx-auto w-full max-w-3xl space-y-5 pb-8">
+        <section
+          className="overflow-hidden rounded-[2rem] border shadow-sm"
+          style={{ borderColor: palette.border, background: palette.wash }}
         >
-          <span
-            className="inline-flex h-12 w-12 items-center justify-center rounded-full"
-            style={{ background: palette.soft, color: palette.ink }}
+          <div
+            className="px-6 pt-12 pb-10 text-center sm:px-10"
+            style={{
+              background: `radial-gradient(120% 80% at 50% 0%, ${palette.soft} 0%, transparent 70%)`,
+            }}
           >
-            <Heart className="h-6 w-6" />
-          </span>
-          <h1
-            className="mt-6 break-words font-serif text-4xl leading-tight tracking-tight sm:text-5xl"
-            style={{ color: palette.ink }}
-          >
-            {displayName}
-          </h1>
-          <WeddingFacts dateLabel={dateLabel} locationLabel={locationLabel} palette={palette} center />
-          <p className="mx-auto mt-6 max-w-md text-base leading-7 text-stone-600">
-            You’re part of the Dream Wave family. We’re excited to create something meaningful with
-            you. Once your deposit is confirmed, we’ll open your wedding workspace and share the next
-            steps.
-          </p>
-          <span
-            className="mt-7 inline-flex min-h-12 items-center gap-2 rounded-full border px-5 text-sm font-medium"
-            style={{ borderColor: palette.border, background: "#fff", color: palette.ink }}
-          >
-            <Heart className="h-4 w-4" /> Invitation accepted
-          </span>
-        </div>
-        <div
-          className="border-t px-6 py-6 text-center text-sm text-stone-600 sm:px-10"
-          style={{ borderColor: palette.border, paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
+            <span
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full"
+              style={{ background: palette.soft, color: palette.ink }}
+            >
+              <Heart className="h-6 w-6" />
+            </span>
+            <h1
+              className="mt-6 break-words font-serif text-4xl leading-tight tracking-tight sm:text-5xl"
+              style={{ color: palette.ink }}
+            >
+              {displayName}
+            </h1>
+            <WeddingFacts dateLabel={dateLabel} locationLabel={locationLabel} palette={palette} center />
+            <p className="mx-auto mt-6 max-w-md text-base leading-7 text-stone-600">
+              You’re part of the Dream Wave family. Your contract and payment details are ready below,
+              and we’ll open the rest of your wedding space as soon as your deposit is confirmed.
+            </p>
+          </div>
+        </section>
+
+        <section className="rounded-[1.75rem] border bg-white p-5 sm:p-7" style={{ borderColor: palette.border }}>
+          <div className="flex items-start gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl" style={{ background: palette.soft, color: palette.ink }}>
+              <LockKeyhole className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="font-serif text-2xl" style={{ color: palette.ink }}>Opening your wedding space</h2>
+              <p className="mt-1 text-sm leading-6 text-stone-600">Here’s what needs to happen next. We’ll take care of opening everything once these first steps are complete.</p>
+            </div>
+          </div>
+          <div className="mt-5 space-y-3">
+            {checklist.map((item) => (
+              <div key={item.label} className="flex min-h-12 items-center gap-3 rounded-2xl px-4 py-3" style={{ background: item.complete ? palette.soft : palette.wash }}>
+                {item.complete ? <CheckCircle2 className="h-5 w-5 shrink-0" style={{ color: palette.accent }} /> : <Circle className="h-5 w-5 shrink-0 text-stone-400" />}
+                <span className={`text-sm ${item.complete ? "font-medium text-stone-800" : "text-stone-600"}`}>{item.label}</span>
+              </div>
+            ))}
+            <div className="flex min-h-12 items-center gap-3 rounded-2xl border px-4 py-3" style={{ borderColor: palette.border }}>
+              <LockKeyhole className="h-5 w-5 shrink-0" style={{ color: palette.accent }} />
+              <span className="text-sm text-stone-600">Dream Wave confirms your deposit and opens planning and content access</span>
+            </div>
+          </div>
+        </section>
+
+        <WeddingContractsSection contractsQ={contractsQ} palette={palette} />
+        <WeddingInvoicesSection invoicesQ={invoicesQ} palette={palette} />
+
+        <section
+          id="wedding-contact"
+          className="rounded-[1.75rem] border px-6 py-6 text-center text-sm text-stone-600 sm:px-10"
+          style={{ borderColor: palette.border, background: palette.wash, paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
         >
           Questions before then? Email us at{" "}
           <a className="font-medium underline" style={{ color: palette.ink }} href={`mailto:${WEDDING_CONTACT_EMAIL}`}>
             {WEDDING_CONTACT_EMAIL}
           </a>
-        </div>
+        </section>
       </div>
     );
   }
@@ -295,46 +331,10 @@ export function WeddingOverview() {
       </section>
 
       {/* Contracts */}
-      <section
-        id="wedding-contracts"
-        className="scroll-mt-24 rounded-[1.75rem] border bg-white p-5 sm:p-7"
-        style={{ borderColor: palette.border }}
-      >
-        <h2 className="font-serif text-xl" style={{ color: palette.ink }}>
-          Contract
-        </h2>
-        <div className="mt-4 space-y-3">
-          {contractsQ.isLoading ? (
-            <Muted text="Loading your contract…" wash={palette.wash} />
-          ) : contractsQ.data?.length ? (
-            contractsQ.data.map((contract) => <ContractCard key={contract.id} contract={contract} />)
-          ) : (
-            <Muted text="Nothing needs your signature right now." wash={palette.wash} />
-          )}
-        </div>
-      </section>
+      <WeddingContractsSection contractsQ={contractsQ} palette={palette} />
 
       {/* Invoices */}
-      <section
-        id="wedding-invoices"
-        className="scroll-mt-24 rounded-[1.75rem] border bg-white p-5 sm:p-7"
-        style={{ borderColor: palette.border }}
-      >
-        <h2 className="font-serif text-xl" style={{ color: palette.ink }}>
-          Payments
-        </h2>
-        <div className="mt-4 space-y-3">
-          {invoicesQ.isLoading ? (
-            <Muted text="Loading your payments…" wash={palette.wash} />
-          ) : invoicesQ.isError ? (
-            <Muted text="We couldn’t load this right now. Please refresh." wash={palette.wash} />
-          ) : invoicesQ.data?.length ? (
-            invoicesQ.data.map((invoice) => <InvoiceCard key={invoice.id} invoice={invoice} />)
-          ) : (
-            <Muted text="You’re all set. Nothing is due right now." wash={palette.wash} />
-          )}
-        </div>
-      </section>
+      <WeddingInvoicesSection invoicesQ={invoicesQ} palette={palette} />
 
       {/* Contact */}
       <section
@@ -357,6 +357,28 @@ export function WeddingOverview() {
         </a>
       </section>
     </div>
+  );
+}
+
+function WeddingContractsSection({ contractsQ, palette }: { contractsQ: UseQueryResult<Contract[]>; palette: ReturnType<typeof weddingPalette> }) {
+  return (
+    <section id="wedding-contracts" className="scroll-mt-24 rounded-[1.75rem] border bg-white p-5 sm:p-7" style={{ borderColor: palette.border }}>
+      <h2 className="font-serif text-xl" style={{ color: palette.ink }}>Contract</h2>
+      <div className="mt-4 space-y-3">
+        {contractsQ.isLoading ? <Muted text="Loading your contract…" wash={palette.wash} /> : contractsQ.isError ? <Muted text="We couldn’t load your contract right now. Please refresh." wash={palette.wash} /> : contractsQ.data?.length ? contractsQ.data.map((contract) => <ContractCard key={contract.id} contract={contract} />) : <Muted text="Nothing needs your signature right now." wash={palette.wash} />}
+      </div>
+    </section>
+  );
+}
+
+function WeddingInvoicesSection({ invoicesQ, palette }: { invoicesQ: UseQueryResult<Invoice[]>; palette: ReturnType<typeof weddingPalette> }) {
+  return (
+    <section id="wedding-invoices" className="scroll-mt-24 rounded-[1.75rem] border bg-white p-5 sm:p-7" style={{ borderColor: palette.border }}>
+      <h2 className="font-serif text-xl" style={{ color: palette.ink }}>Payments</h2>
+      <div className="mt-4 space-y-3">
+        {invoicesQ.isLoading ? <Muted text="Loading your payments…" wash={palette.wash} /> : invoicesQ.isError ? <Muted text="We couldn’t load this right now. Please refresh." wash={palette.wash} /> : invoicesQ.data?.length ? invoicesQ.data.map((invoice) => <InvoiceCard key={invoice.id} invoice={invoice} />) : <Muted text="You’re all set. Nothing is due right now." wash={palette.wash} />}
+      </div>
+    </section>
   );
 }
 
