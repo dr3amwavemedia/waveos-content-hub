@@ -18,6 +18,7 @@ import {
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { cn } from "@/lib/utils";
 import { ProductionProjectsPanel } from "@/components/production/production-projects-panel";
+import { ProductionTodayPanel } from "@/components/production/production-today-panel";
 
 export const Route = createFileRoute("/_authenticated/videographer")({
   component: VideographerDashboard,
@@ -205,6 +206,8 @@ function VideographerDashboard() {
         />
       </section>
 
+      <ProductionTodayPanel />
+
       <ProductionProjectsPanel />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
@@ -213,10 +216,10 @@ function VideographerDashboard() {
             <div>
               <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
                 <CheckCircle2 className="h-5 w-5 text-primary" />
-                Shoot checklist
+                Personal prep checklist
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Complete the essentials before wrapping the production.
+                Your private reusable prep list, saved on this device.
               </p>
             </div>
             <div className="text-right">
