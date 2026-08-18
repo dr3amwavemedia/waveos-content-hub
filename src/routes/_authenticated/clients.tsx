@@ -1371,6 +1371,13 @@ function AccessTab({
           access_expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           wedding_display_name: tier === "wedding_client" ? weddingDisplayName.trim() || workspace.name : workspace.wedding_display_name,
           wedding_theme: tier === "wedding_client" ? weddingTheme : workspace.wedding_theme,
+          wedding_scheduling_url:
+            tier === "wedding_client"
+              ? weddingSchedulingUrl.trim().startsWith("https://")
+                ? weddingSchedulingUrl.trim()
+                : null
+              : workspace.wedding_scheduling_url,
+
         })
         .eq("id", workspace.id);
       if (error) throw error;
