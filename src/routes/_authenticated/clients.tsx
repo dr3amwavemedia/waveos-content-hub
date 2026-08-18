@@ -292,12 +292,32 @@ function ClientsPage() {
         </button>
       </header>
 
+      {weddingColumnsMissing && (
+        <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
+          Wedding portal settings are awaiting a database migration. All clients below are still
+          shown using their standard workspace fields.
+        </div>
+      )}
+      {workspacesQ.isError && (
+        <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+          <p className="font-semibold">The client list could not be loaded.</p>
+          <p className="mt-1 break-words font-mono text-xs">
+            {workspacesQ.error instanceof Error ? workspacesQ.error.message : "Unknown error"}
+          </p>
+        </div>
+      )}
+
       <div className="surface-card overflow-hidden">
         {workspacesQ.isLoading ? (
           <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading workspaces…
           </div>
+        ) : workspacesQ.isError ? (
+          <div className="p-6 text-sm text-muted-foreground">
+            Client list unavailable — see the error above.
+          </div>
         ) : (workspacesQ.data ?? []).length === 0 ? (
+
           <div className="p-6">
             <EmptyState
               icon={Users2}
