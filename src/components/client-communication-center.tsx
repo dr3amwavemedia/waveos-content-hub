@@ -14,6 +14,7 @@ import { useWorkspace } from "@/components/app/workspace-context";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { sendWorkspaceEmail, tryEmail } from "@/lib/transactional-email";
 
 type Decision = "pending" | "approved" | "changes_requested" | "rejected";
 type Section = "requests" | "checklist" | "timeline" | "preferences";
@@ -171,6 +172,13 @@ function Requests({ workspaceId, isStaff }: { workspaceId: string; isStaff: bool
         _status: status,
       });
       if (error) throw error;
+      const request = q.data?.find((item) => item.id === id);
+      await tryEmail(() => sendWorkspaceEmail({
+        workspaceId,
+        event: "request_updated",
+        title: request?.title ?? "Your request",
+        status,
+      }));
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["phase4-requests"] });

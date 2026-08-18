@@ -29,6 +29,7 @@ import { isValidHttpsUrl, URL_VALIDATION_MESSAGE } from "@/lib/url-validation";
 import type { Database } from "@/integrations/supabase/types";
 import { syncFrameioWorkspaceShare } from "@/hooks/use-frameio";
 import { ClientBrandingEditor } from "@/components/branding/client-branding-editor";
+import { sendInviteEmail, sendWorkspaceEmail, tryEmail } from "@/lib/transactional-email";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -1545,11 +1546,20 @@ function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
         _delivery_id: deliveryId,
       });
       if (error) throw error;
-      return typeof data === "number" ? data : 0;
+      const delivery = q.data?.find((item) => item.id === deliveryId);
+      const email = await tryEmail(() => sendWorkspaceEmail({
+        workspaceId,
+        event: "revisions_updated",
+        title: delivery?.title ?? "Your content",
+        url: delivery?.url,
+      }));
+      return { inApp: typeof data === "number" ? data : 0, email };
     },
-    onSuccess: (recipientCount) =>
+    onSuccess: ({ inApp: recipientCount, email }) =>
       toast.success(
-        recipientCount === 1
+        email.sent
+          ? `Revision update emailed to ${email.sent} client member${email.sent === 1 ? "" : "s"}.`
+          : recipientCount === 1
           ? "Revision notification sent to 1 client member."
           : `Revision notification sent to ${recipientCount} client members.`,
       ),
@@ -1637,20 +1647,27 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
       const trimmed = url.trim();
       if (!isValidHttpsUrl(trimmed)) throw new Error(URL_VALIDATION_MESSAGE);
       const { data: auth } = await supabase.auth.getUser();
-      const { error } = await supabase.from("client_deliveries").insert({
+      const { data, error } = await supabase.from("client_deliveries").insert({
         workspace_id: workspaceId,
         title: title.trim(),
         url: trimmed,
         description: description.trim() || null,
         kind,
         created_by: auth.user?.id ?? null,
-      });
+      }).select("id").single();
       if (error) {
         if (error.message.includes("client_deliveries_url_https")) {
           throw new Error(URL_VALIDATION_MESSAGE);
         }
         throw error;
       }
+      await tryEmail(() => sendWorkspaceEmail({
+        workspaceId,
+        event: "content_added",
+        title: title.trim(),
+        url: trimmed,
+      }));
+      return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["client-deliveries", workspaceId] });
@@ -1780,7 +1797,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
       const url = hostedUrl.trim();
       if (!isValidHttpsUrl(url)) throw new Error(URL_VALIDATION_MESSAGE);
       const { data: auth } = await supabase.auth.getUser();
-      const { error } = await db.from("client_contracts").insert({
+      const { data, error } = await db.from("client_contracts").insert({
         workspace_id: workspaceId,
         title: title.trim(),
         description: description.trim() || null,
@@ -1790,8 +1807,16 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
         sent_at: new Date().toISOString(),
         expires_at: dateInputToIso(expiresAt),
         created_by: auth.user?.id,
-      });
+      }).select("id").single();
       if (error) throw error;
+      await tryEmail(() => sendWorkspaceEmail({
+        workspaceId,
+        event: "contract_ready",
+        title: title.trim(),
+        status: "sent",
+        url,
+      }));
+      return data;
     },
     onSuccess: async () => {
       setTitle(""); setDescription(""); setHostedUrl(""); setExpiresAt(""); setShowForm(false);
@@ -1899,6 +1924,14 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
         })
         .eq("id", id);
       if (error) throw error;
+      const invoice = q.data?.find((item) => item.id === id);
+      await tryEmail(() => sendWorkspaceEmail({
+        workspaceId,
+        event: "invoice_updated",
+        title: invoice?.number || "Invoice",
+        status,
+        url: invoice?.hosted_url,
+      }));
     },
     onSuccess: async () => {
       await refreshInvoices();
@@ -2330,16 +2363,20 @@ function InvitesTab({
         _extend_days: 14,
       });
       if (error) throw error;
-      return (data as { raw_token: string }[] | null)?.[0]?.raw_token ?? "";
+      const token = (data as { raw_token: string }[] | null)?.[0]?.raw_token ?? "";
+      const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`;
+      const delivery = await tryEmail(() => sendInviteEmail(id, link));
+      return { token, delivery };
     },
-    onSuccess: (token, id) => {
+    onSuccess: ({ token, delivery }, id) => {
       qc.invalidateQueries({ queryKey: ["clients", "invites", workspace.id] });
       const row = invitesQ.data?.find((i) => i.id === id);
       onNewInvite({
-        link: `${window.location.origin}/accept-invite?token=${token}`,
+        link: `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`,
         email: row?.email ?? "",
         workspace: workspace.name,
       });
+      toast.success(delivery.sent ? "Client invitation emailed." : "Invite refreshed. Copy the link to send it manually.");
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
@@ -2469,18 +2506,22 @@ function InviteQuickForm({
         _expires_days: 14,
       });
       if (error) throw error;
-      const token = (data as { raw_token: string }[] | null)?.[0]?.raw_token;
-      if (!token) throw new Error("No token returned");
+      const row = (data as { invite_id: string; raw_token: string }[] | null)?.[0];
+      if (!row?.raw_token || !row.invite_id) throw new Error("No token returned");
+      const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(row.raw_token)}`;
+      const delivery = await tryEmail(() => sendInviteEmail(row.invite_id, link));
       return {
-        link: `${window.location.origin}/accept-invite?token=${token}`,
+        link,
         email: email.trim(),
         workspace: workspace.name,
+        delivery,
       };
     },
     onSuccess: (payload) => {
       qc.invalidateQueries({ queryKey: ["clients", "invites", workspace.id] });
       setEmail("");
       onNewInvite(payload);
+      toast.success(payload.delivery.sent ? "Client invitation emailed." : "Invite created. Copy the link to send it manually.");
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
