@@ -1,4 +1,3 @@
--- Server-only delivery audit for provider-independent transactional email.
 CREATE TABLE public.transactional_email_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   workspace_id uuid REFERENCES public.workspaces(id) ON DELETE SET NULL,
@@ -18,4 +17,3 @@ CREATE INDEX transactional_email_log_workspace_created_idx
 ALTER TABLE public.transactional_email_log ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.transactional_email_log FROM PUBLIC, anon, authenticated;
 GRANT ALL ON public.transactional_email_log TO service_role;
-

@@ -1680,6 +1680,67 @@ export type Database = {
           },
         ]
       }
+      transactional_email_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_type: string
+          id: string
+          invite_id: string | null
+          provider: string
+          provider_message_id: string | null
+          recipient_email: string
+          status: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          invite_id?: string | null
+          provider?: string
+          provider_message_id?: string | null
+          recipient_email: string
+          status: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          invite_id?: string | null
+          provider?: string
+          provider_message_id?: string | null
+          recipient_email?: string
+          status?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactional_email_log_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactional_email_log_invite_id_fkey"
+            columns: ["invite_id"]
+            isOneToOne: false
+            referencedRelation: "invites_admin"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactional_email_log_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
