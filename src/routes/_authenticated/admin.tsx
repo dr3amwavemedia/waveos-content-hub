@@ -64,6 +64,14 @@ interface AuditRow {
   created_at: string;
 }
 
+interface LoginEventRow {
+  id: string;
+  user_id: string;
+  user_email: string;
+  device_category: "mobile" | "tablet" | "desktop";
+  occurred_at: string;
+}
+
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
@@ -132,6 +140,19 @@ function AdminPage() {
         .limit(50);
       if (error) throw error;
       return (data ?? []) as AuditRow[];
+    },
+  });
+
+  const loginActivityQ = useQuery({
+    queryKey: ["admin", "login-activity"],
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("user_login_events")
+        .select("id,user_id,user_email,device_category,occurred_at")
+        .order("occurred_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return (data ?? []) as LoginEventRow[];
     },
   });
 
@@ -355,6 +376,50 @@ function AdminPage() {
               <Copy className="h-3.5 w-3.5" /> Copy link
             </button>
           </div>
+        )}
+      </div>
+
+      <div className="surface-card overflow-hidden">
+        <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3 sm:px-5">
+          <div>
+            <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Eye className="h-4 w-4 text-primary" /> User login activity
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Successful WaveOS sign-ins. Visible only to Dream Wave owners.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => loginActivityQ.refetch()}
+            className="min-h-10 min-w-10 rounded-lg border border-border p-2.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
+            aria-label="Refresh login activity"
+          >
+            <RefreshCw className={loginActivityQ.isFetching ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+          </button>
+        </div>
+        {loginActivityQ.isLoading ? (
+          <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading sign-ins…
+          </div>
+        ) : loginActivityQ.isError ? (
+          <div className="px-5 py-5 text-sm text-muted-foreground">Login activity could not be loaded.</div>
+        ) : !(loginActivityQ.data ?? []).length ? (
+          <div className="px-5 py-5 text-sm text-muted-foreground">No new login sessions recorded yet.</div>
+        ) : (
+          <ul className="max-h-[24rem] divide-y divide-border/60 overflow-y-auto">
+            {loginActivityQ.data!.map((entry) => (
+              <li key={entry.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">{entry.user_email}</p>
+                  <p className="text-xs capitalize text-muted-foreground">{entry.device_category} sign-in</p>
+                </div>
+                <time className="shrink-0 text-xs text-muted-foreground" dateTime={entry.occurred_at}>
+                  {new Date(entry.occurred_at).toLocaleString()}
+                </time>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
