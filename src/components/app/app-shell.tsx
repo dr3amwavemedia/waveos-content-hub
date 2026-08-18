@@ -128,11 +128,11 @@ const LAYER1_NAV: NavItem[] = [
 ];
 
 const LAYER1_MOBILE_NAV: NavItem[] = [
-  { to: "/home", label: "Overview", icon: Home },
+  { to: "/home", label: "Home", icon: Home },
   { to: "/deliveries", label: "Content", icon: Images },
+  { to: "/approvals", label: "Approvals", icon: CheckSquare },
   { to: "/home", hash: "invoices", label: "Invoices", icon: FileText },
-  { to: "/settings", label: "Info", icon: User },
-  { to: "/feedback", label: "Contact", icon: MessageSquare },
+  { to: "/settings", label: "More", icon: Menu },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -229,7 +229,7 @@ function Shell({ children }: { children: ReactNode }) {
           <NotificationsBell />
           <button
             onClick={() => setMobileOpen(true)}
-            className="rounded-lg border border-border bg-elevated p-2 text-foreground"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-elevated text-foreground"
             aria-label="Open menu"
           >
             <Menu className="h-5 w-5" />
@@ -280,14 +280,14 @@ function Shell({ children }: { children: ReactNode }) {
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-surface/95 px-2 pb-[max(.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-surface/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur lg:hidden">
         {mobilePrimaryNav.map((item) => (
           <MobileNavLink key={`${item.to}#${item.hash ?? ""}`} item={item} />
         ))}
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
-          className="flex flex-1 flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium text-muted-foreground"
+          className="flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 text-[10px] font-semibold text-muted-foreground"
           aria-label="Open all navigation"
         >
           <Menu className="h-5 w-5" />
@@ -350,7 +350,7 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
               to={item.to}
               hash={item.hash}
               className={cn(
-                "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all",
+                "group flex min-h-12 items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
                 active
                   ? "bg-primary/12 text-foreground ring-1 ring-inset ring-primary/30"
                   : "text-muted-foreground hover:bg-sidebar-accent hover:text-foreground",
@@ -383,7 +383,7 @@ function MobileNavLink({ item }: { item: NavItem }) {
       to={item.to}
       hash={item.hash}
       className={cn(
-        "flex flex-1 flex-col items-center gap-1 rounded-lg px-2 py-1.5 text-[10px] font-medium",
+        "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 text-[10px] font-semibold",
         active ? "text-primary" : "text-muted-foreground",
       )}
     >

@@ -155,30 +155,30 @@ function VideographerDashboard() {
         </div>
         <Link
           to="/calendar"
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary"
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary sm:w-auto sm:rounded-full"
         >
           <CalendarDays className="h-4 w-4" />
           View full schedule
         </Link>
       </header>
 
-      <nav className="flex w-fit items-center gap-1 rounded-xl border border-border bg-surface p-1" aria-label="Production sections">
+      <nav className="grid w-full grid-cols-2 items-center gap-1 rounded-xl border border-border bg-surface p-1 sm:flex sm:w-fit" aria-label="Production sections">
         <Link
           to="/videographer"
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
         >
           Dashboard
         </Link>
         <Link
           to="/vision-board"
-          className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-elevated hover:text-foreground"
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-muted-foreground hover:bg-elevated hover:text-foreground"
         >
           <LayoutPanelTop className="h-4 w-4" />
           Vision Board
         </Link>
       </nav>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid grid-cols-2 gap-2 sm:gap-3 xl:grid-cols-4">
         <QuickAction
           to="/content"
           icon={Upload}
@@ -243,7 +243,7 @@ function VideographerDashboard() {
                 <button
                   type="button"
                   onClick={() => toggleChecklist(item.id)}
-                  className="shrink-0 text-primary"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary"
                   aria-label={item.done ? "Mark incomplete" : "Mark complete"}
                 >
                   {item.done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
@@ -254,7 +254,7 @@ function VideographerDashboard() {
                 <button
                   type="button"
                   onClick={() => setChecklist((current) => current.filter((entry) => entry.id !== item.id))}
-                  className="opacity-0 text-muted-foreground transition-opacity hover:text-destructive group-hover:opacity-100"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
                   aria-label="Remove checklist item"
                 >
                   <X className="h-4 w-4" />
@@ -267,12 +267,12 @@ function VideographerDashboard() {
                 onChange={(event) => setNewItem(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && addChecklistItem()}
                 placeholder="Add checklist item"
-                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-3 text-base outline-none focus:border-primary sm:text-sm"
               />
               <button
                 type="button"
                 onClick={addChecklistItem}
-                className="inline-flex items-center gap-1 rounded-xl bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground"
+                className="inline-flex min-h-12 items-center gap-1 rounded-xl bg-primary px-3 py-3 text-sm font-semibold text-primary-foreground"
               >
                 <Plus className="h-4 w-4" />
                 Add
@@ -316,7 +316,7 @@ function VideographerDashboard() {
                     <button
                       type="button"
                       onClick={() => setStoryboard((current) => current.filter((entry) => entry.id !== beat.id))}
-                      className="opacity-0 text-muted-foreground hover:text-destructive group-hover:opacity-100"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100"
                       aria-label="Remove storyboard beat"
                     >
                       <X className="h-4 w-4" />
@@ -343,12 +343,12 @@ function VideographerDashboard() {
                 onChange={(event) => setNewBeat(event.target.value)}
                 onKeyDown={(event) => event.key === "Enter" && addStoryBeat()}
                 placeholder="Add storyboard moment"
-                className="min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-3 text-base outline-none focus:border-primary sm:text-sm"
               />
               <button
                 type="button"
                 onClick={addStoryBeat}
-                className="inline-flex items-center gap-1 rounded-xl border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-semibold text-primary"
+                className="inline-flex min-h-12 items-center gap-1 rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-semibold text-primary"
               >
                 <Plus className="h-4 w-4" />
                 Add
@@ -369,11 +369,11 @@ function VideographerDashboard() {
               Check the calendar, capture the footage, upload it to Content, then prepare the client delivery.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link to="/calendar" className="rounded-full border border-border bg-background px-4 py-2 text-sm font-semibold text-foreground">
+          <div className="grid grid-cols-2 gap-2 sm:flex">
+            <Link to="/calendar" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground sm:rounded-full">
               Open schedule
             </Link>
-            <Link to="/content" className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+            <Link to="/content" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground sm:rounded-full">
               Upload content
             </Link>
           </div>
@@ -397,16 +397,16 @@ function QuickAction({
   return (
     <Link
       to={to}
-      className="group flex items-center gap-3 rounded-2xl border border-border bg-surface p-4 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
+      className="group flex min-h-28 flex-col items-start gap-2 rounded-2xl border border-border bg-surface p-3 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg sm:min-h-0 sm:flex-row sm:items-center sm:gap-3 sm:p-4"
     >
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
         <Icon className="h-5 w-5" />
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-sm font-semibold text-foreground">{title}</span>
-        <span className="block truncate text-xs text-muted-foreground">{detail}</span>
+        <span className="mt-0.5 block line-clamp-2 text-xs text-muted-foreground">{detail}</span>
       </span>
-      <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+      <ChevronRight className="absolute hidden h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary sm:static sm:block" />
     </Link>
   );
 }
