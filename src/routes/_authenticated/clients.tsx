@@ -187,16 +187,34 @@ function ClientsPage() {
     },
   });
 
+  const [weddingColumnsMissing, setWeddingColumnsMissing] = useState(false);
+
   const workspacesQ = useQuery({
     queryKey: ["clients", "workspaces"],
     queryFn: async () => {
-      const { data: ws, error } = await supabase
+      const BASE_COLS =
+        "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at";
+      // Wedding columns are optional: if the Layer 5 migration has not reached
+      // this environment yet, the client list must still load.
+      let missing = false;
+      let ws: Record<string, unknown>[] | null = null;
+      const first = await supabase
         .from("workspaces")
-        .select(
-          "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at,wedding_display_name,wedding_theme",
-        )
+        .select(`${BASE_COLS},wedding_display_name,wedding_theme`)
         .order("created_at", { ascending: false });
-      if (error) throw error;
+      if (first.error) {
+        const fallback = await supabase
+          .from("workspaces")
+          .select(BASE_COLS)
+          .order("created_at", { ascending: false });
+        if (fallback.error) throw fallback.error;
+        missing = true;
+        ws = (fallback.data ?? []) as unknown as Record<string, unknown>[];
+      } else {
+        ws = (first.data ?? []) as unknown as Record<string, unknown>[];
+      }
+      setWeddingColumnsMissing(missing);
+
       const [{ data: members }, { data: invites }, { data: media }] = await Promise.all([
         supabase.from("workspace_members").select("workspace_id"),
         supabase.from("invites_admin").select("workspace_id").eq("status", "pending"),
