@@ -26,13 +26,16 @@ export function WeddingOverview() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("workspaces")
-        .select("name,account_status,wedding_display_name,wedding_theme")
+        .select(
+          "name,account_status,wedding_display_name,wedding_theme,wedding_scheduling_url",
+        )
         .eq("id", wsId!)
         .single();
       if (error) throw error;
       return data;
     },
   });
+
 
   const isActive = workspaceQ.data?.account_status === "active";
   const invoicesQ = useQuery({
