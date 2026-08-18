@@ -160,7 +160,15 @@ export function WeddingOverview() {
               <p className="mt-2 max-w-2xl text-sm leading-6 text-stone-600">Now that your deposit has been accepted, our next step is shaping the look, emotion, and energy of your wedding story together.</p>
             </div>
           </div>
-          <a href="mailto:dr3amwavemedia@outlook.com?subject=Wedding%20Creative%20Strategy%20Meeting" className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white shadow-lg transition-transform hover:-translate-y-0.5" style={{ background: palette.accent }}>Schedule with Dream Wave <ArrowRight className="h-4 w-4" /></a>
+          <a
+            href={schedulingUrl ?? "mailto:dr3amwavemedia@outlook.com?subject=Wedding%20Creative%20Strategy%20Meeting"}
+            {...(schedulingUrl ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+            className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full px-5 text-sm font-semibold text-white shadow-lg transition-transform motion-safe:hover:-translate-y-0.5"
+            style={{ background: palette.accent }}
+          >
+            Schedule meeting <ArrowRight className="h-4 w-4" />
+          </a>
+
         </div>
       </section>
 
