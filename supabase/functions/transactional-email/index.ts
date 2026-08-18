@@ -100,7 +100,7 @@ Deno.serve(async (request) => {
       eventType = invite.app_role === "dream_wave_team" ? "staff_invite" : "client_invite";
       let workspaceName = "WaveOS";
       if (workspaceId) {
-        const { data: workspace } = await auth.db.from("client_workspaces").select("name").eq("id", workspaceId).single();
+        const { data: workspace } = await auth.db.from("workspaces").select("name").eq("id", workspaceId).single();
         workspaceName = workspace?.name ?? workspaceName;
       }
       const staff = eventType === "staff_invite";
@@ -114,7 +114,7 @@ Deno.serve(async (request) => {
       eventType = cleanText(body.event, "", 60) as EmailEvent;
       const supported: EmailEvent[] = ["request_updated", "invoice_updated", "revisions_updated", "content_added", "contract_ready"];
       if (!workspaceId || !supported.includes(eventType as EmailEvent)) return json({ error: "invalid_event" }, 400);
-      const { data: workspace, error } = await auth.db.from("client_workspaces").select("id,name").eq("id", workspaceId).single();
+      const { data: workspace, error } = await auth.db.from("workspaces").select("id,name").eq("id", workspaceId).single();
       if (error || !workspace) return json({ error: "workspace_not_found" }, 404);
       recipients = await clientEmails(auth.db, workspaceId);
       const item = cleanText(body.title, "An item");

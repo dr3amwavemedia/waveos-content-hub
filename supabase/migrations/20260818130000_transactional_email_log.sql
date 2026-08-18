@@ -1,7 +1,7 @@
 -- Server-only delivery audit for provider-independent transactional email.
 CREATE TABLE public.transactional_email_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  workspace_id uuid REFERENCES public.client_workspaces(id) ON DELETE SET NULL,
+  workspace_id uuid REFERENCES public.workspaces(id) ON DELETE SET NULL,
   invite_id uuid REFERENCES public.invites(id) ON DELETE SET NULL,
   event_type text NOT NULL,
   recipient_email text NOT NULL,
