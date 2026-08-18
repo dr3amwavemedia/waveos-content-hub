@@ -128,6 +128,8 @@ interface ClientWorkspace {
   feature_overrides: Record<string, boolean>;
   last_activity_at: string | null;
   created_at: string;
+  wedding_display_name: string | null;
+  wedding_theme: string;
   member_count: number;
   invite_count: number;
   media_count: number;
@@ -138,6 +140,7 @@ const TIER_LABEL: Record<ClientAccessTier, string> = {
   growth_90: "Growth (90 days)",
   retainer_full: "Retainer",
   social_management: "Social Management",
+  wedding_client: "Wedding Client",
 };
 const STATUS_TONE: Record<AccountStatus, string> = {
   active: "bg-success/15 text-success ring-success/30",
@@ -190,7 +193,7 @@ function ClientsPage() {
       const { data: ws, error } = await supabase
         .from("workspaces")
         .select(
-          "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at",
+          "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at,wedding_display_name,wedding_theme",
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -456,6 +459,7 @@ function TierBadge({ tier }: { tier: ClientAccessTier }) {
     growth_90: "bg-primary/12 text-primary ring-primary/30",
     retainer_full: "bg-success/15 text-success ring-success/30",
     social_management: "bg-primary/15 text-primary ring-primary/30",
+    wedding_client: "bg-[#667843]/15 text-[#9daf70] ring-[#667843]/30",
   };
   return (
     <span className={cn("rounded-md px-2 py-0.5 text-xs font-medium ring-1", tone[tier])}>
@@ -1286,6 +1290,8 @@ function AccessTab({
   const [expiresAt, setExpiresAt] = useState(
     workspace.access_expires_at ? workspace.access_expires_at.slice(0, 10) : "",
   );
+  const [weddingDisplayName, setWeddingDisplayName] = useState(workspace.wedding_display_name ?? workspace.name);
+  const [weddingTheme, setWeddingTheme] = useState(workspace.wedding_theme === "gold" ? "gold" : "olive");
   const notesQ = useQuery({
     queryKey: ["workspace-internal-notes", workspace.id],
     queryFn: async () => {
@@ -1313,6 +1319,8 @@ function AccessTab({
           agreement_term: term || null,
           access_starts_at: startsAt ? new Date(startsAt).toISOString() : null,
           access_expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+          wedding_display_name: tier === "wedding_client" ? weddingDisplayName.trim() || workspace.name : workspace.wedding_display_name,
+          wedding_theme: tier === "wedding_client" ? weddingTheme : workspace.wedding_theme,
         })
         .eq("id", workspace.id);
       if (error) throw error;
@@ -1331,6 +1339,31 @@ function AccessTab({
       onRefresh();
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
+  });
+
+  const toggleWeddingPortal = useMutation({
+    mutationFn: async () => {
+      const nextStatus: AccountStatus = status === "active" ? "suspended" : "active";
+      const { error } = await supabase.from("workspaces").update({
+        account_status: nextStatus,
+        activated_at: nextStatus === "active" ? new Date().toISOString() : null,
+        wedding_display_name: weddingDisplayName.trim() || workspace.name,
+        wedding_theme: weddingTheme,
+      }).eq("id", workspace.id);
+      if (error) throw error;
+      return nextStatus;
+    },
+    onSuccess: async (nextStatus) => {
+      setStatus(nextStatus);
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["clients", "workspaces"] }),
+        qc.invalidateQueries({ queryKey: ["workspace-access", workspace.id] }),
+        qc.invalidateQueries({ queryKey: ["wedding", "workspace", workspace.id] }),
+      ]);
+      toast.success(nextStatus === "active" ? "Deposit accepted — wedding portal is live." : "Wedding portal deactivated.");
+      onRefresh();
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not update the wedding portal."),
   });
 
   const deleteWorkspace = useMutation({
@@ -1386,6 +1419,7 @@ function AccessTab({
             <option value="growth_90">Growth (90 days) — review + brand voice</option>
             <option value="retainer_full">Tier 3 — Full access, client managed</option>
             <option value="social_management">Tier 4 — Full access + Social Manager</option>
+            <option value="wedding_client">Layer 5 — Wedding portal only</option>
           </select>
         </Field>
         <Field label="Account status">
@@ -1402,6 +1436,30 @@ function AccessTab({
           </select>
         </Field>
       </div>
+
+      {tier === "wedding_client" && (
+        <div className="space-y-4 rounded-2xl border border-primary/25 bg-primary/[0.06] p-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Wedding portal</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Activate only after the deposit is accepted. Activation reveals the Creative Strategy Meeting, contracts, and payments.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Couple / client display name">
+              <input value={weddingDisplayName} onChange={(e) => setWeddingDisplayName(e.target.value)} placeholder="Jean & Alex" className={inputCls} />
+            </Field>
+            <Field label="Wedding theme">
+              <select value={weddingTheme} onChange={(e) => setWeddingTheme(e.target.value)} className={inputCls}>
+                <option value="olive">Olive green & white</option>
+                <option value="gold">Gold & white</option>
+              </select>
+            </Field>
+          </div>
+          <button type="button" disabled={toggleWeddingPortal.isPending} onClick={() => toggleWeddingPortal.mutate()} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold disabled:opacity-60", status === "active" ? "bg-success/15 text-success ring-1 ring-success/30" : "bg-primary text-primary-foreground")}>
+            {status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {status === "active" ? "Deactivate wedding portal" : "Accept deposit & activate portal"}
+          </button>
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Agreement term">
@@ -2592,6 +2650,8 @@ function OnboardingModal({
   const [timezone, setTimezone] = useState("America/New_York");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"owner" | "approver" | "viewer">("owner");
+  const [weddingDisplayName, setWeddingDisplayName] = useState("");
+  const [weddingTheme, setWeddingTheme] = useState("olive");
 
   const create = useMutation({
     mutationFn: async () => {
@@ -2619,6 +2679,8 @@ function OnboardingModal({
           agreement_term: term || null,
           access_expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           invited_at: new Date().toISOString(),
+          wedding_display_name: tier === "wedding_client" ? weddingDisplayName.trim() || name.trim() : null,
+          wedding_theme: tier === "wedding_client" ? weddingTheme : "olive",
         })
         .select()
         .single();
@@ -2712,6 +2774,7 @@ function OnboardingModal({
               <option value="growth_90">Growth (90 days)</option>
               <option value="retainer_full">Tier 3 — Full access, client managed</option>
               <option value="social_management">Tier 4 — Full access + Social Manager</option>
+              <option value="wedding_client">Layer 5 — Wedding portal</option>
             </select>
           </Field>
           <Field label="Agreement term">
@@ -2728,6 +2791,20 @@ function OnboardingModal({
             </select>
           </Field>
         </div>
+
+        {tier === "wedding_client" && (
+          <div className="grid gap-4 rounded-2xl border border-primary/25 bg-primary/[0.06] p-4 sm:grid-cols-2">
+            <Field label="Couple / client display name">
+              <input value={weddingDisplayName} onChange={(e) => setWeddingDisplayName(e.target.value)} placeholder="Jean & Alex" className={inputCls} />
+            </Field>
+            <Field label="Wedding theme">
+              <select value={weddingTheme} onChange={(e) => setWeddingTheme(e.target.value)} className={inputCls}>
+                <option value="olive">Olive green & white</option>
+                <option value="gold">Gold & white</option>
+              </select>
+            </Field>
+          </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Access expires (optional)">

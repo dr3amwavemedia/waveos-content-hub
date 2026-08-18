@@ -1,6 +1,6 @@
 import { Link, useRouterState, useNavigate } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Home,
   Images,
@@ -135,6 +135,18 @@ const LAYER1_MOBILE_NAV: NavItem[] = [
   { to: "/settings", label: "More", icon: Menu },
 ];
 
+const WEDDING_NAV: NavItem[] = [
+  { to: "/home", label: "Wedding Overview", icon: Sparkles },
+  { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
+  { to: "/home", hash: "wedding-invoices", label: "Invoices & Payments", icon: FileText },
+];
+
+const WEDDING_MOBILE_NAV: NavItem[] = [
+  { to: "/home", label: "Overview", icon: Sparkles },
+  { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
+  { to: "/home", hash: "wedding-invoices", label: "Payments", icon: FileText },
+];
+
 export function AppShell({ children }: { children: ReactNode }) {
   return (
     <WorkspaceProvider>
@@ -149,6 +161,8 @@ function Shell({ children }: { children: ReactNode }) {
   const { activeWorkspace } = useWorkspace();
   const branding = useWorkspaceBranding(activeWorkspace?.id);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const navigate = useNavigate();
   const isOwner = Boolean(user?.isDreamWaveOwner && isStaff);
   const isTeamMember = isStaff && !isOwner;
   const isMediaManager = isTeamMember && user?.staffType === "media_manager";
@@ -168,6 +182,13 @@ function Shell({ children }: { children: ReactNode }) {
   // Layer 1 (project_client) gets a simplified client-facing nav using
   // existing routes only. Staff always keep the full nav.
   const isLayer1 = !isStaff && access?.tier === "project_client";
+  const isWeddingClient = !isStaff && access?.tier === "wedding_client";
+
+  useEffect(() => {
+    if (isWeddingClient && pathname !== "/home") {
+      void navigate({ to: "/home", replace: true });
+    }
+  }, [isWeddingClient, navigate, pathname]);
 
   const clientNav = isCrew
     ? CLIENT_NAV.filter((item) =>
@@ -177,6 +198,8 @@ function Shell({ children }: { children: ReactNode }) {
       ? TEAM_NAV.slice(0, 1)
     : isMediaManager
       ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV)
+      : isWeddingClient
+        ? WEDDING_NAV
       : isLayer1
         ? LAYER1_NAV
         : filterByFeature(CLIENT_NAV);
@@ -191,6 +214,8 @@ function Shell({ children }: { children: ReactNode }) {
       ? TEAM_NAV
     : isMediaManager
       ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV).slice(0, 5)
+      : isWeddingClient
+        ? WEDDING_MOBILE_NAV
       : isLayer1
         ? LAYER1_MOBILE_NAV
         : filterByFeature(MOBILE_NAV);

@@ -4,7 +4,7 @@
 // module for security, only for UX.
 
 export type ClientAccessTier =
-  "project_client" | "growth_90" | "retainer_full" | "social_management";
+  "project_client" | "growth_90" | "retainer_full" | "social_management" | "wedding_client";
 export type AccountStatus = "pending" | "active" | "suspended" | "expired" | "archived";
 export type AgreementTerm = "one_time" | "90_day" | "6_month" | "12_month";
 
@@ -86,6 +86,8 @@ export function hasFeature(access: WorkspaceAccess, feature: FeatureKey): boolea
   }
 
   switch (access.tier) {
+    case "wedding_client":
+      return access.status === "active" && feature === "can_view_invoices";
     case "project_client":
       return PROJECT_CLIENT_FEATURES.has(feature);
     case "growth_90":
@@ -120,6 +122,7 @@ export const TIER_LABELS: Record<ClientAccessTier, string> = {
   growth_90: "90-Day Growth",
   retainer_full: "Full Retainer",
   social_management: "Social Management",
+  wedding_client: "Wedding Client",
 };
 
 export const TERM_LABELS: Record<AgreementTerm, string> = {
