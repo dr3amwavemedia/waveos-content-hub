@@ -135,16 +135,22 @@ const LAYER1_MOBILE_NAV: NavItem[] = [
   { to: "/settings", label: "More", icon: Menu },
 ];
 
+const WEDDING_ALLOWED_PATHS = ["/home", "/wedding-content"];
+
 const WEDDING_NAV: NavItem[] = [
-  { to: "/home", label: "Wedding Overview", icon: Sparkles },
+  { to: "/home", label: "Wedding Overview", icon: Heart },
+  { to: "/wedding-content", label: "Content", icon: Images },
   { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
-  { to: "/home", hash: "wedding-invoices", label: "Invoices & Payments", icon: FileText },
+  { to: "/home", hash: "wedding-invoices", label: "Payments", icon: FileText },
+  { to: "/home", hash: "wedding-contact", label: "Contact Dream Wave", icon: MessageSquare },
 ];
 
 const WEDDING_MOBILE_NAV: NavItem[] = [
-  { to: "/home", label: "Overview", icon: Sparkles },
+  { to: "/home", label: "Overview", icon: Heart },
+  { to: "/wedding-content", label: "Content", icon: Images },
   { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
   { to: "/home", hash: "wedding-invoices", label: "Payments", icon: FileText },
+  { to: "/home", hash: "wedding-contact", label: "More", icon: Menu },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -185,7 +191,7 @@ function Shell({ children }: { children: ReactNode }) {
   const isWeddingClient = !isStaff && access?.tier === "wedding_client";
 
   useEffect(() => {
-    if (isWeddingClient && pathname !== "/home") {
+    if (isWeddingClient && !WEDDING_ALLOWED_PATHS.includes(pathname)) {
       void navigate({ to: "/home", replace: true });
     }
   }, [isWeddingClient, navigate, pathname]);
@@ -300,7 +306,7 @@ function Shell({ children }: { children: ReactNode }) {
         {isMediaManager && <ManagedClientBanner />}
         <AccountStatusBanner />
         <div className="mx-auto max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
-          {isWeddingClient && pathname !== "/home" ? (
+          {isWeddingClient && !WEDDING_ALLOWED_PATHS.includes(pathname) ? (
             <div className="surface-card p-8 text-center text-sm text-muted-foreground">
               Taking you back to your wedding overview…
             </div>
