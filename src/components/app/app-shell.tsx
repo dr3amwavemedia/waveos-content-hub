@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
 
 import { cn } from "@/lib/utils";
+import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display";
 import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
 import { useCurrentUser } from "@/hooks/use-waveos";
@@ -500,8 +501,13 @@ function UserFooter() {
     navigate({ to: "/auth", replace: true });
   }
 
-  const displayName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "You";
+  const displayName = accountDisplayName({
+    firstName: user?.firstName,
+    lastName: user?.lastName,
+    email: user?.email,
+    fallback: "WaveOS user",
+  });
+  const visibleEmail = visibleAccountEmail(user?.email);
   const staffPosition = user?.isDreamWaveOwner
     ? "Admin"
     : user?.staffType === "media_manager"
@@ -521,7 +527,7 @@ function UserFooter() {
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium text-foreground">{displayName}</div>
           <div className="truncate text-[10px] text-muted-foreground">
-            {staffPosition ? `${staffPosition} · Staff` : user?.email}
+            {staffPosition ? `${staffPosition} · Staff` : visibleEmail ?? "Client account"}
           </div>
         </div>
         <NotificationsBell />

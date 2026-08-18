@@ -38,6 +38,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { syncFrameioWorkspaceShare } from "@/hooks/use-frameio";
 import { ClientBrandingEditor } from "@/components/branding/client-branding-editor";
 import { sendInviteEmail, sendWorkspaceEmail, tryEmail } from "@/lib/transactional-email";
+import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -2627,20 +2628,32 @@ function InvitesTab({
           </p>
           <ul className="space-y-2">
             {membersQ.data!.map((member) => {
-              const name = `${member.first_name ?? ""} ${member.last_name ?? ""}`.trim();
+              const email = visibleAccountEmail(member.email);
+              const roleLabel =
+                member.workspace_role === "owner"
+                  ? "Client owner"
+                  : member.workspace_role === "approver"
+                    ? "Client approver"
+                    : "Client viewer";
+              const name = accountDisplayName({
+                firstName: member.first_name,
+                lastName: member.last_name,
+                email,
+                fallback: roleLabel,
+              });
               return (
                 <li key={member.user_id} className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-sm text-foreground">
-                      {name || member.email || "Client member"}
+                      {name}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {member.email} · {member.workspace_role}
+                      {[email, roleLabel].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  {member.email && (
+                  {email && (
                     <button
-                      onClick={() => sendPasswordReset.mutate(member.email!)}
+                      onClick={() => sendPasswordReset.mutate(email)}
                       disabled={sendPasswordReset.isPending}
                       className="whitespace-nowrap rounded-lg border border-primary/30 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
                     >
@@ -2819,7 +2832,7 @@ function OnboardingModal({
   const [weddingTheme, setWeddingTheme] = useState("olive");
 
   const create = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ sendInvite }: { sendInvite: boolean }) => {
       const { data: auth } = await supabase.auth.getUser();
       const uid = auth.user?.id;
       if (!uid) throw new Error("Not signed in");
@@ -2843,13 +2856,17 @@ function OnboardingModal({
           account_status: "pending",
           agreement_term: term || null,
           access_expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-          invited_at: new Date().toISOString(),
+          invited_at: sendInvite ? new Date().toISOString() : null,
           wedding_display_name: tier === "wedding_client" ? weddingDisplayName.trim() || name.trim() : null,
           wedding_theme: tier === "wedding_client" ? weddingTheme : "olive",
         })
         .select()
         .single();
       if (wsErr) throw wsErr;
+
+      if (!sendInvite) {
+        return { kind: "workspace_only" as const, workspace: ws.name };
+      }
 
       const appRole =
         role === "owner"
@@ -2866,15 +2883,32 @@ function OnboardingModal({
         _expires_days: 14,
       });
       if (invErr) throw invErr;
-      const token = (inviteData as { raw_token: string }[] | null)?.[0]?.raw_token;
-      if (!token) throw new Error("No token returned");
+      const invite = (inviteData as { invite_id: string; raw_token: string }[] | null)?.[0];
+      if (!invite?.raw_token || !invite.invite_id) throw new Error("No token returned");
 
-      const link = `${window.location.origin}/accept-invite?token=${token}`;
-      return { link, email: email.trim(), workspace: ws.name };
+      const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(invite.raw_token)}`;
+      const delivery = await tryEmail(() => sendInviteEmail(invite.invite_id, link));
+      return {
+        kind: "invited" as const,
+        link,
+        email: email.trim(),
+        workspace: ws.name,
+        delivery,
+      };
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["clients", "workspaces"] });
       qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] });
+      if (data.kind === "workspace_only") {
+        toast.success("Workspace created. You can send the client invite later from the Invites tab.");
+        onClose();
+        return;
+      }
+      toast.success(
+        data.delivery.sent
+          ? "Workspace created and client invitation emailed."
+          : "Workspace and invite created. Copy the link to send it manually.",
+      );
       onCreated(data);
     },
     onError: (e: unknown) => {
@@ -2882,20 +2916,21 @@ function OnboardingModal({
     },
   });
 
-  const canSubmit = name.trim().length > 1 && /@/.test(email);
+  const canCreate = name.trim().length > 1;
+  const canInvite = canCreate && /@/.test(email);
 
   return (
     <ModalShell title="Onboard a new client" onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (canSubmit) create.mutate();
+          if (canInvite) create.mutate({ sendInvite: true });
         }}
         className="space-y-4"
       >
         <p className="text-xs text-muted-foreground">
-          Creates a Pending workspace at the chosen tier and generates a private, single-use invite
-          link (14-day expiry). Access activates when the client signs in and accepts.
+          Create the client workspace now, then choose whether to email their private invite today
+          or send it later from the client's Invites tab.
         </p>
 
         <Field label="Client / brand name">
@@ -3007,15 +3042,17 @@ function OnboardingModal({
 
         <div className="my-2 h-px bg-border" />
 
-        <Field label="Client contact email">
+        <Field label="Client contact email (optional)">
           <input
-            required
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="owner@acmecoffee.com"
             className={inputCls}
           />
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            Required only when sending the invitation now.
+          </p>
         </Field>
 
         <Field label="Role in this workspace">
@@ -3047,12 +3084,21 @@ function OnboardingModal({
             Cancel
           </button>
           <button
+            type="button"
+            onClick={() => canCreate && create.mutate({ sendInvite: false })}
+            disabled={!canCreate || create.isPending}
+            className="inline-flex items-center gap-2 rounded-lg border border-primary/35 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/15 disabled:opacity-60"
+          >
+            {create.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            Create without invite
+          </button>
+          <button
             type="submit"
-            disabled={!canSubmit || create.isPending}
+            disabled={!canInvite || create.isPending}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-60"
           >
             {create.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Create workspace & invite
+            Create & send invite
           </button>
         </div>
       </form>
