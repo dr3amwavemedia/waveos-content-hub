@@ -2082,8 +2082,6 @@ export type Database = {
           timezone: string
           updated_at: string
           website: string | null
-          wedding_display_name: string | null
-          wedding_theme: string
         }
         Insert: {
           access_expires_at?: string | null
@@ -2115,8 +2113,6 @@ export type Database = {
           timezone?: string
           updated_at?: string
           website?: string | null
-          wedding_display_name?: string | null
-          wedding_theme?: string
         }
         Update: {
           access_expires_at?: string | null
@@ -2148,8 +2144,6 @@ export type Database = {
           timezone?: string
           updated_at?: string
           website?: string | null
-          wedding_display_name?: string | null
-          wedding_theme?: string
         }
         Relationships: []
       }
@@ -2596,7 +2590,6 @@ export type Database = {
         | "growth_90"
         | "retainer_full"
         | "social_management"
-        | "wedding_client"
       content_status:
         | "draft"
         | "in_review"
@@ -2830,7 +2823,6 @@ export const Constants = {
         "growth_90",
         "retainer_full",
         "social_management",
-        "wedding_client",
       ],
       content_status: [
         "draft",
