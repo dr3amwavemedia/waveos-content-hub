@@ -22,6 +22,14 @@ import {
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
+import { WEDDING_STAGES } from "@/components/app/wedding-theme";
+
+function toLocalInput(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 import { EmptyState } from "@/components/app/empty-state";
 import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { cn } from "@/lib/utils";
@@ -1565,7 +1573,7 @@ function AccessTab({
               </select>
             </Field>
             <Field label="Venue name">
-              <input value={weddingVenue} maxLength={160} value-placeholder="" onChange={(e) => setWeddingVenue(e.target.value)} placeholder="The Ringling Museum" className={inputCls} />
+              <input value={weddingVenue} maxLength={160} onChange={(e) => setWeddingVenue(e.target.value)} placeholder="The Ringling Museum" className={inputCls} />
             </Field>
             <Field label="City">
               <input value={weddingCity} maxLength={120} onChange={(e) => setWeddingCity(e.target.value)} placeholder="Sarasota" className={inputCls} />
