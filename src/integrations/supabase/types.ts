@@ -321,6 +321,62 @@ export type Database = {
           },
         ]
       }
+      client_contracts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          expires_at: string | null
+          hosted_url: string
+          id: string
+          provider: string
+          sent_at: string | null
+          signed_at: string | null
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          expires_at?: string | null
+          hosted_url: string
+          id?: string
+          provider?: string
+          sent_at?: string | null
+          signed_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          expires_at?: string | null
+          hosted_url?: string
+          id?: string
+          provider?: string
+          sent_at?: string | null
+          signed_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_contracts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_deliveries: {
         Row: {
           created_at: string
