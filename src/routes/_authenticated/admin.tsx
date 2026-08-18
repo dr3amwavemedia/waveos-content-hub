@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/app/empty-state";
 import { useActingStaff } from "@/hooks/use-acting-staff";
 import { getIntegrationStatus } from "@/lib/ayrshare.functions";
+import { sendInviteEmail, tryEmail } from "@/lib/transactional-email";
 import type { Database } from "@/integrations/supabase/types";
 
 type AppRole = Database["public"]["Enums"]["app_role"];
@@ -145,14 +146,17 @@ function AdminPage() {
       });
       if (error) throw error;
       const token = data?.[0]?.raw_token as string | undefined;
-      if (!token) throw new Error("The staff invite was created without a link.");
-      return `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`;
+      const inviteId = data?.[0]?.invite_id as string | undefined;
+      if (!token || !inviteId) throw new Error("The staff invite was created without a link.");
+      const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`;
+      const delivery = await tryEmail(() => sendInviteEmail(inviteId, link));
+      return { link, delivery };
     },
-    onSuccess: (link) => {
+    onSuccess: ({ link, delivery }) => {
       setEmail("");
       setInviteLink(link);
       qc.invalidateQueries({ queryKey: ["admin", "staff-invites"] });
-      toast.success("Staff invitation created.");
+      toast.success(delivery.sent ? "Staff invitation emailed." : "Staff invitation created. Copy the link to send it manually.");
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Could not create staff invitation."),
@@ -167,12 +171,14 @@ function AdminPage() {
       if (error) throw error;
       const token = data?.[0]?.raw_token;
       if (!token) throw new Error("Could not create a refreshed invitation link.");
-      return `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`;
+      const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`;
+      const delivery = await tryEmail(() => sendInviteEmail(inviteId, link));
+      return { link, delivery };
     },
-    onSuccess: (link) => {
+    onSuccess: ({ link, delivery }) => {
       setInviteLink(link);
       qc.invalidateQueries({ queryKey: ["admin", "staff-invites"] });
-      toast.success("Staff invitation refreshed.");
+      toast.success(delivery.sent ? "Staff invitation refreshed and emailed." : "Staff invitation refreshed. Copy the link to send it manually.");
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not resend."),
   });

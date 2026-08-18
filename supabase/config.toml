@@ -3,6 +3,9 @@ project_id = "clsuecactijyjecxwuxp"
 [functions.send-revision-update]
 verify_jwt = true
 
+[functions.transactional-email]
+verify_jwt = true
+
 [functions.outlook-oauth]
 verify_jwt = false
 
