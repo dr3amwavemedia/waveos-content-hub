@@ -35,6 +35,18 @@ type AccountStatus = Database["public"]["Enums"]["account_status"];
 type AgreementTerm = Database["public"]["Enums"]["agreement_term"];
 type DeliveryKind = Database["public"]["Enums"]["delivery_kind"];
 type InvoiceStatus = Database["public"]["Enums"]["invoice_status"];
+type ContractStatus = "draft" | "sent" | "viewed" | "signed" | "declined" | "expired" | "void";
+type ContractRow = {
+  id: string;
+  title: string;
+  description: string | null;
+  provider: "bloom" | "other";
+  hosted_url: string;
+  status: ContractStatus;
+  sent_at: string | null;
+  signed_at: string | null;
+  expires_at: string | null;
+};
 type InvoiceListItem = Pick<
   Database["public"]["Tables"]["client_invoices"]["Row"],
   | "id"
@@ -453,7 +465,7 @@ function TierBadge({ tier }: { tier: ClientAccessTier }) {
 
 // ─── Drawer with tabs ─────────────────────────────────────────────────────
 
-type DrawerTab = "info" | "branding" | "access" | "media" | "deliveries" | "invoices" | "invites";
+type DrawerTab = "info" | "branding" | "access" | "media" | "deliveries" | "contracts" | "invoices" | "invites";
 
 function WorkspaceDrawer({
   workspace,
@@ -547,7 +559,7 @@ function WorkspaceDrawer({
       </div>
 
       <div className="mb-4 flex gap-1 border-b border-border">
-        {(["info", "branding", "access", "media", "deliveries", "invoices", "invites"] as const).map((t) => (
+        {(["info", "branding", "access", "media", "deliveries", "contracts", "invoices", "invites"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -576,6 +588,7 @@ function WorkspaceDrawer({
       )}
       {tab === "media" && <WorkspaceMediaSourcesTab workspaceId={workspace.id} />}
       {tab === "deliveries" && <DeliveriesTab workspaceId={workspace.id} />}
+      {tab === "contracts" && <ContractsTab workspaceId={workspace.id} />}
       {tab === "invoices" && <InvoicesTab workspaceId={workspace.id} />}
       {tab === "invites" && <InvitesTab workspace={workspace} onNewInvite={onNewInvite} />}
     </ModalShell>
@@ -1734,6 +1747,103 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
       </div>
     </form>
   );
+}
+
+// ─── External contracts tab ───────────────────────────────────────────────
+
+function ContractsTab({ workspaceId }: { workspaceId: string }) {
+  const qc = useQueryClient();
+  const [showForm, setShowForm] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [hostedUrl, setHostedUrl] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+  const refresh = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ["client-contracts", workspaceId] }),
+      qc.invalidateQueries({ queryKey: ["layer1", "contracts", workspaceId] }),
+    ]);
+  const q = useQuery({
+    queryKey: ["client-contracts", workspaceId],
+    queryFn: async (): Promise<ContractRow[]> => {
+      const { data, error } = await db
+        .from("client_contracts")
+        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at")
+        .eq("workspace_id", workspaceId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  const create = useMutation({
+    mutationFn: async () => {
+      const url = hostedUrl.trim();
+      if (!isValidHttpsUrl(url)) throw new Error(URL_VALIDATION_MESSAGE);
+      const { data: auth } = await supabase.auth.getUser();
+      const { error } = await db.from("client_contracts").insert({
+        workspace_id: workspaceId,
+        title: title.trim(),
+        description: description.trim() || null,
+        provider: url.includes("bloom.io") ? "bloom" : "other",
+        hosted_url: url,
+        status: "sent",
+        sent_at: new Date().toISOString(),
+        expires_at: dateInputToIso(expiresAt),
+        created_by: auth.user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      setTitle(""); setDescription(""); setHostedUrl(""); setExpiresAt(""); setShowForm(false);
+      await refresh();
+      toast.success("Contract link added.");
+    },
+    onError: (error: unknown) => toast.error(error instanceof Error ? error.message : "Could not add contract."),
+  });
+  const updateStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: ContractStatus }) => {
+      const { error } = await db.from("client_contracts").update({
+        status,
+        signed_at: status === "signed" ? new Date().toISOString() : null,
+      }).eq("id", id).eq("workspace_id", workspaceId);
+      if (error) throw error;
+    },
+    onSuccess: refresh,
+  });
+  const remove = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await db.from("client_contracts").delete().eq("id", id).eq("workspace_id", workspaceId);
+      if (error) throw error;
+    },
+    onSuccess: async () => { await refresh(); toast.success("Contract removed."); },
+  });
+  const inputCls = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
+
+  return <div className="space-y-3">
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-xs text-muted-foreground">Connect a Bloom.io or other secure signing link.</p>
+      <button onClick={() => setShowForm((value) => !value)} className="inline-flex min-h-10 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground">
+        {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}{showForm ? "Cancel" : "Add contract"}
+      </button>
+    </div>
+    {showForm && <form onSubmit={(event) => { event.preventDefault(); create.mutate(); }} className="grid gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:grid-cols-2">
+      <Field label="Contract title"><input required minLength={2} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Media services agreement" className={inputCls} /></Field>
+      <Field label="Bloom contract link"><input required type="url" value={hostedUrl} onChange={(event) => setHostedUrl(event.target.value)} placeholder="https://...bloom.io/..." className={inputCls} /></Field>
+      <Field label="Description"><input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Optional client note" className={inputCls} /></Field>
+      <Field label="Expires"><input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className={inputCls} /></Field>
+      <button disabled={create.isPending || title.trim().length < 2 || !isValidHttpsUrl(hostedUrl)} className="min-h-11 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:col-span-2">
+        {create.isPending ? "Adding…" : "Add contract link"}
+      </button>
+    </form>}
+    {q.isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : (q.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No contracts yet.</p> :
+      <ul className="space-y-2">{q.data?.map((contract) => <li key={contract.id} className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/40 p-3 sm:flex-row sm:items-center">
+        <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{contract.title}</p>{contract.description && <p className="mt-1 text-xs text-muted-foreground">{contract.description}</p>}
+          <a href={contract.hosted_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-primary"><ExternalLink className="h-3.5 w-3.5" />Open {contract.provider === "bloom" ? "in Bloom" : "contract"}</a></div>
+        <div className="flex items-center gap-2"><select value={contract.status} onChange={(event) => updateStatus.mutate({ id: contract.id, status: event.target.value as ContractStatus })} className="min-h-10 rounded-lg border border-border bg-background px-2 text-xs capitalize">
+          {(["draft","sent","viewed","signed","declined","expired","void"] as ContractStatus[]).map((status) => <option key={status} value={status}>{status}</option>)}</select>
+          <button onClick={() => confirm("Remove this contract link?") && remove.mutate(contract.id)} className="flex h-10 w-10 items-center justify-center rounded-lg text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></button></div>
+      </li>)}</ul>}
+  </div>;
 }
 
 // ─── Invoices tab ─────────────────────────────────────────────────────────
