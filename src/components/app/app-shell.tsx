@@ -206,7 +206,9 @@ function Shell({ children }: { children: ReactNode }) {
     : isMediaManager
       ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV)
       : isWeddingClient
-        ? WEDDING_NAV
+        ? access?.status === "active"
+          ? WEDDING_NAV
+          : WEDDING_NAV.filter((item) => item.to !== "/wedding-content")
       : isLayer1
         ? LAYER1_NAV
         : filterByFeature(CLIENT_NAV);
@@ -222,7 +224,9 @@ function Shell({ children }: { children: ReactNode }) {
     : isMediaManager
       ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV).slice(0, 5)
       : isWeddingClient
-        ? WEDDING_MOBILE_NAV
+        ? access?.status === "active"
+          ? WEDDING_MOBILE_NAV
+          : WEDDING_MOBILE_NAV.filter((item) => item.to !== "/wedding-content")
       : isLayer1
         ? LAYER1_MOBILE_NAV
         : filterByFeature(MOBILE_NAV);
