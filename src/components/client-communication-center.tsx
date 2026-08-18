@@ -25,6 +25,10 @@ type RequestRow = {
   decision: Decision;
   response_note: string | null;
   due_at: string | null;
+  status: string | null;
+  preferred_at: string | null;
+  reference_url: string | null;
+  attachment_path: string | null;
 };
 type ItemRow = { id: string; title: string; checklist_type: string; status: string };
 type ActivityRow = {
@@ -103,7 +107,9 @@ function Requests({ workspaceId, isStaff }: { workspaceId: string; isStaff: bool
     queryFn: async (): Promise<RequestRow[]> => {
       const { data, error } = await db
         .from("client_requests")
-        .select("id,title,description,request_type,decision,response_note,due_at")
+        .select(
+          "id,title,description,request_type,decision,response_note,due_at,status,preferred_at,reference_url,attachment_path",
+        )
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -156,6 +162,20 @@ function Requests({ workspaceId, isStaff }: { workspaceId: string; isStaff: bool
       void qc.invalidateQueries({ queryKey: ["phase4-requests"] });
       void qc.invalidateQueries({ queryKey: ["phase4-timeline"] });
       toast.success("Response saved.");
+    },
+  });
+  const changeStatus = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const { error } = await db.rpc("update_client_service_request_status", {
+        _request_id: id,
+        _status: status,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["phase4-requests"] });
+      void qc.invalidateQueries({ queryKey: ["client-service-requests"] });
+      toast.success("Request status updated.");
     },
   });
   const addNote = useMutation({
@@ -249,7 +269,13 @@ function Requests({ workspaceId, isStaff }: { workspaceId: string; isStaff: bool
                   {r.due_at ? ` · Due ${new Date(r.due_at).toLocaleString()}` : ""}
                 </p>
               </div>
-              <Badge decision={r.decision} />
+              {r.status ? (
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold capitalize text-primary">
+                  {r.status.replace("_", " ")}
+                </span>
+              ) : (
+                <Badge decision={r.decision} />
+              )}
             </div>
             {r.description && (
               <p className="whitespace-pre-wrap text-sm text-muted-foreground">{r.description}</p>
@@ -259,7 +285,41 @@ function Requests({ workspaceId, isStaff }: { workspaceId: string; isStaff: bool
                 <b>Response:</b> {r.response_note}
               </p>
             )}
-            {r.decision === "pending" && (
+            {r.reference_url && (
+              <a
+                href={r.reference_url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                Open reference link
+              </a>
+            )}
+            {r.preferred_at && (
+              <p className="text-sm text-muted-foreground">
+                Preferred date: {new Date(r.preferred_at).toLocaleDateString()}
+              </p>
+            )}
+            {r.attachment_path && <RequestAttachment path={r.attachment_path} />}
+            {r.status && isStaff && (
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Request status
+                <select
+                  value={r.status}
+                  disabled={changeStatus.isPending}
+                  onChange={(e) => changeStatus.mutate({ id: r.id, status: e.target.value })}
+                  className="mt-2 min-h-12 w-full rounded-lg border border-border bg-background px-3 text-sm font-medium capitalize text-foreground"
+                >
+                  <option value="submitted">Submitted</option>
+                  <option value="reviewing">Reviewing</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="closed">Closed</option>
+                </select>
+              </label>
+            )}
+            {!r.status && r.decision === "pending" && (
               <>
                 <textarea
                   value={responses[r.id] ?? ""}
@@ -313,6 +373,24 @@ function Requests({ workspaceId, isStaff }: { workspaceId: string; isStaff: bool
         ))
       )}
     </div>
+  );
+}
+
+function RequestAttachment({ path }: { path: string }) {
+  async function open() {
+    const { data, error } = await supabase.storage
+      .from("client-request-attachments")
+      .createSignedUrl(path, 60);
+    if (error) return toast.error("Could not open attachment.");
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  }
+  return (
+    <button
+      onClick={open}
+      className="min-h-11 rounded-lg border border-border px-3 text-sm font-medium"
+    >
+      Open attachment
+    </button>
   );
 }
 
