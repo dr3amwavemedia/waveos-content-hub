@@ -1479,7 +1479,7 @@ function AccessTab({
         </Field>
       </div>
 
-      {tier === "wedding_client" && (
+      {tier === "wedding_client" && isOwner && (
         <div className="space-y-4 rounded-2xl border border-primary/25 bg-primary/[0.06] p-4">
           <div>
             <p className="text-sm font-semibold text-foreground">Wedding portal</p>
@@ -1487,7 +1487,7 @@ function AccessTab({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Couple / client display name">
-              <input value={weddingDisplayName} onChange={(e) => setWeddingDisplayName(e.target.value)} placeholder="Jean & Alex" className={inputCls} />
+              <input value={weddingDisplayName} maxLength={120} onChange={(e) => setWeddingDisplayName(e.target.value)} placeholder="Jean & Alex" className={inputCls} />
             </Field>
             <Field label="Wedding theme">
               <select value={weddingTheme} onChange={(e) => setWeddingTheme(e.target.value)} className={inputCls}>
@@ -1496,12 +1496,24 @@ function AccessTab({
               </select>
             </Field>
           </div>
+          <Field label="Creative strategy scheduling link (https)">
+            <input
+              value={weddingSchedulingUrl}
+              onChange={(e) => setWeddingSchedulingUrl(e.target.value)}
+              placeholder="https://calendly.com/dreamwave/strategy"
+              className={inputCls}
+            />
+          </Field>
+          <p className="text-xs text-muted-foreground">
+            Portal status: {status === "active" ? "Active — private wedding experience is open." : "Awaiting activation — the couple sees the private welcome screen only."}
+          </p>
           <button type="button" disabled={toggleWeddingPortal.isPending} onClick={() => toggleWeddingPortal.mutate()} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold disabled:opacity-60", status === "active" ? "bg-success/15 text-success ring-1 ring-success/30" : "bg-primary text-primary-foreground")}>
-            {status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            {status === "active" ? "Deactivate wedding portal" : "Accept deposit & activate portal"}
+            {toggleWeddingPortal.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+            {toggleWeddingPortal.isPending ? "Updating…" : status === "active" ? "Deactivate wedding portal" : "Accept deposit & activate portal"}
           </button>
         </div>
       )}
+
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Agreement term">
