@@ -240,7 +240,7 @@ function QrPromoLinksTab() {
         <EmptyState
           icon={QrCode}
           title="No promo campaigns yet"
-          description="Create your first campaign to generate a shareable promo link and QR code."
+          body="Create your first campaign to generate a shareable promo link and QR code."
         />
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
