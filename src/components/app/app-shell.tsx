@@ -24,6 +24,7 @@ import {
   BriefcaseBusiness,
   Mail,
   Camera,
+  QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
@@ -92,6 +93,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true, ownerOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
+  { to: "/tools", label: "Tools", icon: QrCode, staffOnly: true, ownerOnly: true },
   { to: "/admin", label: "Staff", icon: ShieldCheck, staffOnly: true, ownerOnly: true },
 ];
 

@@ -22,11 +22,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as VisionTokenRouteImport } from './routes/vision/$token'
 import { Route as StoryboardTokenRouteImport } from './routes/storyboard.$token'
 import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
+import { Route as PromoTokenRouteImport } from './routes/promo/$token'
 import { Route as ApiFrameioRouteImport } from './routes/api/frameio'
 import { Route as AuthenticatedWeddingContentRouteImport } from './routes/_authenticated/wedding-content'
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
 import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
 import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
+import { Route as AuthenticatedToolsRouteImport } from './routes/_authenticated/tools'
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -130,6 +132,11 @@ const SocialConnectionsCallbackRoute =
     path: '/social-connections/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const PromoTokenRoute = PromoTokenRouteImport.update({
+  id: '/promo/$token',
+  path: '/promo/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFrameioRoute = ApiFrameioRouteImport.update({
   id: '/api/frameio',
   path: '/api/frameio',
@@ -159,6 +166,11 @@ const AuthenticatedVideographerRoute =
     path: '/videographer',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedToolsRoute = AuthenticatedToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedStaffEmailRoute = AuthenticatedStaffEmailRouteImport.update({
   id: '/staff-email',
   path: '/staff-email',
@@ -385,11 +397,13 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/tools': typeof AuthenticatedToolsRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/wedding-content': typeof AuthenticatedWeddingContentRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
+  '/promo/$token': typeof PromoTokenRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
   '/vision/$token': typeof VisionTokenRoute
@@ -441,11 +455,13 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/tools': typeof AuthenticatedToolsRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/wedding-content': typeof AuthenticatedWeddingContentRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
+  '/promo/$token': typeof PromoTokenRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
   '/vision/$token': typeof VisionTokenRoute
@@ -499,11 +515,13 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/_authenticated/tools': typeof AuthenticatedToolsRoute
   '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
   '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/_authenticated/wedding-content': typeof AuthenticatedWeddingContentRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
+  '/promo/$token': typeof PromoTokenRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
   '/vision/$token': typeof VisionTokenRoute
@@ -557,11 +575,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/social-accounts'
     | '/staff-email'
+    | '/tools'
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
     | '/wedding-content'
     | '/api/frameio'
+    | '/promo/$token'
     | '/social-connections/callback'
     | '/storyboard/$token'
     | '/vision/$token'
@@ -613,11 +633,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/social-accounts'
     | '/staff-email'
+    | '/tools'
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
     | '/wedding-content'
     | '/api/frameio'
+    | '/promo/$token'
     | '/social-connections/callback'
     | '/storyboard/$token'
     | '/vision/$token'
@@ -670,11 +692,13 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/social-accounts'
     | '/_authenticated/staff-email'
+    | '/_authenticated/tools'
     | '/_authenticated/videographer'
     | '/_authenticated/vision-board'
     | '/_authenticated/vision-studio'
     | '/_authenticated/wedding-content'
     | '/api/frameio'
+    | '/promo/$token'
     | '/social-connections/callback'
     | '/storyboard/$token'
     | '/vision/$token'
@@ -711,6 +735,7 @@ export interface RootRouteChildren {
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ApiFrameioRoute: typeof ApiFrameioRouteWithChildren
+  PromoTokenRoute: typeof PromoTokenRoute
   SocialConnectionsCallbackRoute: typeof SocialConnectionsCallbackRoute
   StoryboardTokenRoute: typeof StoryboardTokenRoute
   VisionTokenRoute: typeof VisionTokenRoute
@@ -821,6 +846,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SocialConnectionsCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/promo/$token': {
+      id: '/promo/$token'
+      path: '/promo/$token'
+      fullPath: '/promo/$token'
+      preLoaderRoute: typeof PromoTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/frameio': {
       id: '/api/frameio'
       path: '/api/frameio'
@@ -854,6 +886,13 @@ declare module '@tanstack/react-router' {
       path: '/videographer'
       fullPath: '/videographer'
       preLoaderRoute: typeof AuthenticatedVideographerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tools': {
+      id: '/_authenticated/tools'
+      path: '/tools'
+      fullPath: '/tools'
+      preLoaderRoute: typeof AuthenticatedToolsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/staff-email': {
@@ -1151,6 +1190,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSocialAccountsRoute: typeof AuthenticatedSocialAccountsRoute
   AuthenticatedStaffEmailRoute: typeof AuthenticatedStaffEmailRoute
+  AuthenticatedToolsRoute: typeof AuthenticatedToolsRoute
   AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
   AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRouteWithChildren
   AuthenticatedVisionStudioRoute: typeof AuthenticatedVisionStudioRoute
@@ -1176,6 +1216,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSocialAccountsRoute: AuthenticatedSocialAccountsRoute,
   AuthenticatedStaffEmailRoute: AuthenticatedStaffEmailRoute,
+  AuthenticatedToolsRoute: AuthenticatedToolsRoute,
   AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
   AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRouteWithChildren,
   AuthenticatedVisionStudioRoute: AuthenticatedVisionStudioRoute,
@@ -1231,6 +1272,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ApiFrameioRoute: ApiFrameioRouteWithChildren,
+  PromoTokenRoute: PromoTokenRoute,
   SocialConnectionsCallbackRoute: SocialConnectionsCallbackRoute,
   StoryboardTokenRoute: StoryboardTokenRoute,
   VisionTokenRoute: VisionTokenRoute,
