@@ -56,21 +56,36 @@ ${button ? `<a href="${escapeHtml(button.url)}" style="display:inline-block;back
 <tr><td style="border-top:1px solid #e4edf1;background:#f8fbfc;padding:20px 30px"><p style="margin:0;font-size:12px;line-height:1.6;color:#71828d">This automated WaveOS email was sent by Dream Wave Media. Please do not share secure invitation or workspace links.</p></td></tr>
 </table><p style="margin:18px 0 0;font-size:11px;line-height:1.5;color:#83939c">Dream Wave Media &bull; WaveOS</p></td></tr></table></body></html>`;
 
-async function authenticatedStaff(request: Request) {
+/** Admin notification recipients for internal WaveOS alerts. */
+const ADMIN_NOTIFICATION_EMAILS = (
+  Deno.env.get("WAVEOS_ADMIN_NOTIFICATION_EMAILS") ?? "jessehayes@dwmsrq.com,jean@dwmsrq.com"
+)
+  .split(",")
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
+
+async function authenticatedUser(request: Request) {
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) return null;
   const db = adminClient();
   const { data, error } = await db.auth.getUser(authorization.slice(7));
   if (error || !data.user) return null;
-  const { data: role } = await db
+  return { db, user: data.user };
+}
+
+async function authenticatedStaff(request: Request) {
+  const context = await authenticatedUser(request);
+  if (!context) return null;
+  const { data: role } = await context.db
     .from("user_roles")
     .select("role")
-    .eq("user_id", data.user.id)
+    .eq("user_id", context.user.id)
     .in("role", ["dream_wave_owner", "dream_wave_team"])
     .limit(1)
     .maybeSingle();
-  return role ? { db, user: data.user } : null;
+  return role ? context : null;
 }
+
 
 async function clientEmails(db: ReturnType<typeof adminClient>, workspaceId: string) {
   const { data: members, error } = await db
