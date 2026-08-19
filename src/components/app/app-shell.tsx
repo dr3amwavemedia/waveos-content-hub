@@ -24,6 +24,7 @@ import {
   BriefcaseBusiness,
   Mail,
   Camera,
+  QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
