@@ -2621,7 +2621,7 @@ function InvitesTab({
     },
     onSuccess: ({ token, delivery }, id) => {
       qc.invalidateQueries({ queryKey: ["clients", "invites", workspace.id] });
-      const row = invitesQ.data?.find((i) => i.id === id);
+      const row = invitesQ.data?.find((i) => i.invite_id === id);
       onNewInvite({
         link: `${window.location.origin}/accept-invite?token=${encodeURIComponent(token)}`,
         email: row?.email ?? "",
