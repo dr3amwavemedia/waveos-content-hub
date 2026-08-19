@@ -117,9 +117,15 @@ function AcceptInvitePage() {
     }
     sessionStorage.removeItem(INVITE_TOKEN_STORAGE_KEY);
     sessionStorage.removeItem(PENDING_INVITE_TOKEN_KEY);
+    if (invite?.workspace_id) {
+      void tryEmail(() =>
+        sendMemberJoinedEmail(invite.workspace_id!, `${firstName} ${lastName}`.trim()),
+      );
+    }
     toast.success("You're in. Welcome to WaveOS.");
     setStatus("done");
     setTimeout(() => navigate({ to: invite?.workspace_id ? "/home" : "/crm", replace: true }), 400);
+
   }
 
   useEffect(() => {
