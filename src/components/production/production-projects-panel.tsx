@@ -1,10 +1,22 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, CalendarDays, Loader2, Mail, MapPin, Navigation, Phone, Plus, RefreshCw, Users2 } from "lucide-react";
+import {
+  Building2,
+  CalendarDays,
+  Loader2,
+  Mail,
+  MapPin,
+  Navigation,
+  Phone,
+  Plus,
+  RefreshCw,
+  Users2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-waveos";
+import { errorMessage } from "@/lib/error-message";
 
 type ClientContact = {
   first_name: string;
@@ -61,7 +73,10 @@ type ProductionProject = {
 };
 
 const db = supabase as unknown as {
+  // Generated database types land after the production migration is applied.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (table: string) => any;
+  rpc: (name: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }>;
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -74,7 +89,8 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function snapshotFor(account: ClientAccount): ClientSnapshot {
-  const primary = account.crm_contacts.find((contact) => contact.is_primary) ?? account.crm_contacts[0];
+  const primary =
+    account.crm_contacts.find((contact) => contact.is_primary) ?? account.crm_contacts[0];
   const address = [
     account.address_line1,
     account.address_line2,
@@ -146,16 +162,13 @@ export function ProductionProjectsPanel() {
       const client = clientsQ.data?.find((entry) => entry.id === clientId);
       if (!client) throw new Error("Choose a client.");
       if (!title.trim()) throw new Error("Enter a production title.");
-      const { error } = await db.from("production_projects").insert({
-        title: title.trim(),
-        crm_account_id: client.id,
-        workspace_id: client.linked_workspace_id,
-        assigned_to: user?.userId ?? null,
-        scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
-        location: location.trim() || null,
-        client_snapshot: snapshotFor(client),
-        client_synced_at: new Date().toISOString(),
-        created_by: user?.actualUserId ?? user?.userId,
+      const { error } = await db.rpc("assign_production_project", {
+        _title: title.trim(),
+        _crm_account_id: client.id,
+        _assigned_to: user?.userId ?? null,
+        _scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        _location: location.trim() || null,
+        _client_snapshot: snapshotFor(client),
       });
       if (error) throw error;
     },
@@ -168,8 +181,7 @@ export function ProductionProjectsPanel() {
       qc.invalidateQueries({ queryKey: ["production", "projects"] });
       toast.success("Production assigned with synced client information.");
     },
-    onError: (error: unknown) =>
-      toast.error(error instanceof Error ? error.message : "Could not assign production."),
+    onError: (error: unknown) => toast.error(errorMessage(error, "Could not assign production.")),
   });
 
   const syncClient = useMutation({
@@ -257,7 +269,8 @@ export function ProductionProjectsPanel() {
               <option value="">Select WaveCRM client</option>
               {(clientsQ.data ?? []).map((client) => (
                 <option key={client.id} value={client.id}>
-                  {client.business_name}{client.linked_workspace_id ? "" : " · CRM only"}
+                  {client.business_name}
+                  {client.linked_workspace_id ? "" : " · CRM only"}
                 </option>
               ))}
             </select>
@@ -312,7 +325,9 @@ export function ProductionProjectsPanel() {
         ) : (projectsQ.data ?? []).length === 0 ? (
           <div className="py-10 text-center">
             <Building2 className="mx-auto h-8 w-8 text-muted-foreground" />
-            <p className="mt-3 text-sm font-semibold text-foreground">No productions assigned yet</p>
+            <p className="mt-3 text-sm font-semibold text-foreground">
+              No productions assigned yet
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Assign a production and its client details will travel with the project.
             </p>
@@ -322,10 +337,15 @@ export function ProductionProjectsPanel() {
             {projectsQ.data!.map((project) => {
               const client = project.client_snapshot ?? ({} as ClientSnapshot);
               return (
-                <article key={project.id} className="rounded-2xl border border-border bg-elevated/35 p-4">
+                <article
+                  key={project.id}
+                  className="rounded-2xl border border-border bg-elevated/35 p-4"
+                >
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-foreground">{project.title}</div>
+                      <div className="truncate text-sm font-semibold text-foreground">
+                        {project.title}
+                      </div>
                       <div className="mt-1 flex items-center gap-1 text-xs text-primary">
                         <Building2 className="h-3.5 w-3.5" />
                         {client.businessName || "Linked client"}
@@ -339,7 +359,9 @@ export function ProductionProjectsPanel() {
                       className="min-h-12 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground sm:min-h-10 sm:w-auto sm:text-xs"
                     >
                       {Object.entries(STATUS_LABEL).map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -359,21 +381,31 @@ export function ProductionProjectsPanel() {
                         className="flex min-h-11 items-center gap-2 rounded-xl bg-background/50 px-3 py-2 text-foreground"
                       >
                         <MapPin className="h-3.5 w-3.5 text-primary" />
-                        <span className="min-w-0 flex-1 truncate">{project.location || client.address}</span>
+                        <span className="min-w-0 flex-1 truncate">
+                          {project.location || client.address}
+                        </span>
                         <Navigation className="h-3.5 w-3.5 shrink-0 text-primary" />
                       </a>
                     )}
                     {client.primaryContact && (
                       <div className="space-y-2 rounded-xl bg-background/50 p-3 sm:col-span-2">
-                        <div className="font-medium text-foreground">{client.primaryContact.name}</div>
+                        <div className="font-medium text-foreground">
+                          {client.primaryContact.name}
+                        </div>
                         <div className="grid gap-2 sm:flex">
                           {client.primaryContact.phone && (
-                            <a href={`tel:${client.primaryContact.phone}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 font-semibold text-foreground">
+                            <a
+                              href={`tel:${client.primaryContact.phone}`}
+                              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 font-semibold text-foreground"
+                            >
                               <Phone className="h-4 w-4 text-primary" /> Call
                             </a>
                           )}
                           {client.primaryContact.email && (
-                            <a href={`mailto:${client.primaryContact.email}`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 font-semibold text-foreground">
+                            <a
+                              href={`mailto:${client.primaryContact.email}`}
+                              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 font-semibold text-foreground"
+                            >
                               <Mail className="h-4 w-4 text-primary" /> Email
                             </a>
                           )}
