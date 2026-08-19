@@ -1677,6 +1677,54 @@ export type Database = {
         }
         Relationships: []
       }
+      promo_campaigns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          destination_click_count: number
+          destination_label: string
+          destination_url: string
+          google_review_url: string
+          id: string
+          is_active: boolean
+          name: string
+          public_token: string
+          review_click_count: number
+          scan_count: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          destination_click_count?: number
+          destination_label?: string
+          destination_url: string
+          google_review_url: string
+          id?: string
+          is_active?: boolean
+          name: string
+          public_token?: string
+          review_click_count?: number
+          scan_count?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          destination_click_count?: number
+          destination_label?: string
+          destination_url?: string
+          google_review_url?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          public_token?: string
+          review_click_count?: number
+          scan_count?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       publish_attempts: {
         Row: {
           attempted_at: string
@@ -2562,6 +2610,15 @@ export type Database = {
           workspace_role: Database["public"]["Enums"]["workspace_member_role"]
         }[]
       }
+      get_public_promo_campaign: {
+        Args: { _token: string }
+        Returns: {
+          destination_label: string
+          destination_url: string
+          google_review_url: string
+          name: string
+        }[]
+      }
       get_public_vision_board: {
         Args: { _public_token: string }
         Returns: {
@@ -2709,6 +2766,10 @@ export type Database = {
       }
       phase4_set_checklist_status: {
         Args: { _item_id: string; _status: string }
+        Returns: undefined
+      }
+      record_promo_event: {
+        Args: { _event: string; _token: string }
         Returns: undefined
       }
       record_vision_deck_event: {
