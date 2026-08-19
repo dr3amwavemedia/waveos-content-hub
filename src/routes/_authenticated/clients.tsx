@@ -2669,8 +2669,11 @@ function InvitesTab({
                 fallback: roleLabel,
               });
               return (
-                <li key={member.user_id} className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
+                <li
+                  key={member.user_id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 p-2"
+                >
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm text-foreground">
                       {name}
                     </p>
@@ -2678,15 +2681,30 @@ function InvitesTab({
                       {[email, roleLabel].filter(Boolean).join(" · ")}
                     </p>
                   </div>
-                  {email && (
-                    <button
-                      onClick={() => sendPasswordReset.mutate(email)}
-                      disabled={sendPasswordReset.isPending}
-                      className="whitespace-nowrap rounded-lg border border-primary/30 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={member.workspace_role}
+                      disabled={changeRole.isPending}
+                      onChange={(e) =>
+                        changeRole.mutate({ userId: member.user_id, role: e.target.value })
+                      }
+                      className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+                      title="Change workspace role"
                     >
-                      Send password reset
-                    </button>
-                  )}
+                      <option value="owner">Owner</option>
+                      <option value="approver">Approver</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                    {email && (
+                      <button
+                        onClick={() => sendPasswordReset.mutate(email)}
+                        disabled={sendPasswordReset.isPending}
+                        className="whitespace-nowrap rounded-lg border border-primary/30 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
+                      >
+                        Send password reset
+                      </button>
+                    )}
+                  </div>
                 </li>
               );
             })}
@@ -2699,44 +2717,70 @@ function InvitesTab({
         <p className="text-sm text-muted-foreground">No invitations yet.</p>
       ) : (
         <ul className="space-y-2">
-          {invitesQ.data!.map((inv) => (
-            <li
-              key={inv.id}
-              className="flex items-center justify-between rounded-lg border border-border/60 bg-surface/40 p-3"
-            >
-              <div className="min-w-0">
-                <div className="truncate text-sm text-foreground">{inv.email}</div>
-                <div className="text-xs text-muted-foreground">
-                  {inv.workspace_role} · {inv.status}
-                  {inv.status === "pending" &&
-                    inv.expires_at &&
-                    ` · expires ${new Date(inv.expires_at).toLocaleDateString()}`}
+          {invitesQ.data!.map((inv) => {
+            const stateLabel =
+              inv.status === "revoked"
+                ? "Revoked"
+                : inv.status === "expired"
+                  ? "Expired"
+                  : inv.account_state === "active"
+                    ? "Active"
+                    : inv.account_state === "pending_signup"
+                      ? "Pending signup"
+                      : "Invited";
+            const stateCls =
+              stateLabel === "Active"
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : stateLabel === "Pending signup"
+                  ? "border-warning/40 bg-warning/10 text-warning"
+                  : stateLabel === "Invited"
+                    ? "border-border bg-elevated text-muted-foreground"
+                    : "border-destructive/40 bg-destructive/10 text-destructive";
+            return (
+              <li
+                key={inv.invite_id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-surface/40 p-3"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm text-foreground">{inv.email}</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${stateCls}`}
+                    >
+                      {stateLabel}
+                    </span>
+                    <span>{inv.workspace_role}</span>
+                    {inv.status === "pending" && inv.expires_at && (
+                      <span>expires {new Date(inv.expires_at).toLocaleDateString()}</span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-1.5">
-                {inv.status === "pending" && (
-                  <button
-                    onClick={() => inv.id && revoke.mutate(inv.id)}
-                    className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
-                    title="Revoke"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-                {(inv.status === "pending" ||
-                  inv.status === "expired" ||
-                  inv.status === "revoked") && (
-                  <button
-                    onClick={() => inv.id && resend.mutate(inv.id)}
-                    className="rounded-md p-1.5 text-primary hover:bg-primary/15"
-                    title="Regenerate & resend"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
+                <div className="flex gap-1.5">
+                  {inv.status === "pending" && (
+                    <button
+                      onClick={() => revoke.mutate(inv.invite_id)}
+                      className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
+                      title="Revoke"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                  {(inv.status === "pending" ||
+                    inv.status === "expired" ||
+                    inv.status === "revoked") && (
+                    <button
+                      onClick={() => resend.mutate(inv.invite_id)}
+                      className="rounded-md p-1.5 text-primary hover:bg-primary/15"
+                      title="Regenerate & resend"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+
         </ul>
       )}
     </div>
