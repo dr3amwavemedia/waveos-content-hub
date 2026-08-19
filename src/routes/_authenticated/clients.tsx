@@ -2558,15 +2558,42 @@ function InvitesTab({
   const invitesQ = useQuery({
     queryKey: ["clients", "invites", workspace.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("invites_admin")
-        .select("id,email,workspace_role,app_role,status,expires_at,created_at,resend_count")
-        .eq("workspace_id", workspace.id)
-        .order("created_at", { ascending: false });
+      const { data, error } = await db.rpc("get_client_invite_overview", {
+        _workspace_id: workspace.id,
+      });
       if (error) throw error;
-      return data ?? [];
+      return (data ?? []) as Array<{
+        invite_id: string;
+        email: string;
+        workspace_role: string;
+        status: string;
+        expires_at: string | null;
+        created_at: string;
+        resend_count: number;
+        account_state: "invited" | "pending_signup" | "active";
+      }>;
     },
   });
+
+  const changeRole = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
+      const { error } = await db.rpc("admin_set_workspace_member_role", {
+        _workspace_id: workspace.id,
+        _user_id: userId,
+        _role: role,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["clients", "members", workspace.id] });
+      qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] });
+      qc.invalidateQueries({ queryKey: ["workspace-access", workspace.id] });
+      toast.success("Role updated. Permissions apply immediately.");
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not change role."),
+  });
+
 
   const revoke = useMutation({
     mutationFn: async (id: string) => {
