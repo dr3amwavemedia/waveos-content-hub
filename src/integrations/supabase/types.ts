@@ -827,7 +827,7 @@ export type Database = {
           {
             foreignKeyName: "crm_accounts_linked_workspace_id_fkey"
             columns: ["linked_workspace_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -1544,6 +1544,69 @@ export type Database = {
           },
           {
             foreignKeyName: "post_variants_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      production_projects: {
+        Row: {
+          assigned_to: string | null
+          client_snapshot: Json
+          client_synced_at: string
+          created_at: string
+          created_by: string
+          crm_account_id: string
+          id: string
+          location: string | null
+          scheduled_at: string | null
+          status: string
+          title: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          client_snapshot?: Json
+          client_synced_at?: string
+          created_at?: string
+          created_by?: string
+          crm_account_id: string
+          id?: string
+          location?: string | null
+          scheduled_at?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          client_snapshot?: Json
+          client_synced_at?: string
+          created_at?: string
+          created_by?: string
+          crm_account_id?: string
+          id?: string
+          location?: string | null
+          scheduled_at?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_projects_crm_account_id_fkey"
+            columns: ["crm_account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "production_projects_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -2327,6 +2390,17 @@ export type Database = {
         Args: { _name: string; _workspace_id: string }
         Returns: undefined
       }
+      assign_production_project: {
+        Args: {
+          _assigned_to?: string
+          _client_snapshot?: Json
+          _crm_account_id: string
+          _location?: string
+          _scheduled_at?: string
+          _title: string
+        }
+        Returns: string
+      }
       can_staff_manage_workspace: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
@@ -2414,6 +2488,10 @@ export type Database = {
         }[]
       }
       crm_import_bloom_leads: { Args: { _leads: Json }; Returns: Json }
+      crm_link_lead_to_workspace: {
+        Args: { _account_id: string; _workspace_id: string }
+        Returns: string
+      }
       crm_log_communication: {
         Args: {
           _account_id: string

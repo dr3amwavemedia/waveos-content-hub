@@ -35,7 +35,27 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
         if (!auth) return json({ error: "not_authorized" }, 403);
         const connection = await getExternalConnection(workspaceId, provider);
         if (!connection) return json({ error: "not_connected" }, 409);
-        const accessToken = await externalAccessToken(connection);
+        let accessToken: string;
+        try {
+          accessToken = await externalAccessToken(connection);
+        } catch (tokenError) {
+          const message = tokenError instanceof Error ? tokenError.message : "";
+          if (message.endsWith("reconnect_required")) {
+            console.warn(`External media reconnect required for workspace ${workspaceId}`);
+            return json(
+              {
+                error:
+                  provider === "google_drive"
+                    ? "Google Drive access expired. Reconnect Google Drive in Settings to continue."
+                    : "Dropbox access expired. Reconnect Dropbox in Settings to continue.",
+                code: "reconnect_required",
+                provider,
+              },
+              409,
+            );
+          }
+          throw tokenError;
+        }
 
         if (body.action === "picker_token" && provider === "google_drive") {
           const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID ?? "";
