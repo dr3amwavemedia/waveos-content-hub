@@ -22,6 +22,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as VisionTokenRouteImport } from './routes/vision/$token'
 import { Route as StoryboardTokenRouteImport } from './routes/storyboard.$token'
 import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
+import { Route as PromoTokenRouteImport } from './routes/promo/$token'
 import { Route as ApiFrameioRouteImport } from './routes/api/frameio'
 import { Route as AuthenticatedWeddingContentRouteImport } from './routes/_authenticated/wedding-content'
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
@@ -131,6 +132,11 @@ const SocialConnectionsCallbackRoute =
     path: '/social-connections/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const PromoTokenRoute = PromoTokenRouteImport.update({
+  id: '/promo/$token',
+  path: '/promo/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFrameioRoute = ApiFrameioRouteImport.update({
   id: '/api/frameio',
   path: '/api/frameio',
@@ -397,6 +403,7 @@ export interface FileRoutesByFullPath {
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/wedding-content': typeof AuthenticatedWeddingContentRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
+  '/promo/$token': typeof PromoTokenRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
   '/vision/$token': typeof VisionTokenRoute
@@ -454,6 +461,7 @@ export interface FileRoutesByTo {
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/wedding-content': typeof AuthenticatedWeddingContentRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
+  '/promo/$token': typeof PromoTokenRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
   '/vision/$token': typeof VisionTokenRoute
@@ -513,6 +521,7 @@ export interface FileRoutesById {
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
   '/_authenticated/wedding-content': typeof AuthenticatedWeddingContentRoute
   '/api/frameio': typeof ApiFrameioRouteWithChildren
+  '/promo/$token': typeof PromoTokenRoute
   '/social-connections/callback': typeof SocialConnectionsCallbackRoute
   '/storyboard/$token': typeof StoryboardTokenRoute
   '/vision/$token': typeof VisionTokenRoute
@@ -572,6 +581,7 @@ export interface FileRouteTypes {
     | '/vision-studio'
     | '/wedding-content'
     | '/api/frameio'
+    | '/promo/$token'
     | '/social-connections/callback'
     | '/storyboard/$token'
     | '/vision/$token'
@@ -629,6 +639,7 @@ export interface FileRouteTypes {
     | '/vision-studio'
     | '/wedding-content'
     | '/api/frameio'
+    | '/promo/$token'
     | '/social-connections/callback'
     | '/storyboard/$token'
     | '/vision/$token'
@@ -687,6 +698,7 @@ export interface FileRouteTypes {
     | '/_authenticated/vision-studio'
     | '/_authenticated/wedding-content'
     | '/api/frameio'
+    | '/promo/$token'
     | '/social-connections/callback'
     | '/storyboard/$token'
     | '/vision/$token'
@@ -723,6 +735,7 @@ export interface RootRouteChildren {
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   ApiFrameioRoute: typeof ApiFrameioRouteWithChildren
+  PromoTokenRoute: typeof PromoTokenRoute
   SocialConnectionsCallbackRoute: typeof SocialConnectionsCallbackRoute
   StoryboardTokenRoute: typeof StoryboardTokenRoute
   VisionTokenRoute: typeof VisionTokenRoute
@@ -831,6 +844,13 @@ declare module '@tanstack/react-router' {
       path: '/social-connections/callback'
       fullPath: '/social-connections/callback'
       preLoaderRoute: typeof SocialConnectionsCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/promo/$token': {
+      id: '/promo/$token'
+      path: '/promo/$token'
+      fullPath: '/promo/$token'
+      preLoaderRoute: typeof PromoTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/frameio': {
@@ -1252,6 +1272,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   ApiFrameioRoute: ApiFrameioRouteWithChildren,
+  PromoTokenRoute: PromoTokenRoute,
   SocialConnectionsCallbackRoute: SocialConnectionsCallbackRoute,
   StoryboardTokenRoute: StoryboardTokenRoute,
   VisionTokenRoute: VisionTokenRoute,
