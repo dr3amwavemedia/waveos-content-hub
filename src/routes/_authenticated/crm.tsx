@@ -29,6 +29,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { downloadCsv, safeCsvFilename, type CrmCsvRow } from "@/lib/crm-csv";
 import { parseBloomLeadsCsv } from "@/lib/bloom-csv";
+import { errorMessage } from "@/lib/error-message";
 
 export const Route = createFileRoute("/_authenticated/crm")({
   beforeLoad: async () => {
@@ -1236,14 +1237,10 @@ function OverviewTab({
   const linkMutation = useMutation({
     mutationFn: async () => {
       if (!workspaceId) throw new Error("Choose a client workspace.");
-      const { error } = await db
-        .from("crm_accounts")
-        .update({
-          linked_workspace_id: workspaceId,
-          stage: "won",
-          converted_at: new Date().toISOString(),
-        })
-        .eq("id", account.id);
+      const { error } = await db.rpc("crm_link_lead_to_workspace", {
+        _account_id: account.id,
+        _workspace_id: workspaceId,
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -1251,8 +1248,7 @@ function OverviewTab({
       toast.success("Lead linked to the client workspace and marked Won.");
       onRefresh();
     },
-    onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "Could not link workspace."),
+    onError: (e: unknown) => toast.error(errorMessage(e, "Could not link workspace.")),
   });
   const convertMutation = useMutation({
     mutationFn: async () => {
