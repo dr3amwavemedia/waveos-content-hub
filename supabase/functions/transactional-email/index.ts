@@ -56,21 +56,36 @@ ${button ? `<a href="${escapeHtml(button.url)}" style="display:inline-block;back
 <tr><td style="border-top:1px solid #e4edf1;background:#f8fbfc;padding:20px 30px"><p style="margin:0;font-size:12px;line-height:1.6;color:#71828d">This automated WaveOS email was sent by Dream Wave Media. Please do not share secure invitation or workspace links.</p></td></tr>
 </table><p style="margin:18px 0 0;font-size:11px;line-height:1.5;color:#83939c">Dream Wave Media &bull; WaveOS</p></td></tr></table></body></html>`;
 
-async function authenticatedStaff(request: Request) {
+/** Admin notification recipients for internal WaveOS alerts. */
+const ADMIN_NOTIFICATION_EMAILS = (
+  Deno.env.get("WAVEOS_ADMIN_NOTIFICATION_EMAILS") ?? "jessehayes@dwmsrq.com,jean@dwmsrq.com"
+)
+  .split(",")
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
+
+async function authenticatedUser(request: Request) {
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) return null;
   const db = adminClient();
   const { data, error } = await db.auth.getUser(authorization.slice(7));
   if (error || !data.user) return null;
-  const { data: role } = await db
+  return { db, user: data.user };
+}
+
+async function authenticatedStaff(request: Request) {
+  const context = await authenticatedUser(request);
+  if (!context) return null;
+  const { data: role } = await context.db
     .from("user_roles")
     .select("role")
-    .eq("user_id", data.user.id)
+    .eq("user_id", context.user.id)
     .in("role", ["dream_wave_owner", "dream_wave_team"])
     .limit(1)
     .maybeSingle();
-  return role ? { db, user: data.user } : null;
+  return role ? context : null;
 }
+
 
 async function clientEmails(db: ReturnType<typeof adminClient>, workspaceId: string) {
   const { data: members, error } = await db
@@ -110,15 +125,22 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   try {
-    const auth = await authenticatedStaff(request);
-    if (!auth) return json({ error: "staff_required" }, 403);
     const body = await request.json().catch(() => ({}));
+    // A newly joined member is not staff yet, so this event authenticates as
+    // any signed-in user and only ever mails the fixed admin recipients.
+    const auth =
+      body.type === "member_joined"
+        ? await authenticatedUser(request)
+        : await authenticatedStaff(request);
+    if (!auth) return json({ error: "staff_required" }, 403);
     let workspaceId: string | null = null;
     let inviteId: string | null = null;
     let eventType = "";
     let recipients: string[] = [];
     let subject = "";
     let html = "";
+
+
 
     if (body.type === "invite") {
       inviteId = cleanText(body.inviteId, "", 80);
@@ -162,8 +184,45 @@ Deno.serve(async (request) => {
           : `You have been invited to access ${workspaceName}. Use the secure button below to accept your invitation.`,
         { label: "Accept invitation", url: inviteUrl },
       );
+    } else if (body.type === "member_joined") {
+      workspaceId = cleanText(body.workspaceId, "", 80) || null;
+      eventType = "member_joined";
+      const { data: membership } = await auth.db
+        .from("workspace_members")
+        .select("workspace_id,role")
+        .eq("workspace_id", workspaceId)
+        .eq("user_id", auth.user.id)
+        .maybeSingle();
+      if (!membership) return json({ error: "membership_not_found" }, 403);
+      const { data: workspace } = await auth.db
+        .from("workspaces")
+        .select("name")
+        .eq("id", workspaceId)
+        .maybeSingle();
+      const { data: profile } = await auth.db
+        .from("profiles")
+        .select("first_name,last_name")
+        .eq("id", auth.user.id)
+        .maybeSingle();
+      const memberName =
+        [profile?.first_name, profile?.last_name].filter(Boolean).join(" ").trim() ||
+        cleanText(body.name, "", 120) ||
+        "New member";
+      const memberEmail = (auth.user.email ?? "").toLowerCase();
+      const business = workspace?.name ?? "WaveOS workspace";
+      const role = cleanText(membership.role, "viewer", 40);
+      recipients = ADMIN_NOTIFICATION_EMAILS;
+      subject = `Signup completed: ${memberName} joined ${business}`;
+      html = layout(
+        "A new client user completed signup",
+        `${memberName} (${memberEmail}) successfully completed signup and joined ${business} as ${role}.`,
+        safeHttpsUrl(Deno.env.get("WAVEOS_APP_URL"))
+          ? { label: "Open WaveOS", url: safeHttpsUrl(Deno.env.get("WAVEOS_APP_URL"))! }
+          : undefined,
+      );
     } else if (body.type === "workspace_event") {
       workspaceId = cleanText(body.workspaceId, "", 80);
+
       eventType = cleanText(body.event, "", 60) as EmailEvent;
       const supported: EmailEvent[] = [
         "request_updated",
