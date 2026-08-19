@@ -27,6 +27,7 @@ import { Route as AuthenticatedWeddingContentRouteImport } from './routes/_authe
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
 import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
 import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
+import { Route as AuthenticatedToolsRouteImport } from './routes/_authenticated/tools'
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -159,6 +160,11 @@ const AuthenticatedVideographerRoute =
     path: '/videographer',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedToolsRoute = AuthenticatedToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedStaffEmailRoute = AuthenticatedStaffEmailRouteImport.update({
   id: '/staff-email',
   path: '/staff-email',
@@ -385,6 +391,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/tools': typeof AuthenticatedToolsRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -441,6 +448,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/tools': typeof AuthenticatedToolsRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -499,6 +507,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/_authenticated/tools': typeof AuthenticatedToolsRoute
   '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
   '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -557,6 +566,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/social-accounts'
     | '/staff-email'
+    | '/tools'
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
@@ -613,6 +623,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/social-accounts'
     | '/staff-email'
+    | '/tools'
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
@@ -670,6 +681,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/social-accounts'
     | '/_authenticated/staff-email'
+    | '/_authenticated/tools'
     | '/_authenticated/videographer'
     | '/_authenticated/vision-board'
     | '/_authenticated/vision-studio'
@@ -854,6 +866,13 @@ declare module '@tanstack/react-router' {
       path: '/videographer'
       fullPath: '/videographer'
       preLoaderRoute: typeof AuthenticatedVideographerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tools': {
+      id: '/_authenticated/tools'
+      path: '/tools'
+      fullPath: '/tools'
+      preLoaderRoute: typeof AuthenticatedToolsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/staff-email': {
@@ -1151,6 +1170,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSocialAccountsRoute: typeof AuthenticatedSocialAccountsRoute
   AuthenticatedStaffEmailRoute: typeof AuthenticatedStaffEmailRoute
+  AuthenticatedToolsRoute: typeof AuthenticatedToolsRoute
   AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
   AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRouteWithChildren
   AuthenticatedVisionStudioRoute: typeof AuthenticatedVisionStudioRoute
@@ -1176,6 +1196,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSocialAccountsRoute: AuthenticatedSocialAccountsRoute,
   AuthenticatedStaffEmailRoute: AuthenticatedStaffEmailRoute,
+  AuthenticatedToolsRoute: AuthenticatedToolsRoute,
   AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
   AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRouteWithChildren,
   AuthenticatedVisionStudioRoute: AuthenticatedVisionStudioRoute,
