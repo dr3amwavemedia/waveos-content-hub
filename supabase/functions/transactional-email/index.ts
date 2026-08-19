@@ -125,15 +125,22 @@ Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405);
   try {
-    const auth = await authenticatedStaff(request);
-    if (!auth) return json({ error: "staff_required" }, 403);
     const body = await request.json().catch(() => ({}));
+    // A newly joined member is not staff yet, so this event authenticates as
+    // any signed-in user and only ever mails the fixed admin recipients.
+    const auth =
+      body.type === "member_joined"
+        ? await authenticatedUser(request)
+        : await authenticatedStaff(request);
+    if (!auth) return json({ error: "staff_required" }, 403);
     let workspaceId: string | null = null;
     let inviteId: string | null = null;
     let eventType = "";
     let recipients: string[] = [];
     let subject = "";
     let html = "";
+
+
 
     if (body.type === "invite") {
       inviteId = cleanText(body.inviteId, "", 80);
