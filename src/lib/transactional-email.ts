@@ -11,6 +11,11 @@ async function invoke(body: Record<string, unknown>): Promise<Result> {
 export const sendInviteEmail = (inviteId: string, url: string) =>
   invoke({ type: "invite", inviteId, url });
 
+/** Notifies the Dream Wave admins that an invited user completed signup. */
+export const sendMemberJoinedEmail = (workspaceId: string, name?: string) =>
+  invoke({ type: "member_joined", workspaceId, name });
+
+
 export const sendWorkspaceEmail = (payload: {
   workspaceId: string;
   event: "request_updated" | "invoice_updated" | "revisions_updated" | "content_added" | "contract_ready";
