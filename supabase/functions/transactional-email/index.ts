@@ -220,8 +220,9 @@ Deno.serve(async (request) => {
           ? { label: "Open WaveOS", url: safeHttpsUrl(Deno.env.get("WAVEOS_APP_URL"))! }
           : undefined,
       );
-
+    } else if (body.type === "workspace_event") {
       workspaceId = cleanText(body.workspaceId, "", 80);
+
       eventType = cleanText(body.event, "", 60) as EmailEvent;
       const supported: EmailEvent[] = [
         "request_updated",
