@@ -163,3 +163,6 @@ REVOKE ALL ON FUNCTION public.assign_production_project(text, uuid, uuid, timest
   FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.assign_production_project(text, uuid, uuid, timestamptz, text, jsonb)
   TO authenticated;
+
+-- Ensure PostgREST sees both RPCs immediately after the migration is applied.
+NOTIFY pgrst, 'reload schema';
