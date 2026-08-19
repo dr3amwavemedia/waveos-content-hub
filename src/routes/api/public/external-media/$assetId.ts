@@ -38,7 +38,20 @@ async function relayExternalMedia(request: Request, assetId: string, headOnly: b
 
   const connection = await getExternalConnection(asset.workspace_id, "google_drive");
   if (!connection) return new Response("connection_required", { status: 409 });
-  const accessToken = await externalAccessToken(connection);
+  let accessToken: string;
+  try {
+    accessToken = await externalAccessToken(connection);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message.endsWith("reconnect_required")) {
+      console.warn(`External media relay needs reconnect for workspace ${asset.workspace_id}`);
+      return new Response("reconnect_required", {
+        status: 409,
+        headers: { "X-External-Media-Status": "reconnect_required" },
+      });
+    }
+    throw error;
+  }
   if (thumbnailOnly) {
     let thumbnailLink = asset.thumbnail_url;
     if (!thumbnailLink) {
