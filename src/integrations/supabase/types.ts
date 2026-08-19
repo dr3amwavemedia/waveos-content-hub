@@ -2372,6 +2372,14 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { _token: string }; Returns: string }
+      admin_set_workspace_member_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["workspace_member_role"]
+          _user_id: string
+          _workspace_id: string
+        }
+        Returns: undefined
+      }
       admin_update_crm_identity: {
         Args: {
           _account_id: string
@@ -2519,6 +2527,19 @@ export type Database = {
       delete_empty_client_workspace: {
         Args: { _confirmation: string; _workspace_id: string }
         Returns: string
+      }
+      get_client_invite_overview: {
+        Args: { _workspace_id: string }
+        Returns: {
+          account_state: string
+          created_at: string
+          email: string
+          expires_at: string
+          invite_id: string
+          resend_count: number
+          status: Database["public"]["Enums"]["invite_status"]
+          workspace_role: Database["public"]["Enums"]["workspace_member_role"]
+        }[]
       }
       get_client_member_directory: {
         Args: { _workspace_id: string }
