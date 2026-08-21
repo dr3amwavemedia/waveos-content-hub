@@ -25,6 +25,7 @@ import {
   Mail,
   Camera,
   QrCode,
+  FolderKanban,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
@@ -73,7 +74,12 @@ const CLIENT_NAV: NavItem[] = [
   },
   { to: "/brand-voice", label: "Brand Voice", icon: Sparkles, feature: "can_manage_brand_voice" },
   { to: "/approvals", label: "Approvals", icon: CheckSquare },
-  { to: "/feedback", label: "Request Something", icon: MessageSquare, feature: "can_contact_support" },
+  {
+    to: "/feedback",
+    label: "Request Something",
+    icon: MessageSquare,
+    feature: "can_contact_support",
+  },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -83,6 +89,7 @@ const OUTLOOK_INTEGRATIONS_ENABLED = false;
 
 const STAFF_NAV: NavItem[] = [
   { to: "/videographer", label: "Production", icon: Camera, staffOnly: true, mediaOnly: true },
+  { to: "/projects", label: "Projects", icon: FolderKanban, staffOnly: true, ownerOnly: true },
   { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
   ...(OUTLOOK_INTEGRATIONS_ENABLED
     ? [
@@ -201,20 +208,20 @@ function Shell({ children }: { children: ReactNode }) {
   }, [isWeddingClient, navigate, pathname]);
 
   const clientNav = isCrew
-    ? CLIENT_NAV.filter((item) =>
-        ["/deliveries", "/content", "/calendar"].includes(item.to) && !item.hash,
+    ? CLIENT_NAV.filter(
+        (item) => ["/deliveries", "/content", "/calendar"].includes(item.to) && !item.hash,
       )
     : isSales
       ? TEAM_NAV.slice(0, 1)
-    : isMediaManager
-      ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV)
-      : isWeddingClient
-        ? access?.status === "active"
-          ? WEDDING_NAV
-          : WEDDING_NAV.filter((item) => item.to !== "/wedding-content")
-      : isLayer1
-        ? LAYER1_NAV
-        : filterByFeature(CLIENT_NAV);
+      : isMediaManager
+        ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV)
+        : isWeddingClient
+          ? access?.status === "active"
+            ? WEDDING_NAV
+            : WEDDING_NAV.filter((item) => item.to !== "/wedding-content")
+          : isLayer1
+            ? LAYER1_NAV
+            : filterByFeature(CLIENT_NAV);
   const staffNav = isStaff
     ? isCrew
       ? filterByFeature(STAFF_NAV.filter((item) => item.to === "/videographer"))
@@ -224,15 +231,15 @@ function Shell({ children }: { children: ReactNode }) {
     ? filterByFeature(STAFF_NAV.filter((item) => item.to === "/videographer"))
     : isSales
       ? TEAM_NAV
-    : isMediaManager
-      ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV).slice(0, 5)
-      : isWeddingClient
-        ? access?.status === "active"
-          ? WEDDING_MOBILE_NAV
-          : WEDDING_MOBILE_NAV.filter((item) => item.to !== "/wedding-content")
-      : isLayer1
-        ? LAYER1_MOBILE_NAV
-        : filterByFeature(MOBILE_NAV);
+      : isMediaManager
+        ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV).slice(0, 5)
+        : isWeddingClient
+          ? access?.status === "active"
+            ? WEDDING_MOBILE_NAV
+            : WEDDING_MOBILE_NAV.filter((item) => item.to !== "/wedding-content")
+          : isLayer1
+            ? LAYER1_MOBILE_NAV
+            : filterByFeature(MOBILE_NAV);
   const mobilePrimaryNav = mobileNav.filter((item) => item.label !== "More").slice(0, 4);
   const nav = [...clientNav, ...staffNav];
 
@@ -322,7 +329,6 @@ function Shell({ children }: { children: ReactNode }) {
             children
           )}
         </div>
-
       </main>
 
       {/* Mobile bottom nav */}
@@ -529,7 +535,7 @@ function UserFooter() {
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium text-foreground">{displayName}</div>
           <div className="truncate text-[10px] text-muted-foreground">
-            {staffPosition ? `${staffPosition} · Staff` : visibleEmail ?? "Client account"}
+            {staffPosition ? `${staffPosition} · Staff` : (visibleEmail ?? "Client account")}
           </div>
         </div>
         <NotificationsBell />

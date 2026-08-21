@@ -1653,6 +1653,8 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          business_name: string | null
+          client_name: string | null
           created_at: string
           first_name: string | null
           id: string
@@ -1661,6 +1663,8 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          business_name?: string | null
+          client_name?: string | null
           created_at?: string
           first_name?: string | null
           id: string
@@ -1669,6 +1673,8 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          business_name?: string | null
+          client_name?: string | null
           created_at?: string
           first_name?: string | null
           id?: string
@@ -1676,6 +1682,251 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      project_milestones: {
+        Row: {
+          created_at: string
+          description: string | null
+          due_at: string | null
+          id: string
+          is_active: boolean
+          project_id: string
+          sort_order: number
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          is_active?: boolean
+          project_id: string
+          sort_order?: number
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          is_active?: boolean
+          project_id?: string
+          sort_order?: number
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_notes: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          id: string
+          project_id: string
+          updated_at: string
+          visibility: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          project_id: string
+          updated_at?: string
+          visibility?: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          updated_at?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_notes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_references: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          is_approved: boolean
+          kind: string
+          project_id: string
+          title: string
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_approved?: boolean
+          kind?: string
+          project_id: string
+          title: string
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_approved?: boolean
+          kind?: string
+          project_id?: string
+          title?: string
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_references_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_staff_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          position: string | null
+          project_id: string
+          responsibilities: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          position?: string | null
+          project_id: string
+          responsibilities?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          position?: string | null
+          project_id?: string
+          responsibilities?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_staff_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          business_name: string | null
+          client_name: string | null
+          client_visible: boolean
+          created_at: string
+          created_by: string | null
+          crm_account_id: string | null
+          description: string | null
+          end_date: string | null
+          event_date: string | null
+          id: string
+          is_active: boolean
+          name: string
+          project_type: string
+          published_at: string | null
+          start_date: string | null
+          status: string
+          updated_at: string
+          workspace_id: string | null
+        }
+        Insert: {
+          business_name?: string | null
+          client_name?: string | null
+          client_visible?: boolean
+          created_at?: string
+          created_by?: string | null
+          crm_account_id?: string | null
+          description?: string | null
+          end_date?: string | null
+          event_date?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          project_type?: string
+          published_at?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          business_name?: string | null
+          client_name?: string | null
+          client_visible?: boolean
+          created_at?: string
+          created_by?: string | null
+          crm_account_id?: string | null
+          description?: string | null
+          end_date?: string | null
+          event_date?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          project_type?: string
+          published_at?: string | null
+          start_date?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_crm_account_id_fkey"
+            columns: ["crm_account_id"]
+            isOneToOne: false
+            referencedRelation: "crm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "projects_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       promo_campaigns: {
         Row: {
@@ -2228,6 +2479,8 @@ export type Database = {
           activated_at: string | null
           agreement_term: Database["public"]["Enums"]["agreement_term"] | null
           approval_required: boolean
+          business_name: string | null
+          client_name: string | null
           created_at: string
           created_by: string | null
           crm_external_id: string | null
@@ -2270,6 +2523,8 @@ export type Database = {
           activated_at?: string | null
           agreement_term?: Database["public"]["Enums"]["agreement_term"] | null
           approval_required?: boolean
+          business_name?: string | null
+          client_name?: string | null
           created_at?: string
           created_by?: string | null
           crm_external_id?: string | null
@@ -2312,6 +2567,8 @@ export type Database = {
           activated_at?: string | null
           agreement_term?: Database["public"]["Enums"]["agreement_term"] | null
           approval_required?: boolean
+          business_name?: string | null
+          client_name?: string | null
           created_at?: string
           created_by?: string | null
           crm_external_id?: string | null
@@ -2681,6 +2938,14 @@ export type Database = {
         Returns: boolean
       }
       is_dream_wave_staff: { Args: { _user_id: string }; Returns: boolean }
+      is_project_client: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_project_staff: {
+        Args: { _project_id: string; _user_id: string }
+        Returns: boolean
+      }
       is_workspace_member: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
