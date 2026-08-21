@@ -24,7 +24,10 @@ import { cn } from "@/lib/utils";
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (table: string) => any;
-  rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: Error | null }>;
+  rpc: (
+    fn: string,
+    args?: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: Error | null }>;
 };
 
 export const Route = createFileRoute("/_authenticated/projects")({
@@ -121,9 +124,17 @@ function ProjectsPage() {
   const workspacesQ = useQuery({
     queryKey: ["production", "projects", "workspaces"],
     queryFn: async () => {
-      const { data, error } = await db.from("workspaces").select("id,name,business_name,client_name").order("name");
+      const { data, error } = await db
+        .from("workspaces")
+        .select("id,name,business_name,client_name")
+        .order("name");
       if (error) throw error;
-      return (data ?? []) as { id: string; name: string; business_name: string | null; client_name: string | null }[];
+      return (data ?? []) as {
+        id: string;
+        name: string;
+        business_name: string | null;
+        client_name: string | null;
+      }[];
     },
   });
 
@@ -212,8 +223,8 @@ function ProjectsPage() {
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Projects</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Production projects, crew assignments, notes, and milestones. New projects stay internal drafts
-            until you publish them to the client.
+            Production projects, crew assignments, notes, and milestones. New projects stay internal
+            drafts until you publish them to the client.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -221,7 +232,11 @@ function ProjectsPage() {
             onClick={() => setShowArchived((v) => !v)}
             className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium hover:bg-elevated"
           >
-            {showArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+            {showArchived ? (
+              <ArchiveRestore className="h-3.5 w-3.5" />
+            ) : (
+              <Archive className="h-3.5 w-3.5" />
+            )}
             {showArchived ? "Show active" : "Show archived"}
           </button>
           <button
@@ -243,7 +258,11 @@ function ProjectsPage() {
               placeholder="Project name"
               className={inputClass}
             />
-            <select value={draftType} onChange={(e) => setDraftType(e.target.value)} className={inputClass}>
+            <select
+              value={draftType}
+              onChange={(e) => setDraftType(e.target.value)}
+              className={inputClass}
+            >
               {PROJECT_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
                   {t.label}
@@ -302,7 +321,8 @@ function ProjectsPage() {
                     <p className="truncate text-sm font-medium">{project.name}</p>
                     <p className="truncate text-[11px] text-muted-foreground">
                       {project.business_name || "No business"} ·{" "}
-                      {PROJECT_TYPES.find((t) => t.value === project.project_type)?.label ?? project.project_type}{" "}
+                      {PROJECT_TYPES.find((t) => t.value === project.project_type)?.label ??
+                        project.project_type}{" "}
                       · {project.status.replace("_", " ")}
                     </p>
                   </button>
@@ -323,7 +343,9 @@ function ProjectsPage() {
             />
           ) : (
             <div className="surface-card p-6">
-              <p className="text-sm text-muted-foreground">Select a project to view and edit its details.</p>
+              <p className="text-sm text-muted-foreground">
+                Select a project to view and edit its details.
+              </p>
             </div>
           )}
         </div>
@@ -362,7 +384,12 @@ function ProjectDetail({
         .select("id,user_id,position,responsibilities")
         .eq("project_id", project.id);
       if (error) throw error;
-      return (data ?? []) as { id: string; user_id: string; position: string | null; responsibilities: string | null }[];
+      return (data ?? []) as {
+        id: string;
+        user_id: string;
+        position: string | null;
+        responsibilities: string | null;
+      }[];
     },
   });
 
@@ -506,7 +533,11 @@ function ProjectDetail({
               }
               className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-elevated"
             >
-              {project.client_visible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              {project.client_visible ? (
+                <EyeOff className="h-3.5 w-3.5" />
+              ) : (
+                <Eye className="h-3.5 w-3.5" />
+              )}
               {project.client_visible ? "Hide from client" : "Publish to client"}
             </button>
             <button
@@ -519,14 +550,23 @@ function ProjectDetail({
               onClick={() => onPatch({ is_active: !project.is_active })}
               className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-elevated"
             >
-              {project.is_active ? <Archive className="h-3.5 w-3.5" /> : <ArchiveRestore className="h-3.5 w-3.5" />}
+              {project.is_active ? (
+                <Archive className="h-3.5 w-3.5" />
+              ) : (
+                <ArchiveRestore className="h-3.5 w-3.5" />
+              )}
               {project.is_active ? "Archive" : "Restore"}
             </button>
           </div>
         </div>
 
         <div className="grid gap-2 md:grid-cols-2">
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Project name" className={inputClass} />
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Project name"
+            className={inputClass}
+          />
           <select
             value={project.status}
             onChange={(e) => onPatch({ status: e.target.value })}
@@ -576,7 +616,11 @@ function ProjectDetail({
       <section className="surface-card space-y-3 p-4">
         <h2 className="text-sm font-semibold">Staff assignments</h2>
         <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-          <select value={assignee} onChange={(e) => setAssignee(e.target.value)} className={inputClass}>
+          <select
+            value={assignee}
+            onChange={(e) => setAssignee(e.target.value)}
+            className={inputClass}
+          >
             <option value="">Select staff member</option>
             {staff.map((s) => (
               <option key={s.user_id} value={s.user_id}>
@@ -600,7 +644,10 @@ function ProjectDetail({
         </div>
         <ul className="space-y-2">
           {(assignmentsQ.data ?? []).map((a) => (
-            <li key={a.id} className="flex items-center justify-between rounded-lg border border-border/70 p-2">
+            <li
+              key={a.id}
+              className="flex items-center justify-between rounded-lg border border-border/70 p-2"
+            >
               <span className="min-w-0 truncate text-sm">
                 {staffName(a.user_id)}
                 {a.position ? <span className="text-muted-foreground"> · {a.position}</span> : null}
@@ -689,12 +736,17 @@ function ProjectDetail({
         </div>
         <ul className="space-y-2">
           {(milestonesQ.data ?? []).map((m) => (
-            <li key={m.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 p-2">
+            <li
+              key={m.id}
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/70 p-2"
+            >
               <span className="min-w-0 truncate text-sm">{m.title}</span>
               <div className="flex items-center gap-2">
                 <select
                   value={m.status}
-                  onChange={(e) => toggleMilestone.mutate({ id: m.id, patch: { status: e.target.value } })}
+                  onChange={(e) =>
+                    toggleMilestone.mutate({ id: m.id, patch: { status: e.target.value } })
+                  }
                   className="rounded-md border border-border bg-background px-2 py-1 text-xs"
                 >
                   <option value="pending">Pending</option>
@@ -702,7 +754,9 @@ function ProjectDetail({
                   <option value="done">Done</option>
                 </select>
                 <button
-                  onClick={() => toggleMilestone.mutate({ id: m.id, patch: { is_active: !m.is_active } })}
+                  onClick={() =>
+                    toggleMilestone.mutate({ id: m.id, patch: { is_active: !m.is_active } })
+                  }
                   className="rounded-md border border-border px-2 py-1 text-xs hover:bg-elevated"
                 >
                   {m.is_active ? "Active" : "Inactive"}
