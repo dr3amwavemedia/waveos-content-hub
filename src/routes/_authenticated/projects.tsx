@@ -286,7 +286,7 @@ function ProjectsPage() {
             <EmptyState
               icon={FolderKanban}
               title={showArchived ? "No archived projects" : "No projects yet"}
-              description="Create your first production project to start assigning crew and tracking milestones."
+              body="Create your first production project to start assigning crew and tracking milestones."
             />
           ) : (
             <ul className="space-y-2">
