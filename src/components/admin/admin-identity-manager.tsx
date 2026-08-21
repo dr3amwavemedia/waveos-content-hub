@@ -22,7 +22,7 @@ type StaffRow = {
   role: "dream_wave_owner" | "dream_wave_team";
   staff_type: StaffType;
 };
-type WorkspaceRow = { id: string; name: string };
+type WorkspaceRow = { id: string; name: string; business_name: string | null; client_name: string | null };
 type ContactRow = { id: string; first_name: string; last_name: string | null; is_primary: boolean };
 type LeadRow = { id: string; business_name: string; crm_contacts: ContactRow[] };
 
@@ -37,6 +37,8 @@ export function AdminIdentityManager() {
   const [name, setName] = useState("");
   const [contactFirst, setContactFirst] = useState("");
   const [contactLast, setContactLast] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [clientName, setClientName] = useState("");
 
   const staffQ = useQuery({
     queryKey: ["admin", "identity-staff"],
@@ -49,7 +51,7 @@ export function AdminIdentityManager() {
   const workspacesQ = useQuery({
     queryKey: ["admin", "identity-workspaces"],
     queryFn: async () => {
-      const { data, error } = await db.from("workspaces").select("id,name").order("name");
+      const { data, error } = await db.from("workspaces").select("id,name,business_name,client_name").order("name");
       if (error) throw error;
       return (data ?? []) as WorkspaceRow[];
     },
@@ -101,6 +103,11 @@ export function AdminIdentityManager() {
         _name: name,
       });
       if (error) throw error;
+      const { error: fieldsError } = await db
+        .from("workspaces")
+        .update({ business_name: businessName.trim() || null, client_name: clientName.trim() || null })
+        .eq("id", workspaceEdit.id);
+      if (fieldsError) throw fieldsError;
     },
     onSuccess: async () => {
       await Promise.all([
@@ -204,7 +211,13 @@ export function AdminIdentityManager() {
             {(workspacesQ.data ?? []).map((workspace) => (
               <button
                 key={workspace.id}
-                onClick={() => { setWorkspaceEdit(workspace); setLeadEdit(null); setName(workspace.name); }}
+                onClick={() => {
+                  setWorkspaceEdit(workspace);
+                  setLeadEdit(null);
+                  setName(workspace.name);
+                  setBusinessName(workspace.business_name ?? "");
+                  setClientName(workspace.client_name ?? "");
+                }}
                 className="flex w-full items-center justify-between rounded-lg border border-border/70 p-2 text-left hover:bg-elevated"
               >
                 <span className="truncate text-sm">{workspace.name}</span><Pencil className="h-3.5 w-3.5 text-muted-foreground" />
@@ -253,6 +266,12 @@ export function AdminIdentityManager() {
         <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-primary">{workspaceEdit ? "Edit client name" : "Edit lead name"}</p>
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="mt-3 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+          {workspaceEdit && (
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <input value={businessName} onChange={(e) => setBusinessName(e.target.value)} placeholder="Business name (optional)" className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+              <input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Client name (optional)" className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
+            </div>
+          )}
           {leadEdit && (
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
               <input value={contactFirst} onChange={(e) => setContactFirst(e.target.value)} placeholder="Primary contact first name" className="rounded-lg border border-border bg-background px-3 py-2 text-sm" />
