@@ -35,6 +35,8 @@ import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display"
 import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
 import { useCurrentUser } from "@/hooks/use-waveos";
+import { useClientProjects } from "@/hooks/use-client-projects";
+
 import { WorkspaceProvider, useWorkspace } from "./workspace-context";
 import { ImpersonationBanner } from "./impersonation-banner";
 import { AccountStatusBanner } from "./account-status-banner";
