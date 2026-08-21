@@ -25,6 +25,7 @@ import {
   Mail,
   Camera,
   QrCode,
+  FolderKanban,
 } from "lucide-react";
 import { toast } from "sonner";
 import { NotificationsBell } from "./notifications-bell";
@@ -83,6 +84,7 @@ const OUTLOOK_INTEGRATIONS_ENABLED = false;
 
 const STAFF_NAV: NavItem[] = [
   { to: "/videographer", label: "Production", icon: Camera, staffOnly: true, mediaOnly: true },
+  { to: "/projects", label: "Projects", icon: FolderKanban, staffOnly: true, ownerOnly: true },
   { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
   ...(OUTLOOK_INTEGRATIONS_ENABLED
     ? [
