@@ -35,6 +35,8 @@ import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display"
 import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
 import { useCurrentUser } from "@/hooks/use-waveos";
+import { useClientProjects } from "@/hooks/use-client-projects";
+
 import { WorkspaceProvider, useWorkspace } from "./workspace-context";
 import { ImpersonationBanner } from "./impersonation-banner";
 import { AccountStatusBanner } from "./account-status-banner";
@@ -207,7 +209,7 @@ function Shell({ children }: { children: ReactNode }) {
     }
   }, [isWeddingClient, navigate, pathname]);
 
-  const clientNav = isCrew
+  const baseClientNav = isCrew
     ? CLIENT_NAV.filter(
         (item) => ["/deliveries", "/content", "/calendar"].includes(item.to) && !item.hash,
       )
@@ -222,6 +224,23 @@ function Shell({ children }: { children: ReactNode }) {
           : isLayer1
             ? LAYER1_NAV
             : filterByFeature(CLIENT_NAV);
+
+  // "Your Projects" only appears once staff have published a project to this
+  // client account. RLS still enforces the same rule on the page itself.
+  const clientProjects = useClientProjects(
+    activeWorkspace?.id,
+    !isStaff && !isWeddingClient && !!activeWorkspace?.id,
+  );
+  const hasClientProjects = (clientProjects.data?.projects.length ?? 0) > 0;
+  const clientNav =
+    hasClientProjects && !isStaff && !isWeddingClient
+      ? [
+          baseClientNav[0],
+          { to: "/my-projects", label: "Your Projects", icon: FolderKanban } as NavItem,
+          ...baseClientNav.slice(1),
+        ].filter(Boolean)
+      : baseClientNav;
+
   const staffNav = isStaff
     ? isCrew
       ? filterByFeature(STAFF_NAV.filter((item) => item.to === "/videographer"))
