@@ -1653,6 +1653,8 @@ export type Database = {
       profiles: {
         Row: {
           avatar_url: string | null
+          business_name: string | null
+          client_name: string | null
           created_at: string
           first_name: string | null
           id: string
@@ -1661,6 +1663,8 @@ export type Database = {
         }
         Insert: {
           avatar_url?: string | null
+          business_name?: string | null
+          client_name?: string | null
           created_at?: string
           first_name?: string | null
           id: string
@@ -1669,6 +1673,8 @@ export type Database = {
         }
         Update: {
           avatar_url?: string | null
+          business_name?: string | null
+          client_name?: string | null
           created_at?: string
           first_name?: string | null
           id?: string
@@ -2228,6 +2234,8 @@ export type Database = {
           activated_at: string | null
           agreement_term: Database["public"]["Enums"]["agreement_term"] | null
           approval_required: boolean
+          business_name: string | null
+          client_name: string | null
           created_at: string
           created_by: string | null
           crm_external_id: string | null
@@ -2270,6 +2278,8 @@ export type Database = {
           activated_at?: string | null
           agreement_term?: Database["public"]["Enums"]["agreement_term"] | null
           approval_required?: boolean
+          business_name?: string | null
+          client_name?: string | null
           created_at?: string
           created_by?: string | null
           crm_external_id?: string | null
@@ -2312,6 +2322,8 @@ export type Database = {
           activated_at?: string | null
           agreement_term?: Database["public"]["Enums"]["agreement_term"] | null
           approval_required?: boolean
+          business_name?: string | null
+          client_name?: string | null
           created_at?: string
           created_by?: string | null
           crm_external_id?: string | null
