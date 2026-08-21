@@ -36,6 +36,7 @@ import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedPostsRouteImport } from './routes/_authenticated/posts'
 import { Route as AuthenticatedOutlookRouteImport } from './routes/_authenticated/outlook'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedMyProjectsRouteImport } from './routes/_authenticated/my-projects'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
 import { Route as AuthenticatedDeliveriesRouteImport } from './routes/_authenticated/deliveries'
@@ -206,6 +207,11 @@ const AuthenticatedOutlookRoute = AuthenticatedOutlookRouteImport.update({
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMyProjectsRoute = AuthenticatedMyProjectsRouteImport.update({
+  id: '/my-projects',
+  path: '/my-projects',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
@@ -397,6 +403,7 @@ export interface FileRoutesByFullPath {
   '/deliveries': typeof AuthenticatedDeliveriesRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/my-projects': typeof AuthenticatedMyProjectsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/outlook': typeof AuthenticatedOutlookRoute
   '/posts': typeof AuthenticatedPostsRoute
@@ -456,6 +463,7 @@ export interface FileRoutesByTo {
   '/deliveries': typeof AuthenticatedDeliveriesRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/my-projects': typeof AuthenticatedMyProjectsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/outlook': typeof AuthenticatedOutlookRoute
   '/posts': typeof AuthenticatedPostsRoute
@@ -517,6 +525,7 @@ export interface FileRoutesById {
   '/_authenticated/deliveries': typeof AuthenticatedDeliveriesRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
+  '/_authenticated/my-projects': typeof AuthenticatedMyProjectsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/outlook': typeof AuthenticatedOutlookRoute
   '/_authenticated/posts': typeof AuthenticatedPostsRoute
@@ -578,6 +587,7 @@ export interface FileRouteTypes {
     | '/deliveries'
     | '/feedback'
     | '/home'
+    | '/my-projects'
     | '/onboarding'
     | '/outlook'
     | '/posts'
@@ -637,6 +647,7 @@ export interface FileRouteTypes {
     | '/deliveries'
     | '/feedback'
     | '/home'
+    | '/my-projects'
     | '/onboarding'
     | '/outlook'
     | '/posts'
@@ -697,6 +708,7 @@ export interface FileRouteTypes {
     | '/_authenticated/deliveries'
     | '/_authenticated/feedback'
     | '/_authenticated/home'
+    | '/_authenticated/my-projects'
     | '/_authenticated/onboarding'
     | '/_authenticated/outlook'
     | '/_authenticated/posts'
@@ -956,6 +968,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/my-projects': {
+      id: '/_authenticated/my-projects'
+      path: '/my-projects'
+      fullPath: '/my-projects'
+      preLoaderRoute: typeof AuthenticatedMyProjectsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/home': {
       id: '/_authenticated/home'
       path: '/home'
@@ -1203,6 +1222,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDeliveriesRoute: typeof AuthenticatedDeliveriesRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
+  AuthenticatedMyProjectsRoute: typeof AuthenticatedMyProjectsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOutlookRoute: typeof AuthenticatedOutlookRoute
   AuthenticatedPostsRoute: typeof AuthenticatedPostsRoute
@@ -1230,6 +1250,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDeliveriesRoute: AuthenticatedDeliveriesRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
+  AuthenticatedMyProjectsRoute: AuthenticatedMyProjectsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOutlookRoute: AuthenticatedOutlookRoute,
   AuthenticatedPostsRoute: AuthenticatedPostsRoute,
