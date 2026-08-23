@@ -89,16 +89,30 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     sessionStorage.setItem(POST_AUTH_NEXT_KEY, nextPath);
+
+    // Watchdog: a stalled auth request (network stall, blocked request) must
+    // never leave the spinner running forever with no feedback. If the call
+    // resolves late and succeeds, the SIGNED_IN handler still navigates.
+    let watchdogFired = false;
+    const watchdog = window.setTimeout(() => {
+      watchdogFired = true;
+      setBusy(false);
+      toast.error("Sign-in is taking longer than expected. Check your connection and try again.");
+    }, 20_000);
+
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setBusy(false);
+    window.clearTimeout(watchdog);
+    if (!watchdogFired) setBusy(false);
     if (error) {
       sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
-      toast.error(
-        error.message === "Invalid login credentials" ? "That email or password isn't right." : error.message,
-      );
+      if (!watchdogFired) {
+        toast.error(
+          error.message === "Invalid login credentials" ? "That email or password isn't right." : error.message,
+        );
+      }
       return;
     }
-    toast.success("Welcome back.");
+    if (!watchdogFired) toast.success("Welcome back.");
   }
 
   async function handleReset(e: React.FormEvent) {
