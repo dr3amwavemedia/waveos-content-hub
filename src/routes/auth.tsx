@@ -52,34 +52,47 @@ function AuthPage() {
   // Redirect signed-in users to the intended destination (or /home).
   useEffect(() => {
     let cancelled = false;
+    let navigated = false;
     const resolveNext = () => {
       const stashed = typeof window !== "undefined" ? sessionStorage.getItem(POST_AUTH_NEXT_KEY) : null;
       const target = safeNext(stashed ?? nextPath);
       if (stashed) sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
       return target;
     };
-    (async () => {
+    const goToTarget = () => {
+      if (cancelled || navigated) return;
+      navigated = true;
+      const target = resolveNext();
+      if (target !== "/home") window.location.replace(target);
+      else navigate({ to: "/home", replace: true });
+    };
+    // Mobile OAuth completes in a separate tab, which shares this origin's
+    // localStorage but never notifies this tab. Re-check on focus/visibility
+    // and on a light interval so the session is picked up and the user lands
+    // in their workspace instead of staring at a dead sign-in button.
+    const checkSession = async () => {
       const { data } = await supabase.auth.getSession();
-      if (!cancelled && data.session) {
-        const target = resolveNext();
-        if (target !== "/home") window.location.replace(target);
-        else navigate({ to: "/home", replace: true });
-      }
-    })();
+      if (!cancelled && data.session) goToTarget();
+    };
+    void checkSession();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void checkSession();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    const pollId = window.setInterval(() => void checkSession(), 2500);
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN") {
         // Let Supabase finish releasing its auth lock before the destination
         // route calls getUser(). Navigating synchronously here can deadlock.
-        window.setTimeout(() => {
-          if (cancelled) return;
-          const target = resolveNext();
-          if (target !== "/home") window.location.replace(target);
-          else navigate({ to: "/home", replace: true });
-        }, 0);
+        window.setTimeout(goToTarget, 0);
       }
     });
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.clearInterval(pollId);
       sub.subscription.unsubscribe();
     };
   }, [navigate, nextPath]);
