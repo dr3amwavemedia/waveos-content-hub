@@ -8,11 +8,13 @@ import {
   Download,
   Link2,
   Loader2,
+  MailCheck,
   MousePointerClick,
   Pause,
   Play,
   QrCode,
   ScanLine,
+  Send,
   Star,
   Trash2,
 } from "lucide-react";
@@ -74,6 +76,8 @@ function promoUrl(token: string) {
 }
 
 function ToolsPage() {
+  const [activeTool, setActiveTool] = useState<"promos" | "test-emails">("promos");
+
   return (
     <div className="space-y-6">
       <header>
@@ -84,13 +88,155 @@ function ToolsPage() {
       </header>
 
       <div className="flex flex-wrap gap-2 border-b border-border pb-3">
-        <span className="inline-flex items-center gap-2 rounded-full bg-primary/12 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary ring-1 ring-inset ring-primary/30">
+        <button
+          type="button"
+          onClick={() => setActiveTool("promos")}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] ring-1 ring-inset",
+            activeTool === "promos"
+              ? "bg-primary/12 text-primary ring-primary/30"
+              : "text-muted-foreground ring-border hover:bg-elevated hover:text-foreground",
+          )}
+        >
           <QrCode className="h-4 w-4" /> QR Promo Links
-        </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTool("test-emails")}
+          className={cn(
+            "inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] ring-1 ring-inset",
+            activeTool === "test-emails"
+              ? "bg-primary/12 text-primary ring-primary/30"
+              : "text-muted-foreground ring-border hover:bg-elevated hover:text-foreground",
+          )}
+        >
+          <MailCheck className="h-4 w-4" /> Test emails
+        </button>
       </div>
 
-      <QrPromoLinksTab />
+      {activeTool === "promos" ? <QrPromoLinksTab /> : <TestEmailsTab />}
     </div>
+  );
+}
+
+type TestEmailTemplate = "project" | "invoice" | "upload";
+
+const testEmailOptions: Array<{
+  template: TestEmailTemplate;
+  title: string;
+  body: string;
+}> = [
+  {
+    template: "project",
+    title: "Project reminder",
+    body: "Preview the notification used 30, 5, 3, and 1 day before a project.",
+  },
+  {
+    template: "invoice",
+    title: "Unpaid invoice reminder",
+    body: "Preview the payment reminder used 3, 5, and 7 days after sending an invoice.",
+  },
+  {
+    template: "upload",
+    title: "Media and revision update",
+    body: "Preview the notification sent when new media or revisions are available.",
+  },
+];
+
+function TestEmailsTab() {
+  const [runningTemplate, setRunningTemplate] = useState<TestEmailTemplate | "all" | null>(null);
+  const adminEmail = useQuery({
+    queryKey: ["tools", "test-email-recipient"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return data.user?.email ?? "your admin email";
+    },
+  });
+
+  async function sendTest(template: TestEmailTemplate) {
+    const { data, error } = await supabase.functions.invoke("email-automations", {
+      body: { action: "test", template },
+    });
+    if (error) throw error;
+    if (data?.status !== "sent") {
+      throw new Error(data?.error || `${template} test email was not sent.`);
+    }
+  }
+
+  async function runTests(template: TestEmailTemplate | "all") {
+    setRunningTemplate(template);
+    try {
+      if (template === "all") {
+        for (const option of testEmailOptions) await sendTest(option.template);
+        toast.success("All 3 test emails were sent to your admin email.");
+      } else {
+        await sendTest(template);
+        toast.success(
+          `${testEmailOptions.find((option) => option.template === template)?.title} sent.`,
+        );
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "The test email could not be sent.");
+    } finally {
+      setRunningTemplate(null);
+    }
+  }
+
+  return (
+    <section className="surface-card p-4 sm:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
+          <MailCheck className="mt-0.5 h-5 w-5 text-primary" />
+          <div>
+            <h2 className="text-base font-semibold text-foreground">Test emails</h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Send real previews to {adminEmail.data ?? "your admin email"}. Tests do not contact
+              clients or change the live notification switches.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          disabled={runningTemplate !== null}
+          onClick={() => void runTests("all")}
+          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+        >
+          {runningTemplate === "all" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
+          Run all tests
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        {testEmailOptions.map((option) => (
+          <article
+            key={option.template}
+            className="rounded-xl border border-border bg-background p-4"
+          >
+            <h3 className="text-sm font-semibold text-foreground">{option.title}</h3>
+            <p className="mt-1 min-h-10 text-xs leading-relaxed text-muted-foreground">
+              {option.body}
+            </p>
+            <button
+              type="button"
+              disabled={runningTemplate !== null}
+              onClick={() => void runTests(option.template)}
+              className="mt-4 inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-elevated disabled:opacity-50"
+            >
+              {runningTemplate === option.template ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Send className="h-3.5 w-3.5" />
+              )}
+              Send test
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -122,8 +268,10 @@ function QrPromoLinksTab() {
       const destination = normalizeHttpsUrl(destinationUrl);
       const label = destinationLabel.trim() || "View your content";
       if (!cleanName) throw new Error("Add a campaign name.");
-      if (!isValidHttpsUrl(review)) throw new Error(`Google review link: ${URL_VALIDATION_MESSAGE}`);
-      if (!isValidHttpsUrl(destination)) throw new Error(`Destination link: ${URL_VALIDATION_MESSAGE}`);
+      if (!isValidHttpsUrl(review))
+        throw new Error(`Google review link: ${URL_VALIDATION_MESSAGE}`);
+      if (!isValidHttpsUrl(destination))
+        throw new Error(`Destination link: ${URL_VALIDATION_MESSAGE}`);
 
       const { data: auth } = await supabase.auth.getUser();
       const { error } = await supabase.from("promo_campaigns").insert({
