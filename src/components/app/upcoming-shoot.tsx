@@ -2,14 +2,15 @@ import { useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Camera, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 
-import { ClientProjectDetails, ProjectDateChips, formatProjectDate } from "@/components/app/client-project-details";
+import { ClientProjectDetails, ProjectDateChips } from "@/components/app/client-project-details";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { useClientProjects, type ClientProject } from "@/hooks/use-client-projects";
 import { usePermissions } from "@/hooks/use-permissions";
+import { formatProjectDate, projectDateToLocalDate } from "@/lib/date-time";
 import { cn } from "@/lib/utils";
 
 function daysUntil(value: string) {
-  const target = new Date(value);
+  const target = projectDateToLocalDate(value);
   if (Number.isNaN(target.getTime())) return null;
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
@@ -38,10 +39,7 @@ export function UpcomingShootPanel() {
   const { data, isLoading } = useClientProjects(activeWorkspace?.id, enabled);
   const [expanded, setExpanded] = useState(false);
 
-  const project = useMemo(
-    () => pickSpotlightProject(data?.projects ?? []),
-    [data?.projects],
-  );
+  const project = useMemo(() => pickSpotlightProject(data?.projects ?? []), [data?.projects]);
 
   if (permsLoading || isStaff || isLoading || !project) return null;
 
@@ -115,8 +113,8 @@ export function UpcomingShootPanel() {
           </div>
           <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
             <Sparkles className="h-3.5 w-3.5 text-primary" />
-            Tap to {expanded ? "collapse" : "see milestones, updates, and shared links"} — everything
-            your Dream Wave team has planned for you.
+            Tap to {expanded ? "collapse" : "see milestones, updates, and shared links"} —
+            everything your Dream Wave team has planned for you.
           </p>
         </div>
       </button>
