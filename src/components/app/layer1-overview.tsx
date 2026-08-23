@@ -28,6 +28,8 @@ import type { Database } from "@/integrations/supabase/types";
 import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
 import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
 import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
+import { UpcomingShootPanel } from "@/components/app/upcoming-shoot";
+import { PortalReturnHint } from "@/components/app/portal-return-hint";
 
 export type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
 type Delivery = Database["public"]["Tables"]["client_deliveries"]["Row"];
@@ -298,6 +300,9 @@ export function Layer1Overview() {
 
       {/* Primary action */}
       <PrimaryActionBanner action={primaryAction} />
+
+      {/* Upcoming shoot / project spotlight */}
+      <UpcomingShootPanel />
 
       <AttentionCenter
         approvalCount={approvalsQ.data ?? 0}
@@ -701,6 +706,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
       {canOpen && !expired && <a href={contract.hosted_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 sm:w-auto">
         {signed ? "View signed contract" : "View & sign contract"}<ExternalLink className="h-4 w-4" />
       </a>}
+      {canOpen && !expired && <PortalReturnHint />}
       <p className="text-xs text-muted-foreground">Signing and certification are completed securely by {contract.provider === "bloom" ? "Bloom.io" : "the contract provider"}.</p>
     </div>
   );
@@ -767,6 +773,7 @@ export function InvoiceCard({ invoice }: { invoice: Invoice }) {
           <ExternalLink className="h-4 w-4" />
         </a>
       )}
+      {canOpen && <PortalReturnHint />}
     </div>
   );
 }
@@ -832,6 +839,7 @@ export function DeliveryCard({ delivery }: { delivery: Delivery }) {
           <ExternalLink className="h-4 w-4" />
         </a>
       )}
+      {canOpen && <PortalReturnHint />}
     </div>
   );
 }
