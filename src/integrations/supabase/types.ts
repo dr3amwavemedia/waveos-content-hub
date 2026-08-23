@@ -2218,6 +2218,33 @@ export type Database = {
           },
         ]
       }
+      user_login_events: {
+        Row: {
+          auth_session_id: string | null
+          device_category: string
+          id: string
+          occurred_at: string
+          user_email: string
+          user_id: string
+        }
+        Insert: {
+          auth_session_id?: string | null
+          device_category: string
+          id?: string
+          occurred_at?: string
+          user_email?: string
+          user_id?: string
+        }
+        Update: {
+          auth_session_id?: string | null
+          device_category?: string
+          id?: string
+          occurred_at?: string
+          user_email?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

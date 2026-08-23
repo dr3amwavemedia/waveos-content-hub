@@ -63,17 +63,44 @@ function AuthCallbackPage() {
     });
 
     (async () => {
-      for (let attempt = 0; attempt < 24; attempt += 1) {
+      // Some brokers return an authorization code (?code=) instead of hash
+      // tokens. Exchange it explicitly so those returns are never dropped.
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) {
+          goToTarget();
+          return;
+        }
+        console.warn("[auth-callback] code exchange failed", error.message);
+      }
+
+      // Surface broker-reported errors instead of spinning forever.
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const brokerError =
+        params.get("error_description") ??
+        hashParams.get("error_description") ??
+        params.get("error") ??
+        hashParams.get("error");
+
+      for (let attempt = 0; attempt < 40; attempt += 1) {
         const { data } = await supabase.auth.getSession();
         if (cancelled) return;
         if (data.session) {
           goToTarget();
           return;
         }
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        await new Promise((resolve) => setTimeout(resolve, 300));
       }
       if (cancelled) return;
-      setMessage("We couldn't complete the sign in. Please try again.");
+      setMessage(
+        brokerError
+          ? `Sign in failed: ${brokerError.replace(/\+/g, " ")}`
+          : "We couldn't complete the sign in. Please try again.",
+      );
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      if (cancelled) return;
       const target = safeNext(sessionStorage.getItem(POST_AUTH_NEXT_KEY) ?? search.next);
       navigate({ to: "/auth", search: { next: target }, replace: true });
     })();
