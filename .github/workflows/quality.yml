@@ -18,6 +18,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      # Keep the npm lockfile synchronized with package.json before the clean install.
+      # This repairs stale lockfiles produced when dependencies are changed upstream
+      # without committing the regenerated package-lock.json.
+      - run: npm install --package-lock-only --ignore-scripts
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
