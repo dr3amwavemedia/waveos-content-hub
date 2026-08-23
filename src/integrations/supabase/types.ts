@@ -2220,7 +2220,7 @@ export type Database = {
       }
       user_login_events: {
         Row: {
-          auth_session_id: string
+          auth_session_id: string | null
           device_category: string
           id: string
           occurred_at: string
@@ -2228,7 +2228,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
-          auth_session_id?: string
+          auth_session_id?: string | null
           device_category: string
           id?: string
           occurred_at?: string
@@ -2236,7 +2236,7 @@ export type Database = {
           user_id?: string
         }
         Update: {
-          auth_session_id?: string
+          auth_session_id?: string | null
           device_category?: string
           id?: string
           occurred_at?: string
