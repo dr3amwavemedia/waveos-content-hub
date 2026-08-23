@@ -43,6 +43,11 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  // The SSR HTML renders the buttons before React attaches handlers; a click
+  // in that window is silently dropped. Keep the controls disabled until
+  // hydration so every click actually signs in.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   // Redirect signed-in users to the intended destination (or /home).
   useEffect(() => {
@@ -167,7 +172,7 @@ function AuthPage() {
               <button
                 type="button"
                 onClick={handleGoogle}
-                disabled={busy}
+                disabled={busy || !hydrated}
                 className="mb-4 flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-elevated disabled:opacity-60"
               >
                 <GoogleIcon /> Continue with Google
@@ -220,7 +225,7 @@ function AuthPage() {
 
             <button
               type="submit"
-              disabled={busy}
+              disabled={busy || !hydrated}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110 disabled:opacity-60"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}

@@ -2794,6 +2794,17 @@ export type Database = {
           slug: string
         }[]
       }
+      create_client_service_request: {
+        Args: {
+          _description: string
+          _preferred_at?: string
+          _reference_url?: string
+          _request_type: string
+          _title: string
+          _workspace_id: string
+        }
+        Returns: string
+      }
       create_invite: {
         Args: {
           _app_role: Database["public"]["Enums"]["app_role"]
@@ -3146,6 +3157,7 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["content_status"]
       }
+      text_has_blocked_language: { Args: { _text: string }; Returns: boolean }
       workspace_role: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: Database["public"]["Enums"]["workspace_member_role"]

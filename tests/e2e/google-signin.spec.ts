@@ -24,8 +24,11 @@ test.describe("Google sign-in", () => {
 
   test("preserves ?next= destination in sessionStorage before OAuth", async ({ page }) => {
     await page.goto("/auth?next=/calendar");
+    const btn = page.getByRole("button", { name: /continue with google/i });
+    // The button stays disabled until hydration attaches the handler.
+    await expect(btn).toBeEnabled();
     // sessionStorage is written when the click handler runs so the callback can finish routing.
-    await page.getByRole("button", { name: /continue with google/i }).click().catch(() => {});
+    await btn.click().catch(() => {});
     // A best-effort read — the click may navigate away, so we allow either
     // the stored value or a navigation to have started.
     const stored = await page
@@ -36,6 +39,8 @@ test.describe("Google sign-in", () => {
 
   test("clicking Google starts the managed OAuth hand-off", async ({ context, page }) => {
     await page.goto("/auth");
+    // Wait for hydration — the button is inert until React attaches handlers.
+    await expect(page.getByRole("button", { name: /continue with google/i })).toBeEnabled();
 
     // Capture whichever hand-off happens first: popup, top-level nav, or
     // an OAuth-related network request.
@@ -63,6 +68,8 @@ test.describe("Google sign-in", () => {
 
   test("Google hand-off uses the public callback route", async ({ page }) => {
     await page.goto("/auth?next=/home");
+    // Wait for hydration — the button is inert until React attaches handlers.
+    await expect(page.getByRole("button", { name: /continue with google/i })).toBeEnabled();
 
     const oauthRequest = page.waitForRequest((request) => request.url().includes("/~oauth/initiate"));
     await page.getByRole("button", { name: /continue with google/i }).click();
