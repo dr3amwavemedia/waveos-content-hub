@@ -134,6 +134,8 @@ export function UpcomingShootPanel() {
               notes={notes}
               references={references}
               changeRequests={changeRequests}
+              serviceRequests={data?.serviceRequests ?? []}
+              workspaceId={activeWorkspace?.id ?? undefined}
             />
             <Link
               to="/my-projects"
