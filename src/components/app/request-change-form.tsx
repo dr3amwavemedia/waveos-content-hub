@@ -88,8 +88,7 @@ export function RequestChangeForm({ workspaceId }: { workspaceId: string }) {
       void qc.invalidateQueries({ queryKey: ["phase4-requests"] });
       toast.success("Change request sent — watch this page for status updates.");
     },
-    onError: (error: unknown) =>
-      toast.error(error instanceof Error ? error.message : "Could not send your change request."),
+    onError: (error: unknown) => toast.error(friendlySubmitError(error)),
   });
 
   if (!open) {
