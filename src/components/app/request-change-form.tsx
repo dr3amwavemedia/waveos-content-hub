@@ -37,8 +37,15 @@ const changeRequestSchema = z.object({
     }),
 });
 
+// Marks errors raised by the client-side zod schema. Their messages are
+// already user-friendly guidance, so onError shows them verbatim instead of
+// routing them through the server-code mapper (which would swallow them
+// behind the generic fallback).
+class ValidationError extends Error {}
+
 // Friendly copy for the error codes the RPC raises.
 function friendlySubmitError(error: unknown): string {
+  if (error instanceof ValidationError) return error.message;
   const raw = error instanceof Error ? error.message : String(error ?? "");
   if (raw.includes("duplicate_request")) {
     return "You already have an open request with this title — we're on it. Add any extra detail as a comment instead.";
