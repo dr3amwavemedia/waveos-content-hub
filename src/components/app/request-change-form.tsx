@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
+import { containsProfanity } from "@/lib/profanity";
 import { cn } from "@/lib/utils";
 
 const db = supabase as unknown as {
@@ -14,20 +15,43 @@ const db = supabase as unknown as {
   ) => Promise<{ data: unknown; error: Error | null }>;
 };
 
-// Mirrors the server-side limits in create_client_service_request so the
-// client gets instant feedback instead of a rejected RPC.
+// Mirrors the server-side checks in create_client_service_request (length
+// limits, profanity screen) so the client gets instant feedback instead of a
+// rejected RPC. The server re-checks everything — this is UX, not security.
 const changeRequestSchema = z.object({
   title: z
     .string()
     .trim()
     .min(2, { message: "Give your change a short title." })
-    .max(140, { message: "Keep the title under 140 characters." }),
+    .max(140, { message: "Keep the title under 140 characters." })
+    .refine((value) => !containsProfanity(value), {
+      message: "Please keep the language professional.",
+    }),
   comments: z
     .string()
     .trim()
     .min(2, { message: "Add a few details so the team gets it right." })
-    .max(4000, { message: "Keep comments under 4,000 characters." }),
+    .max(4000, { message: "Keep comments under 4,000 characters." })
+    .refine((value) => !containsProfanity(value), {
+      message: "Please keep the language professional.",
+    }),
 });
+
+// Friendly copy for the error codes the RPC raises.
+function friendlySubmitError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error ?? "");
+  if (raw.includes("duplicate_request")) {
+    return "You already have an open request with this title — we're on it. Add any extra detail as a comment instead.";
+  }
+  if (raw.includes("inappropriate_language")) {
+    return "Please keep the language professional.";
+  }
+  if (raw.includes("invalid_title")) return "Keep the title between 2 and 140 characters.";
+  if (raw.includes("invalid_description")) {
+    return "Keep comments between 2 and 4,000 characters.";
+  }
+  return "Could not send your change request.";
+}
 
 const field =
   "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60";
