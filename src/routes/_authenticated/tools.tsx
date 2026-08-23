@@ -145,19 +145,18 @@ const testEmailOptions: Array<{
 
 function TestEmailsTab() {
   const [runningTemplate, setRunningTemplate] = useState<TestEmailTemplate | "all" | null>(null);
-  const adminEmail = useQuery({
-    queryKey: ["tools", "test-email-recipient"],
-    queryFn: async () => {
-      const { data } = await supabase.auth.getUser();
-      return data.user?.email ?? "your admin email";
-    },
-  });
 
   async function sendTest(template: TestEmailTemplate) {
     const { data, error } = await supabase.functions.invoke("email-automations", {
       body: { action: "test", template },
     });
-    if (error) throw error;
+    if (error) {
+      throw new Error(
+        error.message.includes("Failed to send a request")
+          ? "The email test service is not deployed or reachable yet."
+          : error.message,
+      );
+    }
     if (data?.status !== "sent") {
       throw new Error(data?.error || `${template} test email was not sent.`);
     }
@@ -168,7 +167,7 @@ function TestEmailsTab() {
     try {
       if (template === "all") {
         for (const option of testEmailOptions) await sendTest(option.template);
-        toast.success("All 3 test emails were sent to your admin email.");
+        toast.success("All 3 tests were sent to both admin email addresses.");
       } else {
         await sendTest(template);
         toast.success(
@@ -190,8 +189,8 @@ function TestEmailsTab() {
           <div>
             <h2 className="text-base font-semibold text-foreground">Test emails</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Send real previews to {adminEmail.data ?? "your admin email"}. Tests do not contact
-              clients or change the live notification switches.
+              Send real previews to dr3amwavemedia@gmail.com and jean@dwmsrq.com. Tests do not
+              contact clients or change the live notification switches.
             </p>
           </div>
         </div>
