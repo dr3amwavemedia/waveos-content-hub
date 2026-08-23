@@ -86,7 +86,6 @@ async function authenticatedStaff(request: Request) {
   return role ? context : null;
 }
 
-
 async function clientEmails(db: ReturnType<typeof adminClient>, workspaceId: string) {
   const { data: members, error } = await db
     .from("workspace_members")
@@ -95,6 +94,20 @@ async function clientEmails(db: ReturnType<typeof adminClient>, workspaceId: str
   if (error) throw error;
   const results = await Promise.all(
     (members ?? []).map(({ user_id }) => db.auth.admin.getUserById(user_id)),
+  );
+  return [
+    ...new Set(results.map(({ data }) => data.user?.email?.toLowerCase()).filter(Boolean)),
+  ] as string[];
+}
+
+async function staffEmails(db: ReturnType<typeof adminClient>) {
+  const { data: roles, error } = await db
+    .from("user_roles")
+    .select("user_id")
+    .in("role", ["dream_wave_owner", "dream_wave_team"]);
+  if (error) throw error;
+  const results = await Promise.all(
+    (roles ?? []).map(({ user_id }) => db.auth.admin.getUserById(user_id)),
   );
   return [
     ...new Set(results.map(({ data }) => data.user?.email?.toLowerCase()).filter(Boolean)),
@@ -139,8 +152,6 @@ Deno.serve(async (request) => {
     let recipients: string[] = [];
     let subject = "";
     let html = "";
-
-
 
     if (body.type === "invite") {
       inviteId = cleanText(body.inviteId, "", 80);
@@ -239,7 +250,27 @@ Deno.serve(async (request) => {
         .eq("id", workspaceId)
         .single();
       if (error || !workspace) return json({ error: "workspace_not_found" }, 404);
-      recipients = await clientEmails(auth.db, workspaceId);
+      const { data: automation } = await auth.db
+        .from("email_automation_settings")
+        .select(
+          "client_notifications_enabled,staff_notifications_enabled,upload_notifications_enabled",
+        )
+        .eq("id", true)
+        .maybeSingle();
+      const uploadEvent = eventType === "revisions_updated" || eventType === "content_added";
+      if (uploadEvent && automation?.upload_notifications_enabled === false)
+        return json({
+          configured: Boolean(Deno.env.get("RESEND_API_KEY")),
+          sent: 0,
+          skipped: true,
+        });
+      const clientRecipients = automation?.client_notifications_enabled
+        ? await clientEmails(auth.db, workspaceId)
+        : [];
+      const staffRecipients = automation?.staff_notifications_enabled
+        ? await staffEmails(auth.db)
+        : [];
+      recipients = [...new Set([...clientRecipients, ...staffRecipients])];
       const item = cleanText(body.title, "An item");
       const status = cleanText(body.status, "updated", 60).replaceAll("_", " ");
       const url = safeHttpsUrl(body.url) ?? safeHttpsUrl(Deno.env.get("WAVEOS_APP_URL"));
