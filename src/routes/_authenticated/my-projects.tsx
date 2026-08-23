@@ -1,11 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CalendarDays, CheckCircle2, Circle, ExternalLink, FolderKanban, Loader2 } from "lucide-react";
+import { FolderKanban, Loader2 } from "lucide-react";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { Section } from "@/components/app/section";
+import {
+  ClientProjectDetails,
+  ProjectDateChips,
+} from "@/components/app/client-project-details";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { useClientProjects } from "@/hooks/use-client-projects";
-import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/my-projects")({
   head: () => ({
@@ -36,13 +39,6 @@ const STATUS_LABELS: Record<string, string> = {
   review: "In review",
   complete: "Complete",
 };
-
-function formatDate(value: string | null) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
 
 function MyProjectsPage() {
   const { activeWorkspace } = useWorkspace();
@@ -81,11 +77,6 @@ function MyProjectsPage() {
             const notes = (data?.notes ?? []).filter((n) => n.project_id === project.id);
             const references = (data?.references ?? []).filter((r) => r.project_id === project.id);
             const done = milestones.filter((m) => m.status === "done").length;
-            const dates = [
-              ["Starts", formatDate(project.start_date)],
-              ["Event", formatDate(project.event_date)],
-              ["Wraps", formatDate(project.end_date)],
-            ].filter(([, value]) => Boolean(value)) as [string, string][];
 
             return (
               <Section
@@ -98,15 +89,11 @@ function MyProjectsPage() {
                     <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary ring-1 ring-primary/20">
                       {STATUS_LABELS[project.status] ?? project.status}
                     </span>
-                    {dates.map(([label, value]) => (
-                      <span
-                        key={label}
-                        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1 text-xs text-muted-foreground"
-                      >
-                        <CalendarDays className="h-3.5 w-3.5" />
-                        {label} {value}
-                      </span>
-                    ))}
+                    <ProjectDateChips
+                      startDate={project.start_date}
+                      eventDate={project.event_date}
+                      endDate={project.end_date}
+                    />
                     {milestones.length > 0 && (
                       <span className="rounded-full border border-border bg-elevated px-3 py-1 text-xs text-muted-foreground">
                         {done}/{milestones.length} milestones complete
@@ -114,93 +101,12 @@ function MyProjectsPage() {
                     )}
                   </div>
 
-                  {milestones.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Milestones
-                      </div>
-                      <ul className="space-y-2">
-                        {milestones.map((milestone) => {
-                          const complete = milestone.status === "done";
-                          const due = formatDate(milestone.due_at);
-                          return (
-                            <li
-                              key={milestone.id}
-                              className="flex flex-wrap items-start gap-3 rounded-xl border border-border bg-elevated p-3"
-                            >
-                              {complete ? (
-                                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                              ) : (
-                                <Circle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <div
-                                  className={cn(
-                                    "text-sm font-medium text-foreground",
-                                    complete && "text-muted-foreground line-through",
-                                  )}
-                                >
-                                  {milestone.title}
-                                </div>
-                                {milestone.description && (
-                                  <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                                    {milestone.description}
-                                  </p>
-                                )}
-                              </div>
-                              {due && (
-                                <span className="text-xs text-muted-foreground">Due {due}</span>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </div>
-                  )}
-
-                  {notes.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Updates
-                      </div>
-                      <ul className="space-y-2">
-                        {notes.map((note) => (
-                          <li
-                            key={note.id}
-                            className="rounded-xl border border-border bg-elevated p-3 text-sm text-foreground"
-                          >
-                            <p className="whitespace-pre-wrap break-words">{note.body}</p>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {formatDate(note.created_at)}
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {references.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        Shared links
-                      </div>
-                      <ul className="flex flex-wrap gap-2">
-                        {references.map((reference) => (
-                          <li key={reference.id}>
-                            <a
-                              href={reference.url}
-                              target="_blank"
-                              rel="noreferrer noopener"
-                              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1.5 text-xs text-foreground transition-colors hover:bg-surface-2"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              {reference.title}
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
+                  <ClientProjectDetails
+                    milestones={milestones}
+                    notes={notes}
+                    references={references}
+                    changeRequests={data?.changeRequests ?? []}
+                  />
                 </div>
               </Section>
             );
