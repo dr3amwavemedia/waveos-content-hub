@@ -370,6 +370,9 @@ function ProjectDetail({
   const [description, setDescription] = useState(project.description ?? "");
   const [businessName, setBusinessName] = useState(project.business_name ?? "");
   const [clientName, setClientName] = useState(project.client_name ?? "");
+  const [startDate, setStartDate] = useState(project.start_date ?? "");
+  const [eventDate, setEventDate] = useState(project.event_date ?? "");
+  const [endDate, setEndDate] = useState(project.end_date ?? "");
   const [noteBody, setNoteBody] = useState("");
   const [noteVisibility, setNoteVisibility] = useState("internal");
   const [milestoneTitle, setMilestoneTitle] = useState("");
@@ -598,6 +601,40 @@ function ProjectDetail({
           placeholder="Project description"
           className={inputClass}
         />
+        <div className="grid gap-2 md:grid-cols-3">
+          <label className="space-y-1 text-xs text-muted-foreground">
+            Start date
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className={inputClass}
+            />
+          </label>
+          <label className="space-y-1 text-xs text-muted-foreground">
+            Shoot / event date <span className="text-primary">(shown to client)</span>
+            <input
+              type="date"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+              className={inputClass}
+            />
+          </label>
+          <label className="space-y-1 text-xs text-muted-foreground">
+            Wrap date
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className={inputClass}
+            />
+          </label>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Publish the project to the client and anything you enter here — description, dates,
+          client-visible notes, milestones, and approved links — appears on their portal home and
+          Your Projects page automatically.
+        </p>
         <button
           onClick={() =>
             onPatch({
@@ -605,6 +642,9 @@ function ProjectDetail({
               description: description.trim() || null,
               business_name: businessName.trim() || null,
               client_name: clientName.trim() || null,
+              start_date: startDate || null,
+              event_date: eventDate || null,
+              end_date: endDate || null,
             })
           }
           className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
