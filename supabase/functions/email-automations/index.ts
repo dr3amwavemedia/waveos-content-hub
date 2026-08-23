@@ -1,6 +1,7 @@
 import { adminClient, corsHeaders, json } from "../_shared/outlook.ts";
 
 const portal = "https://waveos.dreamwavemedia.co";
+const TEST_ADMIN_EMAILS = ["dr3amwavemedia@gmail.com", "jean@dwmsrq.com"] as const;
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
@@ -105,8 +106,22 @@ Deno.serve(async (request) => {
       } as const;
       const template = templates[body.template as keyof typeof templates];
       if (!template) return json({ error: "invalid_template" }, 400);
-      const result = await send(auth.user.email, template[0], layout(template[1], template[2]));
-      return result.status === "failed" ? json({ error: result.error }, 502) : json(result);
+      const results = await Promise.all(
+        TEST_ADMIN_EMAILS.map(async (recipient) => ({
+          recipient,
+          ...(await send(recipient, template[0], layout(template[1], template[2]))),
+        })),
+      );
+      const failure = results.find((result) => result.status !== "sent");
+      if (failure)
+        return json(
+          {
+            error: failure.error ?? `Test email to ${failure.recipient} was not sent.`,
+            results,
+          },
+          failure.status === "failed" ? 502 : 503,
+        );
+      return json({ status: "sent", sent: results.length, recipients: TEST_ADMIN_EMAILS, results });
     }
 
     if (
