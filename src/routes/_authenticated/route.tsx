@@ -32,13 +32,35 @@ const db = supabase as unknown as {
   from: (table: string) => any;
 };
 
+// OAuth/session persistence can finish a moment after the browser returns to
+// WaveOS. Wait briefly for the client session before treating the visitor as
+// signed out; otherwise a successful login can bounce straight back to /auth.
+async function getAuthenticatedUser() {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session?.user) {
+      const { data, error } = await supabase.auth.getUser();
+      if (!error && data.user) return data.user;
+      // A locally persisted Supabase session is enough to avoid destroying a
+      // just-completed sign-in while token validation catches up.
+      return sessionData.session.user;
+    }
+    if (attempt < 11) {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+
+  const { data, error } = await supabase.auth.getUser();
+  return error ? null : data.user;
+}
+
 // Integration-managed pattern: ssr:false + client-side session check.
 // Supabase stores the session in localStorage, which the server cannot read.
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async ({ location }) => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) {
+    const user = await getAuthenticatedUser();
+    if (!user) {
       throw redirect({ to: "/auth", search: { next: location.href } });
     }
 
@@ -71,7 +93,7 @@ export const Route = createFileRoute("/_authenticated")({
     const { data: roles, error: rolesError } = await db
       .from("user_roles")
       .select("role,staff_type")
-      .eq("user_id", data.user.id);
+      .eq("user_id", user.id);
 
     if (rolesError) {
       console.error("[WaveOS role lookup failed]", rolesError);
@@ -79,7 +101,7 @@ export const Route = createFileRoute("/_authenticated")({
       const { data: fallbackRoles, error: fallbackError } = await db
         .from("user_roles")
         .select("role")
-        .eq("user_id", data.user.id);
+        .eq("user_id", user.id);
 
       if (fallbackError) {
         console.error("[WaveOS fallback role lookup failed]", fallbackError);
@@ -115,7 +137,7 @@ export const Route = createFileRoute("/_authenticated")({
       throw redirect({ to: isCrew ? "/videographer" : "/home" });
     }
 
-    return { user: data.user };
+    return { user };
   },
   component: AuthenticatedLayout,
   errorComponent: AuthenticatedError,
