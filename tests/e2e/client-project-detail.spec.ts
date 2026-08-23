@@ -191,6 +191,33 @@ test.describe("client project detail", () => {
       page.getByText("The current one feels too dark for spring.", { exact: true }),
     ).toBeVisible();
   });
+
+  test("shows the specific validation reason when a submission is rejected", async ({ page }) => {
+    let rpcCalls = 0;
+    await mockSupabaseRest(page, {
+      tables: clientTables,
+      rpc: {
+        create_client_service_request: () => {
+          rpcCalls += 1;
+          return NEW_REQUEST_ID;
+        },
+      },
+    });
+    await page.goto("/home");
+
+    await page.getByRole("button", { name: /view details/i }).click();
+    await page.getByRole("button", { name: /request a change/i }).click();
+
+    // Profanity fails the client-side refine, which short-circuits before the
+    // RPC — the user must see why, not the generic fallback.
+    await page.getByLabel(/what should change/i).fill("Make the cover photo shit");
+    await page.getByLabel(/comments for the team/i).fill("The current one feels too dark.");
+    await page.getByRole("button", { name: /send change request/i }).click();
+
+    await expect(page.getByText("Please keep the language professional.")).toBeVisible();
+    await expect(page.getByText("Could not send your change request.")).toHaveCount(0);
+    expect(rpcCalls).toBe(0);
+  });
 });
 
 test.describe("production health banner", () => {

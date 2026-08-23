@@ -16,10 +16,14 @@ import { defineConfig, devices } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "./tests/e2e",
-  fullyParallel: true,
+  // Serial workers: every test drives the same dev-mode Vite server, and
+  // parallel cold SSR transforms make pages render blank inside the expect
+  // timeout. One worker keeps runs deterministic.
+  fullyParallel: false,
+  workers: 1,
   reporter: [["list"]],
   timeout: 30_000,
-  expect: { timeout: 5_000 },
+  expect: { timeout: 10_000 },
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:8080",
     viewport: { width: 1280, height: 900 },
