@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { errorMessage } from "@/lib/error-message";
+import { formatInTimeZone, zonedDateTimeToIso } from "@/lib/date-time";
 
 type ClientContact = {
   first_name: string;
@@ -143,6 +144,33 @@ export function ProductionProjectsPanel() {
     },
   });
 
+  const workspaceTimeZonesQ = useQuery({
+    queryKey: ["production", "client-workspace-timezones", clientsQ.data],
+    enabled: !!clientsQ.data,
+    queryFn: async () => {
+      const workspaceIds = Array.from(
+        new Set((clientsQ.data ?? []).flatMap((client) => client.linked_workspace_id ?? [])),
+      );
+      if (!workspaceIds.length) return new Map<string, string>();
+      const { data, error } = await db
+        .from("workspaces")
+        .select("id,timezone")
+        .in("id", workspaceIds);
+      if (error) throw error;
+      return new Map<string, string>(
+        (data ?? []).map((workspace: { id: string; timezone: string | null }) => [
+          workspace.id,
+          workspace.timezone || "UTC",
+        ]),
+      );
+    },
+  });
+
+  const selectedClient = clientsQ.data?.find((client) => client.id === clientId);
+  const selectedTimeZone = selectedClient?.linked_workspace_id
+    ? (workspaceTimeZonesQ.data?.get(selectedClient.linked_workspace_id) ?? "UTC")
+    : "UTC";
+
   const projectsQ = useQuery({
     queryKey: ["production", "projects"],
     queryFn: async () => {
@@ -162,11 +190,21 @@ export function ProductionProjectsPanel() {
       const client = clientsQ.data?.find((entry) => entry.id === clientId);
       if (!client) throw new Error("Choose a client.");
       if (!title.trim()) throw new Error("Enter a production title.");
+      let assignmentTimeZone = "UTC";
+      if (client.linked_workspace_id) {
+        const { data: workspace, error: workspaceError } = await db
+          .from("workspaces")
+          .select("timezone")
+          .eq("id", client.linked_workspace_id)
+          .single();
+        if (workspaceError) throw workspaceError;
+        assignmentTimeZone = workspace.timezone || "UTC";
+      }
       const { error } = await db.rpc("assign_production_project", {
         _title: title.trim(),
         _crm_account_id: client.id,
         _assigned_to: user?.userId ?? null,
-        _scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+        _scheduled_at: scheduledAt ? zonedDateTimeToIso(scheduledAt, assignmentTimeZone) : null,
         _location: location.trim() || null,
         _client_snapshot: snapshotFor(client),
       });
@@ -179,6 +217,7 @@ export function ProductionProjectsPanel() {
       setLocation("");
       setCreating(false);
       qc.invalidateQueries({ queryKey: ["production", "projects"] });
+      qc.invalidateQueries({ queryKey: ["production-calendar"] });
       toast.success("Production assigned with synced client information.");
     },
     onError: (error: unknown) => toast.error(errorMessage(error, "Could not assign production.")),
@@ -200,6 +239,7 @@ export function ProductionProjectsPanel() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["production", "projects"] });
+      qc.invalidateQueries({ queryKey: ["production-calendar"] });
       toast.success("Client information synced from WaveCRM.");
     },
     onError: (error: unknown) =>
@@ -211,7 +251,10 @@ export function ProductionProjectsPanel() {
       const { error } = await db.from("production_projects").update({ status }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["production", "projects"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["production", "projects"] });
+      qc.invalidateQueries({ queryKey: ["production-calendar"] });
+    },
     onError: (error: unknown) =>
       toast.error(error instanceof Error ? error.message : "Could not update production."),
   });
@@ -256,6 +299,11 @@ export function ProductionProjectsPanel() {
               placeholder="Darcie listing video"
               className="min-h-12 w-full rounded-xl border border-border bg-background px-3 py-3 text-base outline-none focus:border-primary sm:text-sm"
             />
+            {scheduledAt && (
+              <span className="block text-[10px] text-muted-foreground">
+                Client timezone: {selectedTimeZone}
+              </span>
+            )}
           </label>
           <label className="space-y-1 xl:col-span-2">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -336,6 +384,9 @@ export function ProductionProjectsPanel() {
           <div className="grid gap-3 lg:grid-cols-2">
             {projectsQ.data!.map((project) => {
               const client = project.client_snapshot ?? ({} as ClientSnapshot);
+              const projectTimeZone = project.workspace_id
+                ? (workspaceTimeZonesQ.data?.get(project.workspace_id) ?? "UTC")
+                : "UTC";
               return (
                 <article
                   key={project.id}
@@ -370,7 +421,10 @@ export function ProductionProjectsPanel() {
                     {project.scheduled_at && (
                       <div className="flex min-h-11 items-center gap-2 rounded-xl bg-background/50 px-3 py-2">
                         <CalendarDays className="h-3.5 w-3.5 text-primary" />
-                        {new Date(project.scheduled_at).toLocaleString()}
+                        {formatInTimeZone(project.scheduled_at, projectTimeZone, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
                       </div>
                     )}
                     {(project.location || client.address) && (
