@@ -126,7 +126,7 @@ export function ClientProjectDetails({
         </div>
       )}
 
-      {changeRequests.length > 0 && (
+      {(changeRequests.length > 0 || serviceRequests.length > 0) && (
         <div className="space-y-2">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Requested changes
@@ -146,6 +146,37 @@ export function ClientProjectDetails({
                 </div>
               </li>
             ))}
+            {serviceRequests.map((request) => {
+              const done = request.status === "completed" || request.status === "closed";
+              return (
+                <li
+                  key={request.id}
+                  className="flex items-start gap-3 rounded-xl border border-border bg-elevated p-3"
+                >
+                  {done ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  ) : (
+                    <MessageSquareWarning className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-foreground">{request.title}</span>
+                      <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary ring-1 ring-primary/20">
+                        {SERVICE_STATUS_LABELS[request.status] ?? request.status}
+                      </span>
+                    </div>
+                    {request.description && (
+                      <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                        {request.description}
+                      </p>
+                    )}
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      Sent {formatProjectDate(request.created_at) ?? "recently"}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
