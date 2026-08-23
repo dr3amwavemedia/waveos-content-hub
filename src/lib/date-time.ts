@@ -18,6 +18,25 @@ export function dateKeyInTimeZone(iso: string, timeZone: string) {
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
+// Postgres `date` columns are calendar dates, not UTC instants. Parsing a
+// YYYY-MM-DD value with `new Date(value)` shifts it to the previous day in
+// timezones west of UTC, so construct date-only values in local calendar time.
+export function projectDateToLocalDate(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match) {
+    const [, year, month, day] = match.map(Number);
+    return new Date(year, month - 1, day);
+  }
+  return new Date(value);
+}
+
+export function formatProjectDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = projectDateToLocalDate(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
 export function isoToDateTimeLocal(iso: string, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone,

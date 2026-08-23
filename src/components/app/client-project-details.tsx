@@ -1,4 +1,10 @@
-import { CalendarDays, CheckCircle2, Circle, ExternalLink, MessageSquareWarning } from "lucide-react";
+import {
+  CalendarDays,
+  CheckCircle2,
+  Circle,
+  ExternalLink,
+  MessageSquareWarning,
+} from "lucide-react";
 
 import { PortalReturnHint } from "@/components/app/portal-return-hint";
 import { RequestChangeForm } from "@/components/app/request-change-form";
@@ -9,6 +15,7 @@ import type {
   ClientProjectReference,
   ClientServiceRequest,
 } from "@/hooks/use-client-projects";
+import { formatProjectDate } from "@/lib/date-time";
 import { cn } from "@/lib/utils";
 
 // Client-friendly labels for the client_requests service status lifecycle.
@@ -20,13 +27,6 @@ const SERVICE_STATUS_LABELS: Record<string, string> = {
   completed: "Completed",
   closed: "Closed",
 };
-
-export function formatProjectDate(value: string | null | undefined) {
-  if (!value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
 
 // Shared client-facing project detail body: milestones, updates, approved
 // links, and requested changes. Used by the home "Upcoming shoot" spotlight
