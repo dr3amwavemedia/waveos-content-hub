@@ -4,7 +4,6 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
 const POST_AUTH_NEXT_KEY = "waveos.postAuthNext";
@@ -26,7 +25,6 @@ export const Route = createFileRoute("/auth")({
   }),
 });
 
-// Only accept same-origin relative paths as post-signin destinations.
 function safeNext(next: string | undefined): string {
   if (!next) return "/home";
   if (!next.startsWith("/") || next.startsWith("//")) return "/home";
@@ -93,9 +91,7 @@ function AuthPage() {
     setBusy(false);
     if (error) {
       sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
-      toast.error(
-        error.message === "Invalid login credentials" ? "That email or password isn't right." : error.message,
-      );
+      toast.error(error.message === "Invalid login credentials" ? "That email or password isn't right." : error.message);
       return;
     }
     toast.success("Welcome back.");
@@ -115,30 +111,20 @@ function AuthPage() {
 
   async function handleGoogle() {
     setBusy(true);
-
     try {
       sessionStorage.setItem(POST_AUTH_NEXT_KEY, nextPath);
-
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth-callback`,
-        extraParams: {
-          prompt: "select_account",
-          ...(email ? { login_hint: email } : {}),
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth-callback`,
+          queryParams: {
+            prompt: "select_account",
+            ...(email ? { login_hint: email } : {}),
+          },
         },
       });
-
-      if (result.error) throw result.error;
-
-      if (!result.redirected) {
-        if (result.tokens) {
-          const { error } = await supabase.auth.setSession(result.tokens);
-          if (error) throw error;
-        }
-        const target = safeNext(sessionStorage.getItem(POST_AUTH_NEXT_KEY) ?? nextPath);
-        sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
-        if (target === "/home") navigate({ to: "/home", replace: true });
-        else window.location.replace(target);
-      }
+      if (error) throw error;
+      // Browser redirects to Google on success. Keep busy state until navigation.
     } catch (error) {
       sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
       setBusy(false);
