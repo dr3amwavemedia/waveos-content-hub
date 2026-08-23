@@ -1,13 +1,25 @@
 import { CalendarDays, CheckCircle2, Circle, ExternalLink, MessageSquareWarning } from "lucide-react";
 
 import { PortalReturnHint } from "@/components/app/portal-return-hint";
+import { RequestChangeForm } from "@/components/app/request-change-form";
 import type {
   ClientProjectChangeRequest,
   ClientProjectMilestone,
   ClientProjectNote,
   ClientProjectReference,
+  ClientServiceRequest,
 } from "@/hooks/use-client-projects";
 import { cn } from "@/lib/utils";
+
+// Client-friendly labels for the client_requests service status lifecycle.
+const SERVICE_STATUS_LABELS: Record<string, string> = {
+  submitted: "Submitted",
+  reviewing: "Under review",
+  scheduled: "Scheduled",
+  in_progress: "In progress",
+  completed: "Completed",
+  closed: "Closed",
+};
 
 export function formatProjectDate(value: string | null | undefined) {
   if (!value) return null;
@@ -25,25 +37,32 @@ export function ClientProjectDetails({
   notes,
   references,
   changeRequests,
+  serviceRequests = [],
+  workspaceId,
 }: {
   milestones: ClientProjectMilestone[];
   notes: ClientProjectNote[];
   references: ClientProjectReference[];
   changeRequests: ClientProjectChangeRequest[];
+  serviceRequests?: ClientServiceRequest[];
+  // When provided, the client can submit change requests right from here.
+  workspaceId?: string;
 }) {
   const isEmpty =
-    !milestones.length && !notes.length && !references.length && !changeRequests.length;
-
-  if (isEmpty) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Your Dream Wave team hasn't added details yet — check back soon.
-      </p>
-    );
-  }
+    !milestones.length &&
+    !notes.length &&
+    !references.length &&
+    !changeRequests.length &&
+    !serviceRequests.length;
 
   return (
     <div className="space-y-5">
+      {isEmpty && (
+        <p className="text-sm text-muted-foreground">
+          Your Dream Wave team hasn't added details yet — check back soon.
+        </p>
+      )}
+
       {milestones.length > 0 && (
         <div className="space-y-2">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
@@ -107,7 +126,7 @@ export function ClientProjectDetails({
         </div>
       )}
 
-      {changeRequests.length > 0 && (
+      {(changeRequests.length > 0 || serviceRequests.length > 0) && (
         <div className="space-y-2">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Requested changes
@@ -127,6 +146,37 @@ export function ClientProjectDetails({
                 </div>
               </li>
             ))}
+            {serviceRequests.map((request) => {
+              const done = request.status === "completed" || request.status === "closed";
+              return (
+                <li
+                  key={request.id}
+                  className="flex items-start gap-3 rounded-xl border border-border bg-elevated p-3"
+                >
+                  {done ? (
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  ) : (
+                    <MessageSquareWarning className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium text-foreground">{request.title}</span>
+                      <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary ring-1 ring-primary/20">
+                        {SERVICE_STATUS_LABELS[request.status] ?? request.status}
+                      </span>
+                    </div>
+                    {request.description && (
+                      <p className="mt-1 whitespace-pre-wrap break-words text-xs text-muted-foreground">
+                        {request.description}
+                      </p>
+                    )}
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      Sent {formatProjectDate(request.created_at) ?? "recently"}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -154,6 +204,8 @@ export function ClientProjectDetails({
           <PortalReturnHint />
         </div>
       )}
+
+      {workspaceId && <RequestChangeForm workspaceId={workspaceId} />}
     </div>
   );
 }

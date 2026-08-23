@@ -56,6 +56,19 @@ export interface ClientProjectChangeRequest {
   updated_at: string;
 }
 
+// Client-initiated change requests (client_requests with a service status).
+// Submitted from the project detail "Request a change" form; staff move them
+// through submitted → reviewing → scheduled → in_progress → completed/closed.
+export interface ClientServiceRequest {
+  id: string;
+  title: string;
+  description: string | null;
+  request_type: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ClientProjectBundle {
   projects: ClientProject[];
   milestones: ClientProjectMilestone[];
@@ -64,6 +77,7 @@ export interface ClientProjectBundle {
   // Workspace-scoped: content the client asked to be changed. Shown in every
   // project detail so "requested changes" is visible in one place.
   changeRequests: ClientProjectChangeRequest[];
+  serviceRequests: ClientServiceRequest[];
 }
 
 async function loadClientProjects(workspaceId: string): Promise<ClientProjectBundle> {
@@ -89,8 +103,20 @@ async function loadClientProjects(workspaceId: string): Promise<ClientProjectBun
     .order("updated_at", { ascending: false });
   const changeRequests = (changeRequestsQ.data ?? []) as ClientProjectChangeRequest[];
 
+  // Client-initiated change requests carry a service status; older Phase 4
+  // approval requests have status NULL and stay out of this list.
+  const serviceRequestsQ = await db
+    .from("client_requests")
+    .select("id,title,description,request_type,status,created_at,updated_at")
+    .eq("workspace_id", workspaceId)
+    .not("status", "is", null)
+    .order("created_at", { ascending: false });
+  const serviceRequests = (serviceRequestsQ.data ?? []) as ClientServiceRequest[];
+
   const ids = rows.map((project) => project.id);
-  if (!ids.length) return { projects: [], milestones: [], notes: [], references: [], changeRequests };
+  if (!ids.length) {
+    return { projects: [], milestones: [], notes: [], references: [], changeRequests, serviceRequests };
+  }
 
   const [milestones, notes, references] = await Promise.all([
     db
@@ -120,6 +146,7 @@ async function loadClientProjects(workspaceId: string): Promise<ClientProjectBun
     notes: (notes.data ?? []) as ClientProjectNote[],
     references: (references.data ?? []) as ClientProjectReference[],
     changeRequests,
+    serviceRequests,
   };
 }
 

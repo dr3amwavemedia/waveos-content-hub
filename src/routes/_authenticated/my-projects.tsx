@@ -106,6 +106,8 @@ function MyProjectsPage() {
                     notes={notes}
                     references={references}
                     changeRequests={data?.changeRequests ?? []}
+                    serviceRequests={data?.serviceRequests ?? []}
+                    workspaceId={activeWorkspace?.id ?? undefined}
                   />
                 </div>
               </Section>
