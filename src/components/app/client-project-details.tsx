@@ -37,25 +37,32 @@ export function ClientProjectDetails({
   notes,
   references,
   changeRequests,
+  serviceRequests = [],
+  workspaceId,
 }: {
   milestones: ClientProjectMilestone[];
   notes: ClientProjectNote[];
   references: ClientProjectReference[];
   changeRequests: ClientProjectChangeRequest[];
+  serviceRequests?: ClientServiceRequest[];
+  // When provided, the client can submit change requests right from here.
+  workspaceId?: string;
 }) {
   const isEmpty =
-    !milestones.length && !notes.length && !references.length && !changeRequests.length;
-
-  if (isEmpty) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        Your Dream Wave team hasn't added details yet — check back soon.
-      </p>
-    );
-  }
+    !milestones.length &&
+    !notes.length &&
+    !references.length &&
+    !changeRequests.length &&
+    !serviceRequests.length;
 
   return (
     <div className="space-y-5">
+      {isEmpty && (
+        <p className="text-sm text-muted-foreground">
+          Your Dream Wave team hasn't added details yet — check back soon.
+        </p>
+      )}
+
       {milestones.length > 0 && (
         <div className="space-y-2">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
