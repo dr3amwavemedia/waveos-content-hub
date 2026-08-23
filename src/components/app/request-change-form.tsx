@@ -109,6 +109,10 @@ export function RequestChangeForm({ workspaceId }: { workspaceId: string }) {
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
+    // Duplicate submission prevention: ignore repeat submits (double-click,
+    // Enter key) while a request is already in flight. The server also
+    // rejects duplicate open requests as the real gate.
+    if (submit.isPending) return;
     submit.mutate();
   }
 
