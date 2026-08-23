@@ -122,9 +122,10 @@ export function UpcomingShootPanel() {
       </button>
 
       <div
+        aria-hidden={!expanded}
         className={cn(
           "relative grid transition-all duration-300",
-          expanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
+          expanded ? "grid-rows-[1fr] opacity-100" : "invisible grid-rows-[0fr] opacity-0",
         )}
       >
         <div className="min-h-0 overflow-hidden">
