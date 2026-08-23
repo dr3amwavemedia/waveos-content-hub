@@ -1,13 +1,25 @@
 import { CalendarDays, CheckCircle2, Circle, ExternalLink, MessageSquareWarning } from "lucide-react";
 
 import { PortalReturnHint } from "@/components/app/portal-return-hint";
+import { RequestChangeForm } from "@/components/app/request-change-form";
 import type {
   ClientProjectChangeRequest,
   ClientProjectMilestone,
   ClientProjectNote,
   ClientProjectReference,
+  ClientServiceRequest,
 } from "@/hooks/use-client-projects";
 import { cn } from "@/lib/utils";
+
+// Client-friendly labels for the client_requests service status lifecycle.
+const SERVICE_STATUS_LABELS: Record<string, string> = {
+  submitted: "Submitted",
+  reviewing: "Under review",
+  scheduled: "Scheduled",
+  in_progress: "In progress",
+  completed: "Completed",
+  closed: "Closed",
+};
 
 export function formatProjectDate(value: string | null | undefined) {
   if (!value) return null;
