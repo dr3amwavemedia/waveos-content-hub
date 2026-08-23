@@ -146,6 +146,7 @@ async function loadClientProjects(workspaceId: string): Promise<ClientProjectBun
     notes: (notes.data ?? []) as ClientProjectNote[],
     references: (references.data ?? []) as ClientProjectReference[],
     changeRequests,
+    serviceRequests,
   };
 }
 
