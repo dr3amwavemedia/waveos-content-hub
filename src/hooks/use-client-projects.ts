@@ -103,8 +103,20 @@ async function loadClientProjects(workspaceId: string): Promise<ClientProjectBun
     .order("updated_at", { ascending: false });
   const changeRequests = (changeRequestsQ.data ?? []) as ClientProjectChangeRequest[];
 
+  // Client-initiated change requests carry a service status; older Phase 4
+  // approval requests have status NULL and stay out of this list.
+  const serviceRequestsQ = await db
+    .from("client_requests")
+    .select("id,title,description,request_type,status,created_at,updated_at")
+    .eq("workspace_id", workspaceId)
+    .not("status", "is", null)
+    .order("created_at", { ascending: false });
+  const serviceRequests = (serviceRequestsQ.data ?? []) as ClientServiceRequest[];
+
   const ids = rows.map((project) => project.id);
-  if (!ids.length) return { projects: [], milestones: [], notes: [], references: [], changeRequests };
+  if (!ids.length) {
+    return { projects: [], milestones: [], notes: [], references: [], changeRequests, serviceRequests };
+  }
 
   const [milestones, notes, references] = await Promise.all([
     db
