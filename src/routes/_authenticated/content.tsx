@@ -39,6 +39,7 @@ function ContentLibrary() {
   const [tag, setTag] = useState<string | null>(null);
   const [selected, setSelected] = useState<MediaAsset | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const foldersQ = useMediaFolders(workspaceId);
   const assetsQ = useMediaAssets(workspaceId, {
@@ -71,8 +72,6 @@ function ContentLibrary() {
       </div>
     );
   }
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function handleFiles(files: FileList | null) {
     if (!files || !files.length) return;
