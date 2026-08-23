@@ -15,6 +15,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Search,
   Trash2,
   Users2,
   X,
@@ -190,6 +191,7 @@ const db = supabase as unknown as {
 
 function ClientsPage() {
   const [open, setOpen] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
   const [newInviteLink, setNewInviteLink] = useState<{
     link: string;
     email: string;
@@ -288,6 +290,18 @@ function ClientsPage() {
     },
   });
 
+  const normalizedClientSearch = clientSearch.trim().toLocaleLowerCase();
+  const visibleWorkspaces = (workspacesQ.data ?? []).filter((workspace) => {
+    if (!normalizedClientSearch) return true;
+    return [
+      workspace.name,
+      workspace.slug,
+      workspace.industry,
+      workspace.account_status,
+      workspace.access_tier,
+    ].some((value) => value?.toLocaleLowerCase().includes(normalizedClientSearch));
+  });
+
   const setLegacyStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: WorkspaceStatusLegacy }) => {
       const { error } = await supabase
@@ -332,6 +346,31 @@ function ClientsPage() {
         </button>
       </header>
 
+      <div className="relative max-w-xl">
+        <Search
+          aria-hidden="true"
+          className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+        />
+        <input
+          type="search"
+          value={clientSearch}
+          onChange={(event) => setClientSearch(event.target.value)}
+          placeholder="Search clients by name, industry, status, or workspace…"
+          aria-label="Search clients"
+          className="h-11 w-full rounded-xl border border-border bg-surface pl-11 pr-10 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+        />
+        {clientSearch && (
+          <button
+            type="button"
+            onClick={() => setClientSearch("")}
+            aria-label="Clear client search"
+            className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:bg-elevated hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       {weddingColumnsMissing && (
         <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
           Wedding portal settings are awaiting a database migration. All clients below are still
@@ -365,10 +404,18 @@ function ClientsPage() {
               body="Click New client to create your first workspace and send an invite."
             />
           </div>
+        ) : visibleWorkspaces.length === 0 ? (
+          <div className="p-6">
+            <EmptyState
+              icon={Search}
+              title="No clients found"
+              body={`No clients match “${clientSearch.trim()}”. Try a different search.`}
+            />
+          </div>
         ) : (
           <>
             <div className="divide-y divide-border/60 md:hidden">
-              {(workspacesQ.data ?? []).map((w) => (
+              {visibleWorkspaces.map((w) => (
                 <article key={w.id} className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -437,7 +484,7 @@ function ClientsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {(workspacesQ.data ?? []).map((w) => (
+                  {visibleWorkspaces.map((w) => (
                     <tr key={w.id} className="border-t border-border/60 hover:bg-elevated/40">
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-2">

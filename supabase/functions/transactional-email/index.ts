@@ -53,8 +53,12 @@ const layout = (
 <p style="margin:0 0 26px;font-size:16px;line-height:1.65;color:#405766">${escapeHtml(message)}</p>
 ${button ? `<a href="${escapeHtml(button.url)}" style="display:inline-block;background:#07597a;color:#fff;text-decoration:none;border-radius:12px;padding:14px 24px;font-family:Inter,'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.2;font-weight:600;box-shadow:0 8px 20px rgba(7,89,122,.2)">${escapeHtml(button.label)} &rarr;</a>` : ""}
 </td></tr>
-<tr><td style="border-top:1px solid #e4edf1;background:#f8fbfc;padding:20px 30px"><p style="margin:0;font-size:12px;line-height:1.6;color:#71828d">This automated WaveOS email was sent by Dream Wave Media. Please do not share secure invitation or workspace links.</p></td></tr>
-</table><p style="margin:18px 0 0;font-size:11px;line-height:1.5;color:#83939c">Dream Wave Media &bull; WaveOS</p></td></tr></table></body></html>`;
+<tr><td align="center" style="border-top:1px solid #e4edf1;background:#f8fbfc;padding:24px 30px;color:#71828d">
+<p style="margin:0 0 8px;font-size:12px;line-height:1.6">Questions or concerns?<br><strong style="color:#405766">Jesse Hayes, Sales Director</strong><br><a href="tel:+19412945727" style="color:#07597a;text-decoration:none">941-294-5727</a> &bull; <a href="mailto:jessehayes@dwmsrq.com" style="color:#07597a;text-decoration:none">jessehayes@dwmsrq.com</a></p>
+<p style="margin:0 0 10px;font-size:12px;line-height:1.6"><a href="https://dwmsrq.com" style="color:#07597a;text-decoration:none;font-weight:600">dwmsrq.com</a> &bull; <a href="https://waveos.dreamwavemedia.co" style="color:#07597a;text-decoration:none;font-weight:600">Client Portal</a></p>
+<p style="margin:0;font-size:11px;line-height:1.5;color:#83939c">&copy; 2026 Dream Wave Media LLC. All rights reserved.<br>This is an automated WaveOS email. Please do not share secure invitation or workspace links.</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
 
 /** Admin notification recipients for internal WaveOS alerts. */
 const ADMIN_NOTIFICATION_EMAILS = (
