@@ -49,11 +49,21 @@ export interface ClientProjectReference {
   kind: string;
 }
 
+export interface ClientProjectChangeRequest {
+  id: string;
+  title: string;
+  status: string;
+  updated_at: string;
+}
+
 export interface ClientProjectBundle {
   projects: ClientProject[];
   milestones: ClientProjectMilestone[];
   notes: ClientProjectNote[];
   references: ClientProjectReference[];
+  // Workspace-scoped: content the client asked to be changed. Shown in every
+  // project detail so "requested changes" is visible in one place.
+  changeRequests: ClientProjectChangeRequest[];
 }
 
 async function loadClientProjects(workspaceId: string): Promise<ClientProjectBundle> {
@@ -70,8 +80,17 @@ async function loadClientProjects(workspaceId: string): Promise<ClientProjectBun
   if (error) throw error;
 
   const rows = (projects ?? []) as ClientProject[];
+
+  const changeRequestsQ = await db
+    .from("content_items")
+    .select("id,title,status,updated_at")
+    .eq("workspace_id", workspaceId)
+    .eq("status", "changes_requested")
+    .order("updated_at", { ascending: false });
+  const changeRequests = (changeRequestsQ.data ?? []) as ClientProjectChangeRequest[];
+
   const ids = rows.map((project) => project.id);
-  if (!ids.length) return { projects: [], milestones: [], notes: [], references: [] };
+  if (!ids.length) return { projects: [], milestones: [], notes: [], references: [], changeRequests };
 
   const [milestones, notes, references] = await Promise.all([
     db
@@ -100,6 +119,7 @@ async function loadClientProjects(workspaceId: string): Promise<ClientProjectBun
     milestones: (milestones.data ?? []) as ClientProjectMilestone[],
     notes: (notes.data ?? []) as ClientProjectNote[],
     references: (references.data ?? []) as ClientProjectReference[],
+    changeRequests,
   };
 }
 

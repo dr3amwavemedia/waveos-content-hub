@@ -14,6 +14,7 @@ import { StatCard } from "@/components/app/stat-card";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Layer1Overview } from "@/components/app/layer1-overview";
 import { WeddingOverview } from "@/components/app/wedding-overview";
+import { UpcomingShootPanel } from "@/components/app/upcoming-shoot";
 import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
 import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
 import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
@@ -142,6 +143,8 @@ function HomeDashboard() {
           Create post
         </Link>
       </header>
+
+      <UpcomingShootPanel />
 
       {frameioQ.data && frameioQ.data.files.length > 0 && (
         <Section title={frameioQ.data.label} subtitle="Media curated for your brand by Dream Wave.">

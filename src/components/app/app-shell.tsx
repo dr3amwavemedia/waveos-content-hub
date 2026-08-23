@@ -40,6 +40,7 @@ import { useClientProjects } from "@/hooks/use-client-projects";
 import { WorkspaceProvider, useWorkspace } from "./workspace-context";
 import { ImpersonationBanner } from "./impersonation-banner";
 import { AccountStatusBanner } from "./account-status-banner";
+import { ProductionHealthBanner } from "./production-health-banner";
 
 import type { FeatureKey } from "@/lib/permissions";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -338,6 +339,7 @@ function Shell({ children }: { children: ReactNode }) {
       <main className="min-h-screen lg:pl-64">
         <ImpersonationBanner />
         {isMediaManager && <ManagedClientBanner />}
+        <ProductionHealthBanner enabled={isOwner} />
         <AccountStatusBanner />
         <div className="mx-auto max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
           {isWeddingClient && !WEDDING_ALLOWED_PATHS.includes(pathname) ? (
