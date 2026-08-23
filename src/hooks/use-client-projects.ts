@@ -56,6 +56,19 @@ export interface ClientProjectChangeRequest {
   updated_at: string;
 }
 
+// Client-initiated change requests (client_requests with a service status).
+// Submitted from the project detail "Request a change" form; staff move them
+// through submitted → reviewing → scheduled → in_progress → completed/closed.
+export interface ClientServiceRequest {
+  id: string;
+  title: string;
+  description: string | null;
+  request_type: string;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ClientProjectBundle {
   projects: ClientProject[];
   milestones: ClientProjectMilestone[];
@@ -64,6 +77,7 @@ export interface ClientProjectBundle {
   // Workspace-scoped: content the client asked to be changed. Shown in every
   // project detail so "requested changes" is visible in one place.
   changeRequests: ClientProjectChangeRequest[];
+  serviceRequests: ClientServiceRequest[];
 }
 
 async function loadClientProjects(workspaceId: string): Promise<ClientProjectBundle> {
