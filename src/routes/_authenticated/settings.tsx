@@ -35,6 +35,7 @@ import {
   startFrameioServiceConnection,
 } from "@/hooks/use-frameio";
 import { TeamSettings } from "@/components/app/team-settings";
+import { EmailAutomationSettings } from "@/components/app/email-automation-settings";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -171,6 +172,8 @@ function SettingsPage() {
       )}
 
       {user?.isDreamWaveOwner && <FrameioServiceConnectionCard />}
+
+      {user?.isDreamWaveOwner && <EmailAutomationSettings />}
 
       {activeWorkspace && (
         <section className="space-y-4">

@@ -6,6 +6,9 @@ verify_jwt = true
 [functions.transactional-email]
 verify_jwt = true
 
+[functions.email-automations]
+verify_jwt = false
+
 [functions.outlook-oauth]
 verify_jwt = false
 

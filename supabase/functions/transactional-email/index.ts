@@ -53,8 +53,12 @@ const layout = (
 <p style="margin:0 0 26px;font-size:16px;line-height:1.65;color:#405766">${escapeHtml(message)}</p>
 ${button ? `<a href="${escapeHtml(button.url)}" style="display:inline-block;background:#07597a;color:#fff;text-decoration:none;border-radius:12px;padding:14px 24px;font-family:Inter,'Segoe UI',Arial,sans-serif;font-size:15px;line-height:1.2;font-weight:600;box-shadow:0 8px 20px rgba(7,89,122,.2)">${escapeHtml(button.label)} &rarr;</a>` : ""}
 </td></tr>
-<tr><td style="border-top:1px solid #e4edf1;background:#f8fbfc;padding:20px 30px"><p style="margin:0;font-size:12px;line-height:1.6;color:#71828d">This automated WaveOS email was sent by Dream Wave Media. Please do not share secure invitation or workspace links.</p></td></tr>
-</table><p style="margin:18px 0 0;font-size:11px;line-height:1.5;color:#83939c">Dream Wave Media &bull; WaveOS</p></td></tr></table></body></html>`;
+<tr><td align="center" style="border-top:1px solid #e4edf1;background:#f8fbfc;padding:24px 30px;color:#71828d">
+<p style="margin:0 0 8px;font-size:12px;line-height:1.6">Questions or concerns?<br><strong style="color:#405766">Jesse Hayes, Sales Director</strong><br><a href="tel:+19412945727" style="color:#07597a;text-decoration:none">941-294-5727</a> &bull; <a href="mailto:jessehayes@dwmsrq.com" style="color:#07597a;text-decoration:none">jessehayes@dwmsrq.com</a></p>
+<p style="margin:0 0 10px;font-size:12px;line-height:1.6"><a href="https://dwmsrq.com" style="color:#07597a;text-decoration:none;font-weight:600">dwmsrq.com</a> &bull; <a href="https://waveos.dreamwavemedia.co" style="color:#07597a;text-decoration:none;font-weight:600">Client Portal</a></p>
+<p style="margin:0;font-size:11px;line-height:1.5;color:#83939c">&copy; 2026 Dream Wave Media LLC. All rights reserved.<br>This is an automated WaveOS email. Please do not share secure invitation or workspace links.</p>
+</td></tr>
+</table></td></tr></table></body></html>`;
 
 /** Admin notification recipients for internal WaveOS alerts. */
 const ADMIN_NOTIFICATION_EMAILS = (
@@ -86,7 +90,6 @@ async function authenticatedStaff(request: Request) {
   return role ? context : null;
 }
 
-
 async function clientEmails(db: ReturnType<typeof adminClient>, workspaceId: string) {
   const { data: members, error } = await db
     .from("workspace_members")
@@ -95,6 +98,20 @@ async function clientEmails(db: ReturnType<typeof adminClient>, workspaceId: str
   if (error) throw error;
   const results = await Promise.all(
     (members ?? []).map(({ user_id }) => db.auth.admin.getUserById(user_id)),
+  );
+  return [
+    ...new Set(results.map(({ data }) => data.user?.email?.toLowerCase()).filter(Boolean)),
+  ] as string[];
+}
+
+async function staffEmails(db: ReturnType<typeof adminClient>) {
+  const { data: roles, error } = await db
+    .from("user_roles")
+    .select("user_id")
+    .in("role", ["dream_wave_owner", "dream_wave_team"]);
+  if (error) throw error;
+  const results = await Promise.all(
+    (roles ?? []).map(({ user_id }) => db.auth.admin.getUserById(user_id)),
   );
   return [
     ...new Set(results.map(({ data }) => data.user?.email?.toLowerCase()).filter(Boolean)),
@@ -139,8 +156,6 @@ Deno.serve(async (request) => {
     let recipients: string[] = [];
     let subject = "";
     let html = "";
-
-
 
     if (body.type === "invite") {
       inviteId = cleanText(body.inviteId, "", 80);
@@ -239,7 +254,27 @@ Deno.serve(async (request) => {
         .eq("id", workspaceId)
         .single();
       if (error || !workspace) return json({ error: "workspace_not_found" }, 404);
-      recipients = await clientEmails(auth.db, workspaceId);
+      const { data: automation } = await auth.db
+        .from("email_automation_settings")
+        .select(
+          "client_notifications_enabled,staff_notifications_enabled,upload_notifications_enabled",
+        )
+        .eq("id", true)
+        .maybeSingle();
+      const uploadEvent = eventType === "revisions_updated" || eventType === "content_added";
+      if (uploadEvent && automation?.upload_notifications_enabled === false)
+        return json({
+          configured: Boolean(Deno.env.get("RESEND_API_KEY")),
+          sent: 0,
+          skipped: true,
+        });
+      const clientRecipients = automation?.client_notifications_enabled
+        ? await clientEmails(auth.db, workspaceId)
+        : [];
+      const staffRecipients = automation?.staff_notifications_enabled
+        ? await staffEmails(auth.db)
+        : [];
+      recipients = [...new Set([...clientRecipients, ...staffRecipients])];
       const item = cleanText(body.title, "An item");
       const status = cleanText(body.status, "updated", 60).replaceAll("_", " ");
       const url = safeHttpsUrl(body.url) ?? safeHttpsUrl(Deno.env.get("WAVEOS_APP_URL"));
