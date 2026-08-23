@@ -1551,9 +1551,57 @@ export type Database = {
           },
         ]
       }
+      production_checklist_items: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          item_key: string
+          label: string
+          project_id: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          item_key: string
+          label: string
+          project_id: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          item_key?: string
+          label?: string
+          project_id?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "production_checklist_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "production_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       production_projects: {
         Row: {
           assigned_to: string | null
+          checked_in_at: string | null
+          checked_in_by: string | null
+          checked_out_at: string | null
+          checked_out_by: string | null
           client_snapshot: Json
           client_synced_at: string
           created_at: string
@@ -1561,6 +1609,7 @@ export type Database = {
           crm_account_id: string
           id: string
           location: string | null
+          production_notes: string | null
           scheduled_at: string | null
           status: string
           title: string
@@ -1569,6 +1618,10 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          checked_in_at?: string | null
+          checked_in_by?: string | null
+          checked_out_at?: string | null
+          checked_out_by?: string | null
           client_snapshot?: Json
           client_synced_at?: string
           created_at?: string
@@ -1576,6 +1629,7 @@ export type Database = {
           crm_account_id: string
           id?: string
           location?: string | null
+          production_notes?: string | null
           scheduled_at?: string | null
           status?: string
           title: string
@@ -1584,6 +1638,10 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          checked_in_at?: string | null
+          checked_in_by?: string | null
+          checked_out_at?: string | null
+          checked_out_by?: string | null
           client_snapshot?: Json
           client_synced_at?: string
           created_at?: string
@@ -1591,6 +1649,7 @@ export type Database = {
           crm_account_id?: string
           id?: string
           location?: string | null
+          production_notes?: string | null
           scheduled_at?: string | null
           status?: string
           title?: string
@@ -2832,6 +2891,10 @@ export type Database = {
       delete_empty_client_workspace: {
         Args: { _confirmation: string; _workspace_id: string }
         Returns: string
+      }
+      ensure_production_checklist: {
+        Args: { _project_id: string }
+        Returns: number
       }
       get_client_invite_overview: {
         Args: { _workspace_id: string }
