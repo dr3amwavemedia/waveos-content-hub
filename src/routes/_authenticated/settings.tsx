@@ -1,7 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Cloud, ExternalLink, Image, Loader2, Palette, Settings as SettingsIcon, ShieldCheck, Unplug, Upload } from "lucide-react";
+import {
+  CheckCircle2,
+  Cloud,
+  ExternalLink,
+  Image,
+  Loader2,
+  Palette,
+  Settings as SettingsIcon,
+  ShieldCheck,
+  Unplug,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { useWorkspace } from "@/components/app/workspace-context";
@@ -23,6 +34,7 @@ import {
   getFrameioServiceStatus,
   startFrameioServiceConnection,
 } from "@/hooks/use-frameio";
+import { TeamSettings } from "@/components/app/team-settings";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,7 +53,10 @@ function SettingsPage() {
   const canManageApproval =
     !user?.isStaff && (activeWorkspace?.role === "owner" || activeWorkspace?.role === "admin");
   const canManageBranding =
-    Boolean(user?.isStaff) || activeWorkspace?.role === "owner" || activeWorkspace?.role === "admin";
+    Boolean(user?.isStaff) ||
+    activeWorkspace?.role === "owner" ||
+    activeWorkspace?.role === "admin";
+  const canManageTeam = canManageBranding;
   const automaticApproval = activeWorkspace?.approval_required === false;
   const updateApproval = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -151,6 +166,10 @@ function SettingsPage() {
         />
       )}
 
+      {activeWorkspace && (
+        <TeamSettings workspaceId={activeWorkspace.id} canManage={canManageTeam} />
+      )}
+
       {user?.isDreamWaveOwner && <FrameioServiceConnectionCard />}
 
       {activeWorkspace && (
@@ -201,7 +220,8 @@ function FrameioServiceConnectionCard() {
   const connect = useMutation({
     mutationFn: startFrameioServiceConnection,
     onSuccess: ({ url }) => window.location.assign(url),
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Frame.io connection failed."),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Frame.io connection failed."),
   });
   const disconnect = useMutation({
     mutationFn: disconnectFrameioService,
@@ -209,7 +229,8 @@ function FrameioServiceConnectionCard() {
       await qc.invalidateQueries({ queryKey: ["frameio-service-status"] });
       toast.success("Dream Wave Frame.io disconnected.");
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Could not disconnect Frame.io."),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not disconnect Frame.io."),
   });
   const connected = status.data?.connected === true;
   return (
@@ -224,20 +245,47 @@ function FrameioServiceConnectionCard() {
             {connected && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
           </div>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            One protected company connection powers the curated Shares assigned to client workspaces.
+            One protected company connection powers the curated Shares assigned to client
+            workspaces.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {status.isLoading ? "Checking connection…" : connected ? status.data?.email || "Connected" : status.data?.configured === false ? "Developer credentials needed" : "Not connected"}
+            {status.isLoading
+              ? "Checking connection…"
+              : connected
+                ? status.data?.email || "Connected"
+                : status.data?.configured === false
+                  ? "Developer credentials needed"
+                  : "Not connected"}
           </p>
         </div>
       </div>
       {connected ? (
-        <button type="button" onClick={() => disconnect.mutate()} disabled={disconnect.isPending} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50">
-          {disconnect.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />} Disconnect
+        <button
+          type="button"
+          onClick={() => disconnect.mutate()}
+          disabled={disconnect.isPending}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
+        >
+          {disconnect.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Unplug className="h-4 w-4" />
+          )}{" "}
+          Disconnect
         </button>
       ) : (
-        <button type="button" onClick={() => connect.mutate()} disabled={status.isLoading || status.data?.configured === false || connect.isPending} className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-          {connect.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />} Connect Frame.io
+        <button
+          type="button"
+          onClick={() => connect.mutate()}
+          disabled={status.isLoading || status.data?.configured === false || connect.isPending}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+        >
+          {connect.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ExternalLink className="h-4 w-4" />
+          )}{" "}
+          Connect Frame.io
         </button>
       )}
     </section>
@@ -303,7 +351,8 @@ function WorkspaceBrandingEditor({
           <div>
             <h2 className="text-lg font-semibold text-foreground">Workspace identity</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Give {workspaceName} a private, recognizable welcome while keeping the WaveOS luxury foundation.
+              Give {workspaceName} a private, recognizable welcome while keeping the WaveOS luxury
+              foundation.
             </p>
           </div>
         </div>
@@ -311,17 +360,27 @@ function WorkspaceBrandingEditor({
       <div className="grid gap-6 p-6 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
         <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-3xl border border-primary/25 bg-elevated shadow-[var(--shadow-glow)]">
           {previewUrl ? (
-            <img src={previewUrl} alt={`${workspaceName} logo preview`} className="h-full w-full object-contain p-3" />
+            <img
+              src={previewUrl}
+              alt={`${workspaceName} logo preview`}
+              className="h-full w-full object-contain p-3"
+            />
           ) : (
             <Image className="h-8 w-8 text-primary" />
           )}
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Client logo</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Client logo
+            </span>
             <span className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-border bg-elevated px-4 py-3 text-sm font-medium text-foreground hover:border-primary/40">
               <Upload className="h-4 w-4 text-primary" />
-              {pendingLogo ? pendingLogo.name : branding.data?.logoPath ? "Replace logo" : "Upload logo"}
+              {pendingLogo
+                ? pendingLogo.name
+                : branding.data?.logoPath
+                  ? "Replace logo"
+                  : "Upload logo"}
             </span>
             <input
               type="file"
@@ -331,7 +390,9 @@ function WorkspaceBrandingEditor({
             />
           </label>
           <label className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Brand accent</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Brand accent
+            </span>
             <span className="flex items-center gap-3 rounded-xl border border-border bg-elevated px-3 py-2">
               <input
                 type="color"
@@ -442,7 +503,11 @@ function StorageConnectionCard({
           disabled={disconnect.isPending}
           className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
         >
-          {disconnect.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
+          {disconnect.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Unplug className="h-4 w-4" />
+          )}
           Disconnect
         </button>
       ) : (
@@ -452,7 +517,11 @@ function StorageConnectionCard({
           disabled={!configured || status.isLoading || connect.isPending}
           className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
         >
-          {connect.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+          {connect.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ExternalLink className="h-4 w-4" />
+          )}
           Connect
         </button>
       )}
