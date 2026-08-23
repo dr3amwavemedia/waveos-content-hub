@@ -76,7 +76,9 @@ export function RequestChangeForm({ workspaceId }: { workspaceId: string }) {
     mutationFn: async () => {
       const parsed = changeRequestSchema.safeParse({ title, comments });
       if (!parsed.success) {
-        throw new Error(parsed.error.issues[0]?.message ?? "Check your entries and try again.");
+        throw new ValidationError(
+          parsed.error.issues[0]?.message ?? "Check your entries and try again.",
+        );
       }
       const { error } = await db.rpc("create_client_service_request", {
         _workspace_id: workspaceId,
