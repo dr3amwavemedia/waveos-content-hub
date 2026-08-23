@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   Archive,
   ArchiveRestore,
+  ArrowLeft,
   Copy,
   Eye,
   EyeOff,
@@ -189,10 +190,16 @@ function ProjectsPage() {
 
   const updateProject = useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: Partial<ProjectRow> }) => {
-      const { error } = await db.from("projects").update(patch).eq("id", id);
+      const { data, error } = await db
+        .from("projects")
+        .update(patch)
+        .eq("id", id)
+        .select("id")
+        .single();
       if (error) throw error;
+      if (!data?.id) throw new Error("The project was not updated. Please try again.");
     },
-    onSuccess: refresh,
+    onSuccess: () => refresh(),
     onError: (error: unknown) =>
       toast.error(error instanceof Error ? error.message : "Could not update the project."),
   });
@@ -338,8 +345,9 @@ function ProjectsPage() {
               key={selected.id}
               project={selected}
               staff={staffQ.data ?? []}
-              onPatch={(patch) => updateProject.mutate({ id: selected.id, patch })}
+              onPatch={(patch) => updateProject.mutateAsync({ id: selected.id, patch })}
               onDuplicate={() => duplicateProject.mutate(selected)}
+              onClose={() => setSelectedId(null)}
             />
           ) : (
             <div className="surface-card p-6">
@@ -359,11 +367,13 @@ function ProjectDetail({
   staff,
   onPatch,
   onDuplicate,
+  onClose,
 }: {
   project: ProjectRow;
   staff: StaffRow[];
-  onPatch: (patch: Partial<ProjectRow>) => void;
+  onPatch: (patch: Partial<ProjectRow>) => Promise<void>;
   onDuplicate: () => void;
+  onClose: () => void;
 }) {
   const qc = useQueryClient();
   const [name, setName] = useState(project.name);
@@ -378,6 +388,20 @@ function ProjectDetail({
   const [milestoneTitle, setMilestoneTitle] = useState("");
   const [assignee, setAssignee] = useState("");
   const [position, setPosition] = useState("");
+
+  const saveDetails = useMutation({
+    mutationFn: () =>
+      onPatch({
+        name: name.trim() || project.name,
+        description: description.trim() || null,
+        business_name: businessName.trim() || null,
+        client_name: clientName.trim() || null,
+        start_date: startDate || null,
+        event_date: eventDate || null,
+        end_date: endDate || null,
+      }),
+    onSuccess: () => toast.success("Project details saved."),
+  });
 
   const assignmentsQ = useQuery({
     queryKey: ["production", "projects", project.id, "staff"],
@@ -525,11 +549,21 @@ function ProjectDetail({
     <div className="space-y-4">
       <section className="surface-card space-y-3 p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">Project details</h2>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-elevated"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" /> Back to projects
+            </button>
+            <h2 className="text-sm font-semibold">Project details</h2>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <button
+              type="button"
               onClick={() =>
-                onPatch({
+                void onPatch({
                   client_visible: !project.client_visible,
                   published_at: !project.client_visible ? new Date().toISOString() : null,
                 })
@@ -544,13 +578,15 @@ function ProjectDetail({
               {project.client_visible ? "Hide from client" : "Publish to client"}
             </button>
             <button
+              type="button"
               onClick={onDuplicate}
               className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-elevated"
             >
               <Copy className="h-3.5 w-3.5" /> Duplicate
             </button>
             <button
-              onClick={() => onPatch({ is_active: !project.is_active })}
+              type="button"
+              onClick={() => void onPatch({ is_active: !project.is_active })}
               className="inline-flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-elevated"
             >
               {project.is_active ? (
@@ -572,7 +608,7 @@ function ProjectDetail({
           />
           <select
             value={project.status}
-            onChange={(e) => onPatch({ status: e.target.value })}
+            onChange={(e) => void onPatch({ status: e.target.value })}
             className={inputClass}
           >
             {STATUSES.map((s) => (
@@ -636,20 +672,17 @@ function ProjectDetail({
           Your Projects page automatically.
         </p>
         <button
-          onClick={() =>
-            onPatch({
-              name: name.trim() || project.name,
-              description: description.trim() || null,
-              business_name: businessName.trim() || null,
-              client_name: clientName.trim() || null,
-              start_date: startDate || null,
-              event_date: eventDate || null,
-              end_date: endDate || null,
-            })
-          }
-          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+          type="button"
+          onClick={() => saveDetails.mutate()}
+          disabled={saveDetails.isPending}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
         >
-          <Save className="h-3.5 w-3.5" /> Save details
+          {saveDetails.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Save className="h-3.5 w-3.5" />
+          )}
+          {saveDetails.isPending ? "Saving…" : "Save details"}
         </button>
       </section>
 
@@ -809,6 +842,22 @@ function ProjectDetail({
           )}
         </ul>
       </section>
+
+      <div className="flex justify-end rounded-xl border border-border bg-elevated/40 p-3">
+        <button
+          type="button"
+          onClick={() => saveDetails.mutate(undefined, { onSuccess: onClose })}
+          disabled={saveDetails.isPending}
+          className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+        >
+          {saveDetails.isPending ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <ArrowLeft className="h-3.5 w-3.5" />
+          )}
+          {saveDetails.isPending ? "Saving…" : "Save details & back to project list"}
+        </button>
+      </div>
     </div>
   );
 }
