@@ -204,6 +204,8 @@ export function ClientProjectDetails({
           <PortalReturnHint />
         </div>
       )}
+
+      {workspaceId && <RequestChangeForm workspaceId={workspaceId} />}
     </div>
   );
 }
