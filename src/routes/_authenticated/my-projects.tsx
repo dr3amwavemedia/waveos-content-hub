@@ -80,7 +80,7 @@ function MyProjectsPage() {
             const milestones = (data?.milestones ?? []).filter((m) => m.project_id === project.id);
             const notes = (data?.notes ?? []).filter((n) => n.project_id === project.id);
             const references = (data?.references ?? []).filter((r) => r.project_id === project.id);
-            const done = milestones.filter((m) => m.status === "complete").length;
+            const done = milestones.filter((m) => m.status === "done").length;
             const dates = [
               ["Starts", formatDate(project.start_date)],
               ["Event", formatDate(project.event_date)],
@@ -121,7 +121,7 @@ function MyProjectsPage() {
                       </div>
                       <ul className="space-y-2">
                         {milestones.map((milestone) => {
-                          const complete = milestone.status === "complete";
+                          const complete = milestone.status === "done";
                           const due = formatDate(milestone.due_at);
                           return (
                             <li
