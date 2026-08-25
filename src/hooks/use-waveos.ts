@@ -29,6 +29,8 @@ export interface CurrentUserContext {
   actualUserId: string;
 }
 
+const STAFF_WORKSPACE_ID = "11111111-1111-1111-1111-111111111111";
+
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   from: (table: string) => any;
@@ -96,7 +98,6 @@ async function loadWorkspaces(
   ctx: CurrentUserContext,
   previewWorkspaceId: string | null,
 ): Promise<WorkspaceSummary[]> {
-  const staffWorkspaceId = "11111111-1111-1111-1111-111111111111";
   const { data: memberships } = await supabase
     .from("workspace_members")
     .select("workspace_id, role")
@@ -104,14 +105,12 @@ async function loadWorkspaces(
 
   const membershipMap = new Map((memberships ?? []).map((m) => [m.workspace_id, m.role]));
 
-  // The account switcher is for workspaces the effective account actually
-  // belongs to. During admin acting mode, ctx.userId is the selected staff id.
   const workspaceIds = previewWorkspaceId
     ? [previewWorkspaceId]
     : ctx.isDreamWaveOwner
-      ? [staffWorkspaceId]
+      ? [STAFF_WORKSPACE_ID]
       : ctx.isStaff && ctx.staffType !== "media_manager"
-        ? [staffWorkspaceId]
+        ? [STAFF_WORKSPACE_ID]
         : Array.from(membershipMap.keys());
 
   if (!workspaceIds.length && ctx.staffType !== "media_manager") return [];
@@ -122,15 +121,11 @@ async function loadWorkspaces(
     .eq("is_archived", false)
     .order("name", { ascending: true });
 
-  // Only Social Managers load the Tier 4 client pool. Admins and other staff
-  // stay in the Dream Wave Media workspace and enter an individual account
-  // through the explicit View action in the client/staff directory.
   if (ctx.staffType !== "media_manager" || previewWorkspaceId) {
     workspacesQuery = workspacesQuery.in("id", workspaceIds);
   }
 
   const { data: workspaces, error } = await workspacesQuery;
-
   if (error) throw error;
 
   const visibleWorkspaces =
@@ -143,7 +138,7 @@ async function loadWorkspaces(
               ? (workspace.feature_overrides as Record<string, unknown>)
               : {};
           return (
-            workspace.id === staffWorkspaceId ||
+            workspace.id === STAFF_WORKSPACE_ID ||
             workspace.access_tier === "social_management" ||
             overrides.social_management_access === true
           );
@@ -170,7 +165,7 @@ async function loadWorkspaces(
       approval_required: featureOverrides.automatic_content_approval !== true,
       role: (previewWorkspaceId
         ? "viewer"
-        : w.id === staffWorkspaceId && ctx.isStaff
+        : w.id === STAFF_WORKSPACE_ID && ctx.isStaff
           ? "staff"
           : (role ?? "viewer")) as "owner" | "admin" | "editor" | "approver" | "viewer" | "staff",
     };
@@ -185,10 +180,17 @@ export function useCurrentUser() {
     staleTime: 60_000,
   });
 
-  // "View as Client" must behave like a client at the UI identity layer too.
-  // Keep the real auth/session untouched so existing users and RLS behavior are
-  // unaffected, but never leak the staff position into the client preview.
-  if (!impersonate.on || !query.data) return query;
+  if (!query.data) return query;
+
+  // Identity shown in the shell must follow the workspace being viewed, not a
+  // global staff role. This covers both explicit View as Client and client
+  // workspaces reached through an existing session. Auth/RLS remain untouched.
+  const activeWorkspaceId =
+    typeof window !== "undefined" ? localStorage.getItem("waveos.active-workspace") : null;
+  const viewingClientWorkspace =
+    impersonate.on || (!!activeWorkspaceId && activeWorkspaceId !== STAFF_WORKSPACE_ID);
+
+  if (!viewingClientWorkspace) return query;
 
   return {
     ...query,
