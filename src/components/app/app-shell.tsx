@@ -28,6 +28,7 @@ import {
   FolderKanban,
 } from "lucide-react";
 import { toast } from "sonner";
+import { clearAuthenticatedBrowserState } from "@/lib/auth-session-state";
 import { NotificationsBell } from "./notifications-bell";
 
 import { cn } from "@/lib/utils";
@@ -525,6 +526,7 @@ function UserFooter() {
   async function signOut() {
     await qc.cancelQueries();
     qc.clear();
+    clearAuthenticatedBrowserState();
     await supabase.auth.signOut();
     toast.success("Signed out");
     navigate({ to: "/auth", replace: true });

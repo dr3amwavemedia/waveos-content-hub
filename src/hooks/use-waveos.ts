@@ -207,7 +207,7 @@ export function useWorkspaces() {
   const { data: user } = useCurrentUser();
   const impersonate = useImpersonateClient();
   const previewWorkspaceId =
-    typeof window !== "undefined" && impersonate.on
+    typeof window !== "undefined" && user?.isStaff === true && impersonate.on
       ? localStorage.getItem("waveos.active-workspace")
       : null;
 

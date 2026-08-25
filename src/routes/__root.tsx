@@ -13,6 +13,10 @@ import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  bindAuthenticatedBrowserState,
+  clearAuthenticatedBrowserState,
+} from "@/lib/auth-session-state";
 
 function NotFoundComponent() {
   return (
@@ -149,13 +153,18 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (
+        event !== "INITIAL_SESSION" &&
         event !== "SIGNED_IN" &&
         event !== "SIGNED_OUT" &&
         event !== "USER_UPDATED"
       )
         return;
+
+      if (event === "SIGNED_OUT") clearAuthenticatedBrowserState();
+      else if (session?.user.id) bindAuthenticatedBrowserState(session.user.id);
+
       // Router loaders and queries call Supabase. Run them after the auth
       // callback completes to avoid blocking the client auth lock.
       window.setTimeout(() => {
@@ -176,7 +185,8 @@ function RootComponent() {
           });
         }
         router.invalidate();
-        if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
+        if (event === "SIGNED_OUT") queryClient.clear();
+        else queryClient.invalidateQueries();
       }, 0);
     });
     return () => {
