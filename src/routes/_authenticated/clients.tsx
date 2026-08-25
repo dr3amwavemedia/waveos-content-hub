@@ -2798,6 +2798,216 @@ function InvitesTab({
   );
 }
 
+type ClientMember = {
+  user_id: string;
+  email: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  workspace_role: string;
+};
+
+function ClientMemberRow({
+  workspaceId,
+  member,
+  roleBusy,
+  resetBusy,
+  onChangeRole,
+  onPasswordReset,
+}: {
+  workspaceId: string;
+  member: ClientMember;
+  roleBusy: boolean;
+  resetBusy: boolean;
+  onChangeRole: (role: string) => void;
+  onPasswordReset: (email: string) => void;
+}) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [firstName, setFirstName] = useState(member.first_name ?? "");
+  const [lastName, setLastName] = useState(member.last_name ?? "");
+  const [health, setHealth] = useState<AccountHealth | null>(null);
+
+  const email = visibleAccountEmail(member.email);
+  const roleLabel =
+    member.workspace_role === "owner"
+      ? "Client owner"
+      : member.workspace_role === "approver"
+        ? "Client approver"
+        : "Client viewer";
+  const name = accountDisplayName({
+    firstName: member.first_name,
+    lastName: member.last_name,
+    email,
+    fallback: roleLabel,
+  });
+
+  const saveName = useMutation({
+    mutationFn: async () => {
+      const { error } = await db.rpc("admin_set_client_member_name", {
+        _workspace_id: workspaceId,
+        _user_id: member.user_id,
+        _first_name: firstName.trim() || null,
+        _last_name: lastName.trim() || null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setEditing(false);
+      qc.invalidateQueries({ queryKey: ["clients", "members", workspaceId] });
+      toast.success("Name updated. Their login and business name are unchanged.");
+    },
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not save name."),
+  });
+
+  const checkHealth = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await db.rpc("admin_account_health", {
+        _user_id: member.user_id,
+        _workspace_id: workspaceId,
+      });
+      if (error) throw error;
+      return data as AccountHealth;
+    },
+    onSuccess: (data) => setHealth(data),
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not run the account check."),
+  });
+
+  return (
+    <li className="rounded-lg border border-border/50 p-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm text-foreground">{name}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {[email, roleLabel].filter(Boolean).join(" · ")}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={member.workspace_role}
+            disabled={roleBusy}
+            onChange={(e) => onChangeRole(e.target.value)}
+            className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+            title="Change workspace role"
+          >
+            <option value="owner">Owner</option>
+            <option value="approver">Approver</option>
+            <option value="viewer">Viewer</option>
+          </select>
+          <button
+            type="button"
+            onClick={() => setEditing((v) => !v)}
+            className="whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-elevated"
+          >
+            {editing ? "Cancel" : "Edit name"}
+          </button>
+          <button
+            type="button"
+            onClick={() => checkHealth.mutate()}
+            disabled={checkHealth.isPending}
+            className="whitespace-nowrap rounded-lg border border-border px-3 py-1.5 text-xs text-foreground hover:bg-elevated disabled:opacity-50"
+          >
+            {checkHealth.isPending ? "Checking…" : "Account health"}
+          </button>
+          {email && (
+            <button
+              onClick={() => onPasswordReset(email)}
+              disabled={resetBusy}
+              className="whitespace-nowrap rounded-lg border border-primary/30 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
+            >
+              Send password reset
+            </button>
+          )}
+        </div>
+      </div>
+
+      {editing && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            saveName.mutate();
+          }}
+          className="mt-2 flex flex-wrap items-end gap-2 border-t border-border/50 pt-2"
+        >
+          <div className="min-w-[130px] flex-1">
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              First name
+            </label>
+            <input
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <div className="min-w-[130px] flex-1">
+            <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Last name
+            </label>
+            <input
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={saveName.isPending}
+            className="inline-flex items-center gap-2 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-60"
+          >
+            {saveName.isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Save name
+          </button>
+        </form>
+      )}
+
+      {health && <AccountHealthList health={health} />}
+    </li>
+  );
+}
+
+type HealthCheck = { ok: boolean; detail: string | null; reason: string | null };
+type AccountHealth = Record<string, HealthCheck>;
+
+const HEALTH_LABELS: Array<[string, string]> = [
+  ["auth", "Login"],
+  ["profile", "Profile"],
+  ["role", "Role"],
+  ["membership", "Workspace membership"],
+  ["workspace", "Workspace"],
+  ["access", "Access"],
+];
+
+function AccountHealthList({ health }: { health: AccountHealth }) {
+  return (
+    <ul className="mt-2 space-y-1 border-t border-border/50 pt-2">
+      {HEALTH_LABELS.map(([key, label]) => {
+        const check = health[key];
+        if (!check) return null;
+        return (
+          <li key={key} className="flex flex-wrap items-baseline gap-2 text-xs">
+            <span
+              className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                check.ok
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-warning/40 bg-warning/10 text-warning"
+              }`}
+            >
+              {check.ok ? "OK" : "Needs attention"}
+            </span>
+            <span className="text-foreground">{label}</span>
+            {check.detail && <span className="text-muted-foreground">{check.detail}</span>}
+            {!check.ok && check.reason && (
+              <span className="text-muted-foreground">{check.reason}</span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+
+
 function InviteQuickForm({
   workspace,
   onNewInvite,
