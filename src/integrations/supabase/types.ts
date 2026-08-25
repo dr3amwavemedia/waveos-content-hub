@@ -1176,8 +1176,10 @@ export type Database = {
           created_at: string
           email: string
           expires_at: string
+          first_name: string | null
           id: string
           invited_by: string | null
+          last_name: string | null
           last_sent_at: string
           resend_count: number
           revoked_at: string | null
@@ -1196,8 +1198,10 @@ export type Database = {
           created_at?: string
           email: string
           expires_at?: string
+          first_name?: string | null
           id?: string
           invited_by?: string | null
+          last_name?: string | null
           last_sent_at?: string
           resend_count?: number
           revoked_at?: string | null
@@ -1216,8 +1220,10 @@ export type Database = {
           created_at?: string
           email?: string
           expires_at?: string
+          first_name?: string | null
           id?: string
           invited_by?: string | null
+          last_name?: string | null
           last_sent_at?: string
           resend_count?: number
           revoked_at?: string | null
@@ -2763,6 +2769,23 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { _token: string }; Returns: string }
+      admin_account_health: {
+        Args: { _user_id: string; _workspace_id?: string }
+        Returns: Json
+      }
+      admin_set_client_member_name: {
+        Args: {
+          _first_name?: string
+          _last_name?: string
+          _user_id: string
+          _workspace_id: string
+        }
+        Returns: undefined
+      }
+      admin_set_invite_person_name: {
+        Args: { _first_name?: string; _invite_id: string; _last_name?: string }
+        Returns: undefined
+      }
       admin_set_workspace_member_role: {
         Args: {
           _role: Database["public"]["Enums"]["workspace_member_role"]
@@ -2941,7 +2964,9 @@ export type Database = {
           created_at: string
           email: string
           expires_at: string
+          first_name: string
           invite_id: string
+          last_name: string
           resend_count: number
           status: Database["public"]["Enums"]["invite_status"]
           workspace_role: Database["public"]["Enums"]["workspace_member_role"]
