@@ -177,25 +177,23 @@ async function loadWorkspaces(
   });
 }
 
-export function useCurrentUser() {
-  const impersonate = useImpersonateClient();
-  const activeWorkspaceId =
-    typeof window !== "undefined" ? localStorage.getItem("waveos.active-workspace") : null;
-  const viewingClientWorkspace =
-    impersonate.on || (!!activeWorkspaceId && activeWorkspaceId !== STAFF_WORKSPACE_ID);
-
-  const query = useQuery({
-    queryKey: [
-      "waveos",
-      "current-user",
-      viewingClientWorkspace ? "client" : "staff",
-      activeWorkspaceId,
-    ],
+function useRawCurrentUser() {
+  return useQuery({
+    queryKey: ["waveos", "current-user"],
     queryFn: loadContext,
     staleTime: 60_000,
   });
+}
 
-  if (!viewingClientWorkspace || !query.data) return query;
+export function useCurrentUser() {
+  const impersonate = useImpersonateClient();
+  const query = useRawCurrentUser();
+
+  // Only explicit "View as client" preview masks staff identity. Simply
+  // switching the active workspace must NOT strip staff flags — doing so made
+  // loadWorkspaces fall back to membership rows (which staff don't have) and
+  // wiped the workspace list until sign-out.
+  if (!impersonate.on || !query.data) return query;
 
   return {
     ...query,
@@ -209,11 +207,10 @@ export function useCurrentUser() {
 }
 
 export function useWorkspaces() {
-  const { data: user } = useCurrentUser();
+  // Always load workspaces from the unmasked context so staff keep their
+  // workspace pool while previewing a client.
+  const { data: user } = useRawCurrentUser();
   const impersonate = useImpersonateClient();
-  // Client preview intentionally masks isStaff so the UI follows the same
-  // navigation path as a client. Authorize preview from the verified database
-  // roles retained in the user context instead of that presentation flag.
   const canPreviewClients =
     user?.roles.includes("dream_wave_owner") === true ||
     user?.roles.includes("dream_wave_team") === true;
@@ -229,3 +226,4 @@ export function useWorkspaces() {
     staleTime: 30_000,
   });
 }
+
