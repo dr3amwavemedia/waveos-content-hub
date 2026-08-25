@@ -173,34 +173,11 @@ async function loadWorkspaces(
 }
 
 export function useCurrentUser() {
-  const impersonate = useImpersonateClient();
-  const query = useQuery({
+  return useQuery({
     queryKey: ["waveos", "current-user"],
     queryFn: loadContext,
     staleTime: 60_000,
   });
-
-  if (!query.data) return query;
-
-  // Identity shown in the shell must follow the workspace being viewed, not a
-  // global staff role. This covers both explicit View as Client and client
-  // workspaces reached through an existing session. Auth/RLS remain untouched.
-  const activeWorkspaceId =
-    typeof window !== "undefined" ? localStorage.getItem("waveos.active-workspace") : null;
-  const viewingClientWorkspace =
-    impersonate.on || (!!activeWorkspaceId && activeWorkspaceId !== STAFF_WORKSPACE_ID);
-
-  if (!viewingClientWorkspace) return query;
-
-  return {
-    ...query,
-    data: {
-      ...query.data,
-      isStaff: false,
-      isDreamWaveOwner: false,
-      staffType: null,
-    },
-  };
 }
 
 export function useWorkspaces() {
