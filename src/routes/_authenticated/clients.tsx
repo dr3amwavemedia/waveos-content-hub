@@ -2748,7 +2748,12 @@ function InvitesTab({
                 className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-surface/40 p-3"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm text-foreground">{inv.email}</div>
+                  <div className="truncate text-sm text-foreground">
+                    {[inv.first_name, inv.last_name].filter(Boolean).join(" ") || inv.email}
+                  </div>
+                  {(inv.first_name || inv.last_name) && (
+                    <div className="truncate text-xs text-muted-foreground">{inv.email}</div>
+                  )}
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <span
                       className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${stateCls}`}
