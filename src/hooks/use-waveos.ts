@@ -38,42 +38,20 @@ const db = supabase as unknown as {
 
 async function loadContext(): Promise<CurrentUserContext> {
   const { data: auth, error } = await supabase.auth.getUser();
-
-  if (error || !auth.user) {
-    throw new Error("Your session expired. Please sign in again.");
-  }
+  if (error || !auth.user) throw new Error("Your session expired. Please sign in again.");
 
   const user = auth.user;
   const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("first_name,last_name,avatar_url")
-      .eq("id", user.id)
-      .maybeSingle(),
+    supabase.from("profiles").select("first_name,last_name,avatar_url").eq("id", user.id).maybeSingle(),
     db.from("user_roles").select("role,staff_type").eq("user_id", user.id),
   ]);
-  const roleRows = (roles ?? []) as Array<{
-    role: string;
-    staff_type: "sales" | "media_manager" | "crew" | null;
-  }>;
+  const roleRows = (roles ?? []) as Array<{ role: string; staff_type: "sales" | "media_manager" | "crew" | null }>;
   const roleList = roleRows.map((role) => role.role);
   const actualOwner = roleList.includes("dream_wave_owner");
   const acting = actualOwner ? getActingStaff() : null;
 
   if (acting) {
-    return {
-      userId: acting.userId,
-      email: acting.email,
-      firstName: acting.firstName,
-      lastName: acting.lastName,
-      avatarUrl: null,
-      isStaff: true,
-      isDreamWaveOwner: false,
-      staffType: acting.staffType ?? "sales",
-      roles: ["dream_wave_team"],
-      actingAsStaff: true,
-      actualUserId: user.id,
-    };
+    return { userId: acting.userId, email: acting.email, firstName: acting.firstName, lastName: acting.lastName, avatarUrl: null, isStaff: true, isDreamWaveOwner: false, staffType: acting.staffType ?? "sales", roles: ["dream_wave_team"], actingAsStaff: true, actualUserId: user.id };
   }
 
   const teamRole = roleRows.find((role) => role.role === "dream_wave_team");
@@ -85,136 +63,62 @@ async function loadContext(): Promise<CurrentUserContext> {
     avatarUrl: profile?.avatar_url ?? null,
     isStaff: roleList.includes("dream_wave_owner") || roleList.includes("dream_wave_team"),
     isDreamWaveOwner: actualOwner,
-    staffType: actualOwner
-      ? null
-      : ((teamRole?.staff_type as "sales" | "media_manager" | "crew" | null) ?? "sales"),
+    staffType: actualOwner ? null : ((teamRole?.staff_type as "sales" | "media_manager" | "crew" | null) ?? "sales"),
     roles: roleList,
     actingAsStaff: false,
     actualUserId: user.id,
   };
 }
 
-async function loadWorkspaces(
-  ctx: CurrentUserContext,
-  previewWorkspaceId: string | null,
-): Promise<WorkspaceSummary[]> {
-  const { data: memberships } = await supabase
-    .from("workspace_members")
-    .select("workspace_id, role")
-    .eq("user_id", ctx.userId);
-
+async function loadWorkspaces(ctx: CurrentUserContext, previewWorkspaceId: string | null): Promise<WorkspaceSummary[]> {
+  const { data: memberships } = await supabase.from("workspace_members").select("workspace_id, role").eq("user_id", ctx.userId);
   const membershipMap = new Map((memberships ?? []).map((m) => [m.workspace_id, m.role]));
-
-  const workspaceIds = previewWorkspaceId
-    ? [previewWorkspaceId]
-    : ctx.isDreamWaveOwner
-      ? [STAFF_WORKSPACE_ID]
-      : ctx.isStaff && ctx.staffType !== "media_manager"
-        ? [STAFF_WORKSPACE_ID]
-        : Array.from(membershipMap.keys());
-
+  const workspaceIds = previewWorkspaceId ? [previewWorkspaceId] : ctx.isDreamWaveOwner ? [STAFF_WORKSPACE_ID] : ctx.isStaff && ctx.staffType !== "media_manager" ? [STAFF_WORKSPACE_ID] : Array.from(membershipMap.keys());
   if (!workspaceIds.length && ctx.staffType !== "media_manager") return [];
 
-  let workspacesQuery = supabase
-    .from("workspaces")
-    .select("id,name,slug,industry,timezone,is_demo,access_tier,feature_overrides")
-    .eq("is_archived", false)
-    .order("name", { ascending: true });
-
-  if (ctx.staffType !== "media_manager" || previewWorkspaceId) {
-    workspacesQuery = workspacesQuery.in("id", workspaceIds);
-  }
-
+  let workspacesQuery = supabase.from("workspaces").select("id,name,slug,industry,timezone,is_demo,access_tier,feature_overrides").eq("is_archived", false).order("name", { ascending: true });
+  if (ctx.staffType !== "media_manager" || previewWorkspaceId) workspacesQuery = workspacesQuery.in("id", workspaceIds);
   const { data: workspaces, error } = await workspacesQuery;
   if (error) throw error;
 
-  const visibleWorkspaces =
-    ctx.staffType === "media_manager" && !previewWorkspaceId
-      ? (workspaces ?? []).filter((workspace) => {
-          const overrides =
-            workspace.feature_overrides &&
-            typeof workspace.feature_overrides === "object" &&
-            !Array.isArray(workspace.feature_overrides)
-              ? (workspace.feature_overrides as Record<string, unknown>)
-              : {};
-          return (
-            workspace.id === STAFF_WORKSPACE_ID ||
-            workspace.access_tier === "social_management" ||
-            overrides.social_management_access === true
-          );
-        })
-      : (workspaces ?? []);
+  const visibleWorkspaces = ctx.staffType === "media_manager" && !previewWorkspaceId
+    ? (workspaces ?? []).filter((workspace) => {
+        const overrides = workspace.feature_overrides && typeof workspace.feature_overrides === "object" && !Array.isArray(workspace.feature_overrides) ? (workspace.feature_overrides as Record<string, unknown>) : {};
+        return workspace.id === STAFF_WORKSPACE_ID || workspace.access_tier === "social_management" || overrides.social_management_access === true;
+      })
+    : (workspaces ?? []);
 
   return visibleWorkspaces.map((w) => {
     const role = membershipMap.get(w.id);
-    const featureOverrides =
-      w.feature_overrides &&
-      typeof w.feature_overrides === "object" &&
-      !Array.isArray(w.feature_overrides)
-        ? (w.feature_overrides as Record<string, unknown>)
-        : {};
+    const featureOverrides = w.feature_overrides && typeof w.feature_overrides === "object" && !Array.isArray(w.feature_overrides) ? (w.feature_overrides as Record<string, unknown>) : {};
     return {
-      id: w.id,
-      name: w.name,
-      slug: w.slug,
-      industry: w.industry,
-      timezone: w.timezone,
-      is_demo: w.is_demo,
-      access_tier:
-        featureOverrides.social_management_access === true ? "social_management" : w.access_tier,
+      id: w.id, name: w.name, slug: w.slug, industry: w.industry, timezone: w.timezone, is_demo: w.is_demo,
+      access_tier: featureOverrides.social_management_access === true ? "social_management" : w.access_tier,
       approval_required: featureOverrides.automatic_content_approval !== true,
-      role: (previewWorkspaceId
-        ? "viewer"
-        : w.id === STAFF_WORKSPACE_ID && ctx.isStaff
-          ? "staff"
-          : (role ?? "viewer")) as "owner" | "admin" | "editor" | "approver" | "viewer" | "staff",
+      role: (previewWorkspaceId ? "viewer" : w.id === STAFF_WORKSPACE_ID && ctx.isStaff ? "staff" : (role ?? "viewer")) as "owner" | "admin" | "editor" | "approver" | "viewer" | "staff",
     };
   });
 }
 
 export function useCurrentUser() {
   const impersonate = useImpersonateClient();
-  const query = useQuery({
-    queryKey: ["waveos", "current-user"],
-    queryFn: loadContext,
+  const activeWorkspaceId = typeof window !== "undefined" ? localStorage.getItem("waveos.active-workspace") : null;
+  const viewingClientWorkspace = impersonate.on || (!!activeWorkspaceId && activeWorkspaceId !== STAFF_WORKSPACE_ID);
+
+  return useQuery({
+    queryKey: ["waveos", "current-user", viewingClientWorkspace ? "client" : "staff", activeWorkspaceId],
+    queryFn: async () => {
+      const user = await loadContext();
+      if (!viewingClientWorkspace) return user;
+      return { ...user, isStaff: false, isDreamWaveOwner: false, staffType: null };
+    },
     staleTime: 60_000,
   });
-
-  if (!query.data) return query;
-
-  // Identity shown in the shell must follow the workspace being viewed, not a
-  // global staff role. This covers both explicit View as Client and client
-  // workspaces reached through an existing session. Auth/RLS remain untouched.
-  const activeWorkspaceId =
-    typeof window !== "undefined" ? localStorage.getItem("waveos.active-workspace") : null;
-  const viewingClientWorkspace =
-    impersonate.on || (!!activeWorkspaceId && activeWorkspaceId !== STAFF_WORKSPACE_ID);
-
-  if (!viewingClientWorkspace) return query;
-
-  return {
-    ...query,
-    data: {
-      ...query.data,
-      isStaff: false,
-      isDreamWaveOwner: false,
-      staffType: null,
-    },
-  };
 }
 
 export function useWorkspaces() {
   const { data: user } = useCurrentUser();
   const impersonate = useImpersonateClient();
-  const previewWorkspaceId =
-    typeof window !== "undefined" && impersonate.on
-      ? localStorage.getItem("waveos.active-workspace")
-      : null;
-
-  return useQuery({
-    queryKey: ["waveos", "workspaces", user?.userId, previewWorkspaceId],
-    queryFn: () => loadWorkspaces(user!, previewWorkspaceId),
-    enabled: !!user,
-    staleTime: 30_000,
-  });
+  const previewWorkspaceId = typeof window !== "undefined" && impersonate.on ? localStorage.getItem("waveos.active-workspace") : null;
+  return useQuery({ queryKey: ["waveos", "workspaces", user?.userId, previewWorkspaceId], queryFn: () => loadWorkspaces(user!, previewWorkspaceId), enabled: !!user, staleTime: 30_000 });
 }
