@@ -76,10 +76,10 @@ export const Route = createFileRoute("/_authenticated")({
 
     // Admin acting mode is only for WaveOS workflow/admin tasks. It must never
     // become a way to send email on behalf of the selected employee.
-    const actingAsStaff =
+    const actingStatePresent =
       typeof window !== "undefined" && Boolean(sessionStorage.getItem("waveos.acting-staff"));
     if (
-      actingAsStaff &&
+      actingStatePresent &&
       (location.pathname === "/staff-email" || location.pathname.startsWith("/staff-email/"))
     ) {
       throw redirect({ to: "/home" });
@@ -119,8 +119,9 @@ export const Route = createFileRoute("/_authenticated")({
       }>;
     }
 
-    const actingIdentity = actingAsStaff ? getActingStaff() : null;
     const roleNames = roleRows.map((role) => role.role);
+    const authenticatedOwner = roleNames.includes("dream_wave_owner");
+    const actingIdentity = authenticatedOwner && actingStatePresent ? getActingStaff() : null;
     const isOwner = !actingIdentity && roleNames.includes("dream_wave_owner");
     const isTeamMember = Boolean(actingIdentity) || (roleNames.includes("dream_wave_team") && !isOwner);
     const teamRole = actingIdentity

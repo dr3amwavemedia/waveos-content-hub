@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
+import { clearAuthenticatedBrowserState } from "@/lib/auth-session-state";
 import { sendMemberJoinedEmail, tryEmail } from "@/lib/transactional-email";
 
 import { lovable } from "@/integrations/lovable";
@@ -313,6 +314,7 @@ function AcceptInvitePage() {
             </p>
             <button
               onClick={async () => {
+                clearAuthenticatedBrowserState();
                 await supabase.auth.signOut();
                 setSessionUser(null);
               }}
