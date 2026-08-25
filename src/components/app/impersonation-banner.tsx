@@ -10,7 +10,7 @@ export function ImpersonationBanner() {
   const { data: user } = useCurrentUser();
   const { on, disable, tier, setTier } = useImpersonateClient();
   const acting = useActingStaff();
-  const { activeWorkspace } = useWorkspace();
+  const { activeWorkspace, setActiveWorkspaceId } = useWorkspace();
 
   if (acting.on && acting.identity) {
     const name =
@@ -41,8 +41,18 @@ export function ImpersonationBanner() {
     );
   }
 
+  const canPreviewClients =
+    user?.roles.includes("dream_wave_owner") === true ||
+    user?.roles.includes("dream_wave_team") === true;
+  const exitClientView = () => {
+    disable();
+    setActiveWorkspaceId("11111111-1111-1111-1111-111111111111");
+    qc.clear();
+    window.location.assign("/clients");
+  };
+
   const clientBanner =
-    user?.isStaff && on ? (
+    canPreviewClients && on ? (
       <div className="sticky top-0 z-30 flex flex-wrap items-center justify-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2 text-xs backdrop-blur">
         <Eye className="h-3.5 w-3.5 text-primary" />
         <span className="text-foreground">
@@ -66,7 +76,7 @@ export function ImpersonationBanner() {
           <option value="wedding_client">Layer 5 · Wedding Client</option>
         </select>
         <button
-          onClick={disable}
+          onClick={exitClientView}
           className="inline-flex items-center gap-1 rounded-md border border-border bg-surface/80 px-2 py-0.5 font-medium text-foreground hover:bg-elevated"
         >
           <X className="h-3 w-3" /> Exit

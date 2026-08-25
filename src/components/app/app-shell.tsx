@@ -36,6 +36,7 @@ import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display"
 import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
 import { useCurrentUser } from "@/hooks/use-waveos";
+import { useImpersonateClient } from "@/hooks/use-impersonation";
 import { useClientProjects } from "@/hooks/use-client-projects";
 
 import { WorkspaceProvider, useWorkspace } from "./workspace-context";
@@ -520,8 +521,19 @@ function WorkspaceSwitcher() {
 
 function UserFooter() {
   const { data: user } = useCurrentUser();
+  const { activeWorkspace, setActiveWorkspaceId } = useWorkspace();
+  const impersonate = useImpersonateClient();
   const navigate = useNavigate();
   const qc = useQueryClient();
+
+  async function exitClientView() {
+    await qc.cancelQueries();
+    impersonate.disable();
+    setActiveWorkspaceId("11111111-1111-1111-1111-111111111111");
+    qc.clear();
+    toast.success("Returned to staff view");
+    navigate({ to: "/clients", replace: true });
+  }
 
   async function signOut() {
     await qc.cancelQueries();
@@ -532,12 +544,14 @@ function UserFooter() {
     navigate({ to: "/auth", replace: true });
   }
 
-  const displayName = accountDisplayName({
-    firstName: user?.firstName,
-    lastName: user?.lastName,
-    email: user?.email,
-    fallback: "WaveOS user",
-  });
+  const displayName = impersonate.on
+    ? (activeWorkspace?.name ?? "Client preview")
+    : accountDisplayName({
+        firstName: user?.firstName,
+        lastName: user?.lastName,
+        email: user?.email,
+        fallback: "WaveOS user",
+      });
   const visibleEmail = visibleAccountEmail(user?.email);
   const staffPosition = user?.isStaff
     ? user.isDreamWaveOwner
@@ -560,17 +574,33 @@ function UserFooter() {
         <div className="min-w-0 flex-1">
           <div className="truncate text-xs font-medium text-foreground">{displayName}</div>
           <div className="truncate text-[10px] text-muted-foreground">
-            {staffPosition ? `${staffPosition} · Staff` : (visibleEmail ?? "Client account")}
+            {impersonate.on
+              ? "Client preview"
+              : staffPosition
+                ? `${staffPosition} · Staff`
+                : (visibleEmail ?? "Client account")}
           </div>
         </div>
         <NotificationsBell />
-        <button
-          onClick={signOut}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
-          aria-label="Sign out"
-        >
-          <LogOut className="h-4 w-4" />
-        </button>
+        {impersonate.on ? (
+          <button
+            type="button"
+            onClick={() => void exitClientView()}
+            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-[10px] font-semibold text-primary hover:bg-primary/20"
+            aria-label="Exit client view"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Exit
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
+            aria-label="Sign out"
+          >
+            <LogOut className="h-4 w-4" />
+          </button>
+        )}
       </div>
     </div>
   );

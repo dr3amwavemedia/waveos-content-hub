@@ -211,8 +211,14 @@ export function useCurrentUser() {
 export function useWorkspaces() {
   const { data: user } = useCurrentUser();
   const impersonate = useImpersonateClient();
+  // Client preview intentionally masks isStaff so the UI follows the same
+  // navigation path as a client. Authorize preview from the verified database
+  // roles retained in the user context instead of that presentation flag.
+  const canPreviewClients =
+    user?.roles.includes("dream_wave_owner") === true ||
+    user?.roles.includes("dream_wave_team") === true;
   const previewWorkspaceId =
-    typeof window !== "undefined" && user?.isStaff === true && impersonate.on
+    typeof window !== "undefined" && canPreviewClients && impersonate.on
       ? localStorage.getItem("waveos.active-workspace")
       : null;
 
