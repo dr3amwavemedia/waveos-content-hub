@@ -85,9 +85,14 @@ async function loadContext(): Promise<CurrentUserContext> {
     avatarUrl: profile?.avatar_url ?? null,
     isStaff: roleList.includes("dream_wave_owner") || roleList.includes("dream_wave_team"),
     isDreamWaveOwner: actualOwner,
+    // Only staff accounts have a staff subtype. Previously the fallback to
+    // "sales" also applied to clients with no dream_wave_team row, which made
+    // client-facing UI identify them as Sales Staff.
     staffType: actualOwner
       ? null
-      : ((teamRole?.staff_type as "sales" | "media_manager" | "crew" | null) ?? "sales"),
+      : teamRole
+        ? ((teamRole.staff_type as "sales" | "media_manager" | "crew" | null) ?? "sales")
+        : null,
     roles: roleList,
     actingAsStaff: false,
     actualUserId: user.id,
