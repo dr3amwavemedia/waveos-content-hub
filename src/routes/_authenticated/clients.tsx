@@ -2843,6 +2843,8 @@ function InviteQuickForm({
 }) {
   const qc = useQueryClient();
   const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<"owner" | "approver" | "viewer">("owner");
   const create = useMutation({
     mutationFn: async () => {
@@ -2862,6 +2864,14 @@ function InviteQuickForm({
       if (error) throw error;
       const row = (data as { invite_id: string; raw_token: string }[] | null)?.[0];
       if (!row?.raw_token || !row.invite_id) throw new Error("No token returned");
+      // Person names are optional metadata; never block the invite on them.
+      if (firstName.trim() || lastName.trim()) {
+        await db.rpc("admin_set_invite_person_name", {
+          _invite_id: row.invite_id,
+          _first_name: firstName.trim() || null,
+          _last_name: lastName.trim() || null,
+        });
+      }
       const link = `${window.location.origin}/accept-invite?token=${encodeURIComponent(row.raw_token)}`;
       const delivery = await tryEmail(() => sendInviteEmail(row.invite_id, link));
       return {
@@ -2874,6 +2884,8 @@ function InviteQuickForm({
     onSuccess: (payload) => {
       qc.invalidateQueries({ queryKey: ["clients", "invites", workspace.id] });
       setEmail("");
+      setFirstName("");
+      setLastName("");
       onNewInvite(payload);
       toast.success(payload.delivery.sent ? "Client invitation emailed." : "Invite created. Copy the link to send it manually.");
     },
@@ -2899,6 +2911,28 @@ function InviteQuickForm({
           onChange={(e) => setEmail(e.target.value)}
           className={inputCls}
           placeholder="owner@client.com"
+        />
+      </div>
+      <div className="min-w-[130px] flex-1">
+        <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          First name
+        </label>
+        <input
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          className={inputCls}
+          placeholder="Optional"
+        />
+      </div>
+      <div className="min-w-[130px] flex-1">
+        <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+          Last name
+        </label>
+        <input
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+          className={inputCls}
+          placeholder="Optional"
         />
       </div>
       <div>
