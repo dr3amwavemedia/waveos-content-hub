@@ -539,15 +539,17 @@ function UserFooter() {
     fallback: "WaveOS user",
   });
   const visibleEmail = visibleAccountEmail(user?.email);
-  const staffPosition = user?.isDreamWaveOwner
-    ? "Admin"
-    : user?.staffType === "media_manager"
-      ? "Social Manager"
-      : user?.staffType === "sales"
-        ? "Sales"
-        : user?.staffType === "crew"
-          ? "Crew"
-          : null;
+  const staffPosition = user?.isStaff
+    ? user.isDreamWaveOwner
+      ? "Admin"
+      : user.staffType === "media_manager"
+        ? "Social Manager"
+        : user.staffType === "sales"
+          ? "Sales"
+          : user.staffType === "crew"
+            ? "Crew"
+            : "Staff"
+    : null;
 
   return (
     <div className="border-t border-border/80 p-3">
