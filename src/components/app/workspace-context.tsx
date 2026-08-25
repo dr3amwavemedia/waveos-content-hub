@@ -11,6 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useWorkspaces, type WorkspaceSummary } from "@/hooks/use-waveos";
 
 const STORAGE_KEY = "waveos.active-workspace";
+const WORKSPACE_CHANGE_EVENT = "waveos:active-workspace-change";
 
 interface WorkspaceContextValue {
   workspaces: WorkspaceSummary[];
@@ -21,9 +22,6 @@ interface WorkspaceContextValue {
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
 
-// Query keys that are scoped to a specific workspace and MUST be cleared when
-// the active workspace changes so stale rows from the previous workspace can
-// never flash on screen.
 const WORKSPACE_SCOPED_KEYS = [
   "media",
   "media-folders",
@@ -47,6 +45,12 @@ const WORKSPACE_SCOPED_KEYS = [
   "phase4-timeline",
 ];
 
+function persistActiveWorkspace(id: string) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, id);
+  window.dispatchEvent(new CustomEvent(WORKSPACE_CHANGE_EVENT, { detail: { id } }));
+}
+
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { data: workspaces = [], isLoading } = useWorkspaces();
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -61,16 +65,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!workspaces.length) return;
     if (!activeId || !workspaces.find((w) => w.id === activeId)) {
-      setActiveId(workspaces[0].id);
+      const nextId = workspaces[0].id;
+      setActiveId(nextId);
+      persistActiveWorkspace(nextId);
     }
   }, [workspaces, activeId]);
 
-  // Orphaned users (signed in but not a member of any workspace) stay on the
-  // page they landed on. Individual pages show a friendly "not invited yet"
-  // empty state via the AppShell.
-
-  // Clear workspace-scoped caches when the active workspace changes so stale
-  // rows from the previous workspace can never briefly appear.
   useEffect(() => {
     if (prev.current && prev.current !== activeId) {
       for (const key of WORKSPACE_SCOPED_KEYS) {
@@ -88,7 +88,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       isLoading,
       setActiveWorkspaceId: (id) => {
         setActiveId(id);
-        if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, id);
+        persistActiveWorkspace(id);
       },
     };
   }, [workspaces, activeId, isLoading]);
