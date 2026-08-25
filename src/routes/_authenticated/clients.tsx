@@ -2703,60 +2703,17 @@ function InvitesTab({
             Current client members
           </p>
           <ul className="space-y-2">
-            {membersQ.data!.map((member) => {
-              const email = visibleAccountEmail(member.email);
-              const roleLabel =
-                member.workspace_role === "owner"
-                  ? "Client owner"
-                  : member.workspace_role === "approver"
-                    ? "Client approver"
-                    : "Client viewer";
-              const name = accountDisplayName({
-                firstName: member.first_name,
-                lastName: member.last_name,
-                email,
-                fallback: roleLabel,
-              });
-              return (
-                <li
-                  key={member.user_id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/50 p-2"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm text-foreground">
-                      {name}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {[email, roleLabel].filter(Boolean).join(" · ")}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={member.workspace_role}
-                      disabled={changeRole.isPending}
-                      onChange={(e) =>
-                        changeRole.mutate({ userId: member.user_id, role: e.target.value })
-                      }
-                      className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground"
-                      title="Change workspace role"
-                    >
-                      <option value="owner">Owner</option>
-                      <option value="approver">Approver</option>
-                      <option value="viewer">Viewer</option>
-                    </select>
-                    {email && (
-                      <button
-                        onClick={() => sendPasswordReset.mutate(email)}
-                        disabled={sendPasswordReset.isPending}
-                        className="whitespace-nowrap rounded-lg border border-primary/30 px-3 py-1.5 text-xs text-primary hover:bg-primary/10 disabled:opacity-50"
-                      >
-                        Send password reset
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
+            {membersQ.data!.map((member) => (
+              <ClientMemberRow
+                key={member.user_id}
+                workspaceId={workspace.id}
+                member={member}
+                roleBusy={changeRole.isPending}
+                onChangeRole={(role) => changeRole.mutate({ userId: member.user_id, role })}
+                onPasswordReset={(target) => sendPasswordReset.mutate(target)}
+                resetBusy={sendPasswordReset.isPending}
+              />
+            ))}
           </ul>
         </div>
       )}
