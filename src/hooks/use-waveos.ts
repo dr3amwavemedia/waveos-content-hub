@@ -168,18 +168,37 @@ async function loadWorkspaces(
       access_tier:
         featureOverrides.social_management_access === true ? "social_management" : w.access_tier,
       approval_required: featureOverrides.automatic_content_approval !== true,
-      role: (previewWorkspaceId ? "viewer" : ctx.isStaff ? "staff" : (role ?? "viewer")) as
-        "owner" | "admin" | "editor" | "approver" | "viewer" | "staff",
+      role: (previewWorkspaceId
+        ? "viewer"
+        : w.id === staffWorkspaceId && ctx.isStaff
+          ? "staff"
+          : (role ?? "viewer")) as "owner" | "admin" | "editor" | "approver" | "viewer" | "staff",
     };
   });
 }
 
 export function useCurrentUser() {
-  return useQuery({
+  const impersonate = useImpersonateClient();
+  const query = useQuery({
     queryKey: ["waveos", "current-user"],
     queryFn: loadContext,
     staleTime: 60_000,
   });
+
+  // "View as Client" must behave like a client at the UI identity layer too.
+  // Keep the real auth/session untouched so existing users and RLS behavior are
+  // unaffected, but never leak the staff position into the client preview.
+  if (!impersonate.on || !query.data) return query;
+
+  return {
+    ...query,
+    data: {
+      ...query.data,
+      isStaff: false,
+      isDreamWaveOwner: false,
+      staffType: null,
+    },
+  };
 }
 
 export function useWorkspaces() {
