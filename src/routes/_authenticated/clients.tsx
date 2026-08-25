@@ -2612,6 +2612,8 @@ function InvitesTab({
       return (data ?? []) as Array<{
         invite_id: string;
         email: string;
+        first_name: string | null;
+        last_name: string | null;
         workspace_role: string;
         status: string;
         expires_at: string | null;
