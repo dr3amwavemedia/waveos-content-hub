@@ -429,6 +429,9 @@ export type Database = {
       }
       client_invoices: {
         Row: {
+          amount_paid_cents: number | null
+          payment_plan: string
+          billing_month: string | null
           amount_cents: number | null
           created_at: string
           created_by: string | null
@@ -445,6 +448,9 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          amount_paid_cents?: number | null
+          payment_plan?: string
+          billing_month?: string | null
           amount_cents?: number | null
           created_at?: string
           created_by?: string | null
@@ -461,6 +467,9 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          amount_paid_cents?: number | null
+          payment_plan?: string
+          billing_month?: string | null
           amount_cents?: number | null
           created_at?: string
           created_by?: string | null
