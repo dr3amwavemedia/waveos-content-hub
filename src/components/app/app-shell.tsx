@@ -64,9 +64,9 @@ interface NavItem {
 
 const CLIENT_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
-  { to: "/deliveries", label: "Your Content", icon: Images },
+  { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
-  { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
+  { to: "/content", label: "Social Posts", icon: Images, feature: "can_view_media_library" },
   { to: "/posts", label: "Posts", icon: FileText, feature: "can_create_content" },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
@@ -122,12 +122,12 @@ const MEDIA_MANAGER_CLIENT_NAV = CLIENT_NAV.filter(
 
 const MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
-  { to: "/deliveries", label: "Your Content", icon: Images },
+  { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices", icon: FileText },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/create", label: "Create", icon: PenSquare, feature: "can_create_content" },
   { to: "/posts", label: "Posts", icon: FileText, feature: "can_create_content" },
-  { to: "/content", label: "Content", icon: Images, feature: "can_view_media_library" },
+  { to: "/content", label: "Social Posts", icon: Images, feature: "can_view_media_library" },
   { to: "/settings", label: "More", icon: Settings },
 ];
 
@@ -137,7 +137,7 @@ const MOBILE_NAV: NavItem[] = [
 const LAYER1_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
   { to: "/approvals", label: "Approvals", icon: CheckSquare },
-  { to: "/deliveries", label: "Your Content", icon: Images },
+  { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
   { to: "/settings", label: "Your Information", icon: User },
   { to: "/feedback", label: "Request Something", icon: MessageSquare },
@@ -145,7 +145,7 @@ const LAYER1_NAV: NavItem[] = [
 
 const LAYER1_MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Home", icon: Home },
-  { to: "/deliveries", label: "Content", icon: Images },
+  { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/approvals", label: "Approvals", icon: CheckSquare },
   { to: "/home", hash: "invoices", label: "Invoices", icon: FileText },
   { to: "/settings", label: "More", icon: Menu },
@@ -155,7 +155,7 @@ const WEDDING_ALLOWED_PATHS = ["/home", "/wedding-content"];
 
 const WEDDING_NAV: NavItem[] = [
   { to: "/home", label: "Wedding Overview", icon: Heart },
-  { to: "/wedding-content", label: "Content", icon: Images },
+  { to: "/wedding-content", label: "Deliveries", icon: Images },
   { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
   { to: "/home", hash: "wedding-invoices", label: "Payments", icon: FileText },
   { to: "/home", hash: "wedding-contact", label: "Contact Dream Wave", icon: MessageSquare },
@@ -163,7 +163,7 @@ const WEDDING_NAV: NavItem[] = [
 
 const WEDDING_MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Heart },
-  { to: "/wedding-content", label: "Content", icon: Images },
+  { to: "/wedding-content", label: "Deliveries", icon: Images },
   { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
   { to: "/home", hash: "wedding-invoices", label: "Payments", icon: FileText },
   { to: "/home", hash: "wedding-contact", label: "More", icon: Menu },
