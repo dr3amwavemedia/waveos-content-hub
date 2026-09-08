@@ -430,6 +430,8 @@ export type Database = {
       client_invoices: {
         Row: {
           amount_cents: number | null
+          amount_paid_cents: number
+          billing_month: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -440,12 +442,15 @@ export type Database = {
           issued_at: string
           number: string | null
           paid_at: string | null
+          payment_plan: string
           status: Database["public"]["Enums"]["invoice_status"]
           updated_at: string
           workspace_id: string
         }
         Insert: {
           amount_cents?: number | null
+          amount_paid_cents?: number
+          billing_month?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -456,12 +461,15 @@ export type Database = {
           issued_at?: string
           number?: string | null
           paid_at?: string | null
+          payment_plan?: string
           status?: Database["public"]["Enums"]["invoice_status"]
           updated_at?: string
           workspace_id: string
         }
         Update: {
           amount_cents?: number | null
+          amount_paid_cents?: number
+          billing_month?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -472,6 +480,7 @@ export type Database = {
           issued_at?: string
           number?: string | null
           paid_at?: string | null
+          payment_plan?: string
           status?: Database["public"]["Enums"]["invoice_status"]
           updated_at?: string
           workspace_id?: string
