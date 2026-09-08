@@ -2365,7 +2365,7 @@ function InvoiceForm({
         number: number.trim() || null,
         description: description.trim() || null,
         amount_cents: cents,
-        amount_paid_cents: received,
+        amount_paid_cents: received ?? 0,
         payment_plan: paymentPlan,
         billing_month: paymentPlan === "monthly_retainer" ? `${billingMonth}-01` : null,
         currency: currency.trim().toUpperCase(),
