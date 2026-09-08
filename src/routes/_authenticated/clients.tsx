@@ -1,3 +1,4 @@
+import { PaymentProgress } from "@/components/app/payment-progress";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
@@ -70,6 +71,9 @@ type InvoiceListItem = Pick<
   | "issued_at"
   | "due_at"
   | "paid_at"
+  | "amount_paid_cents"
+  | "payment_plan"
+  | "billing_month"
 >;
 type CrmAccountRow = Database["public"]["Tables"]["crm_accounts"]["Row"];
 type CrmContactRow = Pick<
@@ -2156,6 +2160,7 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
     Promise.all([
       qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] }),
       qc.invalidateQueries({ queryKey: ["layer1", "invoices", workspaceId] }),
+      qc.invalidateQueries({ queryKey: ["wedding", "invoices", workspaceId] }),
     ]);
   const q = useQuery({
     queryKey: ["client-invoices", workspaceId],
@@ -2163,7 +2168,7 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
       const { data, error } = await supabase
         .from("client_invoices")
         .select(
-          "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at",
+          "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month",
         )
         .eq("workspace_id", workspaceId)
         .order("issued_at", { ascending: false });
@@ -2185,32 +2190,6 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
 
-  const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: InvoiceStatus }) => {
-      const { error } = await supabase
-        .from("client_invoices")
-        .update({
-          status,
-          paid_at: status === "paid" ? new Date().toISOString() : null,
-        })
-        .eq("id", id);
-      if (error) throw error;
-      const invoice = q.data?.find((item) => item.id === id);
-      await tryEmail(() => sendWorkspaceEmail({
-        workspaceId,
-        event: "invoice_updated",
-        title: invoice?.number || "Invoice",
-        status,
-        url: invoice?.hosted_url,
-      }));
-    },
-    onSuccess: async () => {
-      await refreshInvoices();
-      toast.success("Invoice status updated.");
-    },
-    onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "Could not update invoice."),
-  });
 
   return (
     <div className="space-y-3">
@@ -2261,8 +2240,9 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
                   <span className="text-sm font-medium text-foreground">
                     {i.number || "Invoice"}
                   </span>
-                  <InvoiceStatusBadge status={i.status} />
+                  <InvoiceStatusBadge status={i.status} partial={(i.amount_paid_cents ?? 0) > 0 && i.amount_paid_cents! < (i.amount_cents ?? 0)} />
                 </div>
+                <PaymentProgress invoice={i} />
                 {i.description && (
                   <p className="mt-1 text-xs text-muted-foreground">{i.description}</p>
                 )}
@@ -2302,26 +2282,7 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
-                <select
-                  value={i.status}
-                  onChange={(event) =>
-                    updateStatus.mutate({
-                      id: i.id,
-                      status: event.target.value as InvoiceStatus,
-                    })
-                  }
-                  disabled={updateStatus.isPending}
-                  className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-foreground disabled:opacity-50"
-                  aria-label={`Invoice status for ${i.number || "invoice"}`}
-                >
-                  <option value="deposit">Deposit</option>
-                  <option value="paid">Paid</option>
-                  <option value="unpaid">Unpaid</option>
-                  <option value="draft">Draft</option>
-                  <option value="sent">Sent</option>
-                  <option value="overdue">Overdue</option>
-                  <option value="void">Void</option>
-                </select>
+
                 <button
                   onClick={() => confirm("Remove this invoice?") && del.mutate(i.id)}
                   className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
@@ -2337,7 +2298,7 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
   );
 }
 
-function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
+function InvoiceStatusBadge({ status, partial = false }: { status: InvoiceStatus; partial?: boolean }) {
   const tone: Record<InvoiceStatus, string> = {
     draft: "bg-elevated text-muted-foreground ring-border",
     sent: "bg-primary/12 text-primary ring-primary/30",
@@ -2354,7 +2315,7 @@ function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
         tone[status],
       )}
     >
-      {status}
+      {partial && ["unpaid", "sent", "deposit"].includes(status) ? "Partially paid" : status}
     </span>
   );
 }
@@ -2380,6 +2341,9 @@ function InvoiceForm({
       ? ""
       : (invoice.amount_cents / 100).toFixed(2),
   );
+  const [paymentPlan, setPaymentPlan] = useState(invoice?.payment_plan ?? "one_time");
+  const [billingMonth, setBillingMonth] = useState(invoice?.billing_month?.slice(0, 7) ?? "");
+  const [amountPaid, setAmountPaid] = useState(invoice?.amount_paid_cents == null ? "" : (invoice.amount_paid_cents / 100).toFixed(2));
   const [currency, setCurrency] = useState(invoice?.currency ?? "USD");
   const [status, setStatus] = useState<InvoiceStatus>(invoice?.status ?? "unpaid");
   const [hostedUrl, setHostedUrl] = useState(invoice?.hosted_url ?? "");
@@ -2395,16 +2359,21 @@ function InvoiceForm({
         throw new Error(URL_VALIDATION_MESSAGE);
       }
       const cents = amount ? Math.round(parseFloat(amount) * 100) : null;
+      const received = status === "paid" ? cents : amountPaid === "" ? null : Math.round(Number(amountPaid) * 100);
+      const effectiveStatus = status !== "void" && status !== "draft" && cents != null && cents > 0 && received === cents ? "paid" : status;
       const values = {
         number: number.trim() || null,
         description: description.trim() || null,
         amount_cents: cents,
+        amount_paid_cents: received,
+        payment_plan: paymentPlan,
+        billing_month: paymentPlan === "monthly_retainer" ? `${billingMonth}-01` : null,
         currency: currency.trim().toUpperCase(),
-        status,
+        status: effectiveStatus,
         hosted_url: trimmedUrl || null,
         issued_at: dateInputToIso(issuedAt)!,
         due_at: dateInputToIso(dueAt),
-        paid_at: status === "paid" ? (invoice?.paid_at ?? new Date().toISOString()) : null,
+        paid_at: effectiveStatus === "paid" ? (invoice?.paid_at ?? new Date().toISOString()) : null,
       };
 
       let result: { data: { id: string } | null; error: { message: string } | null };
@@ -2441,6 +2410,7 @@ function InvoiceForm({
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] }),
         qc.invalidateQueries({ queryKey: ["layer1", "invoices", workspaceId] }),
+      qc.invalidateQueries({ queryKey: ["wedding", "invoices", workspaceId] }),
       ]);
       toast.success(invoice ? "Invoice updated." : "Invoice added.");
       onDone();
@@ -2451,7 +2421,8 @@ function InvoiceForm({
   const hostedUrlValid = !hostedUrl.trim() || isValidHttpsUrl(hostedUrl);
   const currencyValid = /^[A-Za-z]{3}$/.test(currency.trim());
   const amountValid = !amount || (Number.isFinite(Number(amount)) && Number(amount) >= 0);
-  const canSave = hostedUrlValid && currencyValid && amountValid && Boolean(issuedAt);
+  const paidValid = status === "paid" || amountPaid === "" || (amount !== "" && Number.isFinite(Number(amountPaid)) && Number(amountPaid) >= 0 && Number(amountPaid) <= Number(amount));
+  const canSave = hostedUrlValid && currencyValid && amountValid && paidValid && Boolean(issuedAt) && (paymentPlan !== "monthly_retainer" || Boolean(billingMonth));
 
   return (
     <form
@@ -2502,6 +2473,22 @@ function InvoiceForm({
             <p className="mt-1 text-xs text-destructive">Use a three-letter currency code.</p>
           )}
         </Field>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Payment arrangement">
+          <select value={paymentPlan} onChange={(e) => setPaymentPlan(e.target.value)} className={inputCls}>
+            <option value="one_time">One-time payment</option>
+            <option value="deposit_balance">Deposit + remaining balance</option>
+            <option value="installments">Installments / partial payments</option>
+            <option value="monthly_retainer">Monthly retainer</option>
+          </select>
+        </Field>
+        <Field label="Total received so far">
+          <input type="number" min="0" max={amount || undefined} step="0.01" value={status === "paid" ? amount : amountPaid} disabled={status === "paid"} onChange={(e) => setAmountPaid(e.target.value)} className={inputCls} placeholder="Enter confirmed payments" />
+          {!paidValid && <p className="text-xs text-destructive">Received amount must be between zero and the invoice total.</p>}
+          <button type="button" className="mt-1 text-xs text-primary" disabled={!amount || status === "paid"} onClick={() => setAmountPaid((Math.round(Number(amount) * 100 / 2) / 100).toFixed(2))}>Set 50% received</button>
+        </Field>
+        {paymentPlan === "monthly_retainer" && <Field label="Billing month"><input type="month" required value={billingMonth} onChange={(e) => setBillingMonth(e.target.value)} className={inputCls} /><p className="mt-1 text-xs text-muted-foreground">Add a separate invoice for each month to preserve payment history. Payments are recorded manually.</p></Field>}
       </div>
       <Field label="Description">
         <textarea

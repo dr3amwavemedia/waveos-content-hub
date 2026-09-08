@@ -1,3 +1,4 @@
+import { PaymentProgress } from "./payment-progress";
 import { useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -720,7 +721,7 @@ export function InvoiceCard({ invoice }: { invoice: Invoice }) {
   const isPaid = invoice.status === "paid";
   const ctaLabel = isPaid
     ? "View Receipt"
-    : invoice.status === "sent" || invoice.status === "unpaid" || invoice.status === "overdue"
+    : invoice.status === "sent" || invoice.status === "unpaid" || invoice.status === "overdue" || invoice.status === "deposit"
       ? "Make Payment"
       : "View Invoice";
   const canOpen = isValidHttpsUrl(invoice.hosted_url);
@@ -739,7 +740,7 @@ export function InvoiceCard({ invoice }: { invoice: Invoice }) {
                 INVOICE_STATUS_TONE[invoice.status]
               }
             >
-              {INVOICE_STATUS_LABEL[invoice.status]}
+              {(invoice.amount_paid_cents ?? 0) > 0 && invoice.amount_paid_cents! < (invoice.amount_cents ?? 0) && ["unpaid", "sent", "deposit"].includes(invoice.status) ? "Partially paid" : INVOICE_STATUS_LABEL[invoice.status]}
             </span>
           </div>
           {invoice.description && (
@@ -756,6 +757,7 @@ export function InvoiceCard({ invoice }: { invoice: Invoice }) {
         )}
       </div>
 
+      <PaymentProgress invoice={invoice} />
       <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
         {issued && <MetaField label="Issued" value={issued} />}
         {due && <MetaField label="Due" value={due} icon={Clock} />}
