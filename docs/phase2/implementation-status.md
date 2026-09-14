@@ -22,7 +22,7 @@ Prepared on an isolated branch. Not merged or published. No production database 
 
 ## Still required before this batch can go live
 
-- A clean dependency install and CI check against the committed lockfile.
+- GitHub CI passed its install, typecheck and build workflow. The existing workflow regenerates the lockfile before `npm ci`; a strict unchanged-lockfile reproduction remains a separate release check.
 - Full staged authenticated regression for CRM invitation sending, each user tier, client-profile controls, gallery access/downloads and invoice deep links. No real invitation was sent during testing.
 - Verify the production login/refresh report with isolated accounts and network conditions.
 - Review and explicitly approve release. Preserve main and production until then.
