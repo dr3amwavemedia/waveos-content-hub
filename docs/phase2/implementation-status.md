@@ -65,7 +65,7 @@ Verification: TypeScript, local production build, focused lint and invoice/contr
 - Unsaved project notes now block router links, programmatic navigation and history navigation with a focused Keep editing / Discard and leave dialog. Cancellation retains the editor; successful saves or reverting to the saved text remove protection.
 - Router-managed native refresh/tab-close protection replaces the separate project unload listener. Existing project/tool/folder confirmations stay in place.
 - Added an isolated browser-router fixture and six Playwright regression cases to GitHub CI. Simulated saves are in memory and do not test production persistence or access.
-- Local TypeScript, focused lint and the complete production build pass using a copied existing dependency installation. Strict lockfile verification remains outstanding. Local browser clicks were unreliable; automated CI results must be checked. Native refresh/tab-close prompts and staged authenticated workflows remain unverified.
+- Local TypeScript, focused lint and the complete production build pass using a copied existing dependency installation. All six existing unit suites pass. The local browser fixture verifies link/programmatic warnings, cancellation retaining text and confirmed navigation reaching its destination. An unstable fixture field label was corrected during regression testing. GitHub runs all six navigation cases; the final check result is recorded in PR #75. Strict lockfile verification, native refresh/tab-close prompts and staged authenticated workflows remain outstanding.
 
 ## Explicit production moves
 
