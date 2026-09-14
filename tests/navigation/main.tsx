@@ -21,10 +21,8 @@ function Project() {
     <main>
       <ProjectNavigationGuard dirty={value !== saved} />
       <h1>Project notes</h1>
-      <label>
-        Story
-        <textarea value={value} onChange={(e) => setValue(e.target.value)} />
-      </label>
+      <label htmlFor="story">Story</label>
+      <textarea id="story" value={value} onChange={(e) => setValue(e.target.value)} />
       <p role="status">{value !== saved ? "Unsaved changes" : "Saved"}</p>
       {error && <p role="alert">Synthetic save failure. Draft kept.</p>}
       <button
