@@ -17,6 +17,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-waveos";
+import { ProjectNavigationGuard } from "./project-navigation-guard";
 import { errorMessage } from "@/lib/error-message";
 import { saveProductionStatus } from "@/lib/production-status";
 import { formatInTimeZone, zonedDateTimeToIso } from "@/lib/date-time";
@@ -274,6 +275,7 @@ export function ProductionProjectsPanel() {
 
   return (
     <section className="rounded-2xl border border-border bg-surface shadow-sm">
+      <ProjectNavigationGuard dirty={hasUnsavedNotes} />
       <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">

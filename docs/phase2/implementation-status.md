@@ -40,7 +40,7 @@ The full requirement inventory and integration prompts are adjacent to this file
 
 - Added per-project Story, Script, Equipment, Shot list and Organization notes, plus an explicit association with an existing production vision board. Only published boards offer the existing freelance share URL; no token or sharing policy changes. Organization currently means crew roles/responsibilities in a text plan, not a graphical diagram. Vision Studio decks are still a separate system.
 - Added a draft additive migration for those project columns. It inherits the current staff-only project policies. **Not applied or tested against a real database; staging migration and access tests are required.** The UI reports unavailable tools when the schema is absent. Existing personal prep data is not moved or erased.
-- Saves check the project's update timestamp to reject stale edits. Tool/folder/project changes warn before discarding unsaved text; browser unload is protected. General in-app navigation away still requires a broader navigation-blocker pass.
+- Saves check the project's update timestamp to reject stale edits. Tool/folder/project changes warn before discarding unsaved text; browser unload is protected. Router navigation protection is implemented in the batch below.
 - Added invoice record CSV and printable/PDF reports to staff client invoices and project-client home. Filters apply to issued date (UTC) and status. Cents, currency, recorded paid and balance are separate columns; unknown totals stay blank, overpayments remain negative balances. This is a record export, not a verified receipt, executed contract archive or complete tax ledger.
 - Added a business-name display preference to existing workspace feature settings, reflected in the shared account footer and project-client greeting. Person records, email, roles and membership are unchanged. Other tier-specific greetings still require review.
 - Account profile, role and membership read failures now surface errors instead of becoming empty results; account/workspace reads have timeouts and retry UI. Production login diagnosis remains open.
@@ -59,6 +59,13 @@ The user confirmed there is no selected payment/signature provider. Keep provide
 - Contract record CSVs added to staff client profiles and both client home variants. They export recorded status/date metadata only and exclude hosted signing URLs. They are not an executed-contract archive. Wedding clients also receive the invoice export controls.
 
 Verification: TypeScript, local production build, focused lint and invoice/contract export tests passed. A 390px synthetic preview verified viewer next/previous, pagination from 24 to 30 sample files, search locating file 30 and a document hash opening its collapsed section. No authenticated database or provider integration was exercised. The gallery uses the existing access checks; no permission/security certification is implied.
+
+## Project navigation protection
+
+- Unsaved project notes now block router links, programmatic navigation and history navigation with a focused Keep editing / Discard and leave dialog. Cancellation retains the editor; successful saves or reverting to the saved text remove protection.
+- Router-managed native refresh/tab-close protection replaces the separate project unload listener. Existing project/tool/folder confirmations stay in place.
+- Added an isolated browser-router fixture and six Playwright regression cases to GitHub CI. Simulated saves are in memory and do not test production persistence or access.
+- Local TypeScript, focused lint and the complete production build pass using a copied existing dependency installation. Strict lockfile verification remains outstanding. Local browser clicks were unreliable; automated CI results must be checked. Native refresh/tab-close prompts and staged authenticated workflows remain unverified.
 
 ## Explicit production moves
 

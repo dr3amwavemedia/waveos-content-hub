@@ -5,7 +5,7 @@
 | Requirement | Current coverage | Still needed |
 | --- | --- | --- |
 | Production folders and mobile project expansion | Implemented, including confirmed Move to folder actions | Full staged workflow and persistence/permission checks |
-| Tools inside each project | Text planning and production-board association implemented | Apply/test additive schema in staging; structured checklist/organization diagram; Vision Studio association; project-specific deliverables |
+| Tools inside each project | Text planning, production-board association and unsaved router-navigation dialog implemented | Apply/test additive schema in staging; native refresh/tab-close check; structured checklist/organization diagram; Vision Studio association; project-specific deliverables |
 | Preserve freelance links | Existing production-board URLs reused | Deployed share-link and cross-account regression |
 | CRM conversion and invitation email | Prefill and explicit send implemented | Staged conversion, duplicate/missing contact, invitation and all CRM control/role tests |
 | Clients directory | Name opens profile; labeled actions | Full client-button audit and long-name mobile checks |
