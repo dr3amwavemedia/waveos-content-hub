@@ -500,6 +500,7 @@ export function ProductionProjectsPanel() {
                         onChange={(event) => {
                           if (!mayLeaveProject()) return;
                           setHasUnsavedNotes(false);
+                          setExpandedId(null);
                           updateStatus.mutate({ id: project.id, status: event.target.value });
                         }}
                         className="min-h-12 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground sm:min-h-10 sm:w-auto sm:text-xs"
