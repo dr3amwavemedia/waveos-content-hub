@@ -26,9 +26,11 @@ function explanation(item: Destination) {
 export function WorkspaceTour({
   storageKey,
   destinations,
+  audience = "your workspace",
 }: {
   storageKey: string;
   destinations: Destination[];
+  audience?: string;
 }) {
   const steps = destinations.filter(
     (item, index, items) =>
@@ -47,7 +49,13 @@ export function WorkspaceTour({
       return { step: 0, done: false };
     }
   });
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(storageKey) === null;
+    } catch {
+      return false;
+    }
+  });
   if (!steps.length) return null;
   const index = Math.min(progress.step, steps.length - 1);
   const current = steps[index];
@@ -63,7 +71,7 @@ export function WorkspaceTour({
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-surface px-3 py-2">
       <span className="text-xs text-muted-foreground">
-        {progress.done ? "Need a refresher?" : "A quick guide to your workspace"}
+        {progress.done ? "Need a refresher?" : `A quick guide to ${audience}`}
       </span>
       <div className="flex gap-2">
         <button
@@ -82,17 +90,46 @@ export function WorkspaceTour({
           </button>
         )}
       </div>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (!next) save(index);
+          setOpen(next);
+        }}
+      >
         <DialogContent className="w-[calc(100%-2rem)] max-w-lg rounded-xl">
           <p className="text-xs text-muted-foreground">
             Step {index + 1} of {steps.length}
           </p>
           <DialogTitle>{current.label}</DialogTitle>
           <DialogDescription>{explanation(current)}</DialogDescription>
+          <progress
+            aria-label="Guide progress"
+            value={index + 1}
+            max={steps.length}
+            className="h-2 w-full accent-primary"
+          />
+          <label className="text-sm">
+            Jump to a topic
+            <select
+              value={index}
+              onChange={(event) => save(Number(event.target.value))}
+              className="mt-1 min-h-11 w-full rounded-lg border border-border bg-background px-3"
+            >
+              {steps.map((step, i) => (
+                <option key={`${step.to}#${step.hash ?? ""}`} value={i}>
+                  {step.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <Link
             to={current.to}
             hash={current.hash}
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              save(index);
+              setOpen(false);
+            }}
             className="min-h-11 py-3 text-sm font-semibold text-primary"
           >
             Open {current.label}

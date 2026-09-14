@@ -23,6 +23,8 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/components/app/workspace-context";
+import { useCurrentUser } from "@/hooks/use-waveos";
+import { accountDisplayName } from "@/lib/identity-display";
 import {
   ContractCard,
   InvoiceCard,
@@ -52,6 +54,7 @@ const externalDb = supabase as unknown as {
 
 export function WeddingOverview() {
   const { activeWorkspace } = useWorkspace();
+  const { data: user } = useCurrentUser();
   const wsId = activeWorkspace?.id;
 
   const workspaceQ = useWeddingWorkspace(wsId);
@@ -92,7 +95,13 @@ export function WeddingOverview() {
   const deliveriesQ = useWeddingDeliveries(wsId, !!isActive);
 
   const palette = weddingPalette(ws?.wedding_theme);
-  const displayName = weddingDisplayName(ws);
+  const displayName = activeWorkspace?.businessNameOnly
+    ? activeWorkspace.name
+    : accountDisplayName({
+        firstName: user?.firstName,
+        lastName: user?.lastName,
+        fallback: weddingDisplayName(ws),
+      });
   const dateLabel = formatWeddingDate(ws?.wedding_date);
   const locationLabel = weddingLocation(ws);
   const stage = (ws?.wedding_stage ?? null) as WeddingStage | null;

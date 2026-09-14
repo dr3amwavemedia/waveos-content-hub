@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { errorMessage } from "@/lib/error-message";
+import { appendChecklistRow, checklistRows, toggleChecklistRow } from "@/lib/planning-checklist";
 
 const sections = {
   story: "Story",
@@ -162,6 +163,9 @@ function PlanningEditor({
   const [baseline, setBaseline] = useState(initial);
   const [value, setValue] = useState(initial ?? "");
   const [saving, setSaving] = useState(false);
+  const [newItem, setNewItem] = useState("");
+  const checklist = field === "equipment" || field === "shot_list";
+  const rows = checklistRows(value);
   const dirty = value !== (baseline ?? "");
   useEffect(() => {
     onDirtyChange(dirty);
@@ -185,8 +189,78 @@ function PlanningEditor({
         }
       }}
     >
+      {checklist && (
+        <section className="space-y-3" aria-label={`${sections[field]} checklist`}>
+          <p className="text-sm text-muted-foreground">
+            Add items and check them off as you prepare. Save to keep your progress with this
+            project.
+          </p>
+          <div className="flex gap-2">
+            <input
+              aria-label={`New ${field === "equipment" ? "equipment" : "shot"} item`}
+              value={newItem}
+              disabled={saving}
+              maxLength={500}
+              onChange={(event) => setNewItem(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  const next = appendChecklistRow(value, newItem);
+                  if (next.length <= 20000) {
+                    setValue(next);
+                    setNewItem("");
+                  }
+                }
+              }}
+              placeholder={
+                field === "equipment" ? "Camera, lens, lighting…" : "Wide establishing shot…"
+              }
+              className="min-h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-base"
+            />
+            <button
+              type="button"
+              disabled={
+                saving || !newItem.trim() || appendChecklistRow(value, newItem).length > 20000
+              }
+              onClick={() => {
+                setValue(appendChecklistRow(value, newItem));
+                setNewItem("");
+              }}
+              className="min-h-11 rounded-xl border border-border px-4 disabled:opacity-50"
+            >
+              Add
+            </button>
+          </div>
+          {!!rows.length && (
+            <>
+              <p role="status" className="text-xs text-muted-foreground">
+                {rows.filter((row) => row.checked).length} of {rows.length} completed
+              </p>
+              <ul className="space-y-2">
+                {rows.map((row) => (
+                  <li key={row.index}>
+                    <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border px-3 py-2">
+                      <input
+                        type="checkbox"
+                        disabled={saving}
+                        checked={row.checked}
+                        onChange={() => setValue(toggleChecklistRow(value, row.index))}
+                      />
+                      <span
+                        className={`min-w-0 break-words text-sm ${row.checked ? "text-muted-foreground line-through" : ""}`}
+                      >
+                        {row.label}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      )}
       <label className="block text-sm font-medium">
-        {sections[field]}
+        {checklist ? "Notes and checklist text" : sections[field]}
         <textarea
           value={value}
           disabled={saving}
@@ -201,6 +275,12 @@ function PlanningEditor({
           }
         />
       </label>
+      {field === "organization" && (
+        <p className="text-sm text-muted-foreground">
+          Describe who leads each area, who reports to them, and each crew member’s
+          responsibilities.
+        </p>
+      )}
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted-foreground">
           {dirty ? "Unsaved changes — save before switching tools." : "Saved to this project"}

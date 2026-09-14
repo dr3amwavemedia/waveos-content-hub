@@ -11,7 +11,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export function ProjectNavigationGuard({ dirty }: { dirty: boolean }) {
+export function ProjectNavigationGuard({
+  dirty,
+  subject = "project notes",
+}: {
+  dirty: boolean;
+  subject?: string;
+}) {
   const shouldBlockFn = useCallback(() => dirty, [dirty]);
   const blocker = useBlocker({
     shouldBlockFn,
@@ -28,7 +34,7 @@ export function ProjectNavigationGuard({ dirty }: { dirty: boolean }) {
     >
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Leave without saving project notes?</AlertDialogTitle>
+          <AlertDialogTitle>Leave without saving {subject}?</AlertDialogTitle>
           <AlertDialogDescription>
             Your latest changes have not been saved. Keep editing to save them, or discard them and
             leave this page.

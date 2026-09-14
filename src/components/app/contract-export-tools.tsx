@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { contractRecordsCsv, type ExportContract } from "@/lib/contract-export";
+import { contractRecordsCsv, contractReportHtml, type ExportContract } from "@/lib/contract-export";
+import { toast } from "sonner";
 
 export function ContractExportTools({ contracts }: { contracts: ExportContract[] }) {
   const [status, setStatus] = useState("");
@@ -37,6 +38,25 @@ export function ContractExportTools({ contracts }: { contracts: ExportContract[]
           }}
         >
           Download CSV ({records.length})
+        </button>
+        <button
+          type="button"
+          disabled={!records.length}
+          className="min-h-11 rounded-lg border border-border px-3 disabled:opacity-50"
+          onClick={() => {
+            const win = window.open("", "_blank");
+            if (!win) {
+              toast.error("Allow the report window to open, then try again.");
+              return;
+            }
+            win.opener = null;
+            win.document.write(contractReportHtml(records));
+            win.document.close();
+            win.focus();
+            win.print();
+          }}
+        >
+          Print / Save PDF
         </button>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">

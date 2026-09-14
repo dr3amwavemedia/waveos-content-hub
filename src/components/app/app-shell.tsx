@@ -345,13 +345,34 @@ function Shell({ children }: { children: ReactNode }) {
         <ProductionHealthBanner enabled={isOwner} />
         <AccountStatusBanner />
         <div className="mx-auto max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
-          {user && activeWorkspace && !permsLoading && <WorkspaceTour
-            key={`${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
-            storageKey={`waveos.tour.v1:${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
-            destinations={nav.filter(item => !item.feature || can(item.feature))}
-          />}
+          {user && activeWorkspace && !permsLoading && (
+            <WorkspaceTour
+              key={`${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
+              storageKey={`waveos.tour.v1:${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
+              audience={isStaff ? "your team" : isWeddingClient ? "your wedding" : "your projects"}
+              destinations={[
+                ...nav.filter((item) => !item.feature || can(item.feature)),
+                ...(!isStaff && !isWeddingClient
+                  ? [{ to: "/home", hash: "contracts", label: "Contracts" }]
+                  : []),
+              ]}
+            />
+          )}
           {userError || workspaceError ? (
-            <div role="alert" className="surface-card p-6"><h2 className="font-semibold">We couldn’t load your account</h2><p className="mt-2 text-sm">Check your connection and try again.</p><button type="button" className="mt-3 min-h-11 rounded-xl border border-border px-4" onClick={() => { void retryUser(); retryWorkspace(); }}>Try again</button></div>
+            <div role="alert" className="surface-card p-6">
+              <h2 className="font-semibold">We couldn’t load your account</h2>
+              <p className="mt-2 text-sm">Check your connection and try again.</p>
+              <button
+                type="button"
+                className="mt-3 min-h-11 rounded-xl border border-border px-4"
+                onClick={() => {
+                  void retryUser();
+                  retryWorkspace();
+                }}
+              >
+                Try again
+              </button>
+            </div>
           ) : isWeddingClient && !WEDDING_ALLOWED_PATHS.includes(pathname) ? (
             <div className="surface-card p-8 text-center text-sm text-muted-foreground">
               Taking you back to your wedding overview…
@@ -481,7 +502,18 @@ function WorkspaceSwitcher() {
   const { data: user } = useCurrentUser();
   const branding = useWorkspaceBranding(activeWorkspace?.id);
 
-  if (error || isLoading) return <div className="p-3 text-xs">{isLoading ? "Loading workspaces…" : <button type="button" className="min-h-11" onClick={retry}>Could not load workspaces. Try again</button>}</div>;
+  if (error || isLoading)
+    return (
+      <div className="p-3 text-xs">
+        {isLoading ? (
+          "Loading workspaces…"
+        ) : (
+          <button type="button" className="min-h-11" onClick={retry}>
+            Could not load workspaces. Try again
+          </button>
+        )}
+      </div>
+    );
   if (!workspaces.length) {
     return (
       <div className="mx-3 mt-2 rounded-xl border border-border bg-surface/60 p-3 text-xs text-muted-foreground">
@@ -553,14 +585,15 @@ function UserFooter() {
     navigate({ to: "/auth", replace: true });
   }
 
-  const displayName = impersonate.on || (!user?.isStaff && activeWorkspace?.businessNameOnly)
-    ? (activeWorkspace?.name ?? "Client preview")
-    : accountDisplayName({
-        firstName: user?.firstName,
-        lastName: user?.lastName,
-        email: user?.email,
-        fallback: "WaveOS user",
-      });
+  const displayName =
+    impersonate.on || (!user?.isStaff && activeWorkspace?.businessNameOnly)
+      ? (activeWorkspace?.name ?? "Client preview")
+      : accountDisplayName({
+          firstName: user?.firstName,
+          lastName: user?.lastName,
+          email: user?.email,
+          fallback: "WaveOS user",
+        });
   const visibleEmail = visibleAccountEmail(user?.email);
   const staffPosition = user?.isStaff
     ? user.isDreamWaveOwner

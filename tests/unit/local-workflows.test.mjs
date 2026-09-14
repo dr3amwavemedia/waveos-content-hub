@@ -1,0 +1,38 @@
+import { readFileSync } from "node:fs";
+import assert from "node:assert/strict";
+import ts from "typescript";
+function load(path) {
+  const code = ts.transpileModule(readFileSync(path, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
+  const exports = {};
+  new Function("exports", code)(exports);
+  return exports;
+}
+const checklist = load("src/lib/planning-checklist.ts");
+const legacy = "Existing camera notes\n\nKeep this crew link: https://example.com";
+const next = checklist.appendChecklistRow(legacy, "Lens\nkit");
+assert.ok(next.startsWith(legacy));
+assert.deepEqual(checklist.checklistRows(next), [{ index: 3, checked: false, label: "Lens kit" }]);
+const checked = checklist.toggleChecklistRow(next, 3);
+assert.equal(checklist.checklistRows(checked)[0].checked, true);
+assert.equal(checklist.toggleChecklistRow(checked, 3), next);
+assert.equal(checklist.toggleChecklistRow(legacy, 0), legacy);
+assert.equal(checklist.appendChecklistRow(legacy, "  "), legacy);
+const documents = load("src/lib/document-draft.ts");
+const draft = { kind: "Quote", recipient: '<script>alert(1)</script>', reference: '"test"', project: "A & B", date: "2026-09-14", currency: "USD", amount: "123.45", content: "Approved <terms>\nSecond line" };
+const html = documents.documentDraftHtml(draft);
+assert.deepEqual(documents.readDocumentDraft(draft), draft);
+assert.throws(() => documents.readDocumentDraft({ ...draft, currency: "INVALID" }));
+assert.throws(() => documents.readDocumentDraft({ ...draft, content: "x".repeat(40001) }));
+assert.throws(() => documents.readDocumentDraft(null));
+assert.ok(!html.includes("<script>"));
+assert.ok(html.includes("&lt;script&gt;"));
+assert.ok(html.includes("$123.45"));
+assert.ok(html.includes("A &amp; B"));
+assert.ok(html.includes("Draft for review"));
+assert.ok(!documents.documentDraftHtml({ ...draft, amount: "" }).includes("$0.00"));
+const contracts = load("src/lib/contract-export.ts");
+const report = contracts.contractReportHtml([{ id: "1", title: "<img onerror=bad>", description: "A & B", status: "signed", sent_at: null, signed_at: "2026-09-14", expires_at: null, hosted_url: "https://secret.example/token" }]);
+assert.ok(report.includes("&lt;img onerror=bad&gt;"));
+assert.ok(!report.includes("https://secret.example"));
+assert.ok(report.includes("2026-09-14"));
+console.log("Local workflow preservation, amounts and export escaping passed");

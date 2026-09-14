@@ -11,6 +11,7 @@ export function DeliveryGallery({ workspaceId, name }: { workspaceId: string; na
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
+  const [layout, setLayout] = useState<"comfortable" | "compact">("comfortable");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   useEffect(() => {
     const timer = setTimeout(() => setQuery(search.trim()), 250);
@@ -89,6 +90,34 @@ export function DeliveryGallery({ workspaceId, name }: { workspaceId: string; na
           className="min-h-11 w-full rounded-xl border border-border bg-background px-3 sm:max-w-xs"
         />
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div role="group" aria-label="Gallery size" className="flex gap-2">
+          {(["comfortable", "compact"] as const).map((size) => (
+            <button
+              type="button"
+              key={size}
+              aria-pressed={layout === size}
+              onClick={() => setLayout(size)}
+              className={`min-h-11 rounded-lg border px-3 text-sm ${layout === size ? "border-primary text-primary" : "border-border"}`}
+            >
+              {size === "comfortable" ? "Large previews" : "More per row"}
+            </button>
+          ))}
+        </div>
+        {(search || kind !== "all") && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setQuery("");
+              changeKind("all");
+            }}
+            className="min-h-11 px-3 text-sm text-primary"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
       {media.isPending ? (
         <p role="status" className="py-8 text-sm text-muted-foreground">
           Loading your collection…
@@ -112,7 +141,13 @@ export function DeliveryGallery({ workspaceId, name }: { workspaceId: string; na
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div
+            className={
+              layout === "compact"
+                ? "grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6"
+                : "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
+            }
+          >
             {assets.map((asset) => (
               <GalleryTile key={asset.id} asset={asset} open={() => setSelectedId(asset.id)} />
             ))}

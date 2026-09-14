@@ -11,6 +11,8 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { ProjectNavigationGuard } from "../../src/components/production/project-navigation-guard";
+import { WorkspaceTour } from "../../src/components/app/workspace-tour";
+import { DocumentDraftTools } from "../../src/components/app/document-draft-tools";
 
 function Project() {
   const [value, setValue] = useState("");
@@ -53,5 +55,23 @@ const other = createRoute({
     </main>
   ),
 });
-const router = createRouter({ routeTree: root.addChildren([project, other]) });
+const tools = createRoute({
+  getParentRoute: () => root,
+  path: "/tools",
+  component: () => (
+    <main>
+      <WorkspaceTour
+        storageKey="waveos.synthetic.guide"
+        audience="your projects"
+        destinations={[
+          { to: "/tools", label: "Invoices", hash: "invoices" },
+          { to: "/tools", label: "Contracts", hash: "contracts" },
+        ]}
+      />
+      <DocumentDraftTools />
+      <Link to="/other">Leave tools</Link>
+    </main>
+  ),
+});
+const router = createRouter({ routeTree: root.addChildren([project, other, tools]) });
 createRoot(document.getElementById("root")!).render(<RouterProvider router={router} />);
