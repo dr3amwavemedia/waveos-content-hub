@@ -4,7 +4,7 @@
 
 | Requirement | Current coverage | Still needed |
 | --- | --- | --- |
-| Production folders and mobile project expansion | Implemented | Full staged workflow; direct Move to folder UX |
+| Production folders and mobile project expansion | Implemented, including confirmed Move to folder actions | Full staged workflow and persistence/permission checks |
 | Tools inside each project | Text planning and production-board association implemented | Apply/test additive schema in staging; structured checklist/organization diagram; Vision Studio association; project-specific deliverables |
 | Preserve freelance links | Existing production-board URLs reused | Deployed share-link and cross-account regression |
 | CRM conversion and invitation email | Prefill and explicit send implemented | Staged conversion, duplicate/missing contact, invitation and all CRM control/role tests |

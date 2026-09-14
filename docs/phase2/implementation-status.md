@@ -59,3 +59,9 @@ The user confirmed there is no selected payment/signature provider. Keep provide
 - Contract record CSVs added to staff client profiles and both client home variants. They export recorded status/date metadata only and exclude hosted signing URLs. They are not an executed-contract archive. Wedding clients also receive the invoice export controls.
 
 Verification: TypeScript, local production build, focused lint and invoice/contract export tests passed. A 390px synthetic preview verified viewer next/previous, pagination from 24 to 30 sample files, search locating file 30 and a document hash opening its collapsed section. No authenticated database or provider integration was exercised. The gallery uses the existing access checks; no permission/security certification is implied.
+
+## Explicit production moves
+
+- Added labeled Move to Upcoming / Current / Past controls. Confirmation explains the exact status change (Pre-production / Shooting / Complete). Merely opening a folder remains read-only. Successful moves reveal the destination folder.
+- Status saves compare the original status and require a returned row; stale or denied updates cannot silently appear successful. Failed saves keep the expanded project and draft notes. Project switching and note editing pause while the status request is pending. Unrecognized existing statuses remain visible in the status selector.
+- Mock query tests verify project/status predicates, returned-row checks, network failure and no source mutation. No production database query or write was used; staging persistence and permission tests remain required. Supabase guidance informed the returned-row check without changing authorization policies.

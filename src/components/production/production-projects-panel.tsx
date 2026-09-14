@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { errorMessage } from "@/lib/error-message";
+import { saveProductionStatus } from "@/lib/production-status";
 import { formatInTimeZone, zonedDateTimeToIso } from "@/lib/date-time";
 
 type ClientContact = {
@@ -260,9 +261,8 @@ export function ProductionProjectsPanel() {
   });
 
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await db.from("production_projects").update({ status }).eq("id", id);
-      if (error) throw error;
+    mutationFn: async ({ project, status }: { project: ProductionProject; status: string }) => {
+      await saveProductionStatus(db, project, status);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["production", "projects"] });
@@ -384,6 +384,7 @@ export function ProductionProjectsPanel() {
               key={item}
               type="button"
               aria-pressed={folder === item}
+              disabled={updateStatus.isPending}
               onClick={() => {
                 if (!mayLeaveProject()) return;
                 setHasUnsavedNotes(false);
@@ -401,6 +402,7 @@ export function ProductionProjectsPanel() {
         </nav>
         <input
           aria-label="Search projects"
+          disabled={updateStatus.isPending}
           placeholder="Search project or client"
           value={search}
           onChange={(event) => {
@@ -475,6 +477,7 @@ export function ProductionProjectsPanel() {
                         <button
                           type="button"
                           aria-expanded={expandedId === project.id}
+                          disabled={updateStatus.isPending}
                           aria-controls={`project-${project.id}`}
                           onClick={() => {
                             if (!mayLeaveProject()) return;
@@ -499,12 +502,21 @@ export function ProductionProjectsPanel() {
                         value={project.status}
                         onChange={(event) => {
                           if (!mayLeaveProject()) return;
-                          setHasUnsavedNotes(false);
-                          setExpandedId(null);
-                          updateStatus.mutate({ id: project.id, status: event.target.value });
+                          updateStatus.mutate(
+                            { project, status: event.target.value },
+                            {
+                              onSuccess: () => {
+                                setHasUnsavedNotes(false);
+                                setExpandedId(null);
+                              },
+                            },
+                          );
                         }}
                         className="min-h-12 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground sm:min-h-10 sm:w-auto sm:text-xs"
                       >
+                        {!STATUS_LABEL[project.status] && (
+                          <option value={project.status}>{project.status}</option>
+                        )}
                         {Object.entries(STATUS_LABEL).map(([value, label]) => (
                           <option key={value} value={value}>
                             {label}
@@ -513,12 +525,60 @@ export function ProductionProjectsPanel() {
                       </select>
                     </div>
 
+                    <div
+                      className="mt-3 flex flex-wrap items-center gap-2"
+                      aria-label={`Move ${project.title} to folder`}
+                    >
+                      <span className="text-xs text-muted-foreground">Move to…</span>
+                      {(
+                        [
+                          ["upcoming", "pre_production", "Upcoming"],
+                          ["current", "shooting", "Current"],
+                          ["past", "complete", "Past"],
+                        ] as const
+                      )
+                        .filter(([destination]) => destination !== folderFor(project.status))
+                        .map(([destination, status, label]) => (
+                          <button
+                            key={destination}
+                            type="button"
+                            disabled={updateStatus.isPending}
+                            className="min-h-11 rounded-xl border border-border px-3 py-2 text-xs disabled:opacity-50"
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  `Move “${project.title}” to ${label}? This changes its status to ${STATUS_LABEL[status]}.`,
+                                ) ||
+                                !mayLeaveProject()
+                              )
+                                return;
+                              updateStatus.mutate(
+                                { project, status },
+                                {
+                                  onSuccess: () => {
+                                    setHasUnsavedNotes(false);
+                                    setExpandedId(null);
+                                    setFolder(destination);
+                                    setSearch("");
+                                    toast.success(`Project moved to ${label}.`);
+                                  },
+                                },
+                              );
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                    </div>
+
                     <div id={`project-${project.id}`} hidden={expandedId !== project.id}>
                       {expandedId === project.id && (
-                        <ProjectWorkspace
-                          projectId={project.id}
-                          onDirtyChange={setHasUnsavedNotes}
-                        />
+                        <fieldset disabled={updateStatus.isPending} className="min-w-0">
+                          <ProjectWorkspace
+                            projectId={project.id}
+                            onDirtyChange={setHasUnsavedNotes}
+                          />
+                        </fieldset>
                       )}
                       <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 sm:text-xs">
                         {project.scheduled_at && (
