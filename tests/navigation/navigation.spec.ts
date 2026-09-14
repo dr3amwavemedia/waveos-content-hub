@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  page.on("pageerror", (error) => console.error("Fixture browser error:", error.message));
+});
+test.afterEach(async ({ page }, info) => {
+  if (info.status !== info.expectedStatus) console.log(await page.locator("body").innerText());
+});
+
 for (const method of ["link", "programmatic"] as const) {
   test(`${method}: cancel preserves draft; confirm leaves`, async ({ page }) => {
     await page.goto("/");
