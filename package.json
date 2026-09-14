@@ -2,6 +2,9 @@
   "name": "tanstack_start_ts",
   "private": true,
   "sideEffects": false,
+  "overrides": {
+    "@tanstack/history": "1.162.4"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite dev",
