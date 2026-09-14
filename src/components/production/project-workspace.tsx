@@ -5,7 +5,10 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { errorMessage } from "@/lib/error-message";
-import { appendChecklistRow, checklistRows, toggleChecklistRow } from "@/lib/planning-checklist";
+import { appendChecklistRow, checklistRows } from "@/lib/planning-checklist";
+
+import { PlanningChecklistControls } from "./planning-checklist-controls";
+import { CrewPlanControls } from "./crew-plan-controls";
 
 const sections = {
   story: "Story",
@@ -238,50 +241,41 @@ function PlanningEditor({
               Add
             </button>
           </div>
-          {!!rows.length && (
-            <>
-              <p role="status" className="text-xs text-muted-foreground">
-                {rows.filter((row) => row.checked).length} of {rows.length} completed
-              </p>
-              <ul className="space-y-2">
-                {rows.map((row) => (
-                  <li key={row.index}>
-                    <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border px-3 py-2">
-                      <input
-                        type="checkbox"
-                        disabled={saving}
-                        checked={row.checked}
-                        onChange={() => setValue(toggleChecklistRow(value, row.index))}
-                      />
-                      <span
-                        className={`min-w-0 break-words text-sm ${row.checked ? "text-muted-foreground line-through" : ""}`}
-                      >
-                        {row.label}
-                      </span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
+          <PlanningChecklistControls value={value} onChange={setValue} disabled={saving} />
         </section>
       )}
-      <label className="block text-sm font-medium">
-        {checklist ? "Notes and checklist text" : sections[field]}
-        <textarea
-          value={value}
-          disabled={saving}
-          onChange={(event) => setValue(event.target.value)}
-          maxLength={field === "script" ? 40000 : 20000}
-          rows={8}
-          className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-base"
-          placeholder={
-            field === "organization"
-              ? "Crew roles, responsibilities and project structure"
-              : `Add this project's ${sections[field].toLowerCase()}`
-          }
-        />
-      </label>
+      {field === "organization" && (
+        <CrewPlanControls value={value} onChange={setValue} disabled={saving} />
+      )}
+      <details
+        open={checklist ? rows.length === 0 : field !== "organization"}
+        className="rounded-xl border border-border p-3"
+        key={field}
+      >
+        <summary className="min-h-11 cursor-pointer text-sm font-medium">
+          {checklist
+            ? "Notes and checklist text"
+            : field === "organization"
+              ? "Original notes and crew text"
+              : sections[field]}
+        </summary>
+        <label className="block text-sm font-medium">
+          {checklist ? "Notes and checklist text" : sections[field]}
+          <textarea
+            value={value}
+            disabled={saving}
+            onChange={(event) => setValue(event.target.value)}
+            maxLength={field === "script" ? 40000 : 20000}
+            rows={8}
+            className="mt-2 w-full rounded-xl border border-border bg-background p-3 text-base"
+            placeholder={
+              field === "organization"
+                ? "Crew roles, responsibilities and project structure"
+                : `Add this project's ${sections[field].toLowerCase()}`
+            }
+          />
+        </label>
+      </details>
       {field === "organization" && (
         <p className="text-sm text-muted-foreground">
           Describe who leads each area, who reports to them, and each crew member’s

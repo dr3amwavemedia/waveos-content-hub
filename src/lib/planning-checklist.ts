@@ -24,3 +24,19 @@ export function appendChecklistRow(value: string, label: string) {
   const text = label.trim().replace(/[\r\n]+/g, " ");
   return text ? `${value}${value && !value.endsWith("\n") ? "\n" : ""}- [ ] ${text}` : value;
 }
+export function editChecklistRow(value: string, index: number, label: string) {
+  const text = label.trim().replace(/[\r\n]+/g, " ");
+  if (!text) return value;
+  return value
+    .split("\n")
+    .map((line, i) =>
+      i === index ? line.replace(/^(\s*[-*] \[[ xX]\] ).*$/, (_, prefix) => prefix + text) : line,
+    )
+    .join("\n");
+}
+export function removeChecklistRow(value: string, index: number) {
+  return value
+    .split("\n")
+    .filter((line, i) => i !== index || !/^\s*[-*] \[[ xX]\] /.test(line))
+    .join("\n");
+}
