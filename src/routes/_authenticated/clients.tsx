@@ -1,3 +1,4 @@
+import { ContractExportTools } from "@/components/app/contract-export-tools";
 import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
 import { PaymentProgress } from "@/components/app/payment-progress";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
@@ -2121,6 +2122,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
   const inputCls = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
 
   return <div className="space-y-3">
+    {q.isSuccess && <ContractExportTools key={workspaceId} contracts={q.data ?? []} />}
     <div className="flex items-center justify-between gap-3">
       <p className="text-xs text-muted-foreground">Connect a Bloom.io or other secure signing link.</p>
       <button type="button" onClick={() => setShowForm((value) => !value)} className="inline-flex min-h-12 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">

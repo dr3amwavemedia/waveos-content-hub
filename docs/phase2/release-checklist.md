@@ -9,11 +9,11 @@
 | Preserve freelance links | Existing production-board URLs reused | Deployed share-link and cross-account regression |
 | CRM conversion and invitation email | Prefill and explicit send implemented | Staged conversion, duplicate/missing contact, invitation and all CRM control/role tests |
 | Clients directory | Name opens profile; labeled actions | Full client-button audit and long-name mobile checks |
-| Personal/business identity | Preference in staff Access settings, shared footer and project-client greeting | Other tier greetings; staged preference save |
+| Personal/business identity | Preference in staff Access settings, shared footer and shared standard-client greeting | Wedding identity review; staged preference save |
 | Login/refresh | Bounded reads, errors and retry UI | Reproduce original issue; expired session, account switching and every role |
-| Compact dashboards/tutorials | Project-client shortcuts and role navigation guide | Full tier-specific home layout and tutorial walkthrough |
-| Gallery | In-app photo viewer and gallery entry | Branded cover, large-gallery workflow, download permissions and external storage |
-| Accounting export | Existing invoice CSV/print report and CRM CSV | Contracts/quotes/receipts/vendor records, approved templates, complete ledger and client downloads across tiers |
+| Compact dashboards/tutorials | Shared standard-client shortcuts, wedding quick access/collapsed documents and role navigation guide | Full role/tutorial walkthrough |
+| Gallery | Collection layout, filters/search, pagination, shared media viewer and separate source error states | Staged permissions/download tests, generated thumbnails and external storage |
+| Accounting export | Invoice CSV/print reports, contract-record CSV and CRM CSV | Executed contracts/quotes/receipts/vendor records, approved templates and complete ledger |
 | Payments/signatures/access progression | Planned | Provider selection, server integration, webhook/security tests and pilot |
 | Private data/archives | Existing access rules preserved | Deployed policy audit, backup/restore and signed-document retention |
 

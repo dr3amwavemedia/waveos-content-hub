@@ -1,3 +1,6 @@
+import { ContractExportTools } from "./contract-export-tools";
+import { ExpandableSection } from "./expandable-section";
+import { InvoiceExportTools } from "./invoice-export-tools";
 import { Link } from "@tanstack/react-router";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
@@ -126,7 +129,7 @@ export function WeddingOverview() {
           style={{ borderColor: palette.border, background: palette.wash }}
         >
           <div
-            className="px-6 pt-12 pb-10 text-center sm:px-10"
+            className="px-6 py-6 text-center sm:px-10"
             style={{
               background: `radial-gradient(120% 80% at 50% 0%, ${palette.soft} 0%, transparent 70%)`,
             }}
@@ -157,6 +160,7 @@ export function WeddingOverview() {
           </div>
         </section>
 
+        <WeddingShortcuts active={isActive} />
         <WeddingAtAGlance
           daysUntilWedding={daysUntilWedding}
           venue={ws?.wedding_venue}
@@ -205,7 +209,7 @@ export function WeddingOverview() {
     >
       {/* Warm, personalized header */}
       <header
-        className="relative overflow-hidden rounded-[2rem] border px-5 py-8 sm:px-9 sm:py-10"
+        className="relative overflow-hidden rounded-[2rem] border px-5 py-5 sm:px-9 sm:py-10"
         style={{
           borderColor: palette.border,
           background: `linear-gradient(160deg, ${palette.soft} 0%, #ffffff 62%)`,
@@ -237,6 +241,7 @@ export function WeddingOverview() {
         </div>
       </header>
 
+      <WeddingShortcuts active={isActive} />
       <WeddingAtAGlance
         daysUntilWedding={daysUntilWedding}
         venue={ws?.wedding_venue}
@@ -616,15 +621,14 @@ function WeddingContractsSection({
   palette: ReturnType<typeof weddingPalette>;
 }) {
   return (
-    <section
+    <ExpandableSection
       id="wedding-contracts"
+      title="Contracts"
       className="scroll-mt-24 rounded-[1.75rem] border bg-white p-5 sm:p-7"
       style={{ borderColor: palette.border }}
     >
-      <h2 className="font-serif text-xl" style={{ color: palette.ink }}>
-        Contract
-      </h2>
       <div className="mt-4 space-y-3">
+        {contractsQ.isSuccess && <ContractExportTools contracts={contractsQ.data ?? []} />}
         {contractsQ.isLoading ? (
           <Muted text="Loading your contract…" wash={palette.wash} />
         ) : contractsQ.isError ? (
@@ -638,7 +642,7 @@ function WeddingContractsSection({
           <Muted text="Nothing needs your signature right now." wash={palette.wash} />
         )}
       </div>
-    </section>
+    </ExpandableSection>
   );
 }
 
@@ -650,15 +654,14 @@ function WeddingInvoicesSection({
   palette: ReturnType<typeof weddingPalette>;
 }) {
   return (
-    <section
+    <ExpandableSection
       id="wedding-invoices"
+      title="Payments"
       className="scroll-mt-24 rounded-[1.75rem] border bg-white p-5 sm:p-7"
       style={{ borderColor: palette.border }}
     >
-      <h2 className="font-serif text-xl" style={{ color: palette.ink }}>
-        Payments
-      </h2>
       <div className="mt-4 space-y-3">
+        {invoicesQ.isSuccess && <InvoiceExportTools invoices={invoicesQ.data ?? []} />}
         {invoicesQ.isLoading ? (
           <Muted text="Loading your payments…" wash={palette.wash} />
         ) : invoicesQ.isError ? (
@@ -669,7 +672,7 @@ function WeddingInvoicesSection({
           <Muted text="You’re all set. Nothing is due right now." wash={palette.wash} />
         )}
       </div>
-    </section>
+    </ExpandableSection>
   );
 }
 
@@ -712,5 +715,42 @@ function Muted({ text, wash }: { text: string; wash: string }) {
     <div className="rounded-2xl p-5 text-sm text-stone-600" style={{ background: wash }}>
       {text}
     </div>
+  );
+}
+
+function WeddingShortcuts({ active }: { active: boolean }) {
+  return (
+    <nav aria-label="Wedding quick access" className="grid grid-cols-2 gap-2">
+      <a
+        href="#wedding-contracts"
+        className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm"
+      >
+        <FileSignature className="h-4 w-4" />
+        Contracts
+      </a>
+      <a
+        href="#wedding-invoices"
+        className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm"
+      >
+        <CreditCard className="h-4 w-4" />
+        Payments
+      </a>
+      {active && (
+        <Link
+          to="/wedding-content"
+          className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm"
+        >
+          <Film className="h-4 w-4" />
+          Films & photos
+        </Link>
+      )}
+      <a
+        href="#wedding-contact"
+        className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm"
+      >
+        <Mail className="h-4 w-4" />
+        Contact us
+      </a>
+    </nav>
   );
 }

@@ -49,3 +49,13 @@ The full requirement inventory and integration prompts are adjacent to this file
 Additional verification: TypeScript and targeted lint; invoice export unit checks covering partial/unknown/overpaid amounts, CSV formula protection and HTML escaping; mobile synthetic preview verified separate project fields and no note carry-over into another project. Synthetic writes stay in memory and do not validate deployed RLS or persistence.
 
 The user confirmed there is no selected payment/signature provider. Keep provider activation in the following phase. Do not cancel Bloom.
+
+## Gallery and document navigation batch
+
+- Replaced the flat uploaded-media list with a workspace collection: photo/video filters, filename search, 24-record pages, a shared next/previous viewer, in-app video controls, preview retry and original-file links. Media records and storage paths remain unchanged. Frame.io imports with no playable original use their existing provider fallback instead of treating a thumbnail as the original.
+- Gallery, project links and connected-media errors are independent, so one unavailable source does not hide the others. Larger collections can load subsequent pages rather than relying on an unpaged response. Existing storage still serves full-sized WaveOS images; thumbnail generation/external storage is not implemented by this UI change.
+- Wedding home now has compact contract/payment/contact/delivery shortcuts and collapsible document lists. Existing active/pending gates remain unchanged. Standard client tiers already share Layer1Overview in home.tsx, so the earlier compact layout also covers growth/retainer/social clients.
+- Router-aware expandable document sections preserve existing invoice/contract hash navigation, including tutorial links. Dialog close controls have larger touch targets.
+- Contract record CSVs added to staff client profiles and both client home variants. They export recorded status/date metadata only and exclude hosted signing URLs. They are not an executed-contract archive. Wedding clients also receive the invoice export controls.
+
+Verification: TypeScript, local production build, focused lint and invoice/contract export tests passed. A 390px synthetic preview verified viewer next/previous, pagination from 24 to 30 sample files, search locating file 30 and a document hash opening its collapsed section. No authenticated database or provider integration was exercised. The gallery uses the existing access checks; no permission/security certification is implied.

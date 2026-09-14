@@ -1,3 +1,5 @@
+import { ContractExportTools } from "./contract-export-tools";
+import { ExpandableSection } from "./expandable-section";
 import { InvoiceExportTools } from "./invoice-export-tools";
 import { PaymentProgress } from "./payment-progress";
 import { useEffect, useMemo } from "react";
@@ -396,8 +398,8 @@ export function Layer1Overview() {
       </section>
 
       {/* Contracts */}
-      <details id="contracts" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
-        <summary className="min-h-11 cursor-pointer text-lg font-semibold">Contracts</summary>
+      <ExpandableSection title="Contracts" id="contracts" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
+        {contractsQ.isSuccess && <ContractExportTools key={wsId} contracts={contractsQ.data ?? []} />}
         <div className="flex flex-wrap items-end justify-between gap-2">
           <h2 className="text-lg font-semibold text-foreground">Contracts & Agreements</h2>
           {(contractsQ.data?.length ?? 0) > 1 && <span className="text-xs text-muted-foreground">{contractsQ.data!.length} contracts</span>}
@@ -406,11 +408,10 @@ export function Layer1Overview() {
           <div className="surface-card p-5 text-sm text-destructive">Contracts could not be loaded. Refresh the page to try again.</div> :
           (contractsQ.data ?? []).length > 0 ? <div className="space-y-3">{contractsQ.data?.map((contract) => <ContractCard key={contract.id} contract={contract} />)}</div> :
           <PolishedEmpty icon={FileText} body="You currently have no contracts requiring action." />}
-      </details>
+      </ExpandableSection>
 
       {/* Invoices */}
-      <details id="invoices" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
-        <summary className="min-h-11 cursor-pointer text-lg font-semibold">Invoices & Payments</summary>
+      <ExpandableSection title="Invoices & Payments" id="invoices" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
         {invoicesQ.isSuccess && <InvoiceExportTools key={wsId} invoices={invoicesQ.data ?? []} />}
         <div className="flex flex-wrap items-end justify-between gap-2">
 
@@ -435,7 +436,7 @@ export function Layer1Overview() {
         ) : (
           <PolishedEmpty icon={FileText} body="You currently have no invoices requiring action." />
         )}
-      </details>
+      </ExpandableSection>
 
       {/* Content */}
       <section id="your-content" className="scroll-mt-24 space-y-3">
