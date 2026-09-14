@@ -1,5 +1,8 @@
+import { ContractExportTools } from "./contract-export-tools";
+import { ExpandableSection } from "./expandable-section";
+import { InvoiceExportTools } from "./invoice-export-tools";
 import { PaymentProgress } from "./payment-progress";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -136,9 +139,20 @@ export function Layer1Overview() {
   const { data: user } = useCurrentUser();
   const { activeWorkspace } = useWorkspace();
   const wsId = activeWorkspace?.id;
+  useEffect(() => {
+    const reveal = () => {
+      const id = window.location.hash.slice(1);
+      if (!["invoices", "contracts", "your-content"].includes(id)) return;
+      const section = document.getElementById(id);
+      if (section instanceof HTMLDetailsElement) section.open = true;
+    };
+    reveal();
+    window.addEventListener("hashchange", reveal);
+    return () => window.removeEventListener("hashchange", reveal);
+  }, [wsId]);
   const branding = useWorkspaceBranding(wsId);
 
-  const firstName = user?.firstName?.split(" ")[0] ?? null;
+  const firstName = activeWorkspace?.businessNameOnly ? activeWorkspace.name : user?.firstName?.trim().split(/\s+/)[0] || null;
 
   const brandQ = useQuery({
     queryKey: ["layer1", "brand", wsId],
@@ -299,6 +313,20 @@ export function Layer1Overview() {
         )}
       </div>
 
+      <nav aria-label="Your workspace tools" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[{ id: "invoices", label: "Invoices", count: invoicesQ.data?.length },
+          { id: "contracts", label: "Contracts", count: contractsQ.data?.length }].map(item =>
+          <a key={item.id} href={`#${item.id}`} onClick={() => {
+            const section = document.getElementById(item.id);
+            if (section instanceof HTMLDetailsElement) section.open = true;
+          }} className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary">
+            <FileText className="mb-2 h-5 w-5 text-primary" />{item.label}
+            <span className="ml-2 text-xs text-muted-foreground">{item.count ?? "—"}</span>
+          </a>)}
+        <Link to="/deliveries" className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary"><ImageIcon className="mb-2 h-5 w-5 text-primary" />Deliverables</Link>
+        <Link to="/my-projects" className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary"><Film className="mb-2 h-5 w-5 text-primary" />Projects</Link>
+      </nav>
+
       {/* Primary action */}
       <PrimaryActionBanner action={primaryAction} />
 
@@ -370,7 +398,8 @@ export function Layer1Overview() {
       </section>
 
       {/* Contracts */}
-      <section id="contracts" className="scroll-mt-24 space-y-3">
+      <ExpandableSection title="Contracts" id="contracts" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
+        {contractsQ.isSuccess && <ContractExportTools key={wsId} contracts={contractsQ.data ?? []} />}
         <div className="flex flex-wrap items-end justify-between gap-2">
           <h2 className="text-lg font-semibold text-foreground">Contracts & Agreements</h2>
           {(contractsQ.data?.length ?? 0) > 1 && <span className="text-xs text-muted-foreground">{contractsQ.data!.length} contracts</span>}
@@ -379,12 +408,13 @@ export function Layer1Overview() {
           <div className="surface-card p-5 text-sm text-destructive">Contracts could not be loaded. Refresh the page to try again.</div> :
           (contractsQ.data ?? []).length > 0 ? <div className="space-y-3">{contractsQ.data?.map((contract) => <ContractCard key={contract.id} contract={contract} />)}</div> :
           <PolishedEmpty icon={FileText} body="You currently have no contracts requiring action." />}
-      </section>
+      </ExpandableSection>
 
       {/* Invoices */}
-      <section id="invoices" className="scroll-mt-24 space-y-3">
+      <ExpandableSection title="Invoices & Payments" id="invoices" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
+        {invoicesQ.isSuccess && <InvoiceExportTools key={wsId} invoices={invoicesQ.data ?? []} />}
         <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-lg font-semibold text-foreground">Invoices & Payments</h2>
+
           {(invoicesQ.data?.length ?? 0) > 1 && (
             <span className="text-xs text-muted-foreground">
               {invoicesQ.data!.length} invoices · newest first
@@ -406,7 +436,7 @@ export function Layer1Overview() {
         ) : (
           <PolishedEmpty icon={FileText} body="You currently have no invoices requiring action." />
         )}
-      </section>
+      </ExpandableSection>
 
       {/* Content */}
       <section id="your-content" className="scroll-mt-24 space-y-3">

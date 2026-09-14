@@ -1,3 +1,5 @@
+import { ContractExportTools } from "@/components/app/contract-export-tools";
+import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
 import { PaymentProgress } from "@/components/app/payment-progress";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,7 +12,6 @@ import {
   Eye,
   ExternalLink,
   Loader2,
-  MoreHorizontal,
   Pause,
   Pencil,
   Play,
@@ -40,6 +41,7 @@ import type { Database } from "@/integrations/supabase/types";
 import { syncFrameioWorkspaceShare } from "@/hooks/use-frameio";
 import { ClientBrandingEditor } from "@/components/branding/client-branding-editor";
 import { sendInviteEmail, sendWorkspaceEmail, tryEmail } from "@/lib/transactional-email";
+import { invitationContact } from "@/lib/invitation-contact";
 import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
@@ -423,7 +425,7 @@ function ClientsPage() {
                 <article key={w.id} className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3 className="truncate font-semibold text-foreground">{w.name}</h3>
+                      <h3><button type="button" onClick={() => setSelectedWs(w)} className="min-h-11 text-left font-semibold text-foreground hover:text-primary">{w.name}</button></h3>
                       <p className="truncate text-xs text-muted-foreground">
                         /{w.slug} · {w.industry ?? "Industry not set"}
                       </p>
@@ -439,7 +441,7 @@ function ClientsPage() {
                       className="min-h-10 min-w-10 rounded-lg border border-border p-2.5 text-muted-foreground"
                       aria-label={`Manage ${w.name}`}
                     >
-                      <MoreHorizontal className="h-4 w-4" />
+                      <span className="text-xs font-semibold">Profile</span>
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -492,7 +494,7 @@ function ClientsPage() {
                     <tr key={w.id} className="border-t border-border/60 hover:bg-elevated/40">
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <div className="font-semibold text-foreground">{w.name}</div>
+                          <button type="button" onClick={() => setSelectedWs(w)} className="min-h-11 text-left font-semibold text-foreground hover:text-primary">{w.name}</button>
                           <button
                             onClick={() => setSelectedWs(w)}
                             className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
@@ -538,7 +540,7 @@ function ClientsPage() {
                           className="rounded-lg p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
                           aria-label={`Open ${w.name}`}
                         >
-                          <MoreHorizontal className="h-4 w-4" />
+                          <span className="text-xs font-semibold">Profile</span>
                         </button>
                       </td>
                     </tr>
@@ -696,14 +698,14 @@ function WorkspaceDrawer({
         </div>
       </div>
 
-      <div className="mb-4 flex gap-1 border-b border-border">
+      <div className="mb-4 grid grid-cols-2 gap-1 border-b border-border sm:grid-cols-4">
         {(["info", "branding", "access", "media", "deliveries", "contracts", "invoices", "invites"] as const).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
             className={cn(
-              "border-b-2 px-3 py-2 text-xs font-medium capitalize -mb-px transition-colors",
+              "min-h-11 border-b-2 px-3 py-2 text-xs font-medium capitalize transition-colors",
               tab === t
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -1415,6 +1417,7 @@ function AccessTab({
   isOwner: boolean;
 }) {
   const qc = useQueryClient();
+  const [businessNameOnly, setBusinessNameOnly] = useState(workspace.feature_overrides.business_name_only === true);
   const [tier, setTier] = useState<ClientAccessTier>(workspace.access_tier);
   const [status, setStatus] = useState<AccountStatus>(workspace.account_status);
   const [term, setTerm] = useState<AgreementTerm | "">(workspace.agreement_term ?? "");
@@ -1462,7 +1465,7 @@ function AccessTab({
       const { error } = await supabase
         .from("workspaces")
         .update({
-          ...tierStorage(tier, workspace.feature_overrides),
+          ...tierStorage(tier, { ...workspace.feature_overrides, business_name_only: businessNameOnly }),
           account_status: status,
           agreement_term: term || null,
           access_starts_at: startsAt ? new Date(startsAt).toISOString() : null,
@@ -1503,6 +1506,7 @@ function AccessTab({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients", "workspaces"] });
       qc.invalidateQueries({ queryKey: ["workspace-access", workspace.id] });
+      qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] });
       toast.success("Access updated.");
       onRefresh();
     },
@@ -1577,6 +1581,7 @@ function AccessTab({
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border p-3 sm:col-span-2"><input type="checkbox" checked={businessNameOnly} onChange={event => setBusinessNameOnly(event.target.checked)} /><span className="text-sm">Show the business name in the client portal instead of the person’s name</span></label>
         <Field label="Access tier">
           <select
             value={tier}
@@ -2117,6 +2122,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
   const inputCls = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
 
   return <div className="space-y-3">
+    {q.isSuccess && <ContractExportTools key={workspaceId} contracts={q.data ?? []} />}
     <div className="flex items-center justify-between gap-3">
       <p className="text-xs text-muted-foreground">Connect a Bloom.io or other secure signing link.</p>
       <button type="button" onClick={() => setShowForm((value) => !value)} className="inline-flex min-h-12 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">
@@ -2179,7 +2185,7 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("client_invoices").delete().eq("id", id);
+      const { error } = await supabase.from("client_invoices").delete().eq("id", id).eq("workspace_id", workspaceId);
       if (error) throw error;
     },
     onSuccess: async (_, id) => {
@@ -2193,6 +2199,7 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
 
   return (
     <div className="space-y-3">
+      {q.isSuccess && <InvoiceExportTools key={workspaceId} invoices={q.data ?? []} />}
       <div className="flex justify-end">
         <button
           onClick={() => {
@@ -2683,7 +2690,7 @@ function InvitesTab({
 
   return (
     <div className="space-y-3">
-      <InviteQuickForm workspace={workspace} onNewInvite={onNewInvite} />
+      <InviteQuickForm key={workspace.id} workspace={workspace} onNewInvite={onNewInvite} />
       {(membersQ.data ?? []).length > 0 && (
         <div className="rounded-lg border border-border/60 bg-surface/40 p-3">
           <p className="mb-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -3003,9 +3010,24 @@ function InviteQuickForm({
   onNewInvite: (p: { link: string; email: string; workspace: string }) => void;
 }) {
   const qc = useQueryClient();
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  // Null means untouched; an explicitly cleared field must stay cleared even
+  // if the CRM request finishes or refetches while the user is typing.
+  const [emailOverride, setEmail] = useState<string | null>(null);
+  const [firstNameOverride, setFirstName] = useState<string | null>(null);
+  const [lastNameOverride, setLastName] = useState<string | null>(null);
+  const contactQ = useQuery({
+    queryKey: ["clients", "invitation-contact", workspace.id],
+    queryFn: async () => {
+      const { data, error } = await db.from("crm_accounts")
+        .select("email,crm_contacts(first_name,last_name,email,is_primary)")
+        .eq("linked_workspace_id", workspace.id).maybeSingle();
+      if (error) throw error;
+      return invitationContact(data);
+    },
+  });
+  const email = emailOverride ?? contactQ.data?.email ?? "";
+  const firstName = firstNameOverride ?? contactQ.data?.firstName ?? "";
+  const lastName = lastNameOverride ?? contactQ.data?.lastName ?? "";
   const [role, setRole] = useState<"owner" | "approver" | "viewer">("owner");
   const create = useMutation({
     mutationFn: async () => {
@@ -3061,7 +3083,12 @@ function InviteQuickForm({
       }}
       className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border bg-surface/40 p-3"
     >
-      <div className="flex-1 min-w-[200px]">
+      <p className="w-full text-xs text-muted-foreground" role="status">
+        {contactQ.isLoading ? "Loading saved CRM contact…" : contactQ.isError
+          ? "Saved contact could not be loaded. Enter the invitation details below."
+          : "Review the saved contact details. Nothing is sent until you select Send invite."}
+      </p>
+      <div className="min-w-0 basis-full sm:flex-1">
         <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
           Invite email
         </label>

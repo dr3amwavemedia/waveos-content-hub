@@ -100,7 +100,11 @@ function VideographerDashboard() {
   );
 
   if (isLoading) {
-    return <div className="py-20 text-center text-sm text-muted-foreground">Loading production dashboard…</div>;
+    return (
+      <div className="py-20 text-center text-sm text-muted-foreground">
+        Loading production dashboard…
+      </div>
+    );
   }
 
   if (!canUseDashboard) {
@@ -124,10 +128,7 @@ function VideographerDashboard() {
   function addChecklistItem() {
     const label = newItem.trim();
     if (!label) return;
-    setChecklist((current) => [
-      ...current,
-      { id: crypto.randomUUID(), label, done: false },
-    ]);
+    setChecklist((current) => [...current, { id: crypto.randomUUID(), label, done: false }]);
     setNewItem("");
   }
 
@@ -163,7 +164,10 @@ function VideographerDashboard() {
         </Link>
       </header>
 
-      <nav className="grid w-full grid-cols-2 items-center gap-1 rounded-xl border border-border bg-surface p-1 sm:flex sm:w-fit" aria-label="Production sections">
+      <nav
+        className="grid w-full grid-cols-2 items-center gap-1 rounded-xl border border-border bg-surface p-1 sm:flex sm:w-fit"
+        aria-label="Production sections"
+      >
         <Link
           to="/videographer"
           className="inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
@@ -206,182 +210,216 @@ function VideographerDashboard() {
         />
       </section>
 
-      <ProductionTodayPanel />
-
       <ProductionProjectsPanel />
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
-        <section className="rounded-2xl border border-border bg-surface shadow-sm">
-          <div className="flex items-center justify-between border-b border-border p-5">
-            <div>
+      <details className="rounded-2xl border border-border bg-surface p-4">
+        <summary className="min-h-11 cursor-pointer font-semibold">Today's schedule</summary>
+        <ProductionTodayPanel />
+      </details>
+      <details className="rounded-2xl border border-border bg-surface p-4">
+        <summary className="min-h-11 cursor-pointer font-semibold">
+          Personal preparation tools
+        </summary>
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
+          <section className="rounded-2xl border border-border bg-surface shadow-sm">
+            <div className="flex items-center justify-between border-b border-border p-5">
+              <div>
+                <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                  <CheckCircle2 className="h-5 w-5 text-primary" />
+                  Personal prep checklist
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Your private reusable prep list, saved on this device.
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-xl font-bold text-foreground">{progress}%</div>
+                <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  {completed}/{checklist.length} done
+                </div>
+              </div>
+            </div>
+            <div className="h-1 bg-elevated">
+              <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+            </div>
+            <div className="space-y-2 p-5">
+              {checklist.map((item) => (
+                <div
+                  key={item.id}
+                  className={cn(
+                    "group flex items-center gap-3 rounded-xl border px-3 py-3 transition-colors",
+                    item.done
+                      ? "border-primary/20 bg-primary/5"
+                      : "border-border bg-elevated/40 hover:border-primary/30",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => toggleChecklist(item.id)}
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary"
+                    aria-label={item.done ? "Mark incomplete" : "Mark complete"}
+                  >
+                    {item.done ? (
+                      <CheckCircle2 className="h-5 w-5" />
+                    ) : (
+                      <Circle className="h-5 w-5" />
+                    )}
+                  </button>
+                  <span
+                    className={cn(
+                      "min-w-0 flex-1 text-sm",
+                      item.done && "text-muted-foreground line-through",
+                    )}
+                  >
+                    {item.label}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setChecklist((current) => current.filter((entry) => entry.id !== item.id))
+                    }
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
+                    aria-label="Remove checklist item"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex gap-2 pt-2">
+                <input
+                  value={newItem}
+                  onChange={(event) => setNewItem(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && addChecklistItem()}
+                  placeholder="Add checklist item"
+                  className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-3 text-base outline-none focus:border-primary sm:text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={addChecklistItem}
+                  className="inline-flex min-h-12 items-center gap-1 rounded-xl bg-primary px-3 py-3 text-sm font-semibold text-primary-foreground"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-surface shadow-sm">
+            <div className="border-b border-border p-5">
               <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
-                Personal prep checklist
+                <Map className="h-5 w-5 text-primary" />
+                Storyboard map
               </h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Your private reusable prep list, saved on this device.
+                Arrange the shoot from opening frame to final reveal.
               </p>
             </div>
-            <div className="text-right">
-              <div className="text-xl font-bold text-foreground">{progress}%</div>
-              <div className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                {completed}/{checklist.length} done
-              </div>
-            </div>
-          </div>
-          <div className="h-1 bg-elevated">
-            <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
-          </div>
-          <div className="space-y-2 p-5">
-            {checklist.map((item) => (
-              <div
-                key={item.id}
-                className={cn(
-                  "group flex items-center gap-3 rounded-xl border px-3 py-3 transition-colors",
-                  item.done
-                    ? "border-primary/20 bg-primary/5"
-                    : "border-border bg-elevated/40 hover:border-primary/30",
-                )}
-              >
-                <button
-                  type="button"
-                  onClick={() => toggleChecklist(item.id)}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-primary"
-                  aria-label={item.done ? "Mark incomplete" : "Mark complete"}
-                >
-                  {item.done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
-                </button>
-                <span className={cn("min-w-0 flex-1 text-sm", item.done && "text-muted-foreground line-through")}>
-                  {item.label}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setChecklist((current) => current.filter((entry) => entry.id !== item.id))}
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100"
-                  aria-label="Remove checklist item"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
-            <div className="flex gap-2 pt-2">
-              <input
-                value={newItem}
-                onChange={(event) => setNewItem(event.target.value)}
-                onKeyDown={(event) => event.key === "Enter" && addChecklistItem()}
-                placeholder="Add checklist item"
-                className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-3 text-base outline-none focus:border-primary sm:text-sm"
-              />
-              <button
-                type="button"
-                onClick={addChecklistItem}
-                className="inline-flex min-h-12 items-center gap-1 rounded-xl bg-primary px-3 py-3 text-sm font-semibold text-primary-foreground"
-              >
-                <Plus className="h-4 w-4" />
-                Add
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-border bg-surface shadow-sm">
-          <div className="border-b border-border p-5">
-            <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <Map className="h-5 w-5 text-primary" />
-              Storyboard map
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Arrange the shoot from opening frame to final reveal.
-            </p>
-          </div>
-          <div className="space-y-3 p-5">
-            {storyboard.map((beat, index) => (
-              <div key={beat.id} className="group flex gap-3">
-                <div className="flex w-8 shrink-0 flex-col items-center">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-xs font-bold text-primary">
-                    {index + 1}
-                  </span>
-                  {index < storyboard.length - 1 && <span className="mt-1 h-full w-px bg-border" />}
-                </div>
-                <div className="mb-2 min-w-0 flex-1 rounded-xl border border-border bg-elevated/40 p-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={beat.title}
+            <div className="space-y-3 p-5">
+              {storyboard.map((beat, index) => (
+                <div key={beat.id} className="group flex gap-3">
+                  <div className="flex w-8 shrink-0 flex-col items-center">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-xs font-bold text-primary">
+                      {index + 1}
+                    </span>
+                    {index < storyboard.length - 1 && (
+                      <span className="mt-1 h-full w-px bg-border" />
+                    )}
+                  </div>
+                  <div className="mb-2 min-w-0 flex-1 rounded-xl border border-border bg-elevated/40 p-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={beat.title}
+                        onChange={(event) =>
+                          setStoryboard((current) =>
+                            current.map((entry) =>
+                              entry.id === beat.id
+                                ? { ...entry, title: event.target.value }
+                                : entry,
+                            ),
+                          )
+                        }
+                        className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-foreground outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setStoryboard((current) =>
+                            current.filter((entry) => entry.id !== beat.id),
+                          )
+                        }
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100"
+                        aria-label="Remove storyboard beat"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <textarea
+                      value={beat.note}
+                      rows={2}
                       onChange={(event) =>
                         setStoryboard((current) =>
                           current.map((entry) =>
-                            entry.id === beat.id ? { ...entry, title: event.target.value } : entry,
+                            entry.id === beat.id ? { ...entry, note: event.target.value } : entry,
                           ),
                         )
                       }
-                      className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-foreground outline-none"
+                      className="mt-1 w-full resize-none bg-transparent text-xs leading-relaxed text-muted-foreground outline-none"
                     />
-                    <button
-                      type="button"
-                      onClick={() => setStoryboard((current) => current.filter((entry) => entry.id !== beat.id))}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:text-destructive sm:opacity-0 sm:group-hover:opacity-100"
-                      aria-label="Remove storyboard beat"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
                   </div>
-                  <textarea
-                    value={beat.note}
-                    rows={2}
-                    onChange={(event) =>
-                      setStoryboard((current) =>
-                        current.map((entry) =>
-                          entry.id === beat.id ? { ...entry, note: event.target.value } : entry,
-                        ),
-                      )
-                    }
-                    className="mt-1 w-full resize-none bg-transparent text-xs leading-relaxed text-muted-foreground outline-none"
-                  />
                 </div>
+              ))}
+              <div className="flex gap-2 pt-1">
+                <input
+                  value={newBeat}
+                  onChange={(event) => setNewBeat(event.target.value)}
+                  onKeyDown={(event) => event.key === "Enter" && addStoryBeat()}
+                  placeholder="Add storyboard moment"
+                  className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-3 text-base outline-none focus:border-primary sm:text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={addStoryBeat}
+                  className="inline-flex min-h-12 items-center gap-1 rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-semibold text-primary"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add
+                </button>
               </div>
-            ))}
-            <div className="flex gap-2 pt-1">
-              <input
-                value={newBeat}
-                onChange={(event) => setNewBeat(event.target.value)}
-                onKeyDown={(event) => event.key === "Enter" && addStoryBeat()}
-                placeholder="Add storyboard moment"
-                className="min-h-12 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 py-3 text-base outline-none focus:border-primary sm:text-sm"
-              />
-              <button
-                type="button"
-                onClick={addStoryBeat}
-                className="inline-flex min-h-12 items-center gap-1 rounded-xl border border-primary/40 bg-primary/10 px-3 py-3 text-sm font-semibold text-primary"
+            </div>
+          </section>
+        </div>
+
+        <section className="rounded-2xl border border-border bg-gradient-to-br from-surface to-primary/5 p-5">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
+                <Clock3 className="h-5 w-5 text-primary" />
+                Ready for the next shoot?
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Check the calendar, capture the footage, upload it to Content, then prepare the
+                client delivery.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:flex">
+              <Link
+                to="/calendar"
+                className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground sm:rounded-full"
               >
-                <Plus className="h-4 w-4" />
-                Add
-              </button>
+                Open schedule
+              </Link>
+              <Link
+                to="/content"
+                className="inline-flex min-h-12 items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground sm:rounded-full"
+              >
+                Upload content
+              </Link>
             </div>
           </div>
         </section>
-      </div>
-
-      <section className="rounded-2xl border border-border bg-gradient-to-br from-surface to-primary/5 p-5">
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-          <div>
-            <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
-              <Clock3 className="h-5 w-5 text-primary" />
-              Ready for the next shoot?
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Check the calendar, capture the footage, upload it to Content, then prepare the client delivery.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex">
-            <Link to="/calendar" className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border bg-background px-4 py-3 text-sm font-semibold text-foreground sm:rounded-full">
-              Open schedule
-            </Link>
-            <Link to="/content" className="inline-flex min-h-12 items-center justify-center rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground sm:rounded-full">
-              Upload content
-            </Link>
-          </div>
-        </div>
-      </section>
+      </details>
     </div>
   );
 }

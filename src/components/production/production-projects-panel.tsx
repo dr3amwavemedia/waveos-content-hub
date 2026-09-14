@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ProjectWorkspace } from "./project-workspace";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
@@ -16,7 +17,9 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-waveos";
+import { ProjectNavigationGuard } from "./project-navigation-guard";
 import { errorMessage } from "@/lib/error-message";
+import { saveProductionStatus } from "@/lib/production-status";
 import { formatInTimeZone, zonedDateTimeToIso } from "@/lib/date-time";
 
 type ClientContact = {
@@ -124,6 +127,18 @@ export function ProductionProjectsPanel() {
   const qc = useQueryClient();
   const { data: user } = useCurrentUser();
   const [creating, setCreating] = useState(false);
+  const [folder, setFolder] = useState("current");
+  const [search, setSearch] = useState("");
+  const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
+  const mayLeaveProject = () =>
+    !hasUnsavedNotes || window.confirm("Discard unsaved project notes?");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const folderFor = (status: string) =>
+    status === "complete"
+      ? "past"
+      : ["shooting", "uploading", "editing"].includes(status)
+        ? "current"
+        : "upcoming";
   const [title, setTitle] = useState("");
   const [clientId, setClientId] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
@@ -247,9 +262,8 @@ export function ProductionProjectsPanel() {
   });
 
   const updateStatus = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await db.from("production_projects").update({ status }).eq("id", id);
-      if (error) throw error;
+    mutationFn: async ({ project, status }: { project: ProductionProject; status: string }) => {
+      await saveProductionStatus(db, project, status);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["production", "projects"] });
@@ -261,14 +275,15 @@ export function ProductionProjectsPanel() {
 
   return (
     <section className="rounded-2xl border border-border bg-surface shadow-sm">
+      <ProjectNavigationGuard dirty={hasUnsavedNotes} />
       <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <Users2 className="h-5 w-5 text-primary" />
-            Assigned productions
+            Your projects
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Link every production to its WaveCRM client and workspace.
+            Choose a folder, then open a project to see its details.
           </p>
         </div>
         <button
@@ -364,8 +379,56 @@ export function ProductionProjectsPanel() {
         </form>
       )}
 
+      <div className="space-y-3 border-b border-border p-4">
+        <nav aria-label="Project folders" className="grid grid-cols-3 gap-2">
+          {["upcoming", "current", "past"].map((item) => (
+            <button
+              key={item}
+              type="button"
+              aria-pressed={folder === item}
+              disabled={updateStatus.isPending}
+              onClick={() => {
+                if (!mayLeaveProject()) return;
+                setHasUnsavedNotes(false);
+                setFolder(item);
+                setExpandedId(null);
+              }}
+              className={`min-h-12 rounded-xl border px-2 py-3 text-sm capitalize ${folder === item ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
+            >
+              {item}{" "}
+              <span className="text-xs">
+                ({(projectsQ.data ?? []).filter((p) => folderFor(p.status) === item).length})
+              </span>
+            </button>
+          ))}
+        </nav>
+        <input
+          aria-label="Search projects"
+          disabled={updateStatus.isPending}
+          placeholder="Search project or client"
+          value={search}
+          onChange={(event) => {
+            if (!mayLeaveProject()) return;
+            setHasUnsavedNotes(false);
+            setExpandedId(null);
+            setSearch(event.target.value);
+          }}
+          className="min-h-11 w-full rounded-xl border border-border bg-background px-3"
+        />
+      </div>
       <div className="p-3 sm:p-5">
-        {projectsQ.isLoading ? (
+        {projectsQ.isError ? (
+          <div role="alert" className="p-4 text-sm">
+            Projects could not be loaded.{" "}
+            <button
+              type="button"
+              onClick={() => projectsQ.refetch()}
+              className="min-h-11 text-primary"
+            >
+              Try again
+            </button>
+          </div>
+        ) : projectsQ.isLoading ? (
           <div className="flex justify-center py-10 text-sm text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Loading productions…
@@ -382,109 +445,212 @@ export function ProductionProjectsPanel() {
           </div>
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
-            {projectsQ.data!.map((project) => {
-              const client = project.client_snapshot ?? ({} as ClientSnapshot);
-              const projectTimeZone = project.workspace_id
-                ? (workspaceTimeZonesQ.data?.get(project.workspace_id) ?? "UTC")
-                : "UTC";
-              return (
-                <article
-                  key={project.id}
-                  className="rounded-2xl border border-border bg-elevated/35 p-4"
-                >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-foreground">
-                        {project.title}
+            {projectsQ.data!.filter(
+              (project) =>
+                folderFor(project.status) === folder &&
+                `${project.title} ${project.client_snapshot?.businessName ?? ""}`
+                  .toLowerCase()
+                  .includes(search.trim().toLowerCase()),
+            ).length === 0 && (
+              <p className="py-6 text-sm text-muted-foreground">
+                No matching projects in this folder. Try another folder or search.
+              </p>
+            )}
+            {projectsQ
+              .data!.filter(
+                (project) =>
+                  folderFor(project.status) === folder &&
+                  `${project.title} ${project.client_snapshot?.businessName ?? ""}`
+                    .toLowerCase()
+                    .includes(search.trim().toLowerCase()),
+              )
+              .map((project) => {
+                const client = project.client_snapshot ?? ({} as ClientSnapshot);
+                const projectTimeZone = project.workspace_id
+                  ? (workspaceTimeZonesQ.data?.get(project.workspace_id) ?? "UTC")
+                  : "UTC";
+                return (
+                  <article
+                    key={project.id}
+                    className="rounded-2xl border border-border bg-elevated/35 p-4"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <button
+                          type="button"
+                          aria-expanded={expandedId === project.id}
+                          disabled={updateStatus.isPending}
+                          aria-controls={`project-${project.id}`}
+                          onClick={() => {
+                            if (!mayLeaveProject()) return;
+                            setHasUnsavedNotes(false);
+                            setExpandedId(expandedId === project.id ? null : project.id);
+                          }}
+                          className="min-h-11 text-left text-sm font-semibold text-foreground hover:text-primary"
+                        >
+                          {project.title}{" "}
+                          <span className="ml-2 text-xs text-primary">
+                            {expandedId === project.id ? "Minimize" : "Open project"}
+                          </span>
+                        </button>
+                        <div className="mt-1 flex items-center gap-1 text-xs text-primary">
+                          <Building2 className="h-3.5 w-3.5" />
+                          {client.businessName || "Linked client"}
+                        </div>
                       </div>
-                      <div className="mt-1 flex items-center gap-1 text-xs text-primary">
-                        <Building2 className="h-3.5 w-3.5" />
-                        {client.businessName || "Linked client"}
+                      <select
+                        aria-label={`Status for ${project.title}`}
+                        disabled={updateStatus.isPending}
+                        value={project.status}
+                        onChange={(event) => {
+                          if (!mayLeaveProject()) return;
+                          updateStatus.mutate(
+                            { project, status: event.target.value },
+                            {
+                              onSuccess: () => {
+                                setHasUnsavedNotes(false);
+                                setExpandedId(null);
+                              },
+                            },
+                          );
+                        }}
+                        className="min-h-12 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground sm:min-h-10 sm:w-auto sm:text-xs"
+                      >
+                        {!STATUS_LABEL[project.status] && (
+                          <option value={project.status}>{project.status}</option>
+                        )}
+                        {Object.entries(STATUS_LABEL).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div
+                      className="mt-3 flex flex-wrap items-center gap-2"
+                      aria-label={`Move ${project.title} to folder`}
+                    >
+                      <span className="text-xs text-muted-foreground">Move to…</span>
+                      {(
+                        [
+                          ["upcoming", "pre_production", "Upcoming"],
+                          ["current", "shooting", "Current"],
+                          ["past", "complete", "Past"],
+                        ] as const
+                      )
+                        .filter(([destination]) => destination !== folderFor(project.status))
+                        .map(([destination, status, label]) => (
+                          <button
+                            key={destination}
+                            type="button"
+                            disabled={updateStatus.isPending}
+                            className="min-h-11 rounded-xl border border-border px-3 py-2 text-xs disabled:opacity-50"
+                            onClick={() => {
+                              if (
+                                !window.confirm(
+                                  `Move “${project.title}” to ${label}? This changes its status to ${STATUS_LABEL[status]}.`,
+                                ) ||
+                                !mayLeaveProject()
+                              )
+                                return;
+                              updateStatus.mutate(
+                                { project, status },
+                                {
+                                  onSuccess: () => {
+                                    setHasUnsavedNotes(false);
+                                    setExpandedId(null);
+                                    setFolder(destination);
+                                    setSearch("");
+                                    toast.success(`Project moved to ${label}.`);
+                                  },
+                                },
+                              );
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                    </div>
+
+                    <div id={`project-${project.id}`} hidden={expandedId !== project.id}>
+                      {expandedId === project.id && (
+                        <fieldset disabled={updateStatus.isPending} className="min-w-0">
+                          <ProjectWorkspace
+                            projectId={project.id}
+                            onDirtyChange={setHasUnsavedNotes}
+                          />
+                        </fieldset>
+                      )}
+                      <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 sm:text-xs">
+                        {project.scheduled_at && (
+                          <div className="flex min-h-11 items-center gap-2 rounded-xl bg-background/50 px-3 py-2">
+                            <CalendarDays className="h-3.5 w-3.5 text-primary" />
+                            {formatInTimeZone(project.scheduled_at, projectTimeZone, {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })}
+                          </div>
+                        )}
+                        {(project.location || client.address) && (
+                          <a
+                            href={`https://maps.apple.com/?q=${encodeURIComponent(project.location || client.address || "")}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex min-h-11 items-center gap-2 rounded-xl bg-background/50 px-3 py-2 text-foreground"
+                          >
+                            <MapPin className="h-3.5 w-3.5 text-primary" />
+                            <span className="min-w-0 flex-1 truncate">
+                              {project.location || client.address}
+                            </span>
+                            <Navigation className="h-3.5 w-3.5 shrink-0 text-primary" />
+                          </a>
+                        )}
+                        {client.primaryContact && (
+                          <div className="space-y-2 rounded-xl bg-background/50 p-3 sm:col-span-2">
+                            <div className="font-medium text-foreground">
+                              {client.primaryContact.name}
+                            </div>
+                            <div className="grid gap-2 sm:flex">
+                              {client.primaryContact.phone && (
+                                <a
+                                  href={`tel:${client.primaryContact.phone}`}
+                                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 font-semibold text-foreground"
+                                >
+                                  <Phone className="h-4 w-4 text-primary" /> Call
+                                </a>
+                              )}
+                              {client.primaryContact.email && (
+                                <a
+                                  href={`mailto:${client.primaryContact.email}`}
+                                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 font-semibold text-foreground"
+                                >
+                                  <Mail className="h-4 w-4 text-primary" /> Email
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
+                        <span className="text-[10px] text-muted-foreground">
+                          Synced {new Date(project.client_synced_at).toLocaleString()}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => syncClient.mutate(project)}
+                          disabled={syncClient.isPending}
+                          className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold text-primary disabled:opacity-50"
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          Sync client info
+                        </button>
                       </div>
                     </div>
-                    <select
-                      value={project.status}
-                      onChange={(event) =>
-                        updateStatus.mutate({ id: project.id, status: event.target.value })
-                      }
-                      className="min-h-12 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground sm:min-h-10 sm:w-auto sm:text-xs"
-                    >
-                      {Object.entries(STATUS_LABEL).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 sm:text-xs">
-                    {project.scheduled_at && (
-                      <div className="flex min-h-11 items-center gap-2 rounded-xl bg-background/50 px-3 py-2">
-                        <CalendarDays className="h-3.5 w-3.5 text-primary" />
-                        {formatInTimeZone(project.scheduled_at, projectTimeZone, {
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        })}
-                      </div>
-                    )}
-                    {(project.location || client.address) && (
-                      <a
-                        href={`https://maps.apple.com/?q=${encodeURIComponent(project.location || client.address || "")}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex min-h-11 items-center gap-2 rounded-xl bg-background/50 px-3 py-2 text-foreground"
-                      >
-                        <MapPin className="h-3.5 w-3.5 text-primary" />
-                        <span className="min-w-0 flex-1 truncate">
-                          {project.location || client.address}
-                        </span>
-                        <Navigation className="h-3.5 w-3.5 shrink-0 text-primary" />
-                      </a>
-                    )}
-                    {client.primaryContact && (
-                      <div className="space-y-2 rounded-xl bg-background/50 p-3 sm:col-span-2">
-                        <div className="font-medium text-foreground">
-                          {client.primaryContact.name}
-                        </div>
-                        <div className="grid gap-2 sm:flex">
-                          {client.primaryContact.phone && (
-                            <a
-                              href={`tel:${client.primaryContact.phone}`}
-                              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 font-semibold text-foreground"
-                            >
-                              <Phone className="h-4 w-4 text-primary" /> Call
-                            </a>
-                          )}
-                          {client.primaryContact.email && (
-                            <a
-                              href={`mailto:${client.primaryContact.email}`}
-                              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 font-semibold text-foreground"
-                            >
-                              <Mail className="h-4 w-4 text-primary" /> Email
-                            </a>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="mt-3 flex flex-col gap-2 border-t border-border pt-3 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="text-[10px] text-muted-foreground">
-                      Synced {new Date(project.client_synced_at).toLocaleString()}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => syncClient.mutate(project)}
-                      disabled={syncClient.isPending}
-                      className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-border px-3 py-2 text-xs font-semibold text-primary disabled:opacity-50"
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      Sync client info
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+                  </article>
+                );
+              })}
           </div>
         )}
       </div>

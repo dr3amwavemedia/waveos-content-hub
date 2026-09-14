@@ -1,0 +1,12 @@
+import {readFileSync} from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+const compiled=ts.transpileModule(readFileSync('src/lib/request-timeout.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const exports={};new Function('exports',compiled)(exports);
+const {withRequestTimeout}=exports;
+assert.equal(await withRequestTimeout(Promise.resolve('ready'),100),'ready');
+await assert.rejects(withRequestTimeout(Promise.reject(new Error('original')),100),/original/);
+await assert.rejects(withRequestTimeout(new Promise(()=>{}),5),/connection took too long/);
+await assert.rejects(withRequestTimeout(new Promise((_,reject)=>setTimeout(()=>reject(new Error('late')),25)),5),/connection took too long/);
+await new Promise(resolve=>setTimeout(resolve,35));
+console.log('Timeout checks passed: success, original error, stalled read, safe late rejection.');

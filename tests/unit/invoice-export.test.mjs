@@ -1,0 +1,16 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+const compiled = ts.transpileModule(readFileSync('src/lib/invoice-export.ts', 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const exports = {}; new Function('exports', compiled)(exports);
+const row = {id:'one',number:'=HYPERLINK("bad")',description:'<script>alert(1)</script>,\nhello',amount_cents:10000,amount_paid_cents:2500,currency:'USD',status:'deposit',issued_at:'2026-09-14T00:00:00Z',due_at:null,paid_at:null};
+assert.equal(exports.invoiceExportRows([row])[0][6],7500);
+assert.equal(exports.invoiceExportRows([{...row,amount_cents:null}])[0][6],null);
+assert.equal(exports.invoiceExportRows([{...row,amount_paid_cents:12000}])[0][6],-2000);
+assert.ok(exports.invoiceCsv([row]).includes("'="));
+assert.ok(exports.invoiceCsv([{...row,number:'  =SUM(1)'}]).includes("'  ="));
+assert.ok(exports.invoiceCsv([row]).includes('"10000","2500","7500"'));
+assert.ok(!exports.invoiceReportHtml([row]).includes('<script>'));
+assert.ok(exports.invoiceReportHtml([row]).includes('&lt;script&gt;'));
+assert.ok(exports.invoiceCsv([]).startsWith('\uFEFF"Record ID"'));
+console.log('Invoice export checks passed');

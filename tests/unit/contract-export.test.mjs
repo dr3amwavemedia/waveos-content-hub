@@ -1,0 +1,13 @@
+import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+const source = ts.transpileModule(readFileSync('src/lib/contract-export.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+const exports = {}; new Function('exports',source)(exports);
+const record = {id:'sample',title:'  =HYPERLINK("bad")',description:'First line,\n"Second line"',status:'signed',sent_at:null,signed_at:'2026-09-14T00:00:00Z',expires_at:null,hosted_url:'https://secret.example/token'};
+const csv=exports.contractRecordsCsv([record]);
+assert.ok(csv.includes("'  =HYPERLINK"));
+assert.ok(csv.includes('"First line,\n""Second line"""'));
+assert.ok(csv.includes('2026-09-14T00:00:00Z'));
+assert.ok(!csv.includes('secret.example'));
+assert.ok(exports.contractRecordsCsv([]).startsWith('\uFEFF"Record ID"'));
+console.log('Contract record exports passed');
