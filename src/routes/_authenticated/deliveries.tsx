@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Download, ExternalLink, File, Image as ImageIcon, Loader2, Sparkles, Video } from "lucide-react";
 
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { DeliveryCard } from "@/components/app/layer1-overview";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { EmptyState } from "@/components/app/empty-state";
@@ -91,6 +92,7 @@ function YourContentRoute() {
         )}
       </header>
 
+      {media.some(asset => asset.mime_type.startsWith("image/")) && <a href="#gallery" className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 text-sm font-semibold text-primary"><ImageIcon className="h-5 w-5" />Open photo gallery</a>}
       {loading ? (
         <div className="surface-card p-6 text-sm text-muted-foreground">Loading your content…</div>
       ) : failed ? (
@@ -111,8 +113,8 @@ function YourContentRoute() {
             </section>
           )}
           {media.length > 0 && (
-            <section className="space-y-3">
-              <h2 className="text-lg font-semibold text-foreground">Uploaded photos and videos</h2>
+            <section id="gallery" className="scroll-mt-24 space-y-3">
+              <h2 className="text-lg font-semibold text-foreground">Your gallery</h2><p className="text-sm text-muted-foreground">Tap a photo to view it full size. Your videos play here too.</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 {media.map((asset) => (
                   <MediaCard key={asset.id} asset={asset} />
@@ -172,6 +174,7 @@ function FrameioCard({ file }: { file: FrameioProviderFile }) {
 function MediaCard({ asset }: { asset: MediaAsset }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [viewing, setViewing] = useState(false);
   const isImage = asset.mime_type.startsWith("image/");
   const isVideo = asset.mime_type.startsWith("video/");
 
@@ -191,9 +194,18 @@ function MediaCard({ asset }: { asset: MediaAsset }) {
 
   return (
     <article className="surface-card overflow-hidden">
+      <Dialog open={viewing} onOpenChange={setViewing}>
+        <DialogContent className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-5xl overflow-y-auto">
+          <DialogTitle className="pr-6 break-words">{asset.name}</DialogTitle>
+          {url && isImage && <img src={url} alt={asset.name} className="max-h-[70dvh] w-full object-contain" />}
+          {url && <a href={url} target="_blank" rel="noopener noreferrer" download={asset.name} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary"><Download className="h-4 w-4" />Download photo</a>}
+        </DialogContent>
+      </Dialog>
       <div className="relative aspect-square bg-elevated">
         {url && isImage ? (
-          <img src={url} alt={asset.name} className="h-full w-full object-cover" />
+          <button type="button" onClick={() => setViewing(true)} aria-label={`View ${asset.name}`} className="h-full w-full focus-visible:ring-2 focus-visible:ring-primary">
+            <img src={url} alt={asset.name} className="h-full w-full object-cover transition-transform hover:scale-105" loading="lazy" />
+          </button>
         ) : url && isVideo ? (
           <video src={url} className="h-full w-full object-cover" controls playsInline preload="metadata" />
         ) : (

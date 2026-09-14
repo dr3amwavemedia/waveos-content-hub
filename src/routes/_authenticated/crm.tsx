@@ -1281,7 +1281,7 @@ function OverviewTab({
       qc.invalidateQueries({ queryKey: ["crm", "workspaces"] });
       qc.invalidateQueries({ queryKey: ["clients", "workspaces"] });
       qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] });
-      toast.success("Client profile created. The lead is now marked Won.");
+      toast.success("Client profile created. No invitation sent. Review the client profile to invite them when ready.");
       onRefresh();
     },
     onError: (e: unknown) =>

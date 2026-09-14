@@ -1,4 +1,5 @@
 import { createFileRoute, Link, Outlet, redirect } from "@tanstack/react-router";
+import { withRequestTimeout } from "@/lib/request-timeout";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app/app-shell";
@@ -59,7 +60,7 @@ async function getAuthenticatedUser() {
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
   beforeLoad: async ({ location }) => {
-    const user = await getAuthenticatedUser();
+    const user = await withRequestTimeout(getAuthenticatedUser());
     if (!user) {
       throw redirect({ to: "/auth", search: { next: location.href } });
     }
@@ -90,18 +91,18 @@ export const Route = createFileRoute("/_authenticated")({
       staff_type: "sales" | "media_manager" | "crew" | null;
     }> = [];
 
-    const { data: roles, error: rolesError } = await db
-      .from("user_roles")
-      .select("role,staff_type")
-      .eq("user_id", user.id);
+    const { data: roles, error: rolesError } = await withRequestTimeout<{
+      data: typeof roleRows | null;
+      error: unknown;
+    }>(db.from("user_roles").select("role,staff_type").eq("user_id", user.id));
 
     if (rolesError) {
       console.error("[WaveOS role lookup failed]", rolesError);
 
-      const { data: fallbackRoles, error: fallbackError } = await db
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id);
+      const { data: fallbackRoles, error: fallbackError } = await withRequestTimeout<{
+        data: Array<{ role: string }> | null;
+        error: unknown;
+      }>(db.from("user_roles").select("role").eq("user_id", user.id));
 
       if (fallbackError) {
         console.error("[WaveOS fallback role lookup failed]", fallbackError);
@@ -123,7 +124,8 @@ export const Route = createFileRoute("/_authenticated")({
     const authenticatedOwner = roleNames.includes("dream_wave_owner");
     const actingIdentity = authenticatedOwner && actingStatePresent ? getActingStaff() : null;
     const isOwner = !actingIdentity && roleNames.includes("dream_wave_owner");
-    const isTeamMember = Boolean(actingIdentity) || (roleNames.includes("dream_wave_team") && !isOwner);
+    const isTeamMember =
+      Boolean(actingIdentity) || (roleNames.includes("dream_wave_team") && !isOwner);
     const teamRole = actingIdentity
       ? { staff_type: actingIdentity.staffType }
       : roleRows.find((role) => role.role === "dream_wave_team");
@@ -140,6 +142,16 @@ export const Route = createFileRoute("/_authenticated")({
 
     return { user };
   },
+  pendingMs: 300,
+  pendingComponent: () => (
+    <div
+      role="status"
+      className="flex min-h-screen items-center justify-center gap-3 bg-background p-6 text-foreground"
+    >
+      <RefreshCw className="h-5 w-5 animate-spin" />
+      Opening your workspace…
+    </div>
+  ),
   component: AuthenticatedLayout,
   errorComponent: AuthenticatedError,
 });

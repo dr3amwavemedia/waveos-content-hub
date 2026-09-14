@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { clearAuthenticatedBrowserState } from "@/lib/auth-session-state";
+import { WorkspaceTour } from "./workspace-tour";
 import { NotificationsBell } from "./notifications-bell";
 
 import { cn } from "@/lib/utils";
@@ -344,6 +345,11 @@ function Shell({ children }: { children: ReactNode }) {
         <ProductionHealthBanner enabled={isOwner} />
         <AccountStatusBanner />
         <div className="mx-auto max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
+          {user && activeWorkspace && !permsLoading && <WorkspaceTour
+            key={`${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
+            storageKey={`waveos.tour.v1:${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
+            destinations={nav.filter(item => !item.feature || can(item.feature))}
+          />}
           {isWeddingClient && !WEDDING_ALLOWED_PATHS.includes(pathname) ? (
             <div className="surface-card p-8 text-center text-sm text-muted-foreground">
               Taking you back to your wedding overview…
