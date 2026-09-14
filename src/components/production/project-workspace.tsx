@@ -166,7 +166,7 @@ function PlanningEditor({
   const [newItem, setNewItem] = useState("");
   const checklist = field === "equipment" || field === "shot_list";
   const rows = checklistRows(value);
-  const dirty = value !== (baseline ?? "");
+  const dirty = value !== (baseline ?? "") || !!newItem.trim();
   useEffect(() => {
     onDirtyChange(dirty);
   }, [dirty, onDirtyChange]);
@@ -175,11 +175,18 @@ function PlanningEditor({
       className="space-y-3"
       onSubmit={async (event) => {
         event.preventDefault();
+        const nextValue = checklist ? appendChecklistRow(value, newItem) : value;
+        if (nextValue.length > (field === "script" ? 40000 : 20000)) {
+          toast.error("These notes are too long. Shorten them before saving.");
+          return;
+        }
         setSaving(true);
         try {
-          const nextVersion = await saveField(projectId, field, savedVersion, value || null);
+          const nextVersion = await saveField(projectId, field, savedVersion, nextValue || null);
           setSavedVersion(nextVersion);
-          setBaseline(value || null);
+          setBaseline(nextValue || null);
+          setValue(nextValue);
+          setNewItem("");
           await refresh();
           toast.success(`${sections[field]} saved.`);
         } catch (error) {
