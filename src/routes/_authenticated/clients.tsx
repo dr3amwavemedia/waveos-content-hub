@@ -1,3 +1,4 @@
+import { DocumentDraftTools } from "@/components/app/document-draft-tools";
 import { ContractExportTools } from "@/components/app/contract-export-tools";
 import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
 import { PaymentProgress } from "@/components/app/payment-progress";
@@ -352,6 +353,7 @@ function ClientsPage() {
         </button>
       </header>
 
+      <DocumentDraftTools />
       <div className="relative max-w-xl">
         <Search
           aria-hidden="true"

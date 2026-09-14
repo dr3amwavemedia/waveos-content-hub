@@ -43,6 +43,7 @@ const WORKSPACE_SCOPED_KEYS = [
   "client-deliveries",
   "your-content",
   "layer1",
+  "wedding",
   "phase4-requests",
   "phase4-internal-notes",
   "phase4-checklist",
@@ -89,7 +90,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       activeWorkspace: active,
       isLoading,
       error,
-      retry: () => { void refetch(); },
+      retry: () => {
+        void refetch();
+      },
       setActiveWorkspaceId: (id) => {
         setActiveId(id);
         if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, id);

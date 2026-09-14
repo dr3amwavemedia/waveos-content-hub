@@ -5,13 +5,22 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { supabase } from "@/integrations/supabase/client";
 import { getMediaPreviewUrl, type MediaAsset } from "@/hooks/use-media";
 import { isValidHttpsUrl } from "@/lib/url-validation";
+import { GallerySwipeSurface } from "./gallery-swipe-surface";
 
 const PAGE_SIZE = 24;
 export function DeliveryGallery({ workspaceId, name }: { workspaceId: string; name: string }) {
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [kind, setKind] = useState("all");
+  const [layout, setLayout] = useState<"comfortable" | "compact">("comfortable");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("waveos.gallery.layout") === "compact") setLayout("compact");
+    } catch {
+      /* Layout remains usable. */
+    }
+  }, []);
   useEffect(() => {
     const timer = setTimeout(() => setQuery(search.trim()), 250);
     return () => clearTimeout(timer);
@@ -89,6 +98,41 @@ export function DeliveryGallery({ workspaceId, name }: { workspaceId: string; na
           className="min-h-11 w-full rounded-xl border border-border bg-background px-3 sm:max-w-xs"
         />
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div role="group" aria-label="Gallery size" className="flex gap-2">
+          {(["comfortable", "compact"] as const).map((size) => (
+            <button
+              type="button"
+              key={size}
+              aria-pressed={layout === size}
+              onClick={() => {
+                setLayout(size);
+                try {
+                  localStorage.setItem("waveos.gallery.layout", size);
+                } catch {
+                  /* Layout remains usable. */
+                }
+              }}
+              className={`min-h-11 rounded-lg border px-3 text-sm ${layout === size ? "border-primary text-primary" : "border-border"}`}
+            >
+              {size === "comfortable" ? "Large previews" : "More per row"}
+            </button>
+          ))}
+        </div>
+        {(search || kind !== "all") && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearch("");
+              setQuery("");
+              changeKind("all");
+            }}
+            className="min-h-11 px-3 text-sm text-primary"
+          >
+            Clear filters
+          </button>
+        )}
+      </div>
       {media.isPending ? (
         <p role="status" className="py-8 text-sm text-muted-foreground">
           Loading your collection…
@@ -112,7 +156,13 @@ export function DeliveryGallery({ workspaceId, name }: { workspaceId: string; na
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div
+            className={
+              layout === "compact"
+                ? "grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6"
+                : "grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
+            }
+          >
             {assets.map((asset) => (
               <GalleryTile key={asset.id} asset={asset} open={() => setSelectedId(asset.id)} />
             ))}
@@ -168,12 +218,29 @@ export function DeliveryGallery({ workspaceId, name }: { workspaceId: string; na
             }
           }}
         >
-          <DialogTitle className="break-words pr-8 text-base">{selected?.name}</DialogTitle>
+          <DialogTitle
+            title={selected?.name}
+            className="line-clamp-3 min-w-0 [overflow-wrap:anywhere] pr-12 text-base leading-snug"
+          >
+            {selected?.name}
+          </DialogTitle>
           <DialogDescription>
             {selectedIndex + 1} of {assets.length}
             {media.hasNextPage ? " loaded files" : " files"}
           </DialogDescription>
-          {selected && <GalleryViewer key={selected.id} asset={selected} />}
+          <GallerySwipeSurface
+            onPrevious={() => {
+              if (selectedIndex > 0) setSelectedId(assets[selectedIndex - 1].id);
+            }}
+            onNext={() => {
+              if (selectedIndex + 1 < assets.length) setSelectedId(assets[selectedIndex + 1].id);
+            }}
+          >
+            {selected && <GalleryViewer key={selected.id} asset={selected} />}
+          </GallerySwipeSurface>
+          <p className="text-xs text-muted-foreground">
+            Swipe across a photo or use Previous and Next to browse.
+          </p>
           <div className="flex items-center justify-between gap-3">
             <button
               type="button"
@@ -239,7 +306,7 @@ function GalleryTile({ asset, open }: { asset: MediaAsset; open: () => void }) {
       type="button"
       onClick={open}
       aria-label={`View ${asset.name}`}
-      className="group overflow-hidden rounded-2xl border border-border bg-surface text-left focus-visible:ring-2 focus-visible:ring-primary"
+      className="group min-w-0 overflow-hidden rounded-2xl border border-border bg-surface text-left focus-visible:ring-2 focus-visible:ring-primary"
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-elevated">
         {preview.data && !failed && (isImage || asset.source_provider !== "waveos") ? (
@@ -263,7 +330,10 @@ function GalleryTile({ asset, open }: { asset: MediaAsset; open: () => void }) {
           <Icon className="h-4 w-4" />
         </span>
       </div>
-      <p className="truncate px-3 py-3 text-xs font-medium sm:text-sm" title={asset.name}>
+      <p
+        className="line-clamp-2 min-h-12 [overflow-wrap:anywhere] px-3 py-2 text-xs font-medium sm:text-sm"
+        title={asset.name}
+      >
         {asset.name}
       </p>
     </button>

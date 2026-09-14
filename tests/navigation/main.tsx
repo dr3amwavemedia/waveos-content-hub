@@ -11,6 +11,98 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { ProjectNavigationGuard } from "../../src/components/production/project-navigation-guard";
+import { WorkspaceTour } from "../../src/components/app/workspace-tour";
+import { DocumentDraftTools } from "../../src/components/app/document-draft-tools";
+import "../../src/styles.css";
+import { PlanningChecklistControls } from "../../src/components/production/planning-checklist-controls";
+import { CrewPlanControls } from "../../src/components/production/crew-plan-controls";
+import { GallerySwipeSurface } from "../../src/components/deliveries/gallery-swipe-surface";
+import { InvoiceExportTools } from "../../src/components/app/invoice-export-tools";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { DeliveryGallery } from "../../src/components/deliveries/delivery-gallery";
+
+function GalleryFixture() {
+  const [client] = useState(() => {
+    const cache = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const assets = [1, 2].map((id) => ({
+      id: `photo-${id}`,
+      workspace_id: "synthetic",
+      name: id === 1 ? "VeryLongClientPhotoFilename".repeat(12) + ".jpg" : "Second photo.jpg",
+      mime_type: "image/jpeg",
+      storage_path: null,
+      source_provider: "frameio",
+      thumbnail_url: null,
+    }));
+    cache.setQueryData(["your-content", "gallery", "synthetic", "", "all"], {
+      pages: [assets],
+      pageParams: [0],
+    });
+    const preview =
+      "data:image/svg+xml," +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="800"><rect width="600" height="800" fill="#227b83"/></svg>',
+      );
+    for (const asset of assets)
+      for (const mode of ["thumbnail", "content"])
+        cache.setQueryData(
+          ["media", "delivery-preview", "synthetic", asset.id, null, "frameio", mode],
+          preview,
+        );
+    return cache;
+  });
+  return (
+    <QueryClientProvider client={client}>
+      <main className="mx-auto max-w-5xl p-3">
+        <DeliveryGallery workspaceId="synthetic" name="Synthetic client collection" />
+      </main>
+    </QueryClientProvider>
+  );
+}
+
+function PlanningTools() {
+  const [notes, setNotes] = useState("Original equipment notes\n- [ ] Camera\n- [x] Lens");
+  const [crew, setCrew] = useState(
+    'Original crew notes\nCrew: {"name":"Alex","role":"Producer","reportsTo":"","responsibilities":"Lead the project"}',
+  );
+  const [photo, setPhoto] = useState(1);
+  return (
+    <main className="mx-auto max-w-5xl space-y-4 p-3">
+      <PlanningChecklistControls value={notes} onChange={setNotes} disabled={false} />
+      <pre data-testid="checklist-source" className="whitespace-pre-wrap break-words">
+        {notes}
+      </pre>
+      <CrewPlanControls value={crew} onChange={setCrew} disabled={false} />
+      <pre data-testid="crew-source" className="whitespace-pre-wrap break-words">
+        {crew}
+      </pre>
+      <GallerySwipeSurface
+        onNext={() => setPhoto((n) => Math.min(3, n + 1))}
+        onPrevious={() => setPhoto((n) => Math.max(1, n - 1))}
+      >
+        <div data-testid="swipe-photo" className="h-40 bg-surface">
+          Photo {photo}
+        </div>
+        <video data-testid="swipe-video" controls />
+      </GallerySwipeSurface>
+      <InvoiceExportTools
+        invoices={[
+          {
+            id: "sample",
+            number: "INV-1",
+            description: "Services",
+            amount_cents: 10000,
+            amount_paid_cents: 2500,
+            currency: "USD",
+            status: "deposit",
+            issued_at: "2026-09-14",
+            due_at: null,
+            paid_at: null,
+          },
+        ]}
+      />
+    </main>
+  );
+}
 
 function Project() {
   const [value, setValue] = useState("");
@@ -53,5 +145,35 @@ const other = createRoute({
     </main>
   ),
 });
-const router = createRouter({ routeTree: root.addChildren([project, other]) });
+const tools = createRoute({
+  getParentRoute: () => root,
+  path: "/tools",
+  component: () => (
+    <main className="mx-auto max-w-5xl p-3">
+      <WorkspaceTour
+        storageKey="waveos.synthetic.guide"
+        audience="your projects"
+        destinations={[
+          { to: "/tools", label: "Invoices", hash: "invoices" },
+          { to: "/tools", label: "Contracts", hash: "contracts" },
+        ]}
+      />
+      <DocumentDraftTools />
+      <Link to="/other">Leave tools</Link>
+    </main>
+  ),
+});
+const planning = createRoute({
+  getParentRoute: () => root,
+  path: "/planning",
+  component: PlanningTools,
+});
+const gallery = createRoute({
+  getParentRoute: () => root,
+  path: "/gallery-fixture",
+  component: GalleryFixture,
+});
+const router = createRouter({
+  routeTree: root.addChildren([project, other, tools, planning, gallery]),
+});
 createRoot(document.getElementById("root")!).render(<RouterProvider router={router} />);
