@@ -1,3 +1,4 @@
+import { InvoiceExportTools } from "./invoice-export-tools";
 import { PaymentProgress } from "./payment-progress";
 import { useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
@@ -149,7 +150,7 @@ export function Layer1Overview() {
   }, [wsId]);
   const branding = useWorkspaceBranding(wsId);
 
-  const firstName = user?.firstName?.split(" ")[0] ?? null;
+  const firstName = activeWorkspace?.businessNameOnly ? activeWorkspace.name : user?.firstName?.trim().split(/\s+/)[0] || null;
 
   const brandQ = useQuery({
     queryKey: ["layer1", "brand", wsId],
@@ -410,6 +411,7 @@ export function Layer1Overview() {
       {/* Invoices */}
       <details id="invoices" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
         <summary className="min-h-11 cursor-pointer text-lg font-semibold">Invoices & Payments</summary>
+        {invoicesQ.isSuccess && <InvoiceExportTools key={wsId} invoices={invoicesQ.data ?? []} />}
         <div className="flex flex-wrap items-end justify-between gap-2">
 
           {(invoicesQ.data?.length ?? 0) > 1 && (

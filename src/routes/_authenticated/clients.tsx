@@ -1,3 +1,4 @@
+import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
 import { PaymentProgress } from "@/components/app/payment-progress";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1415,6 +1416,7 @@ function AccessTab({
   isOwner: boolean;
 }) {
   const qc = useQueryClient();
+  const [businessNameOnly, setBusinessNameOnly] = useState(workspace.feature_overrides.business_name_only === true);
   const [tier, setTier] = useState<ClientAccessTier>(workspace.access_tier);
   const [status, setStatus] = useState<AccountStatus>(workspace.account_status);
   const [term, setTerm] = useState<AgreementTerm | "">(workspace.agreement_term ?? "");
@@ -1462,7 +1464,7 @@ function AccessTab({
       const { error } = await supabase
         .from("workspaces")
         .update({
-          ...tierStorage(tier, workspace.feature_overrides),
+          ...tierStorage(tier, { ...workspace.feature_overrides, business_name_only: businessNameOnly }),
           account_status: status,
           agreement_term: term || null,
           access_starts_at: startsAt ? new Date(startsAt).toISOString() : null,
@@ -1503,6 +1505,7 @@ function AccessTab({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["clients", "workspaces"] });
       qc.invalidateQueries({ queryKey: ["workspace-access", workspace.id] });
+      qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] });
       toast.success("Access updated.");
       onRefresh();
     },
@@ -1577,6 +1580,7 @@ function AccessTab({
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border p-3 sm:col-span-2"><input type="checkbox" checked={businessNameOnly} onChange={event => setBusinessNameOnly(event.target.checked)} /><span className="text-sm">Show the business name in the client portal instead of the person’s name</span></label>
         <Field label="Access tier">
           <select
             value={tier}
@@ -2179,7 +2183,7 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("client_invoices").delete().eq("id", id);
+      const { error } = await supabase.from("client_invoices").delete().eq("id", id).eq("workspace_id", workspaceId);
       if (error) throw error;
     },
     onSuccess: async (_, id) => {
@@ -2193,6 +2197,7 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
 
   return (
     <div className="space-y-3">
+      {q.isSuccess && <InvoiceExportTools key={workspaceId} invoices={q.data ?? []} />}
       <div className="flex justify-end">
         <button
           onClick={() => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ProjectWorkspace } from "./project-workspace";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Building2,
@@ -126,6 +127,9 @@ export function ProductionProjectsPanel() {
   const [creating, setCreating] = useState(false);
   const [folder, setFolder] = useState("current");
   const [search, setSearch] = useState("");
+  const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
+  const mayLeaveProject = () =>
+    !hasUnsavedNotes || window.confirm("Discard unsaved project notes?");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const folderFor = (status: string) =>
     status === "complete"
@@ -381,6 +385,8 @@ export function ProductionProjectsPanel() {
               type="button"
               aria-pressed={folder === item}
               onClick={() => {
+                if (!mayLeaveProject()) return;
+                setHasUnsavedNotes(false);
                 setFolder(item);
                 setExpandedId(null);
               }}
@@ -397,7 +403,12 @@ export function ProductionProjectsPanel() {
           aria-label="Search projects"
           placeholder="Search project or client"
           value={search}
-          onChange={(event) => setSearch(event.target.value)}
+          onChange={(event) => {
+            if (!mayLeaveProject()) return;
+            setHasUnsavedNotes(false);
+            setExpandedId(null);
+            setSearch(event.target.value);
+          }}
           className="min-h-11 w-full rounded-xl border border-border bg-background px-3"
         />
       </div>
@@ -465,9 +476,11 @@ export function ProductionProjectsPanel() {
                           type="button"
                           aria-expanded={expandedId === project.id}
                           aria-controls={`project-${project.id}`}
-                          onClick={() =>
-                            setExpandedId(expandedId === project.id ? null : project.id)
-                          }
+                          onClick={() => {
+                            if (!mayLeaveProject()) return;
+                            setHasUnsavedNotes(false);
+                            setExpandedId(expandedId === project.id ? null : project.id);
+                          }}
                           className="min-h-11 text-left text-sm font-semibold text-foreground hover:text-primary"
                         >
                           {project.title}{" "}
@@ -484,9 +497,11 @@ export function ProductionProjectsPanel() {
                         aria-label={`Status for ${project.title}`}
                         disabled={updateStatus.isPending}
                         value={project.status}
-                        onChange={(event) =>
-                          updateStatus.mutate({ id: project.id, status: event.target.value })
-                        }
+                        onChange={(event) => {
+                          if (!mayLeaveProject()) return;
+                          setHasUnsavedNotes(false);
+                          updateStatus.mutate({ id: project.id, status: event.target.value });
+                        }}
                         className="min-h-12 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground sm:min-h-10 sm:w-auto sm:text-xs"
                       >
                         {Object.entries(STATUS_LABEL).map(([value, label]) => (
@@ -498,6 +513,12 @@ export function ProductionProjectsPanel() {
                     </div>
 
                     <div id={`project-${project.id}`} hidden={expandedId !== project.id}>
+                      {expandedId === project.id && (
+                        <ProjectWorkspace
+                          projectId={project.id}
+                          onDirtyChange={setHasUnsavedNotes}
+                        />
+                      )}
                       <div className="mt-4 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 sm:text-xs">
                         {project.scheduled_at && (
                           <div className="flex min-h-11 items-center gap-2 rounded-xl bg-background/50 px-3 py-2">

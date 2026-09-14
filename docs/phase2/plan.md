@@ -1,6 +1,6 @@
 # WaveOS — Phase 2 implementation plan
 
-Status: planning and source inspection only. No application code, live data, permissions, existing links, or production deployment changed.
+Status: implementation in draft PR #75. See implementation-status.md and release-checklist.md for actual coverage. No live data, permissions, existing links or production deployment changed.
 
 Priority: make daily client and staff tasks easy on phones, keep clients inside WaveOS, and preserve the live service.
 

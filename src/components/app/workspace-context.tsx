@@ -17,6 +17,8 @@ interface WorkspaceContextValue {
   activeWorkspace: WorkspaceSummary | null;
   setActiveWorkspaceId: (id: string) => void;
   isLoading: boolean;
+  error: unknown;
+  retry: () => void;
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | undefined>(undefined);
@@ -48,7 +50,7 @@ const WORKSPACE_SCOPED_KEYS = [
 ];
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const { data: workspaces = [], isLoading } = useWorkspaces();
+  const { data: workspaces = [], isLoading, error, refetch } = useWorkspaces();
   const [activeId, setActiveId] = useState<string | null>(null);
   const qc = useQueryClient();
   const prev = useRef<string | null>(null);
@@ -86,12 +88,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workspaces,
       activeWorkspace: active,
       isLoading,
+      error,
+      retry: () => { void refetch(); },
       setActiveWorkspaceId: (id) => {
         setActiveId(id);
         if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, id);
       },
     };
-  }, [workspaces, activeId, isLoading]);
+  }, [workspaces, activeId, isLoading, error, refetch]);
 
   return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }

@@ -35,3 +35,17 @@ Prepared on an isolated branch. Not merged or published. No production database 
 - Deployed security, backup/restore, hosting and billing review.
 
 The full requirement inventory and integration prompts are adjacent to this file. This batch is not completion of the entire Phase 2 plan.
+
+## Additional GitHub work — September 14
+
+- Added per-project Story, Script, Equipment, Shot list and Organization notes, plus an explicit association with an existing production vision board. Only published boards offer the existing freelance share URL; no token or sharing policy changes. Organization currently means crew roles/responsibilities in a text plan, not a graphical diagram. Vision Studio decks are still a separate system.
+- Added a draft additive migration for those project columns. It inherits the current staff-only project policies. **Not applied or tested against a real database; staging migration and access tests are required.** The UI reports unavailable tools when the schema is absent. Existing personal prep data is not moved or erased.
+- Saves check the project's update timestamp to reject stale edits. Tool/folder/project changes warn before discarding unsaved text; browser unload is protected. General in-app navigation away still requires a broader navigation-blocker pass.
+- Added invoice record CSV and printable/PDF reports to staff client invoices and project-client home. Filters apply to issued date (UTC) and status. Cents, currency, recorded paid and balance are separate columns; unknown totals stay blank, overpayments remain negative balances. This is a record export, not a verified receipt, executed contract archive or complete tax ledger.
+- Added a business-name display preference to existing workspace feature settings, reflected in the shared account footer and project-client greeting. Person records, email, roles and membership are unchanged. Other tier-specific greetings still require review.
+- Account profile, role and membership read failures now surface errors instead of becoming empty results; account/workspace reads have timeouts and retry UI. Production login diagnosis remains open.
+- Explicit workspace predicate added to the existing invoice-delete query.
+
+Additional verification: TypeScript and targeted lint; invoice export unit checks covering partial/unknown/overpaid amounts, CSV formula protection and HTML escaping; mobile synthetic preview verified separate project fields and no note carry-over into another project. Synthetic writes stay in memory and do not validate deployed RLS or persistence.
+
+The user confirmed there is no selected payment/signature provider. Keep provider activation in the following phase. Do not cancel Bloom.

@@ -180,8 +180,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
 function Shell({ children }: { children: ReactNode }) {
   const { can, visibility, isLoading: permsLoading, access, isStaff } = usePermissions();
-  const { data: user } = useCurrentUser();
-  const { activeWorkspace } = useWorkspace();
+  const { data: user, error: userError, refetch: retryUser } = useCurrentUser();
+  const { activeWorkspace, error: workspaceError, retry: retryWorkspace } = useWorkspace();
   const branding = useWorkspaceBranding(activeWorkspace?.id);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
@@ -350,7 +350,9 @@ function Shell({ children }: { children: ReactNode }) {
             storageKey={`waveos.tour.v1:${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
             destinations={nav.filter(item => !item.feature || can(item.feature))}
           />}
-          {isWeddingClient && !WEDDING_ALLOWED_PATHS.includes(pathname) ? (
+          {userError || workspaceError ? (
+            <div role="alert" className="surface-card p-6"><h2 className="font-semibold">We couldn’t load your account</h2><p className="mt-2 text-sm">Check your connection and try again.</p><button type="button" className="mt-3 min-h-11 rounded-xl border border-border px-4" onClick={() => { void retryUser(); retryWorkspace(); }}>Try again</button></div>
+          ) : isWeddingClient && !WEDDING_ALLOWED_PATHS.includes(pathname) ? (
             <div className="surface-card p-8 text-center text-sm text-muted-foreground">
               Taking you back to your wedding overview…
             </div>
@@ -475,10 +477,11 @@ function MobileNavLink({ item }: { item: NavItem }) {
 }
 
 function WorkspaceSwitcher() {
-  const { workspaces, activeWorkspace } = useWorkspace();
+  const { workspaces, activeWorkspace, error, isLoading, retry } = useWorkspace();
   const { data: user } = useCurrentUser();
   const branding = useWorkspaceBranding(activeWorkspace?.id);
 
+  if (error || isLoading) return <div className="p-3 text-xs">{isLoading ? "Loading workspaces…" : <button type="button" className="min-h-11" onClick={retry}>Could not load workspaces. Try again</button>}</div>;
   if (!workspaces.length) {
     return (
       <div className="mx-3 mt-2 rounded-xl border border-border bg-surface/60 p-3 text-xs text-muted-foreground">
@@ -550,7 +553,7 @@ function UserFooter() {
     navigate({ to: "/auth", replace: true });
   }
 
-  const displayName = impersonate.on
+  const displayName = impersonate.on || (!user?.isStaff && activeWorkspace?.businessNameOnly)
     ? (activeWorkspace?.name ?? "Client preview")
     : accountDisplayName({
         firstName: user?.firstName,

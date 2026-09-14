@@ -1,3 +1,4 @@
+import { withRequestTimeout } from "@/lib/request-timeout";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getActingStaff } from "@/hooks/use-acting-staff";
@@ -10,8 +11,10 @@ export interface WorkspaceSummary {
   industry: string | null;
   timezone: string;
   is_demo: boolean;
-  access_tier: "project_client" | "growth_90" | "retainer_full" | "social_management" | "wedding_client";
+  access_tier:
+    "project_client" | "growth_90" | "retainer_full" | "social_management" | "wedding_client";
   approval_required: boolean;
+  businessNameOnly?: boolean;
   role: "owner" | "admin" | "editor" | "approver" | "viewer" | "staff";
 }
 
@@ -44,14 +47,17 @@ async function loadContext(): Promise<CurrentUserContext> {
   }
 
   const user = auth.user;
-  const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("first_name,last_name,avatar_url")
-      .eq("id", user.id)
-      .maybeSingle(),
-    db.from("user_roles").select("role,staff_type").eq("user_id", user.id),
-  ]);
+  const [{ data: profile, error: profileError }, { data: roles, error: rolesError }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("first_name,last_name,avatar_url")
+        .eq("id", user.id)
+        .maybeSingle(),
+      db.from("user_roles").select("role,staff_type").eq("user_id", user.id),
+    ]);
+  if (profileError) throw profileError;
+  if (rolesError) throw rolesError;
   const roleRows = (roles ?? []) as Array<{
     role: string;
     staff_type: "sales" | "media_manager" | "crew" | null;
@@ -103,11 +109,12 @@ async function loadWorkspaces(
   ctx: CurrentUserContext,
   previewWorkspaceId: string | null,
 ): Promise<WorkspaceSummary[]> {
-  const { data: memberships } = await supabase
+  const { data: memberships, error: membershipError } = await supabase
     .from("workspace_members")
     .select("workspace_id, role")
     .eq("user_id", ctx.userId);
 
+  if (membershipError) throw membershipError;
   const membershipMap = new Map((memberships ?? []).map((m) => [m.workspace_id, m.role]));
 
   const workspaceIds = previewWorkspaceId
@@ -167,6 +174,7 @@ async function loadWorkspaces(
       is_demo: w.is_demo,
       access_tier:
         featureOverrides.social_management_access === true ? "social_management" : w.access_tier,
+      businessNameOnly: featureOverrides.business_name_only === true,
       approval_required: featureOverrides.automatic_content_approval !== true,
       role: (previewWorkspaceId
         ? "viewer"
@@ -180,7 +188,7 @@ async function loadWorkspaces(
 function useRawCurrentUser() {
   return useQuery({
     queryKey: ["waveos", "current-user"],
-    queryFn: loadContext,
+    queryFn: () => withRequestTimeout(loadContext()),
     staleTime: 60_000,
   });
 }
@@ -221,9 +229,8 @@ export function useWorkspaces() {
 
   return useQuery({
     queryKey: ["waveos", "workspaces", user?.userId, previewWorkspaceId],
-    queryFn: () => loadWorkspaces(user!, previewWorkspaceId),
+    queryFn: () => withRequestTimeout(loadWorkspaces(user!, previewWorkspaceId)),
     enabled: !!user,
     staleTime: 30_000,
   });
 }
-
