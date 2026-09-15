@@ -2158,7 +2158,13 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
 
 // ─── Invoices tab ─────────────────────────────────────────────────────────
 
-function InvoicesTab({ workspaceId }: { workspaceId: string }) {
+function InvoicesTab({
+  workspaceId,
+  clientName,
+}: {
+  workspaceId: string;
+  clientName?: string | null;
+}) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceListItem | null>(null);
