@@ -40,7 +40,10 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
     const paid = invoice.amount_paid_cents ?? 0;
     const due = total - paid;
     if (due <= 0) throw new Error("This invoice has no balance due.");
-    if (!stripeIsTestMode()) throw new Error("Payments are available in test mode only.");
+    if (!stripeIsTestMode())
+      throw new Error(
+        "Payments are in test mode only. The saved Stripe key is a live key, so no checkout can open. Add a Stripe test key to enable test payments.",
+      );
 
     // A retry must leave the client with a new hosted session. Expire an old
     // open session before creating another; never recycle a fixed idempotency key.

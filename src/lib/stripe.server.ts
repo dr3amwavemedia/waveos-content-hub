@@ -11,9 +11,10 @@ function stripeKey(): string {
   return key;
 }
 
-/** True when the configured key is a test-mode key. */
+/** True when the configured key is a test-mode key (standard or restricted). */
 export function stripeIsTestMode(): boolean {
-  return (process.env.STRIPE_SECRET_KEY ?? "").startsWith("sk_test_");
+  const key = process.env.STRIPE_SECRET_KEY ?? "";
+  return key.startsWith("sk_test_") || key.startsWith("rk_test_");
 }
 
 function encodeForm(value: unknown, prefix = "", out: string[] = []): string[] {
