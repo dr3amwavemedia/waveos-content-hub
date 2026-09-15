@@ -127,6 +127,7 @@ export function TemplateLibrary() {
           <button
             key={k.key}
             type="button"
+            aria-pressed={kind === k.key}
             onClick={() => {
               setKind(k.key);
               setEditing(null);

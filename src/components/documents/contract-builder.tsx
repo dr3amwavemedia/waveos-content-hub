@@ -229,7 +229,8 @@ export function ContractBuilder({
     setSelectedTemplate(template);
     setTitle(body.title ?? template.name);
     setTemplateText(body.content ?? "");
-    refreshFromClient();
+    if (context.data) refreshFromClient();
+    else contextApplied.current = false;
   };
   const chooseProject = (id: string) => {
     setSourceProjectId(id);
