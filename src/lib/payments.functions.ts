@@ -23,12 +23,15 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
 
     const { data: invoice, error } = await supabase
       .from("client_invoices")
-      .select("id,workspace_id,number,description,amount_cents,amount_paid_cents,currency,status,published_at,provider_session_id")
+      .select(
+        "id,workspace_id,number,description,amount_cents,amount_paid_cents,currency,status,published_at,provider_session_id",
+      )
       .eq("id", data.invoiceId)
       .maybeSingle();
     if (error) throw error;
     if (!invoice) throw new Error("Invoice not found.");
-    if (!invoice.published_at) throw new Error("This invoice is still a draft and cannot be paid yet.");
+    if (!invoice.published_at)
+      throw new Error("This invoice is still a draft and cannot be paid yet.");
     if (invoice.status === "paid" || invoice.status === "void") {
       throw new Error("This invoice is already settled.");
     }
@@ -37,6 +40,31 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
     const paid = invoice.amount_paid_cents ?? 0;
     const due = total - paid;
     if (due <= 0) throw new Error("This invoice has no balance due.");
+    if (!stripeIsTestMode()) throw new Error("Payments are available in test mode only.");
+
+    // A retry must leave the client with a new hosted session. Expire an old
+    // open session before creating another; never recycle a fixed idempotency key.
+    if (invoice.provider_session_id?.startsWith("cs_test_")) {
+      try {
+        const previous = await stripeRequest<StripeCheckoutSession>(
+          `/checkout/sessions/${encodeURIComponent(invoice.provider_session_id)}`,
+          { method: "GET" },
+        );
+        if (previous.status === "complete" || previous.payment_status === "paid") {
+          throw new Error(
+            "A payment is already processing. Refresh the invoice before trying again.",
+          );
+        }
+        if (previous.status === "open") {
+          await stripeRequest(`/checkout/sessions/${encodeURIComponent(previous.id)}/expire`);
+        }
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith("A payment is already")) throw error;
+        // Stripe may already have expired a session. The new session is still
+        // safe because invoice balance is read above from the server.
+        console.warn("[stripe] could not expire prior checkout session", invoice.id);
+      }
+    }
 
     const origin = originFromRequest();
     const session = await stripeRequest<StripeCheckoutSession>("/checkout/sessions", {
@@ -67,17 +95,32 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
           },
         ],
       },
-      // Same balance + same invoice => same session, so double clicks cannot double charge.
-      idempotencyKey: `invoice:${invoice.id}:${due}`,
+      // Unique per attempt, so Stripe never returns an expired session from a
+      // previous request. This key still protects transport-level retries.
+      idempotencyKey: `invoice:${invoice.id}:${crypto.randomUUID()}`,
     });
 
-    if (!session.url) throw new Error("Stripe did not return a payment link.");
+    if (!session.url || session.status !== "open" || session.livemode !== false) {
+      throw new Error("Stripe did not return an open test payment link.");
+    }
+    const checkoutUrl = new URL(session.url);
+    if (checkoutUrl.protocol !== "https:" || checkoutUrl.hostname !== "checkout.stripe.com") {
+      throw new Error("Stripe returned an invalid payment destination.");
+    }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    await supabaseAdmin
+    let claim = supabaseAdmin
       .from("client_invoices")
       .update({ payment_provider: "stripe", provider_session_id: session.id })
       .eq("id", invoice.id);
+    claim = invoice.provider_session_id
+      ? claim.eq("provider_session_id", invoice.provider_session_id)
+      : claim.is("provider_session_id", null);
+    const { data: claimed, error: updateError } = await claim.select("id");
+    if (updateError || !claimed?.length) {
+      await stripeRequest(`/checkout/sessions/${encodeURIComponent(session.id)}/expire`);
+      throw new Error("Checkout changed while loading. Refresh the invoice and try again.");
+    }
 
     return { url: session.url, testMode: stripeIsTestMode() };
   });
