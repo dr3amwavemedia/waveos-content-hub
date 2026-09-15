@@ -63,6 +63,8 @@ import { Route as ApiExternalMediaProviderRouteImport } from './routes/api/exter
 import { Route as AuthenticatedVisionBoardBoardIdRouteImport } from './routes/_authenticated/vision-board.$boardId'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
+import { Route as ApiPublicHooksStripeRouteImport } from './routes/api/public/hooks/stripe'
+import { Route as ApiPublicHooksSignwellRouteImport } from './routes/api/public/hooks/signwell'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 import { Route as ApiPublicHooksAyrshareRouteImport } from './routes/api/public/hooks/ayrshare'
 import { Route as ApiPublicExternalMediaAssetIdRouteImport } from './routes/api/public/external-media/$assetId'
@@ -349,6 +351,16 @@ const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
   path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksStripeRoute = ApiPublicHooksStripeRouteImport.update({
+  id: '/api/public/hooks/stripe',
+  path: '/api/public/hooks/stripe',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksSignwellRoute = ApiPublicHooksSignwellRouteImport.update({
+  id: '/api/public/hooks/signwell',
+  path: '/api/public/hooks/signwell',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksPublishDueRoute =
   ApiPublicHooksPublishDueRouteImport.update({
     id: '/api/public/hooks/publish-due',
@@ -438,6 +450,8 @@ export interface FileRoutesByFullPath {
   '/api/public/external-media/$assetId': typeof ApiPublicExternalMediaAssetIdRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
+  '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -498,6 +512,8 @@ export interface FileRoutesByTo {
   '/api/public/external-media/$assetId': typeof ApiPublicExternalMediaAssetIdRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
+  '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -560,6 +576,8 @@ export interface FileRoutesById {
   '/api/public/external-media/$assetId': typeof ApiPublicExternalMediaAssetIdRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
+  '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
+  '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -622,6 +640,8 @@ export interface FileRouteTypes {
     | '/api/public/external-media/$assetId'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
+    | '/api/public/hooks/signwell'
+    | '/api/public/hooks/stripe'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -682,6 +702,8 @@ export interface FileRouteTypes {
     | '/api/public/external-media/$assetId'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
+    | '/api/public/hooks/signwell'
+    | '/api/public/hooks/stripe'
   id:
     | '__root__'
     | '/'
@@ -743,6 +765,8 @@ export interface FileRouteTypes {
     | '/api/public/external-media/$assetId'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/publish-due'
+    | '/api/public/hooks/signwell'
+    | '/api/public/hooks/stripe'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -775,6 +799,8 @@ export interface RootRouteChildren {
   ApiPublicExternalMediaAssetIdRoute: typeof ApiPublicExternalMediaAssetIdRoute
   ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
+  ApiPublicHooksSignwellRoute: typeof ApiPublicHooksSignwellRoute
+  ApiPublicHooksStripeRoute: typeof ApiPublicHooksStripeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1157,6 +1183,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/stripe': {
+      id: '/api/public/hooks/stripe'
+      path: '/api/public/hooks/stripe'
+      fullPath: '/api/public/hooks/stripe'
+      preLoaderRoute: typeof ApiPublicHooksStripeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/signwell': {
+      id: '/api/public/hooks/signwell'
+      path: '/api/public/hooks/signwell'
+      fullPath: '/api/public/hooks/signwell'
+      preLoaderRoute: typeof ApiPublicHooksSignwellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/publish-due': {
       id: '/api/public/hooks/publish-due'
       path: '/api/public/hooks/publish-due'
@@ -1330,6 +1370,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicExternalMediaAssetIdRoute: ApiPublicExternalMediaAssetIdRoute,
   ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
+  ApiPublicHooksSignwellRoute: ApiPublicHooksSignwellRoute,
+  ApiPublicHooksStripeRoute: ApiPublicHooksStripeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
