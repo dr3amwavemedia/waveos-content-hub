@@ -29,6 +29,7 @@ import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authent
 import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
 import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
 import { Route as AuthenticatedToolsRouteImport } from './routes/_authenticated/tools'
+import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -173,6 +174,11 @@ const AuthenticatedVideographerRoute =
 const AuthenticatedToolsRoute = AuthenticatedToolsRouteImport.update({
   id: '/tools',
   path: '/tools',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedStaffEmailRoute = AuthenticatedStaffEmailRouteImport.update({
@@ -423,6 +429,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/templates': typeof AuthenticatedTemplatesRoute
   '/tools': typeof AuthenticatedToolsRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
@@ -485,6 +492,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/templates': typeof AuthenticatedTemplatesRoute
   '/tools': typeof AuthenticatedToolsRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
@@ -549,6 +557,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
+  '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
   '/_authenticated/tools': typeof AuthenticatedToolsRoute
   '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
   '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
@@ -613,6 +622,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/social-accounts'
     | '/staff-email'
+    | '/templates'
     | '/tools'
     | '/videographer'
     | '/vision-board'
@@ -675,6 +685,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/social-accounts'
     | '/staff-email'
+    | '/templates'
     | '/tools'
     | '/videographer'
     | '/vision-board'
@@ -738,6 +749,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/social-accounts'
     | '/_authenticated/staff-email'
+    | '/_authenticated/templates'
     | '/_authenticated/tools'
     | '/_authenticated/videographer'
     | '/_authenticated/vision-board'
@@ -943,6 +955,13 @@ declare module '@tanstack/react-router' {
       path: '/tools'
       fullPath: '/tools'
       preLoaderRoute: typeof AuthenticatedToolsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/templates': {
+      id: '/_authenticated/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof AuthenticatedTemplatesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/staff-email': {
@@ -1270,6 +1289,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSocialAccountsRoute: typeof AuthenticatedSocialAccountsRoute
   AuthenticatedStaffEmailRoute: typeof AuthenticatedStaffEmailRoute
+  AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
   AuthenticatedToolsRoute: typeof AuthenticatedToolsRoute
   AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
   AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRouteWithChildren
@@ -1298,6 +1318,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSocialAccountsRoute: AuthenticatedSocialAccountsRoute,
   AuthenticatedStaffEmailRoute: AuthenticatedStaffEmailRoute,
+  AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
   AuthenticatedToolsRoute: AuthenticatedToolsRoute,
   AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
   AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRouteWithChildren,
