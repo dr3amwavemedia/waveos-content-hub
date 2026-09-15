@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import type { ExportInvoice } from "@/lib/invoice-export";
 import { invoiceDocumentHtml, formatMoney } from "@/lib/invoice-document";
 import { missingBusinessProfileFields } from "@/lib/business-profile";
+import { invoiceItemsFromJson } from "@/lib/invoice-items";
 
 /**
  * Branded single-invoice preview / print. Uses the recorded invoice values
@@ -46,6 +47,7 @@ export function InvoiceDocumentTools({
           paidAt: invoice.paid_at,
           billTo: clientName ? { name: clientName } : null,
           projectReference: projectReference ?? null,
+          lineItems: invoiceItemsFromJson(invoice.line_items),
           isDraft: invoice.status === "draft",
         },
         { portalUrl: `${window.location.origin}/home` },

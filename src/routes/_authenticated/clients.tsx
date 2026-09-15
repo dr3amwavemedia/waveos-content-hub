@@ -1,5 +1,13 @@
 import { DocumentDraftTools } from "@/components/app/document-draft-tools";
 import { DocumentsTab } from "@/components/documents/documents-tab";
+import { TemplatePicker, type TemplateRow } from "@/components/documents/template-picker";
+import { InvoiceItemPicker } from "@/components/documents/invoice-item-picker";
+import {
+  invoiceItemsFromJson,
+  invoiceItemTotal,
+  validInvoiceItems,
+  type DraftInvoiceItem,
+} from "@/lib/invoice-items";
 import { ContractExportTools } from "@/components/app/contract-export-tools";
 import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
 import { InvoiceDocumentTools } from "@/components/app/invoice-document-tools";
@@ -57,8 +65,8 @@ type ContractRow = {
   id: string;
   title: string;
   description: string | null;
-  provider: "bloom" | "other";
-  hosted_url: string;
+  provider: "bloom" | "other" | "signwell";
+  hosted_url: string | null;
   status: ContractStatus;
   sent_at: string | null;
   signed_at: string | null;
@@ -79,6 +87,7 @@ type InvoiceListItem = Pick<
   | "amount_paid_cents"
   | "payment_plan"
   | "billing_month"
+  | "line_items"
 >;
 type CrmAccountRow = Database["public"]["Tables"]["crm_accounts"]["Row"];
 type CrmContactRow = Pick<
@@ -295,7 +304,6 @@ function ClientsPage() {
           media_count: mediaCount.get(w.id) ?? 0,
         };
       });
-
     },
   });
 
@@ -406,7 +414,6 @@ function ClientsPage() {
             Client list unavailable — see the error above.
           </div>
         ) : (workspacesQ.data ?? []).length === 0 ? (
-
           <div className="p-6">
             <EmptyState
               icon={Users2}
@@ -429,7 +436,15 @@ function ClientsPage() {
                 <article key={w.id} className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <h3><button type="button" onClick={() => setSelectedWs(w)} className="min-h-11 text-left font-semibold text-foreground hover:text-primary">{w.name}</button></h3>
+                      <h3>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedWs(w)}
+                          className="min-h-11 text-left font-semibold text-foreground hover:text-primary"
+                        >
+                          {w.name}
+                        </button>
+                      </h3>
                       <p className="truncate text-xs text-muted-foreground">
                         /{w.slug} · {w.industry ?? "Industry not set"}
                       </p>
@@ -498,7 +513,13 @@ function ClientsPage() {
                     <tr key={w.id} className="border-t border-border/60 hover:bg-elevated/40">
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <button type="button" onClick={() => setSelectedWs(w)} className="min-h-11 text-left font-semibold text-foreground hover:text-primary">{w.name}</button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedWs(w)}
+                            className="min-h-11 text-left font-semibold text-foreground hover:text-primary"
+                          >
+                            {w.name}
+                          </button>
                           <button
                             onClick={() => setSelectedWs(w)}
                             className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
@@ -609,7 +630,16 @@ function TierBadge({ tier }: { tier: ClientAccessTier }) {
 
 // ─── Drawer with tabs ─────────────────────────────────────────────────────
 
-type DrawerTab = "info" | "branding" | "access" | "media" | "deliveries" | "documents" | "contracts" | "invoices" | "invites";
+type DrawerTab =
+  | "info"
+  | "branding"
+  | "access"
+  | "media"
+  | "deliveries"
+  | "documents"
+  | "contracts"
+  | "invoices"
+  | "invites";
 
 function WorkspaceDrawer({
   workspace,
@@ -703,7 +733,19 @@ function WorkspaceDrawer({
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-1 border-b border-border sm:grid-cols-4">
-        {(["info", "branding", "access", "media", "deliveries", "documents", "contracts", "invoices", "invites"] as const).map((t) => (
+        {(
+          [
+            "info",
+            "branding",
+            "access",
+            "media",
+            "deliveries",
+            "documents",
+            "contracts",
+            "invoices",
+            "invites",
+          ] as const
+        ).map((t) => (
           <button
             key={t}
             type="button"
@@ -721,7 +763,9 @@ function WorkspaceDrawer({
       </div>
 
       {tab === "info" && <ClientInfoTab workspace={workspace} onRefresh={onRefresh} />}
-      {tab === "branding" && <ClientBrandingEditor workspaceId={workspace.id} workspaceName={workspace.name} />}
+      {tab === "branding" && (
+        <ClientBrandingEditor workspaceId={workspace.id} workspaceName={workspace.name} />
+      )}
       {tab === "access" && (
         <AccessTab
           workspace={workspace}
@@ -742,9 +786,7 @@ function WorkspaceDrawer({
         />
       )}
       {tab === "contracts" && <ContractsTab workspaceId={workspace.id} />}
-      {tab === "invoices" && (
-        <InvoicesTab workspaceId={workspace.id} clientName={workspace.name} />
-      )}
+      {tab === "invoices" && <InvoicesTab workspaceId={workspace.id} clientName={workspace.name} />}
       {tab === "invites" && <InvitesTab workspace={workspace} onNewInvite={onNewInvite} />}
     </ModalShell>
   );
@@ -800,8 +842,7 @@ function WorkspaceMediaSourcesTab({ workspaceId }: { workspaceId: string }) {
       await qc.invalidateQueries({ queryKey: ["workspace-frameio-source", workspaceId] });
       toast.success("Frame.io Share assigned and ready for this client.");
     },
-    onError: (error) =>
-      toast.error(frameioAssignmentMessage(error)),
+    onError: (error) => toast.error(frameioAssignmentMessage(error)),
   });
 
   const remove = useMutation({
@@ -827,8 +868,8 @@ function WorkspaceMediaSourcesTab({ workspaceId }: { workspaceId: string }) {
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <h3 className="text-sm font-semibold text-foreground">Curated Frame.io media</h3>
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          Paste the Share link approved for this client. They will not be able to connect a
-          Frame.io account or replace this source.
+          Paste the Share link approved for this client. They will not be able to connect a Frame.io
+          account or replace this source.
         </p>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -854,9 +895,13 @@ function WorkspaceMediaSourcesTab({ workspaceId }: { workspaceId: string }) {
       {sourceQ.data && (
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="rounded-full border border-border bg-elevated px-2.5 py-1 capitalize">
-            {sourceQ.data.sync_status === "pending" ? "Awaiting Frame.io sync" : sourceQ.data.sync_status}
+            {sourceQ.data.sync_status === "pending"
+              ? "Awaiting Frame.io sync"
+              : sourceQ.data.sync_status}
           </span>
-          {sourceQ.data.sync_error && <span className="text-destructive">{sourceQ.data.sync_error}</span>}
+          {sourceQ.data.sync_error && (
+            <span className="text-destructive">{sourceQ.data.sync_error}</span>
+          )}
           <a
             href={sourceQ.data.share_url}
             target="_blank"
@@ -1431,7 +1476,9 @@ function AccessTab({
   isOwner: boolean;
 }) {
   const qc = useQueryClient();
-  const [businessNameOnly, setBusinessNameOnly] = useState(workspace.feature_overrides.business_name_only === true);
+  const [businessNameOnly, setBusinessNameOnly] = useState(
+    workspace.feature_overrides.business_name_only === true,
+  );
   const [tier, setTier] = useState<ClientAccessTier>(workspace.access_tier);
   const [status, setStatus] = useState<AccountStatus>(workspace.account_status);
   const [term, setTerm] = useState<AgreementTerm | "">(workspace.agreement_term ?? "");
@@ -1441,8 +1488,12 @@ function AccessTab({
   const [expiresAt, setExpiresAt] = useState(
     workspace.access_expires_at ? workspace.access_expires_at.slice(0, 10) : "",
   );
-  const [weddingDisplayName, setWeddingDisplayName] = useState(workspace.wedding_display_name ?? workspace.name);
-  const [weddingTheme, setWeddingTheme] = useState(workspace.wedding_theme === "gold" ? "gold" : "olive");
+  const [weddingDisplayName, setWeddingDisplayName] = useState(
+    workspace.wedding_display_name ?? workspace.name,
+  );
+  const [weddingTheme, setWeddingTheme] = useState(
+    workspace.wedding_theme === "gold" ? "gold" : "olive",
+  );
   const [weddingSchedulingUrl, setWeddingSchedulingUrl] = useState(
     workspace.wedding_scheduling_url ?? "",
   );
@@ -1479,12 +1530,18 @@ function AccessTab({
       const { error } = await supabase
         .from("workspaces")
         .update({
-          ...tierStorage(tier, { ...workspace.feature_overrides, business_name_only: businessNameOnly }),
+          ...tierStorage(tier, {
+            ...workspace.feature_overrides,
+            business_name_only: businessNameOnly,
+          }),
           account_status: status,
           agreement_term: term || null,
           access_starts_at: startsAt ? new Date(startsAt).toISOString() : null,
           access_expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
-          wedding_display_name: tier === "wedding_client" ? weddingDisplayName.trim() || workspace.name : workspace.wedding_display_name,
+          wedding_display_name:
+            tier === "wedding_client"
+              ? weddingDisplayName.trim() || workspace.name
+              : workspace.wedding_display_name,
           wedding_theme: tier === "wedding_client" ? weddingTheme : workspace.wedding_theme,
           wedding_scheduling_url:
             tier === "wedding_client"
@@ -1530,12 +1587,15 @@ function AccessTab({
   const toggleWeddingPortal = useMutation({
     mutationFn: async () => {
       const nextStatus: AccountStatus = status === "active" ? "suspended" : "active";
-      const { error } = await supabase.from("workspaces").update({
-        account_status: nextStatus,
-        activated_at: nextStatus === "active" ? new Date().toISOString() : null,
-        wedding_display_name: weddingDisplayName.trim() || workspace.name,
-        wedding_theme: weddingTheme,
-      }).eq("id", workspace.id);
+      const { error } = await supabase
+        .from("workspaces")
+        .update({
+          account_status: nextStatus,
+          activated_at: nextStatus === "active" ? new Date().toISOString() : null,
+          wedding_display_name: weddingDisplayName.trim() || workspace.name,
+          wedding_theme: weddingTheme,
+        })
+        .eq("id", workspace.id);
       if (error) throw error;
       return nextStatus;
     },
@@ -1546,10 +1606,15 @@ function AccessTab({
         qc.invalidateQueries({ queryKey: ["workspace-access", workspace.id] }),
         qc.invalidateQueries({ queryKey: ["wedding", "workspace", workspace.id] }),
       ]);
-      toast.success(nextStatus === "active" ? "Deposit accepted — wedding portal is live." : "Wedding portal deactivated.");
+      toast.success(
+        nextStatus === "active"
+          ? "Deposit accepted — wedding portal is live."
+          : "Wedding portal deactivated.",
+      );
       onRefresh();
     },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not update the wedding portal."),
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not update the wedding portal."),
   });
 
   const deleteWorkspace = useMutation({
@@ -1595,7 +1660,16 @@ function AccessTab({
   return (
     <div className="space-y-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border p-3 sm:col-span-2"><input type="checkbox" checked={businessNameOnly} onChange={event => setBusinessNameOnly(event.target.checked)} /><span className="text-sm">Show the business name in the client portal instead of the person’s name</span></label>
+        <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border p-3 sm:col-span-2">
+          <input
+            type="checkbox"
+            checked={businessNameOnly}
+            onChange={(event) => setBusinessNameOnly(event.target.checked)}
+          />
+          <span className="text-sm">
+            Show the business name in the client portal instead of the person’s name
+          </span>
+        </label>
         <Field label="Access tier">
           <select
             value={tier}
@@ -1628,14 +1702,27 @@ function AccessTab({
         <div className="space-y-4 rounded-2xl border border-primary/25 bg-primary/[0.06] p-4">
           <div>
             <p className="text-sm font-semibold text-foreground">Wedding portal</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Activate only after the deposit is accepted. Activation reveals the Creative Strategy Meeting, contracts, and payments.</p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              Activate only after the deposit is accepted. Activation reveals the Creative Strategy
+              Meeting, contracts, and payments.
+            </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Couple / client display name">
-              <input value={weddingDisplayName} maxLength={120} onChange={(e) => setWeddingDisplayName(e.target.value)} placeholder="Jean & Alex" className={inputCls} />
+              <input
+                value={weddingDisplayName}
+                maxLength={120}
+                onChange={(e) => setWeddingDisplayName(e.target.value)}
+                placeholder="Jean & Alex"
+                className={inputCls}
+              />
             </Field>
             <Field label="Wedding theme">
-              <select value={weddingTheme} onChange={(e) => setWeddingTheme(e.target.value)} className={inputCls}>
+              <select
+                value={weddingTheme}
+                onChange={(e) => setWeddingTheme(e.target.value)}
+                className={inputCls}
+              >
                 <option value="olive">Olive green & white</option>
                 <option value="gold">Gold & white</option>
               </select>
@@ -1643,34 +1730,81 @@ function AccessTab({
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Wedding date">
-              <input type="date" value={weddingDate} onChange={(e) => setWeddingDate(e.target.value)} className={inputCls} />
+              <input
+                type="date"
+                value={weddingDate}
+                onChange={(e) => setWeddingDate(e.target.value)}
+                className={inputCls}
+              />
             </Field>
             <Field label="Wedding stage">
-              <select value={weddingStage} onChange={(e) => setWeddingStage(e.target.value)} className={inputCls}>
+              <select
+                value={weddingStage}
+                onChange={(e) => setWeddingStage(e.target.value)}
+                className={inputCls}
+              >
                 <option value="">Not set</option>
                 {WEDDING_STAGES.map((stage) => (
-                  <option key={stage.value} value={stage.value}>{stage.label}</option>
+                  <option key={stage.value} value={stage.value}>
+                    {stage.label}
+                  </option>
                 ))}
               </select>
             </Field>
             <Field label="Venue name">
-              <input value={weddingVenue} maxLength={160} onChange={(e) => setWeddingVenue(e.target.value)} placeholder="The Ringling Museum" className={inputCls} />
+              <input
+                value={weddingVenue}
+                maxLength={160}
+                onChange={(e) => setWeddingVenue(e.target.value)}
+                placeholder="The Ringling Museum"
+                className={inputCls}
+              />
             </Field>
             <Field label="City">
-              <input value={weddingCity} maxLength={120} onChange={(e) => setWeddingCity(e.target.value)} placeholder="Sarasota" className={inputCls} />
+              <input
+                value={weddingCity}
+                maxLength={120}
+                onChange={(e) => setWeddingCity(e.target.value)}
+                placeholder="Sarasota"
+                className={inputCls}
+              />
             </Field>
             <Field label="State">
-              <input value={weddingState} maxLength={120} onChange={(e) => setWeddingState(e.target.value)} placeholder="Florida" className={inputCls} />
+              <input
+                value={weddingState}
+                maxLength={120}
+                onChange={(e) => setWeddingState(e.target.value)}
+                placeholder="Florida"
+                className={inputCls}
+              />
             </Field>
             <Field label="Creative Strategy Meeting date & time (optional)">
-              <input type="datetime-local" value={weddingMeetingAt} onChange={(e) => setWeddingMeetingAt(e.target.value)} className={inputCls} />
+              <input
+                type="datetime-local"
+                value={weddingMeetingAt}
+                onChange={(e) => setWeddingMeetingAt(e.target.value)}
+                className={inputCls}
+              />
             </Field>
           </div>
           <Field label="Full location or address (optional)">
-            <input value={weddingLocation} maxLength={400} onChange={(e) => setWeddingLocation(e.target.value)} placeholder="5401 Bay Shore Rd, Sarasota, Florida" className={inputCls} />
+            <input
+              value={weddingLocation}
+              maxLength={400}
+              onChange={(e) => setWeddingLocation(e.target.value)}
+              placeholder="5401 Bay Shore Rd, Sarasota, Florida"
+              className={inputCls}
+            />
           </Field>
           <Field label="Short welcome message (optional)">
-            <textarea value={weddingWelcome} maxLength={600} rows={3} onChange={(e) => setWeddingWelcome(e.target.value)} placeholder="We can't wait for October." className={inputCls} />
+            <textarea
+              value={weddingWelcome}
+              maxLength={600}
+              rows={3}
+              onChange={(e) => setWeddingWelcome(e.target.value)}
+              placeholder="We can't wait for October."
+              className={inputCls}
+            />
           </Field>
           <Field label="Creative strategy scheduling link (https)">
             <input
@@ -1681,15 +1815,37 @@ function AccessTab({
             />
           </Field>
           <p className="text-xs text-muted-foreground">
-            Portal status: {status === "active" ? "Active — private wedding experience is open." : "Awaiting activation — the couple sees the private welcome screen only."}
+            Portal status:{" "}
+            {status === "active"
+              ? "Active — private wedding experience is open."
+              : "Awaiting activation — the couple sees the private welcome screen only."}
           </p>
-          <button type="button" disabled={toggleWeddingPortal.isPending} onClick={() => toggleWeddingPortal.mutate()} className={cn("inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold disabled:opacity-60", status === "active" ? "bg-success/15 text-success ring-1 ring-success/30" : "bg-primary text-primary-foreground")}>
-            {toggleWeddingPortal.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : status === "active" ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            {toggleWeddingPortal.isPending ? "Updating…" : status === "active" ? "Deactivate wedding portal" : "Accept deposit & activate portal"}
+          <button
+            type="button"
+            disabled={toggleWeddingPortal.isPending}
+            onClick={() => toggleWeddingPortal.mutate()}
+            className={cn(
+              "inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold disabled:opacity-60",
+              status === "active"
+                ? "bg-success/15 text-success ring-1 ring-success/30"
+                : "bg-primary text-primary-foreground",
+            )}
+          >
+            {toggleWeddingPortal.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : status === "active" ? (
+              <Pause className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4" />
+            )}
+            {toggleWeddingPortal.isPending
+              ? "Updating…"
+              : status === "active"
+                ? "Deactivate wedding portal"
+                : "Accept deposit & activate portal"}
           </button>
         </div>
       )}
-
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Field label="Agreement term">
@@ -1835,12 +1991,14 @@ function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
       });
       if (error) throw error;
       const delivery = q.data?.find((item) => item.id === deliveryId);
-      const email = await tryEmail(() => sendWorkspaceEmail({
-        workspaceId,
-        event: "revisions_updated",
-        title: delivery?.title ?? "Your content",
-        url: delivery?.url,
-      }));
+      const email = await tryEmail(() =>
+        sendWorkspaceEmail({
+          workspaceId,
+          event: "revisions_updated",
+          title: delivery?.title ?? "Your content",
+          url: delivery?.url,
+        }),
+      );
       return { inApp: typeof data === "number" ? data : 0, email };
     },
     onSuccess: ({ inApp: recipientCount, email }) =>
@@ -1848,8 +2006,8 @@ function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
         email.sent
           ? `Revision update emailed to ${email.sent} client member${email.sent === 1 ? "" : "s"}.`
           : recipientCount === 1
-          ? "Revision notification sent to 1 client member."
-          : `Revision notification sent to ${recipientCount} client members.`,
+            ? "Revision notification sent to 1 client member."
+            : `Revision notification sent to ${recipientCount} client members.`,
       ),
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Could not notify the client."),
@@ -1935,26 +2093,32 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
       const trimmed = url.trim();
       if (!isValidHttpsUrl(trimmed)) throw new Error(URL_VALIDATION_MESSAGE);
       const { data: auth } = await supabase.auth.getUser();
-      const { data, error } = await supabase.from("client_deliveries").insert({
-        workspace_id: workspaceId,
-        title: title.trim(),
-        url: trimmed,
-        description: description.trim() || null,
-        kind,
-        created_by: auth.user?.id ?? null,
-      }).select("id").single();
+      const { data, error } = await supabase
+        .from("client_deliveries")
+        .insert({
+          workspace_id: workspaceId,
+          title: title.trim(),
+          url: trimmed,
+          description: description.trim() || null,
+          kind,
+          created_by: auth.user?.id ?? null,
+        })
+        .select("id")
+        .single();
       if (error) {
         if (error.message.includes("client_deliveries_url_https")) {
           throw new Error(URL_VALIDATION_MESSAGE);
         }
         throw error;
       }
-      await tryEmail(() => sendWorkspaceEmail({
-        workspaceId,
-        event: "content_added",
-        title: title.trim(),
-        url: trimmed,
-      }));
+      await tryEmail(() =>
+        sendWorkspaceEmail({
+          workspaceId,
+          event: "content_added",
+          title: title.trim(),
+          url: trimmed,
+        }),
+      );
       return data;
     },
     onSuccess: () => {
@@ -2059,8 +2223,12 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
 function ContractsTab({ workspaceId }: { workspaceId: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [creationMode, setCreationMode] = useState<"external" | "template">("external");
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateRow | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [signerName, setSignerName] = useState("");
+  const [signerEmail, setSignerEmail] = useState("");
   const [hostedUrl, setHostedUrl] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const refresh = () =>
@@ -2082,88 +2250,348 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
   });
   const create = useMutation({
     mutationFn: async () => {
-      const url = normalizeHttpsUrl(hostedUrl);
-      if (!isValidHttpsUrl(url)) throw new Error(URL_VALIDATION_MESSAGE);
+      const url = creationMode === "external" ? normalizeHttpsUrl(hostedUrl) : null;
+      if (creationMode === "external" && !isValidHttpsUrl(url ?? ""))
+        throw new Error(URL_VALIDATION_MESSAGE);
+      if (creationMode === "template" && (!selectedTemplate || !description.trim()))
+        throw new Error("Select an approved contract template with content.");
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw new Error("Your session expired. Please sign in again.");
-      const { data, error } = await db.from("client_contracts").insert({
-        workspace_id: workspaceId,
-        title: title.trim(),
-        description: description.trim() || null,
-        provider: url.includes("bloom.io") ? "bloom" : "other",
-        hosted_url: url,
-        status: "sent",
-        sent_at: new Date().toISOString(),
-        expires_at: dateInputToIso(expiresAt),
-        created_by: auth.user.id,
-      }).select("id").single();
+      const { data, error } = await db
+        .from("client_contracts")
+        .insert({
+          workspace_id: workspaceId,
+          title: title.trim(),
+          description: description.trim() || null,
+          provider: url?.includes("bloom.io") ? "bloom" : "other",
+          hosted_url: url,
+          status: creationMode === "template" ? "draft" : "sent",
+          sent_at: creationMode === "template" ? null : new Date().toISOString(),
+          published_at: creationMode === "template" ? null : new Date().toISOString(),
+          signer_name: creationMode === "template" ? signerName.trim() || null : null,
+          signer_email: creationMode === "template" ? signerEmail.trim() || null : null,
+          source_template_id: creationMode === "template" ? selectedTemplate?.id : null,
+          source_template_version: creationMode === "template" ? selectedTemplate?.version : null,
+          expires_at: dateInputToIso(expiresAt),
+          created_by: auth.user.id,
+        })
+        .select("id")
+        .single();
       if (error) throw error;
-      await tryEmail(() => sendWorkspaceEmail({
-        workspaceId,
-        event: "contract_ready",
-        title: title.trim(),
-        status: "sent",
-        url,
-      }));
+      if (creationMode === "external" && url)
+        await tryEmail(() =>
+          sendWorkspaceEmail({
+            workspaceId,
+            event: "contract_ready",
+            title: title.trim(),
+            status: "sent",
+            url,
+          }),
+        );
       return data;
     },
     onSuccess: async () => {
-      setTitle(""); setDescription(""); setHostedUrl(""); setExpiresAt(""); setShowForm(false);
+      setTitle("");
+      setDescription("");
+      setHostedUrl("");
+      setExpiresAt("");
+      setSignerName("");
+      setSignerEmail("");
+      setSelectedTemplate(null);
+      setCreationMode("external");
+      setShowForm(false);
       await refresh();
-      toast.success("Contract link added.");
+      toast.success(
+        creationMode === "template"
+          ? "Private contract draft created for this client."
+          : "Contract link added.",
+      );
     },
     onError: (error: unknown) => toast.error(readableError(error, "Could not add contract.")),
   });
   const updateStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: ContractStatus }) => {
-      const { error } = await db.from("client_contracts").update({
-        status,
-        signed_at: status === "signed" ? new Date().toISOString() : null,
-      }).eq("id", id).eq("workspace_id", workspaceId);
+      const { error } = await db
+        .from("client_contracts")
+        .update({
+          status,
+          signed_at: status === "signed" ? new Date().toISOString() : null,
+        })
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
       if (error) throw error;
     },
     onSuccess: refresh,
-    onError: (error: unknown) => toast.error(readableError(error, "Could not update the contract.")),
+    onError: (error: unknown) =>
+      toast.error(readableError(error, "Could not update the contract.")),
   });
   const remove = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await db.from("client_contracts").delete().eq("id", id).eq("workspace_id", workspaceId);
+      const { error } = await db
+        .from("client_contracts")
+        .delete()
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
       if (error) throw error;
     },
-    onSuccess: async () => { await refresh(); toast.success("Contract removed."); },
-    onError: (error: unknown) => toast.error(readableError(error, "Could not remove the contract.")),
+    onSuccess: async () => {
+      await refresh();
+      toast.success("Contract removed.");
+    },
+    onError: (error: unknown) =>
+      toast.error(readableError(error, "Could not remove the contract.")),
   });
-  const inputCls = "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
+  const inputCls =
+    "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
 
-  return <div className="space-y-3">
-    {q.isSuccess && <ContractExportTools key={workspaceId} contracts={q.data ?? []} />}
-    <div className="flex items-center justify-between gap-3">
-      <p className="text-xs text-muted-foreground">Connect a Bloom.io or other secure signing link.</p>
-      <button type="button" onClick={() => setShowForm((value) => !value)} className="inline-flex min-h-12 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">
-        {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}{showForm ? "Cancel" : "Add contract"}
-      </button>
+  return (
+    <div className="space-y-3">
+      {q.isSuccess && <ContractExportTools key={workspaceId} contracts={q.data ?? []} />}
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-muted-foreground">
+          Connect a Bloom.io or other secure signing link.
+        </p>
+        <button
+          type="button"
+          onClick={() => setShowForm((value) => !value)}
+          className="inline-flex min-h-12 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
+        >
+          {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+          {showForm ? "Cancel" : "Add contract"}
+        </button>
+      </div>
+      {showForm && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            create.mutate();
+          }}
+          className="grid gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:grid-cols-2"
+        >
+          <div className="flex flex-wrap gap-2 sm:col-span-2">
+            <button
+              type="button"
+              onClick={() => setCreationMode("external")}
+              className={cn(
+                "min-h-11 rounded-lg border px-3 text-sm",
+                creationMode === "external" ? "border-primary bg-primary/10" : "border-border",
+              )}
+            >
+              External signing link
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreationMode("template")}
+              className={cn(
+                "min-h-11 rounded-lg border px-3 text-sm",
+                creationMode === "template" ? "border-primary bg-primary/10" : "border-border",
+              )}
+            >
+              Create private draft from DOCUMENTS
+            </button>
+            {creationMode === "template" && (
+              <TemplatePicker
+                kind="contract"
+                label="Choose contract template"
+                onPick={(template) => {
+                  const body = (template.body ?? {}) as { title?: string; content?: string };
+                  setSelectedTemplate(template);
+                  setTitle(body.title ?? template.name);
+                  setDescription(body.content ?? "");
+                }}
+              />
+            )}
+          </div>
+          <Field label="Contract title">
+            <input
+              required
+              minLength={2}
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Media services agreement"
+              className={inputCls}
+            />
+          </Field>
+          {creationMode === "external" && (
+            <Field label="Bloom contract link">
+              <input
+                required
+                type="text"
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={hostedUrl}
+                onChange={(event) => setHostedUrl(event.target.value)}
+                onBlur={() => setHostedUrl(normalizeHttpsUrl(hostedUrl))}
+                placeholder="bloom.io/your-contract"
+                className={inputCls}
+              />
+              {hostedUrl && !isValidHttpsUrl(normalizeHttpsUrl(hostedUrl)) && (
+                <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
+              )}
+            </Field>
+          )}
+          {creationMode === "template" && (
+            <div className="text-xs text-muted-foreground sm:col-span-2">
+              Template:{" "}
+              {selectedTemplate
+                ? `${selectedTemplate.name} · version ${selectedTemplate.version}`
+                : "none selected"}
+              . This saves a private draft for this client; it does not send a signing request.
+            </div>
+          )}
+          <Field label={creationMode === "template" ? "Approved contract content" : "Description"}>
+            <textarea
+              required={creationMode === "template"}
+              rows={creationMode === "template" ? 8 : 2}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder={
+                creationMode === "template" ? "Select an approved template" : "Optional client note"
+              }
+              className={inputCls}
+            />
+          </Field>
+          {creationMode === "template" && (
+            <>
+              <Field label="Signer name">
+                <input
+                  value={signerName}
+                  onChange={(event) => setSignerName(event.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="Signer email">
+                <input
+                  type="email"
+                  value={signerEmail}
+                  onChange={(event) => setSignerEmail(event.target.value)}
+                  className={inputCls}
+                />
+              </Field>
+            </>
+          )}
+          <Field label="Expires">
+            <input
+              type="date"
+              value={expiresAt}
+              onChange={(event) => setExpiresAt(event.target.value)}
+              className={inputCls}
+            />
+          </Field>
+          <button
+            type="submit"
+            disabled={
+              create.isPending ||
+              title.trim().length < 2 ||
+              (creationMode === "external"
+                ? !hostedUrl.trim()
+                : !selectedTemplate || !description.trim())
+            }
+            className="min-h-12 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:col-span-2"
+          >
+            {create.isPending
+              ? "Saving…"
+              : creationMode === "template"
+                ? "Create without sending"
+                : "Add contract link"}
+          </button>
+        </form>
+      )}
+      {q.isLoading ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : q.isError ? (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3">
+          <p className="text-sm font-medium text-destructive">Contracts could not be loaded.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {readableError(q.error, "Please try again.")}
+          </p>
+          <button
+            type="button"
+            onClick={() => q.refetch()}
+            className="mt-2 min-h-10 rounded-lg border border-border px-3 text-xs font-semibold"
+          >
+            Try again
+          </button>
+        </div>
+      ) : (q.data ?? []).length === 0 ? (
+        <p className="text-sm text-muted-foreground">No contracts yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {q.data?.map((contract) => (
+            <li
+              key={contract.id}
+              className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/40 p-3 sm:flex-row sm:items-center"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{contract.title}</p>
+                {contract.description && (
+                  <p className="mt-1 text-xs text-muted-foreground">{contract.description}</p>
+                )}
+                {contract.hosted_url && (
+                  <a
+                    href={contract.hosted_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-primary"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open {contract.provider === "bloom" ? "in Bloom" : "contract"}
+                  </a>
+                )}
+                {!contract.hosted_url && contract.status === "draft" && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Private template draft · no signing link sent
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={contract.status}
+                  disabled={
+                    contract.provider === "signwell" ||
+                    (contract.status === "draft" && !contract.hosted_url)
+                  }
+                  onChange={(event) =>
+                    updateStatus.mutate({
+                      id: contract.id,
+                      status: event.target.value as ContractStatus,
+                    })
+                  }
+                  className="min-h-10 rounded-lg border border-border bg-background px-2 text-xs capitalize disabled:opacity-60"
+                >
+                  {(
+                    [
+                      "draft",
+                      "sent",
+                      "viewed",
+                      "signed",
+                      "declined",
+                      "expired",
+                      "void",
+                    ] as ContractStatus[]
+                  ).map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() =>
+                    confirm("Remove this contract link?") && remove.mutate(contract.id)
+                  }
+                  className="flex h-10 w-10 items-center justify-center rounded-lg text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
-    {showForm && <form onSubmit={(event) => { event.preventDefault(); create.mutate(); }} className="grid gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:grid-cols-2">
-      <Field label="Contract title"><input required minLength={2} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Media services agreement" className={inputCls} /></Field>
-      <Field label="Bloom contract link">
-        <input required type="text" inputMode="url" autoCapitalize="none" autoCorrect="off" value={hostedUrl} onChange={(event) => setHostedUrl(event.target.value)} onBlur={() => setHostedUrl(normalizeHttpsUrl(hostedUrl))} placeholder="bloom.io/your-contract" className={inputCls} />
-        {hostedUrl && !isValidHttpsUrl(normalizeHttpsUrl(hostedUrl)) && <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>}
-      </Field>
-      <Field label="Description"><input value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Optional client note" className={inputCls} /></Field>
-      <Field label="Expires"><input type="date" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} className={inputCls} /></Field>
-      <button type="submit" disabled={create.isPending || title.trim().length < 2 || !hostedUrl.trim()} className="min-h-12 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:col-span-2">
-        {create.isPending ? "Adding…" : "Add contract link"}
-      </button>
-    </form>}
-    {q.isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : q.isError ? <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3"><p className="text-sm font-medium text-destructive">Contracts could not be loaded.</p><p className="mt-1 text-xs text-muted-foreground">{readableError(q.error, "Please try again.")}</p><button type="button" onClick={() => q.refetch()} className="mt-2 min-h-10 rounded-lg border border-border px-3 text-xs font-semibold">Try again</button></div> : (q.data ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No contracts yet.</p> :
-      <ul className="space-y-2">{q.data?.map((contract) => <li key={contract.id} className="flex flex-col gap-3 rounded-xl border border-border/60 bg-surface/40 p-3 sm:flex-row sm:items-center">
-        <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{contract.title}</p>{contract.description && <p className="mt-1 text-xs text-muted-foreground">{contract.description}</p>}
-          <a href={contract.hosted_url} target="_blank" rel="noreferrer" className="mt-2 inline-flex min-h-9 items-center gap-1 text-xs font-semibold text-primary"><ExternalLink className="h-3.5 w-3.5" />Open {contract.provider === "bloom" ? "in Bloom" : "contract"}</a></div>
-        <div className="flex items-center gap-2"><select value={contract.status} onChange={(event) => updateStatus.mutate({ id: contract.id, status: event.target.value as ContractStatus })} className="min-h-10 rounded-lg border border-border bg-background px-2 text-xs capitalize">
-          {(["draft","sent","viewed","signed","declined","expired","void"] as ContractStatus[]).map((status) => <option key={status} value={status}>{status}</option>)}</select>
-          <button type="button" onClick={() => confirm("Remove this contract link?") && remove.mutate(contract.id)} className="flex h-10 w-10 items-center justify-center rounded-lg text-destructive hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></button></div>
-      </li>)}</ul>}
-  </div>;
+  );
 }
 
 // ─── Invoices tab ─────────────────────────────────────────────────────────
@@ -2191,13 +2619,21 @@ function InvoicesTab({
   const q = useQuery({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
+      const invoiceColumns = "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month";
       const { data, error } = await supabase
         .from("client_invoices")
-        .select(
-          "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month",
-        )
+        .select(`${invoiceColumns},line_items`)
         .eq("workspace_id", workspaceId)
         .order("issued_at", { ascending: false });
+      if (error?.code === "42703") {
+        const fallback = await supabase
+          .from("client_invoices")
+          .select(invoiceColumns)
+          .eq("workspace_id", workspaceId)
+          .order("issued_at", { ascending: false });
+        if (fallback.error) throw fallback.error;
+        return (fallback.data ?? []).map((row) => ({ ...row, line_items: [] })) as InvoiceListItem[];
+      }
       if (error) throw error;
       return (data ?? []) as InvoiceListItem[];
     },
@@ -2205,7 +2641,11 @@ function InvoicesTab({
 
   const del = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("client_invoices").delete().eq("id", id).eq("workspace_id", workspaceId);
+      const { error } = await supabase
+        .from("client_invoices")
+        .delete()
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
       if (error) throw error;
     },
     onSuccess: async (_, id) => {
@@ -2215,7 +2655,6 @@ function InvoicesTab({
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
-
 
   return (
     <div className="space-y-3">
@@ -2274,7 +2713,12 @@ function InvoicesTab({
                   <span className="text-sm font-medium text-foreground">
                     {i.number || "Invoice"}
                   </span>
-                  <InvoiceStatusBadge status={i.status} partial={(i.amount_paid_cents ?? 0) > 0 && i.amount_paid_cents! < (i.amount_cents ?? 0)} />
+                  <InvoiceStatusBadge
+                    status={i.status}
+                    partial={
+                      (i.amount_paid_cents ?? 0) > 0 && i.amount_paid_cents! < (i.amount_cents ?? 0)
+                    }
+                  />
                 </div>
                 <PaymentProgress invoice={i} />
                 {i.description && (
@@ -2332,7 +2776,13 @@ function InvoicesTab({
   );
 }
 
-function InvoiceStatusBadge({ status, partial = false }: { status: InvoiceStatus; partial?: boolean }) {
+function InvoiceStatusBadge({
+  status,
+  partial = false,
+}: {
+  status: InvoiceStatus;
+  partial?: boolean;
+}) {
   const tone: Record<InvoiceStatus, string> = {
     draft: "bg-elevated text-muted-foreground ring-border",
     sent: "bg-primary/12 text-primary ring-primary/30",
@@ -2370,6 +2820,9 @@ function InvoiceForm({
   const qc = useQueryClient();
   const [number, setNumber] = useState(invoice?.number ?? "");
   const [description, setDescription] = useState(invoice?.description ?? "");
+  const [items, setItems] = useState<DraftInvoiceItem[]>(() =>
+    invoiceItemsFromJson(invoice?.line_items),
+  );
   const [amount, setAmount] = useState(
     invoice?.amount_cents === null || invoice?.amount_cents === undefined
       ? ""
@@ -2377,7 +2830,9 @@ function InvoiceForm({
   );
   const [paymentPlan, setPaymentPlan] = useState(invoice?.payment_plan ?? "one_time");
   const [billingMonth, setBillingMonth] = useState(invoice?.billing_month?.slice(0, 7) ?? "");
-  const [amountPaid, setAmountPaid] = useState(invoice?.amount_paid_cents == null ? "" : (invoice.amount_paid_cents / 100).toFixed(2));
+  const [amountPaid, setAmountPaid] = useState(
+    invoice?.amount_paid_cents == null ? "" : (invoice.amount_paid_cents / 100).toFixed(2),
+  );
   const [currency, setCurrency] = useState(invoice?.currency ?? "USD");
   const [status, setStatus] = useState<InvoiceStatus>(invoice?.status ?? "unpaid");
   const [hostedUrl, setHostedUrl] = useState(invoice?.hosted_url ?? "");
@@ -2392,13 +2847,24 @@ function InvoiceForm({
       if (trimmedUrl && !isValidHttpsUrl(trimmedUrl)) {
         throw new Error(URL_VALIDATION_MESSAGE);
       }
-      const cents = amount ? Math.round(parseFloat(amount) * 100) : null;
-      const received = status === "paid" ? cents : amountPaid === "" ? null : Math.round(Number(amountPaid) * 100);
-      const effectiveStatus = status !== "void" && status !== "draft" && cents != null && cents > 0 && received === cents ? "paid" : status;
+      if (!validInvoiceItems(items))
+        throw new Error("Check the item descriptions, quantities, and prices.");
+      const cents = items.length
+        ? invoiceItemTotal(items)
+        : amount
+          ? Math.round(parseFloat(amount) * 100)
+          : null;
+      const received =
+        status === "paid" ? cents : amountPaid === "" ? null : Math.round(Number(amountPaid) * 100);
+      const effectiveStatus =
+        status !== "void" && status !== "draft" && cents != null && cents > 0 && received === cents
+          ? "paid"
+          : status;
       const values = {
         number: number.trim() || null,
         description: description.trim() || null,
         amount_cents: cents,
+        ...(items.length ? { line_items: items as never } : {}),
         amount_paid_cents: received ?? 0,
         payment_plan: paymentPlan,
         billing_month: paymentPlan === "monthly_retainer" ? `${billingMonth}-01` : null,
@@ -2444,7 +2910,7 @@ function InvoiceForm({
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] }),
         qc.invalidateQueries({ queryKey: ["layer1", "invoices", workspaceId] }),
-      qc.invalidateQueries({ queryKey: ["wedding", "invoices", workspaceId] }),
+        qc.invalidateQueries({ queryKey: ["wedding", "invoices", workspaceId] }),
       ]);
       toast.success(invoice ? "Invoice updated." : "Invoice added.");
       onDone();
@@ -2454,9 +2920,24 @@ function InvoiceForm({
 
   const hostedUrlValid = !hostedUrl.trim() || isValidHttpsUrl(hostedUrl);
   const currencyValid = /^[A-Za-z]{3}$/.test(currency.trim());
-  const amountValid = !amount || (Number.isFinite(Number(amount)) && Number(amount) >= 0);
-  const paidValid = status === "paid" || amountPaid === "" || (amount !== "" && Number.isFinite(Number(amountPaid)) && Number(amountPaid) >= 0 && Number(amountPaid) <= Number(amount));
-  const canSave = hostedUrlValid && currencyValid && amountValid && paidValid && Boolean(issuedAt) && (paymentPlan !== "monthly_retainer" || Boolean(billingMonth));
+  const effectiveAmount = items.length ? (invoiceItemTotal(items) / 100).toFixed(2) : amount;
+  const amountValid = items.length
+    ? validInvoiceItems(items)
+    : !amount || (Number.isFinite(Number(amount)) && Number(amount) >= 0);
+  const paidValid =
+    status === "paid" ||
+    amountPaid === "" ||
+    (effectiveAmount !== "" &&
+      Number.isFinite(Number(amountPaid)) &&
+      Number(amountPaid) >= 0 &&
+      Number(amountPaid) <= Number(effectiveAmount));
+  const canSave =
+    hostedUrlValid &&
+    currencyValid &&
+    amountValid &&
+    paidValid &&
+    Boolean(issuedAt) &&
+    (paymentPlan !== "monthly_retainer" || Boolean(billingMonth));
 
   return (
     <form
@@ -2490,8 +2971,9 @@ function InvoiceForm({
             type="number"
             step="0.01"
             min="0"
-            value={amount}
+            value={effectiveAmount}
             onChange={(e) => setAmount(e.target.value)}
+            readOnly={items.length > 0}
             className={inputCls}
             placeholder="1250.00"
           />
@@ -2508,9 +2990,83 @@ function InvoiceForm({
           )}
         </Field>
       </div>
+      <InvoiceItemPicker
+        currency={currency}
+        onAdd={(item) => setItems((current) => [...current, item])}
+      />
+      {items.length > 0 && (
+        <div className="space-y-2 rounded-lg border border-border p-3">
+          <p className="text-sm font-medium">Invoice items</p>
+          {items.map((item, index) => (
+            <div
+              key={`${item.templateId ?? "manual"}-${index}`}
+              className="grid gap-2 sm:grid-cols-[1fr_80px_120px_auto]"
+            >
+              <input
+                aria-label={`Item ${index + 1} description`}
+                value={item.description}
+                onChange={(e) =>
+                  setItems((current) =>
+                    current.map((row, i) =>
+                      i === index ? { ...row, description: e.target.value } : row,
+                    ),
+                  )
+                }
+                className={inputCls}
+              />
+              <input
+                aria-label={`Item ${index + 1} quantity`}
+                type="number"
+                min="1"
+                step="1"
+                value={item.quantity}
+                onChange={(e) =>
+                  setItems((current) =>
+                    current.map((row, i) =>
+                      i === index ? { ...row, quantity: Number(e.target.value) } : row,
+                    ),
+                  )
+                }
+                className={inputCls}
+              />
+              <input
+                aria-label={`Item ${index + 1} unit price`}
+                type="number"
+                min="0"
+                step="0.01"
+                value={(item.unitCents / 100).toFixed(2)}
+                onChange={(e) =>
+                  setItems((current) =>
+                    current.map((row, i) =>
+                      i === index
+                        ? { ...row, unitCents: Math.round(Number(e.target.value) * 100) }
+                        : row,
+                    ),
+                  )
+                }
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
+                className="min-h-11 rounded-lg border border-border px-3 text-sm"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <p className="text-xs text-muted-foreground">
+            Total updates automatically. Template item values are copied into this invoice.
+          </p>
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Payment arrangement">
-          <select value={paymentPlan} onChange={(e) => setPaymentPlan(e.target.value)} className={inputCls}>
+          <select
+            value={paymentPlan}
+            onChange={(e) => setPaymentPlan(e.target.value)}
+            className={inputCls}
+          >
             <option value="one_time">One-time payment</option>
             <option value="deposit_balance">Deposit + remaining balance</option>
             <option value="installments">Installments / partial payments</option>
@@ -2518,11 +3074,48 @@ function InvoiceForm({
           </select>
         </Field>
         <Field label="Total received so far">
-          <input type="number" min="0" max={amount || undefined} step="0.01" value={status === "paid" ? amount : amountPaid} disabled={status === "paid"} onChange={(e) => setAmountPaid(e.target.value)} className={inputCls} placeholder="Enter confirmed payments" />
-          {!paidValid && <p className="text-xs text-destructive">Received amount must be between zero and the invoice total.</p>}
-          <button type="button" className="mt-1 text-xs text-primary" disabled={!amount || status === "paid"} onClick={() => setAmountPaid((Math.round(Number(amount) * 100 / 2) / 100).toFixed(2))}>Set 50% received</button>
+          <input
+            type="number"
+            min="0"
+            max={effectiveAmount || undefined}
+            step="0.01"
+            value={status === "paid" ? effectiveAmount : amountPaid}
+            disabled={status === "paid"}
+            onChange={(e) => setAmountPaid(e.target.value)}
+            className={inputCls}
+            placeholder="Enter confirmed payments"
+          />
+          {!paidValid && (
+            <p className="text-xs text-destructive">
+              Received amount must be between zero and the invoice total.
+            </p>
+          )}
+          <button
+            type="button"
+            className="mt-1 text-xs text-primary"
+            disabled={!effectiveAmount || status === "paid"}
+            onClick={() =>
+              setAmountPaid((Math.round((Number(effectiveAmount) * 100) / 2) / 100).toFixed(2))
+            }
+          >
+            Set 50% received
+          </button>
         </Field>
-        {paymentPlan === "monthly_retainer" && <Field label="Billing month"><input type="month" required value={billingMonth} onChange={(e) => setBillingMonth(e.target.value)} className={inputCls} /><p className="mt-1 text-xs text-muted-foreground">Add a separate invoice for each month to preserve payment history. Payments are recorded manually.</p></Field>}
+        {paymentPlan === "monthly_retainer" && (
+          <Field label="Billing month">
+            <input
+              type="month"
+              required
+              value={billingMonth}
+              onChange={(e) => setBillingMonth(e.target.value)}
+              className={inputCls}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Add a separate invoice for each month to preserve payment history. Payments are
+              recorded manually.
+            </p>
+          </Field>
+        )}
       </div>
       <Field label="Description">
         <textarea
@@ -2660,10 +3253,8 @@ function InvitesTab({
       qc.invalidateQueries({ queryKey: ["workspace-access", workspace.id] });
       toast.success("Role updated. Permissions apply immediately.");
     },
-    onError: (e: unknown) =>
-      toast.error(e instanceof Error ? e.message : "Could not change role."),
+    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not change role."),
   });
-
 
   const revoke = useMutation({
     mutationFn: async (id: string) => {
@@ -2697,7 +3288,11 @@ function InvitesTab({
         email: row?.email ?? "",
         workspace: workspace.name,
       });
-      toast.success(delivery.sent ? "Client invitation emailed." : "Invite refreshed. Copy the link to send it manually.");
+      toast.success(
+        delivery.sent
+          ? "Client invitation emailed."
+          : "Invite refreshed. Copy the link to send it manually.",
+      );
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
@@ -2812,7 +3407,6 @@ function InvitesTab({
               </li>
             );
           })}
-
         </ul>
       )}
     </div>
@@ -3027,8 +3621,6 @@ function AccountHealthList({ health }: { health: AccountHealth }) {
   );
 }
 
-
-
 function InviteQuickForm({
   workspace,
   onNewInvite,
@@ -3045,9 +3637,11 @@ function InviteQuickForm({
   const contactQ = useQuery({
     queryKey: ["clients", "invitation-contact", workspace.id],
     queryFn: async () => {
-      const { data, error } = await db.from("crm_accounts")
+      const { data, error } = await db
+        .from("crm_accounts")
         .select("email,crm_contacts(first_name,last_name,email,is_primary)")
-        .eq("linked_workspace_id", workspace.id).maybeSingle();
+        .eq("linked_workspace_id", workspace.id)
+        .maybeSingle();
       if (error) throw error;
       return invitationContact(data);
     },
@@ -3097,7 +3691,11 @@ function InviteQuickForm({
       setFirstName("");
       setLastName("");
       onNewInvite(payload);
-      toast.success(payload.delivery.sent ? "Client invitation emailed." : "Invite created. Copy the link to send it manually.");
+      toast.success(
+        payload.delivery.sent
+          ? "Client invitation emailed."
+          : "Invite created. Copy the link to send it manually.",
+      );
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
   });
@@ -3111,9 +3709,11 @@ function InviteQuickForm({
       className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed border-border bg-surface/40 p-3"
     >
       <p className="w-full text-xs text-muted-foreground" role="status">
-        {contactQ.isLoading ? "Loading saved CRM contact…" : contactQ.isError
-          ? "Saved contact could not be loaded. Enter the invitation details below."
-          : "Review the saved contact details. Nothing is sent until you select Send invite."}
+        {contactQ.isLoading
+          ? "Loading saved CRM contact…"
+          : contactQ.isError
+            ? "Saved contact could not be loaded. Enter the invitation details below."
+            : "Review the saved contact details. Nothing is sent until you select Send invite."}
       </p>
       <div className="min-w-0 basis-full sm:flex-1">
         <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
@@ -3224,7 +3824,8 @@ function OnboardingModal({
           agreement_term: term || null,
           access_expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
           invited_at: sendInvite ? new Date().toISOString() : null,
-          wedding_display_name: tier === "wedding_client" ? weddingDisplayName.trim() || name.trim() : null,
+          wedding_display_name:
+            tier === "wedding_client" ? weddingDisplayName.trim() || name.trim() : null,
           wedding_theme: tier === "wedding_client" ? weddingTheme : "olive",
         })
         .select()
@@ -3267,7 +3868,9 @@ function OnboardingModal({
       qc.invalidateQueries({ queryKey: ["clients", "workspaces"] });
       qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] });
       if (data.kind === "workspace_only") {
-        toast.success("Workspace created. You can send the client invite later from the Invites tab.");
+        toast.success(
+          "Workspace created. You can send the client invite later from the Invites tab.",
+        );
         onClose();
         return;
       }
@@ -3362,10 +3965,19 @@ function OnboardingModal({
         {tier === "wedding_client" && (
           <div className="grid gap-4 rounded-2xl border border-primary/25 bg-primary/[0.06] p-4 sm:grid-cols-2">
             <Field label="Couple / client display name">
-              <input value={weddingDisplayName} onChange={(e) => setWeddingDisplayName(e.target.value)} placeholder="Jean & Alex" className={inputCls} />
+              <input
+                value={weddingDisplayName}
+                onChange={(e) => setWeddingDisplayName(e.target.value)}
+                placeholder="Jean & Alex"
+                className={inputCls}
+              />
             </Field>
             <Field label="Wedding theme">
-              <select value={weddingTheme} onChange={(e) => setWeddingTheme(e.target.value)} className={inputCls}>
+              <select
+                value={weddingTheme}
+                onChange={(e) => setWeddingTheme(e.target.value)}
+                className={inputCls}
+              >
                 <option value="olive">Olive green & white</option>
                 <option value="gold">Gold & white</option>
               </select>

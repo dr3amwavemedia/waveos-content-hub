@@ -41,14 +41,14 @@ export function DocumentsTab({
           Everything created here is assigned to{" "}
           <span className="font-medium text-foreground">{clientName}</span> (workspace{" "}
           <code className="rounded bg-elevated px-1">{workspaceId.slice(0, 8)}…</code>). The
-          assignment is fixed at creation — switching clients later does not move a document.
-          Drafts stay private; only the explicit Send action shows a document to the client.
+          assignment is fixed at creation — switching clients later does not move a document. Drafts
+          stay private; only the explicit Send action shows a document to the client.
         </div>
         <Link
           to="/templates"
           className="ml-auto inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm hover:bg-elevated"
         >
-          <FileStack className="h-3.5 w-3.5" /> Template Library
+          <FileStack className="h-3.5 w-3.5" /> DOCUMENTS
         </Link>
       </div>
 

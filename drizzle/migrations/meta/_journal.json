@@ -15,6 +15,13 @@
       "when": 1789445687447,
       "tag": "0001_allow_signwell_contract_provider",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1789454400000,
+      "tag": "0002_invoice_line_items",
+      "breakpoints": true
     }
   ]
 }
