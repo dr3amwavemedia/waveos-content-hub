@@ -35,6 +35,7 @@ import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authe
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedPostsRouteImport } from './routes/_authenticated/posts'
+import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
 import { Route as AuthenticatedOutlookRouteImport } from './routes/_authenticated/outlook'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMyProjectsRouteImport } from './routes/_authenticated/my-projects'
@@ -205,6 +206,11 @@ const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
 const AuthenticatedPostsRoute = AuthenticatedPostsRouteImport.update({
   id: '/posts',
   path: '/posts',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedOutlookRoute = AuthenticatedOutlookRouteImport.update({
@@ -424,6 +430,7 @@ export interface FileRoutesByFullPath {
   '/my-projects': typeof AuthenticatedMyProjectsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/outlook': typeof AuthenticatedOutlookRoute
+  '/payments': typeof AuthenticatedPaymentsRoute
   '/posts': typeof AuthenticatedPostsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -487,6 +494,7 @@ export interface FileRoutesByTo {
   '/my-projects': typeof AuthenticatedMyProjectsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/outlook': typeof AuthenticatedOutlookRoute
+  '/payments': typeof AuthenticatedPaymentsRoute
   '/posts': typeof AuthenticatedPostsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -552,6 +560,7 @@ export interface FileRoutesById {
   '/_authenticated/my-projects': typeof AuthenticatedMyProjectsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/outlook': typeof AuthenticatedOutlookRoute
+  '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
   '/_authenticated/posts': typeof AuthenticatedPostsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -617,6 +626,7 @@ export interface FileRouteTypes {
     | '/my-projects'
     | '/onboarding'
     | '/outlook'
+    | '/payments'
     | '/posts'
     | '/projects'
     | '/settings'
@@ -680,6 +690,7 @@ export interface FileRouteTypes {
     | '/my-projects'
     | '/onboarding'
     | '/outlook'
+    | '/payments'
     | '/posts'
     | '/projects'
     | '/settings'
@@ -744,6 +755,7 @@ export interface FileRouteTypes {
     | '/_authenticated/my-projects'
     | '/_authenticated/onboarding'
     | '/_authenticated/outlook'
+    | '/_authenticated/payments'
     | '/_authenticated/posts'
     | '/_authenticated/projects'
     | '/_authenticated/settings'
@@ -997,6 +1009,13 @@ declare module '@tanstack/react-router' {
       path: '/posts'
       fullPath: '/posts'
       preLoaderRoute: typeof AuthenticatedPostsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/payments': {
+      id: '/_authenticated/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof AuthenticatedPaymentsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/outlook': {
@@ -1284,6 +1303,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMyProjectsRoute: typeof AuthenticatedMyProjectsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOutlookRoute: typeof AuthenticatedOutlookRoute
+  AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
   AuthenticatedPostsRoute: typeof AuthenticatedPostsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -1313,6 +1333,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMyProjectsRoute: AuthenticatedMyProjectsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOutlookRoute: AuthenticatedOutlookRoute,
+  AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
   AuthenticatedPostsRoute: AuthenticatedPostsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,

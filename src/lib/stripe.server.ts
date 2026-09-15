@@ -34,7 +34,11 @@ function encodeForm(value: unknown, prefix = "", out: string[] = []): string[] {
 
 export async function stripeRequest<T = Record<string, unknown>>(
   path: string,
-  options: { method?: "GET" | "POST"; body?: Record<string, unknown>; idempotencyKey?: string } = {},
+  options: {
+    method?: "GET" | "POST";
+    body?: Record<string, unknown>;
+    idempotencyKey?: string;
+  } = {},
 ): Promise<T> {
   const method = options.method ?? "POST";
   const headers: Record<string, string> = {
@@ -47,6 +51,7 @@ export async function stripeRequest<T = Record<string, unknown>>(
     method,
     headers,
     body: method === "POST" ? encodeForm(options.body ?? {}).join("&") : undefined,
+    signal: AbortSignal.timeout(15000),
   });
   const json = (await response.json()) as T & { error?: { message?: string; code?: string } };
   if (!response.ok) {
@@ -65,6 +70,8 @@ export type StripeCheckoutSession = {
   currency: string | null;
   payment_status: string | null;
   metadata?: Record<string, string>;
+  status?: "open" | "complete" | "expired";
+  livemode?: boolean;
 };
 
 /** Verify a Stripe webhook signature header (scheme v1, HMAC-SHA256). */
