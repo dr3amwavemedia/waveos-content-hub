@@ -794,18 +794,27 @@ export function InvoiceCard({ invoice }: { invoice: Invoice }) {
         {paid && <MetaField label="Paid" value={paid} icon={CheckCircle2} />}
       </dl>
 
-      {canOpen && (
-        <a
-          href={invoice.hosted_url!}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-all hover:brightness-110 sm:w-auto"
-        >
-          {ctaLabel}
-          <ExternalLink className="h-4 w-4" />
-        </a>
-      )}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {!isPaid && invoice.published_at && (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0) > 0 && (
+          <PayInvoiceButton
+            invoiceId={invoice.id}
+            label={(invoice.amount_paid_cents ?? 0) > 0 ? "Pay balance" : "Pay now"}
+          />
+        )}
+        {canOpen && (
+          <a
+            href={invoice.hosted_url!}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border px-4 py-2.5 text-sm font-semibold text-foreground transition-all hover:bg-muted sm:w-auto"
+          >
+            {ctaLabel}
+            <ExternalLink className="h-4 w-4" />
+          </a>
+        )}
+      </div>
       {canOpen && <PortalReturnHint />}
+
     </div>
   );
 }
