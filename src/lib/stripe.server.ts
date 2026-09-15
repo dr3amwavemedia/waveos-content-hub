@@ -5,15 +5,23 @@
 
 const STRIPE_API = "https://api.stripe.com/v1";
 
+/**
+ * The dedicated test key always wins while payments are in test phase, so a
+ * live/restricted key saved by the Stripe connector can never open a checkout.
+ */
+function activeStripeKey(): string {
+  return process.env.WAVEOS_STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY || "";
+}
+
 function stripeKey(): string {
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = activeStripeKey();
   if (!key) throw new Error("stripe_not_configured");
   return key;
 }
 
 /** True when the configured key is a test-mode key (standard or restricted). */
 export function stripeIsTestMode(): boolean {
-  const key = process.env.STRIPE_SECRET_KEY ?? "";
+  const key = activeStripeKey();
   return key.startsWith("sk_test_") || key.startsWith("rk_test_");
 }
 
