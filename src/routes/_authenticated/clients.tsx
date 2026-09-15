@@ -1,6 +1,6 @@
 import { DocumentDraftTools } from "@/components/app/document-draft-tools";
 import { DocumentsTab } from "@/components/documents/documents-tab";
-import { TemplatePicker, type TemplateRow } from "@/components/documents/template-picker";
+import { ContractBuilder } from "@/components/documents/contract-builder";
 import { InvoiceItemPicker } from "@/components/documents/invoice-item-picker";
 import {
   invoiceItemsFromJson,
@@ -71,6 +71,10 @@ type ContractRow = {
   sent_at: string | null;
   signed_at: string | null;
   expires_at: string | null;
+  contract_data: Database["public"]["Tables"]["client_contracts"]["Row"]["contract_data"];
+  signer_email: string | null;
+  source_template_id: string | null;
+  source_template_version: number | null;
 };
 type InvoiceListItem = Pick<
   Database["public"]["Tables"]["client_invoices"]["Row"],
@@ -783,10 +787,10 @@ function WorkspaceDrawer({
           workspaceId={workspace.id}
           clientName={workspace.name}
           invoicesSlot={<InvoicesTab workspaceId={workspace.id} clientName={workspace.name} />}
-          contractsSlot={<ContractsTab workspaceId={workspace.id} />}
+          contractsSlot={<ContractsTab workspaceId={workspace.id} clientLabel={workspace.name} />}
         />
       )}
-      {tab === "contracts" && <ContractsTab workspaceId={workspace.id} />}
+      {tab === "contracts" && <ContractsTab workspaceId={workspace.id} clientLabel={workspace.name} />}
       {tab === "invoices" && <InvoicesTab workspaceId={workspace.id} clientName={workspace.name} />}
       {tab === "invites" && <InvitesTab workspace={workspace} onNewInvite={onNewInvite} />}
     </ModalShell>
@@ -2221,15 +2225,13 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
 
 // ─── External contracts tab ───────────────────────────────────────────────
 
-function ContractsTab({ workspaceId }: { workspaceId: string }) {
+function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clientLabel: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const [creationMode, setCreationMode] = useState<"external" | "template">("external");
-  const [selectedTemplate, setSelectedTemplate] = useState<TemplateRow | null>(null);
+  const [creationMode, setCreationMode] = useState<"external" | "template">("template");
+  const [editingDraft, setEditingDraft] = useState<ContractRow | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [signerName, setSignerName] = useState("");
-  const [signerEmail, setSignerEmail] = useState("");
   const [hostedUrl, setHostedUrl] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const refresh = () =>
@@ -2240,22 +2242,29 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
   const q = useQuery({
     queryKey: ["client-contracts", workspaceId],
     queryFn: async (): Promise<ContractRow[]> => {
+      const legacyColumns = "id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,signer_email,source_template_id,source_template_version";
       const { data, error } = await db
         .from("client_contracts")
-        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at")
+        .select(`${legacyColumns},contract_data`)
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
+      if (error && error.message?.includes("contract_data")) {
+        const fallback = await db
+          .from("client_contracts")
+          .select(legacyColumns)
+          .eq("workspace_id", workspaceId)
+          .order("created_at", { ascending: false });
+        if (fallback.error) throw fallback.error;
+        return (fallback.data ?? []).map((row: ContractRow) => ({ ...row, contract_data: {} }));
+      }
       if (error) throw error;
       return data ?? [];
     },
   });
   const create = useMutation({
     mutationFn: async () => {
-      const url = creationMode === "external" ? normalizeHttpsUrl(hostedUrl) : null;
-      if (creationMode === "external" && !isValidHttpsUrl(url ?? ""))
-        throw new Error(URL_VALIDATION_MESSAGE);
-      if (creationMode === "template" && (!selectedTemplate || !description.trim()))
-        throw new Error("Select an approved contract template with content.");
+      const url = normalizeHttpsUrl(hostedUrl);
+      if (!isValidHttpsUrl(url)) throw new Error(URL_VALIDATION_MESSAGE);
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw new Error("Your session expired. Please sign in again.");
       const { data, error } = await db
@@ -2264,23 +2273,18 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
           workspace_id: workspaceId,
           title: title.trim(),
           description: description.trim() || null,
-          provider: url?.includes("bloom.io") ? "bloom" : "other",
+          provider: url.includes("bloom.io") ? "bloom" : "other",
           hosted_url: url,
-          status: creationMode === "template" ? "draft" : "sent",
-          sent_at: creationMode === "template" ? null : new Date().toISOString(),
-          published_at: creationMode === "template" ? null : new Date().toISOString(),
-          signer_name: creationMode === "template" ? signerName.trim() || null : null,
-          signer_email: creationMode === "template" ? signerEmail.trim() || null : null,
-          source_template_id: creationMode === "template" ? selectedTemplate?.id : null,
-          source_template_version: creationMode === "template" ? selectedTemplate?.version : null,
+          status: "sent",
+          sent_at: new Date().toISOString(),
+          published_at: new Date().toISOString(),
           expires_at: dateInputToIso(expiresAt),
           created_by: auth.user.id,
         })
         .select("id")
         .single();
       if (error) throw error;
-      if (creationMode === "external" && url)
-        await tryEmail(() =>
+      await tryEmail(() =>
           sendWorkspaceEmail({
             workspaceId,
             event: "contract_ready",
@@ -2296,17 +2300,10 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
       setDescription("");
       setHostedUrl("");
       setExpiresAt("");
-      setSignerName("");
-      setSignerEmail("");
-      setSelectedTemplate(null);
-      setCreationMode("external");
+      setCreationMode("template");
       setShowForm(false);
       await refresh();
-      toast.success(
-        creationMode === "template"
-          ? "Private contract draft created for this client."
-          : "Contract link added.",
-      );
+      toast.success("Contract link added.");
     },
     onError: (error: unknown) => toast.error(readableError(error, "Could not add contract.")),
   });
@@ -2348,13 +2345,16 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
   return (
     <div className="space-y-3">
       {q.isSuccess && <ContractExportTools key={workspaceId} contracts={q.data ?? []} />}
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          Connect a Bloom.io or other secure signing link.
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Build a client-specific draft or connect an existing secure signing link.
         </p>
         <button
           type="button"
-          onClick={() => setShowForm((value) => !value)}
+          onClick={() => {
+            setEditingDraft(null);
+            setShowForm((value) => !value);
+          }}
           className="inline-flex min-h-12 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
         >
           {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
@@ -2362,6 +2362,37 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
         </button>
       </div>
       {showForm && (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setCreationMode("template")}
+            className={cn("min-h-11 rounded-lg border px-3 text-sm", creationMode === "template" ? "border-primary bg-primary/10" : "border-border")}
+          >
+            Build contract
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreationMode("external")}
+            className={cn("min-h-11 rounded-lg border px-3 text-sm", creationMode === "external" ? "border-primary bg-primary/10" : "border-border")}
+          >
+            External signing link
+          </button>
+        </div>
+      )}
+      {(editingDraft || (showForm && creationMode === "template")) && (
+        <ContractBuilder
+          key={editingDraft?.id ?? `new-${workspaceId}`}
+          workspaceId={workspaceId}
+          clientLabel={clientLabel}
+          draft={editingDraft}
+          onDone={async () => {
+            setEditingDraft(null);
+            setShowForm(false);
+            await refresh();
+          }}
+        />
+      )}
+      {showForm && creationMode === "external" && !editingDraft && (
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -2369,40 +2400,6 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
           }}
           className="grid gap-3 rounded-xl border border-primary/25 bg-primary/5 p-4 sm:grid-cols-2"
         >
-          <div className="flex flex-wrap gap-2 sm:col-span-2">
-            <button
-              type="button"
-              onClick={() => setCreationMode("external")}
-              className={cn(
-                "min-h-11 rounded-lg border px-3 text-sm",
-                creationMode === "external" ? "border-primary bg-primary/10" : "border-border",
-              )}
-            >
-              External signing link
-            </button>
-            <button
-              type="button"
-              onClick={() => setCreationMode("template")}
-              className={cn(
-                "min-h-11 rounded-lg border px-3 text-sm",
-                creationMode === "template" ? "border-primary bg-primary/10" : "border-border",
-              )}
-            >
-              Create private draft from DOCUMENTS
-            </button>
-            {creationMode === "template" && (
-              <TemplatePicker
-                kind="contract"
-                label="Choose contract template"
-                onPick={(template) => {
-                  const body = (template.body ?? {}) as { title?: string; content?: string };
-                  setSelectedTemplate(template);
-                  setTitle(body.title ?? template.name);
-                  setDescription(body.content ?? "");
-                }}
-              />
-            )}
-          </div>
           <Field label="Contract title">
             <input
               required
@@ -2413,8 +2410,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
               className={inputCls}
             />
           </Field>
-          {creationMode === "external" && (
-            <Field label="Bloom contract link">
+          <Field label="Contract link">
               <input
                 required
                 type="text"
@@ -2430,48 +2426,16 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
               {hostedUrl && !isValidHttpsUrl(normalizeHttpsUrl(hostedUrl)) && (
                 <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
               )}
-            </Field>
-          )}
-          {creationMode === "template" && (
-            <div className="text-xs text-muted-foreground sm:col-span-2">
-              Template:{" "}
-              {selectedTemplate
-                ? `${selectedTemplate.name} · version ${selectedTemplate.version}`
-                : "none selected"}
-              . This saves a private draft for this client; it does not send a signing request.
-            </div>
-          )}
-          <Field label={creationMode === "template" ? "Approved contract content" : "Description"}>
+          </Field>
+          <Field label="Description">
             <textarea
-              required={creationMode === "template"}
-              rows={creationMode === "template" ? 8 : 2}
+              rows={2}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder={
-                creationMode === "template" ? "Select an approved template" : "Optional client note"
-              }
+              placeholder="Optional client note"
               className={inputCls}
             />
           </Field>
-          {creationMode === "template" && (
-            <>
-              <Field label="Signer name">
-                <input
-                  value={signerName}
-                  onChange={(event) => setSignerName(event.target.value)}
-                  className={inputCls}
-                />
-              </Field>
-              <Field label="Signer email">
-                <input
-                  type="email"
-                  value={signerEmail}
-                  onChange={(event) => setSignerEmail(event.target.value)}
-                  className={inputCls}
-                />
-              </Field>
-            </>
-          )}
           <Field label="Expires">
             <input
               type="date"
@@ -2482,20 +2446,10 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
           </Field>
           <button
             type="submit"
-            disabled={
-              create.isPending ||
-              title.trim().length < 2 ||
-              (creationMode === "external"
-                ? !hostedUrl.trim()
-                : !selectedTemplate || !description.trim())
-            }
+            disabled={create.isPending || title.trim().length < 2 || !hostedUrl.trim()}
             className="min-h-12 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-50 sm:col-span-2"
           >
-            {create.isPending
-              ? "Saving…"
-              : creationMode === "template"
-                ? "Create without sending"
-                : "Add contract link"}
+            {create.isPending ? "Saving…" : "Add contract link"}
           </button>
         </form>
       )}
@@ -2527,7 +2481,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">{contract.title}</p>
                 {contract.description && (
-                  <p className="mt-1 text-xs text-muted-foreground">{contract.description}</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{contract.description}</p>
                 )}
                 {contract.hosted_url && (
                   <a
@@ -2547,6 +2501,18 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
                 )}
               </div>
               <div className="flex items-center gap-2">
+                {contract.status === "draft" && !contract.hosted_url && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingDraft(contract);
+                      setShowForm(false);
+                    }}
+                    className="min-h-10 rounded-lg border border-border px-3 text-xs font-semibold hover:border-primary/40"
+                  >
+                    Edit draft
+                  </button>
+                )}
                 <select
                   value={contract.status}
                   disabled={

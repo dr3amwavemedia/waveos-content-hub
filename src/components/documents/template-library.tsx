@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Archive, Eye, Loader2, Pencil, Plus, RotateCcw, X } from "lucide-react";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { errorMessage } from "@/lib/error-message";
 import { businessProfile } from "@/lib/business-profile";
 import { invoiceDocumentHtml } from "@/lib/invoice-document";
+import { CONTRACT_FIELDS, CONTRACT_STARTER, emptyContractValues, renderContract, todayLocalDate } from "@/lib/contract-variables";
 import {
   invoiceItemTotal,
   moneyInputToCents,
@@ -16,10 +17,10 @@ import {
 } from "@/lib/invoice-items";
 import { useTemplates, type TemplateKind, type TemplateRow } from "./template-picker";
 
-const KINDS: Array<{ key: TemplateKind; label: string }> = [
-  { key: "invoice", label: "Invoice item templates" },
-  { key: "contract", label: "Contract templates" },
-  { key: "form", label: "Form templates" },
+const KINDS: Array<{ key: TemplateKind; label: string; detail: string }> = [
+  { key: "invoice", label: "Invoice items", detail: "Reusable services with descriptions and prices" },
+  { key: "contract", label: "Contracts", detail: "Agreements with client and project variables" },
+  { key: "form", label: "Forms", detail: "Questions you can reuse for future clients" },
 ];
 
 const inputCls =
@@ -90,6 +91,15 @@ export function TemplateLibrary() {
         ),
       );
     } else {
+      const sampleContract = renderContract(body.content ?? "", {
+        client_name: "Sample Client",
+        business_name: "Sample Business",
+        services: "Sample service package",
+        project_date: "2026-10-01",
+        today_date: todayLocalDate(),
+        location: "Sarasota, FL",
+        project_name: "Sample Project",
+      }).content;
       const lines =
         template.kind === "form"
           ? (body.fields ?? []).map((f) => `<li>${escapeHtml(f.label)}</li>`).join("")
@@ -99,7 +109,8 @@ export function TemplateLibrary() {
           `<body style="font-family:system-ui;max-width:720px;margin:40px auto;padding:0 20px;color:#111">` +
           `<img src="${businessProfile.logoUrl}" alt="${escapeHtml(businessProfile.name)}" style="height:56px"/>` +
           `<h1 style="font-size:20px">${escapeHtml(body.title ?? template.name)}</h1>` +
-          `<p style="white-space:pre-wrap;line-height:1.6">${escapeHtml(body.content ?? template.description ?? "")}</p>` +
+          (template.kind === "contract" ? `<p style="font-size:12px;color:#666">Sample preview · replace all sample details before use</p>` : "") +
+          `<p style="white-space:pre-wrap;line-height:1.6">${escapeHtml(template.kind === "contract" ? sampleContract : body.content ?? template.description ?? "")}</p>` +
           (lines ? `<ol style="line-height:1.8">${lines}</ol>` : "") +
           `<hr style="margin-top:32px"/><p style="font-size:12px;color:#555">${escapeHtml(
             `${businessProfile.name} · ${businessProfile.website.replace(/^https?:\/\//, "")} · ${businessProfile.location} · ${businessProfile.phone}`,
@@ -110,8 +121,8 @@ export function TemplateLibrary() {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-7">
+      <nav aria-label="Document categories" className="grid gap-3 md:grid-cols-3">
         {KINDS.map((k) => (
           <button
             key={k.key}
@@ -121,16 +132,30 @@ export function TemplateLibrary() {
               setEditing(null);
             }}
             className={cn(
-              "min-h-11 rounded-lg border px-3 text-sm",
+              "min-h-28 rounded-2xl border p-5 text-left transition-colors",
               kind === k.key
-                ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-border text-muted-foreground hover:text-foreground",
+                ? "border-primary/50 bg-primary/10 text-foreground"
+                : "border-border bg-surface/40 text-foreground hover:border-primary/30",
             )}
           >
-            {k.label}
+            <span className="block text-base font-semibold">{k.label}</span>
+            <span className="mt-2 block text-sm text-muted-foreground">{k.detail}</span>
           </button>
         ))}
-        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+      </nav>
+
+      <section className="space-y-6 rounded-2xl border border-border bg-surface/30 p-5 sm:p-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-foreground">
+            {KINDS.find((category) => category.key === kind)?.label}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Select a document to preview, edit or archive it.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs text-muted-foreground">
           <input
             type="checkbox"
             checked={showArchived}
@@ -148,8 +173,11 @@ export function TemplateLibrary() {
             ? "Cancel"
             : kind === "invoice"
               ? "New invoice item template"
-              : "New document template"}
+              : kind === "contract"
+                ? "New contract template"
+                : "New form template"}
         </button>
+        </div>
       </div>
 
       {editing && (
@@ -164,16 +192,20 @@ export function TemplateLibrary() {
         />
       )}
 
-      {q.isLoading ? (
+      {editing ? null : q.isLoading ? (
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : q.isError ? (
+        <p className="rounded-lg border border-destructive/30 p-3 text-sm text-destructive">
+          Documents could not load: {errorMessage(q.error, "Try again.")}
+        </p>
       ) : (q.data ?? []).length === 0 ? (
         <p className="text-sm text-muted-foreground">No templates in this category yet.</p>
       ) : (
-        <ul className="space-y-2">
+        <ul className="grid gap-4 lg:grid-cols-2">
           {q.data!.map((template) => (
             <li
               key={template.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-surface/40 p-3"
+              className="flex min-h-36 flex-col justify-between gap-5 rounded-xl border border-border/60 bg-background/60 p-5"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -189,7 +221,7 @@ export function TemplateLibrary() {
                   <p className="mt-1 text-xs text-muted-foreground">{template.description}</p>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => previewTemplate(template)}
@@ -224,6 +256,7 @@ export function TemplateLibrary() {
           ))}
         </ul>
       )}
+      </section>
     </div>
   );
 }
@@ -240,7 +273,21 @@ function TemplateEditor({
   const body = (template?.body ?? {}) as Body;
   const [name, setName] = useState(template?.name ?? "");
   const [description, setDescription] = useState(template?.description ?? "");
-  const [content, setContent] = useState(body.content ?? "");
+  const [content, setContent] = useState(
+    body.content ?? (kind === "contract" && !template ? CONTRACT_STARTER : ""),
+  );
+  const contractTextRef = useRef<HTMLTextAreaElement>(null);
+  const insertVariable = (token: string) => {
+    const input = contractTextRef.current;
+    const start = input?.selectionStart ?? content.length;
+    const end = input?.selectionEnd ?? content.length;
+    const next = `${content.slice(0, start)}{{${token}}}${content.slice(end)}`;
+    setContent(next);
+    requestAnimationFrame(() => {
+      input?.focus();
+      input?.setSelectionRange(start + token.length + 4, start + token.length + 4);
+    });
+  };
   const [questions, setQuestions] = useState((body.fields ?? []).map((f) => f.label).join("\n"));
   const existingItems = invoiceItemsFromJson(body.items);
   const [items, setItems] = useState(() =>
@@ -257,6 +304,13 @@ function TemplateEditor({
   const save = useMutation({
     mutationFn: async () => {
       if (!name.trim()) throw new Error("Give the template a name.");
+      if (kind === "contract" && !content.trim())
+        throw new Error("Add the contract wording before saving this template.");
+      if (kind === "contract") {
+        const unknown = renderContract(content, emptyContractValues()).unknown;
+        if (unknown.length)
+          throw new Error(`Use the supported contract variables: ${unknown.join(", ")}.`);
+      }
       const pricedItems =
         kind === "invoice"
           ? items.map((item) => ({
@@ -461,21 +515,55 @@ function TemplateEditor({
           className="min-h-32 w-full rounded-lg border border-border bg-background p-3 text-sm outline-none focus:border-primary"
         />
       ) : (
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Approved contract wording"
-          className="min-h-40 w-full rounded-lg border border-border bg-background p-3 text-sm outline-none focus:border-primary"
-        />
+        <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-background/60 p-4">
+            <p className="text-sm font-semibold text-foreground">Contract variables</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Insert a field where it belongs. When you choose this template from a client profile,
+              the editor fills known details and lets you complete the rest.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {CONTRACT_FIELDS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => insertVariable(key)}
+                  className="min-h-10 rounded-lg border border-border px-3 text-xs font-medium hover:border-primary/50"
+                >
+                  + {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <label className="block text-sm font-medium text-foreground">
+            Editable contract wording
+            <textarea
+              ref={contractTextRef}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Write the agreement and insert client variables above"
+              className="mt-2 min-h-96 w-full rounded-lg border border-border bg-background p-4 font-mono text-sm leading-6 outline-none focus:border-primary"
+            />
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Review payment, delivery, revisions, cancellation, rights and signatures before using a
+            template. Placeholder wording in a new template is editable.
+          </p>
+        </div>
       )}
-      <button
-        type="submit"
-        disabled={save.isPending}
-        className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-      >
-        {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-          {template ? `Save as version ${template.version + 1}` : kind === "invoice" ? "Create priced items" : "Create document template"}
-      </button>
+      <div className="flex flex-wrap justify-end gap-3">
+        <button type="button" onClick={onDone} className="min-h-11 rounded-lg border border-border px-4 text-sm">
+          Cancel editing
+        </button>
+        <button
+          type="submit"
+          disabled={save.isPending}
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
+        >
+          {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+          {template ? `Save as version ${template.version + 1}` : kind === "invoice" ? "Create priced items" : kind === "contract" ? "Create contract template" : "Create form template"}
+        </button>
+      </div>
     </form>
   );
 }
