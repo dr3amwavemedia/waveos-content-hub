@@ -67,7 +67,21 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
           .maybeSingle();
         if (!invoice) return new Response("ok", { status: 200 });
 
+        if (
+          eventType === "checkout.session.expired" ||
+          eventType === "checkout.session.async_payment_failed"
+        ) {
+          // Nothing is unlocked and nothing is marked paid; just clear the session pointer.
+          await supabaseAdmin
+            .from("client_invoices")
+            .update({ provider_session_id: null })
+            .eq("id", invoice.id);
+          return new Response("ok", { status: 200 });
+        }
+
         if (eventType === "checkout.session.completed" || eventType === "checkout.session.async_payment_succeeded") {
+          // Delayed payment methods complete the session while still "unpaid"/
+          // "no_payment_required". Never unlock until Stripe says paid.
           if (String(object.payment_status ?? "") !== "paid") return new Response("ok", { status: 200 });
 
           const received = Number(object.amount_total ?? 0);
