@@ -18,13 +18,22 @@ import { UpcomingShootPanel } from "@/components/app/upcoming-shoot";
 import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
 import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
 import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
+import { ProviderReturnBanner, type ReturnSearch } from "@/components/app/provider-return-banner";
 
 export const Route = createFileRoute("/_authenticated/home")({
   component: HomeRoute,
+  validateSearch: (s: Record<string, unknown>): ReturnSearch => ({
+    invoice: typeof s.invoice === "string" ? s.invoice : undefined,
+    payment: s.payment === "success" || s.payment === "cancelled" ? s.payment : undefined,
+    session_id: typeof s.session_id === "string" ? s.session_id : undefined,
+    contract: typeof s.contract === "string" ? s.contract : undefined,
+    signing: s.signing === "completed" || s.signing === "declined" ? s.signing : undefined,
+  }),
   head: () => ({ meta: [{ title: "Home — WaveOS" }] }),
 });
 
 function HomeRoute() {
+  const search = Route.useSearch();
   const { access, isStaff, isLoading } = usePermissions();
   const { workspaces, isLoading: wsLoading } = useWorkspace();
 
@@ -59,10 +68,10 @@ function HomeRoute() {
   // Client projects and delivery links are universal across every tier.
   // Tier-specific tools remain available through the client navigation.
   if (!isStaff && !isLoading && access) {
-    if (access.tier === "wedding_client") return <WeddingOverview />;
-    return <Layer1Overview />;
+    if (access.tier === "wedding_client") return <><ProviderReturnBanner search={search} weddingClient /><WeddingOverview /></>;
+    return <><ProviderReturnBanner search={search} weddingClient={false} /><Layer1Overview /></>;
   }
-  return <HomeDashboard />;
+  return <><ProviderReturnBanner search={search} weddingClient={false} /><HomeDashboard /></>;
 }
 
 

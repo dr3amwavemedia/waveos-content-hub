@@ -70,7 +70,7 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
     const session = await stripeRequest<StripeCheckoutSession>("/checkout/sessions", {
       body: {
         mode: "payment",
-        success_url: `${origin}/home?invoice=${invoice.id}&payment=success`,
+        success_url: `${origin}/home?invoice=${invoice.id}&payment=success&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/home?invoice=${invoice.id}&payment=cancelled`,
         client_reference_id: invoice.id,
         metadata: {

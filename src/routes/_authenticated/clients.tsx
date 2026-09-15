@@ -13,6 +13,7 @@ import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
 import { InvoiceDocumentTools } from "@/components/app/invoice-document-tools";
 import { PaymentProgress } from "@/components/app/payment-progress";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import {
@@ -54,6 +55,7 @@ import { ClientBrandingEditor } from "@/components/branding/client-branding-edit
 import { sendInviteEmail, sendWorkspaceEmail, tryEmail } from "@/lib/transactional-email";
 import { invitationContact } from "@/lib/invitation-contact";
 import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display";
+import { sendContractForSignature } from "@/lib/contracts.functions";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -71,6 +73,8 @@ type ContractRow = {
   sent_at: string | null;
   signed_at: string | null;
   expires_at: string | null;
+  signer_name: string | null;
+  signer_email: string | null;
 };
 type InvoiceListItem = Pick<
   Database["public"]["Tables"]["client_invoices"]["Row"],
@@ -2223,6 +2227,10 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
 
 function ContractsTab({ workspaceId }: { workspaceId: string }) {
   const qc = useQueryClient();
+  const startSignWell = useServerFn(sendContractForSignature);
+  const [editingSignerId, setEditingSignerId] = useState<string | null>(null);
+  const [draftSignerName, setDraftSignerName] = useState("");
+  const [draftSignerEmail, setDraftSignerEmail] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [creationMode, setCreationMode] = useState<"external" | "template">("external");
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateRow | null>(null);
@@ -2242,7 +2250,7 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
     queryFn: async (): Promise<ContractRow[]> => {
       const { data, error } = await db
         .from("client_contracts")
-        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at")
+        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,signer_name,signer_email")
         .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -2325,6 +2333,37 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
     onSuccess: refresh,
     onError: (error: unknown) =>
       toast.error(readableError(error, "Could not update the contract.")),
+  });
+  const saveSigner = useMutation({
+    mutationFn: async (id: string) => {
+      const name = draftSignerName.trim();
+      const email = draftSignerEmail.trim();
+      if (!name || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+        throw new Error("Add the signer's name and a valid email.");
+      const { data, error } = await db
+        .from("client_contracts")
+        .update({ signer_name: name, signer_email: email })
+        .eq("id", id)
+        .eq("workspace_id", workspaceId)
+        .eq("status", "draft")
+        .select("id");
+      if (error) throw error;
+      if (!data?.length) throw new Error("This draft could not be updated. Refresh and try again.");
+    },
+    onSuccess: async () => {
+      setEditingSignerId(null);
+      await refresh();
+      toast.success("Signer details saved.");
+    },
+    onError: (error: unknown) => toast.error(readableError(error, "Could not save signer details.")),
+  });
+  const createSigningLink = useMutation({
+    mutationFn: async (id: string) => startSignWell({ data: { contractId: id } }),
+    onSuccess: async () => {
+      await refresh();
+      toast.success("SignWell signing link created. The client can now sign in WaveOS.");
+    },
+    onError: (error: unknown) => toast.error(readableError(error, "Could not create the signing link.")),
   });
   const remove = useMutation({
     mutationFn: async (id: string) => {
@@ -2542,8 +2581,67 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
                 )}
                 {!contract.hosted_url && contract.status === "draft" && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Private template draft · no signing link sent
+                    Private template draft · create a signing link when ready
                   </p>
+                )}
+                {contract.status === "draft" && !contract.hosted_url && (
+                  <div className="mt-2 space-y-2">
+                    {contract.signer_name && contract.signer_email ? (
+                      <p className="text-xs text-muted-foreground">Signer: {contract.signer_name} · {contract.signer_email}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Add signer details before creating the link.</p>
+                    )}
+                    {editingSignerId === contract.id ? (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        <input
+                          aria-label="Signer name"
+                          value={draftSignerName}
+                          onChange={(event) => setDraftSignerName(event.target.value)}
+                          placeholder="Signer name"
+                          className="min-h-10 rounded-lg border border-border bg-background px-2 text-sm"
+                        />
+                        <input
+                          aria-label="Signer email"
+                          type="email"
+                          value={draftSignerEmail}
+                          onChange={(event) => setDraftSignerEmail(event.target.value)}
+                          placeholder="Signer email"
+                          className="min-h-10 rounded-lg border border-border bg-background px-2 text-sm"
+                        />
+                        <button
+                          type="button"
+                          disabled={saveSigner.isPending}
+                          onClick={() => saveSigner.mutate(contract.id)}
+                          className="min-h-10 rounded-lg border border-border px-3 text-xs font-semibold disabled:opacity-50"
+                        >
+                          Save signer details
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingSignerId(contract.id);
+                          setDraftSignerName(contract.signer_name ?? "");
+                          setDraftSignerEmail(contract.signer_email ?? "");
+                        }}
+                        className="min-h-10 rounded-lg border border-border px-3 text-xs font-semibold"
+                      >
+                        {contract.signer_name && contract.signer_email ? "Edit signer details" : "Add signer details"}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={!contract.signer_name || !contract.signer_email || createSigningLink.isPending}
+                      onClick={() => createSigningLink.mutate(contract.id)}
+                      className="min-h-10 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+                    >
+                      {createSigningLink.isPending && createSigningLink.variables === contract.id
+                        ? "Creating link…"
+                        : "Create SignWell signing link"}
+                    </button>
+                    <p className="text-xs text-muted-foreground">Test mode does not email the signer.</p>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2">

@@ -22,7 +22,10 @@ async function signwellRequest<T>(path: string, body: Record<string, unknown>): 
     headers: { "X-Api-Key": signwellKey(), "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const json = (await response.json().catch(() => ({}))) as T & { errors?: unknown; message?: string };
+  const json = (await response.json().catch(() => ({}))) as T & {
+    errors?: unknown;
+    message?: string;
+  };
   if (!response.ok) {
     console.error("[signwell] request failed", path, response.status);
     throw new Error(typeof json?.message === "string" ? json.message : "signwell_request_failed");
@@ -43,6 +46,8 @@ export async function createSignwellDocument(input: {
   html: string;
   signerName: string;
   signerEmail: string;
+  returnUrl: string;
+  declineUrl: string;
   metadata?: Record<string, string>;
 }): Promise<SignwellDocument> {
   return signwellRequest<SignwellDocument>("/documents", {
@@ -51,10 +56,18 @@ export async function createSignwellDocument(input: {
     subject: input.name,
     draft: false,
     embedded_signing: true,
+    text_tags: true,
+    redirect_url: input.returnUrl,
+    decline_redirect_url: input.declineUrl,
     // No client emails during the test phase.
     reminders: false,
     apply_signing_order: false,
-    files: [{ name: `${input.name}.html`, file_base64: Buffer.from(input.html, "utf8").toString("base64") }],
+    files: [
+      {
+        name: `${input.name}.html`,
+        file_base64: Buffer.from(input.html, "utf8").toString("base64"),
+      },
+    ],
     recipients: [{ id: "1", name: input.signerName, email: input.signerEmail, send_email: false }],
     metadata: input.metadata ?? {},
   });
