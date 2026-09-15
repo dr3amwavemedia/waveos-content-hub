@@ -21,10 +21,14 @@ export function PayInvoiceButton({ invoiceId, label = "Pay now" }: { invoiceId: 
       const result = await startCheckout({ data: { invoiceId } });
       if (tab && !tab.closed) {
         tab.location.href = result.url;
-      } else if (window.top && window.top !== window.self) {
-        window.top.location.href = result.url;
       } else {
-        window.location.href = result.url;
+        // Popup was blocked before we could use it. Opening a new tab now is
+        // async so blockers may reject it; as a last resort navigate this tab
+        // (never window.top — cross-origin frame navigation is forbidden).
+        const fallback = window.open(result.url, "_blank", "noopener,noreferrer");
+        if (!fallback || fallback.closed) {
+          window.location.href = result.url;
+        }
       }
       setBusy(false);
     } catch (error) {
