@@ -609,7 +609,7 @@ function TierBadge({ tier }: { tier: ClientAccessTier }) {
 
 // ─── Drawer with tabs ─────────────────────────────────────────────────────
 
-type DrawerTab = "info" | "branding" | "access" | "media" | "deliveries" | "contracts" | "invoices" | "invites";
+type DrawerTab = "info" | "branding" | "access" | "media" | "deliveries" | "documents" | "contracts" | "invoices" | "invites";
 
 function WorkspaceDrawer({
   workspace,
