@@ -1,6 +1,7 @@
 import { DocumentDraftTools } from "@/components/app/document-draft-tools";
 import { ContractExportTools } from "@/components/app/contract-export-tools";
 import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
+import { InvoiceDocumentTools } from "@/components/app/invoice-document-tools";
 import { PaymentProgress } from "@/components/app/payment-progress";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -2209,6 +2210,13 @@ function InvoicesTab({
 
   return (
     <div className="space-y-3">
+      {q.isSuccess && (
+        <InvoiceDocumentTools
+          key={`doc-${workspaceId}`}
+          invoices={q.data ?? []}
+          clientName={clientName ?? null}
+        />
+      )}
       {q.isSuccess && <InvoiceExportTools key={workspaceId} invoices={q.data ?? []} />}
       <div className="flex justify-end">
         <button
