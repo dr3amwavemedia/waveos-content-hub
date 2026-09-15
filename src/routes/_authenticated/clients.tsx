@@ -2725,6 +2725,32 @@ function InvoicesTab({
                 {i.description && (
                   <p className="mt-1 text-xs text-muted-foreground">{i.description}</p>
                 )}
+                {invoiceItemsFromJson(i.line_items).length > 0 && (
+                  <ul className="mt-2 space-y-1 border-l border-border/60 pl-2">
+                    {invoiceItemsFromJson(i.line_items).map((item, index) => (
+                      <li key={index} className="text-[11px] text-muted-foreground">
+                        <span className="font-medium text-foreground">
+                          {item.title ?? item.description}
+                        </span>
+                        {item.title && <span> — {item.description}</span>}
+                        <span className="ml-1 whitespace-nowrap">
+                          {item.quantity} ×{" "}
+                          {(item.unitCents / 100).toLocaleString("en-US", {
+                            style: "currency",
+                            currency: i.currency,
+                          })}{" "}
+                          ={" "}
+                          <span className="font-medium text-foreground">
+                            {((item.quantity * item.unitCents) / 100).toLocaleString("en-US", {
+                              style: "currency",
+                              currency: i.currency,
+                            })}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 <div className="mt-1 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                   {i.amount_cents !== null && (
                     <span className="font-medium text-foreground">
