@@ -1,6 +1,7 @@
 import { businessFooterLine, businessProfile, type BusinessProfile } from "@/lib/business-profile";
 
 export interface InvoiceLineItem {
+  title?: string;
   description: string;
   quantity: number;
   unitCents: number;
@@ -90,7 +91,7 @@ export function invoiceDocumentHtml(
   const rows = items
     .map(
       (item) =>
-        `<tr><td>${esc(item.description)}</td><td class="num">${esc(item.quantity)}</td><td class="num">${esc(
+        `<tr><td>${item.title ? `<strong>${esc(item.title)}</strong><br>` : ""}${esc(item.description)}</td><td class="num">${esc(item.quantity)}</td><td class="num">${esc(
           formatMoney(item.unitCents, invoice.currency),
         )}</td><td class="num">${esc(formatMoney(Math.round(item.quantity * item.unitCents), invoice.currency))}</td></tr>`,
     )

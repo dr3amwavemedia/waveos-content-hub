@@ -28,6 +28,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { isValidHttpsUrl } from "@/lib/url-validation";
+import { invoiceItemsFromJson } from "@/lib/invoice-items";
 import { cn } from "@/lib/utils";
 import { STATUS_LABELS } from "@/lib/permissions";
 import type { Database } from "@/integrations/supabase/types";
@@ -746,6 +747,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
 }
 
 export function InvoiceCard({ invoice }: { invoice: Invoice }) {
+  const lineItems = invoiceItemsFromJson(invoice.line_items);
   const amount = formatMoney(invoice.amount_cents, invoice.currency);
   const due = formatDate(invoice.due_at);
   const issued = formatDate(invoice.issued_at);
@@ -790,6 +792,25 @@ export function InvoiceCard({ invoice }: { invoice: Invoice }) {
       </div>
 
       <PaymentProgress invoice={invoice} />
+      {lineItems.length > 0 && (
+        <div className="space-y-2 rounded-lg border border-border/60 p-3 text-sm">
+          <p className="font-medium text-foreground">Invoice items</p>
+          {lineItems.map((item, index) => (
+            <div key={index} className="flex justify-between gap-3 border-t border-border/50 pt-2">
+              <div>
+                {item.title && <p className="font-medium text-foreground">{item.title}</p>}
+                <p className="text-muted-foreground">{item.description}</p>
+                <p className="text-xs text-muted-foreground">
+                  {item.quantity} × {formatMoney(item.unitCents, invoice.currency)}
+                </p>
+              </div>
+              <span className="shrink-0 font-medium text-foreground">
+                {formatMoney(item.quantity * item.unitCents, invoice.currency)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
       <dl className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
         {issued && <MetaField label="Issued" value={issued} />}
         {due && <MetaField label="Due" value={due} icon={Clock} />}

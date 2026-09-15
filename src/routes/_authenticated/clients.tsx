@@ -88,6 +88,7 @@ type InvoiceListItem = Pick<
   | "payment_plan"
   | "billing_month"
   | "line_items"
+  | "published_at"
 >;
 type CrmAccountRow = Database["public"]["Tables"]["crm_accounts"]["Row"];
 type CrmContactRow = Pick<
@@ -2619,13 +2620,13 @@ function InvoicesTab({
   const q = useQuery({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
-      const invoiceColumns = "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month";
+      const invoiceColumns = "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at";
       const { data, error } = await supabase
         .from("client_invoices")
         .select(`${invoiceColumns},line_items`)
         .eq("workspace_id", workspaceId)
         .order("issued_at", { ascending: false });
-      if (error?.code === "42703") {
+      if (error && (error.code === "42703" || error.code === "PGRST204" || error.message.includes("line_items"))) {
         const fallback = await supabase
           .from("client_invoices")
           .select(invoiceColumns)
@@ -2848,35 +2849,45 @@ function InvoiceForm({
         throw new Error(URL_VALIDATION_MESSAGE);
       }
       if (!validInvoiceItems(items))
-        throw new Error("Check the item descriptions, quantities, and prices.");
+        throw new Error("Check the item titles, descriptions, quantities, and prices.");
       const cents = items.length
         ? invoiceItemTotal(items)
         : amount
           ? Math.round(parseFloat(amount) * 100)
           : null;
+      if (cents === null || !Number.isSafeInteger(cents) || cents <= 0)
+        throw new Error("Add a priced item or enter an invoice amount greater than zero.");
       const received =
         status === "paid" ? cents : amountPaid === "" ? null : Math.round(Number(amountPaid) * 100);
       const effectiveStatus =
         status !== "void" && status !== "draft" && cents != null && cents > 0 && received === cents
           ? "paid"
           : status;
+      let invoiceNumber = number.trim();
+      if (!invoice && !invoiceNumber) {
+        const generated = await supabase.rpc("next_invoice_number", { _workspace_id: workspaceId });
+        if (generated.error) throw generated.error;
+        if (!generated.data) throw new Error("Could not assign an invoice number.");
+        invoiceNumber = generated.data;
+      }
       const values = {
-        number: number.trim() || null,
+        number: invoiceNumber || null,
         description: description.trim() || null,
         amount_cents: cents,
-        ...(items.length ? { line_items: items as never } : {}),
+        line_items: items as never,
         amount_paid_cents: received ?? 0,
         payment_plan: paymentPlan,
         billing_month: paymentPlan === "monthly_retainer" ? `${billingMonth}-01` : null,
         currency: currency.trim().toUpperCase(),
         status: effectiveStatus,
+        published_at: effectiveStatus === "draft" ? null : invoice?.published_at ?? new Date().toISOString(),
         hosted_url: trimmedUrl || null,
         issued_at: dateInputToIso(issuedAt)!,
         due_at: dateInputToIso(dueAt),
         paid_at: effectiveStatus === "paid" ? (invoice?.paid_at ?? new Date().toISOString()) : null,
       };
 
-      let result: { data: { id: string } | null; error: { message: string } | null };
+      let result: { data: { id: string } | null; error: { message: string; code?: string } | null };
       if (invoice) {
         result = await supabase
           .from("client_invoices")
@@ -2899,6 +2910,10 @@ function InvoiceForm({
       }
       const { data, error } = result;
       if (error) {
+        if ((error.message.includes("line_items") || error.message.includes("published_at")) &&
+            (error.code === "PGRST204" || error.code === "42703" || error.message.includes("schema cache"))) {
+          throw new Error("Invoice items cannot be saved until the invoice line-items database migration is applied. Your draft is still on this screen.");
+        }
         if (error.message.includes("client_invoices_hosted_url_https")) {
           throw new Error(URL_VALIDATION_MESSAGE);
         }
@@ -2915,7 +2930,7 @@ function InvoiceForm({
       toast.success(invoice ? "Invoice updated." : "Invoice added.");
       onDone();
     },
-    onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
+    onError: (e: unknown) => toast.error(readableError(e, "Could not save the invoice.")),
   });
 
   const hostedUrlValid = !hostedUrl.trim() || isValidHttpsUrl(hostedUrl);
@@ -2923,7 +2938,7 @@ function InvoiceForm({
   const effectiveAmount = items.length ? (invoiceItemTotal(items) / 100).toFixed(2) : amount;
   const amountValid = items.length
     ? validInvoiceItems(items)
-    : !amount || (Number.isFinite(Number(amount)) && Number(amount) >= 0);
+    : Number.isFinite(Number(amount)) && Number(amount) > 0;
   const paidValid =
     status === "paid" ||
     amountPaid === "" ||
@@ -3000,8 +3015,22 @@ function InvoiceForm({
           {items.map((item, index) => (
             <div
               key={`${item.templateId ?? "manual"}-${index}`}
-              className="grid gap-2 sm:grid-cols-[1fr_80px_120px_auto]"
+              className="space-y-2 rounded-lg border border-border/60 p-2"
             >
+              <input
+                aria-label={`Item ${index + 1} title`}
+                value={item.title ?? ""}
+                onChange={(e) =>
+                  setItems((current) =>
+                    current.map((row, i) =>
+                      i === index ? { ...row, title: e.target.value } : row,
+                    ),
+                  )
+                }
+                placeholder="Item title"
+                className={inputCls}
+              />
+              <div className="grid gap-2 sm:grid-cols-[1fr_80px_120px_auto]">
               <input
                 aria-label={`Item ${index + 1} description`}
                 value={item.description}
@@ -3053,6 +3082,7 @@ function InvoiceForm({
               >
                 Remove
               </button>
+              </div>
             </div>
           ))}
           <p className="text-xs text-muted-foreground">
