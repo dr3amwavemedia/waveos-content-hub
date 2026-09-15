@@ -29,6 +29,20 @@
       "when": 1789452241122,
       "tag": "0003_invoice_line_items",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1789493410219,
+      "tag": "0004_contract_variable_snapshot",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1789493434751,
+      "tag": "0005_payment_ledger",
+      "breakpoints": true
     }
   ]
 }

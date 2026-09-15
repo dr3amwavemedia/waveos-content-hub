@@ -323,6 +323,7 @@ export type Database = {
       }
       client_contracts: {
         Row: {
+          contract_data: Json
           created_at: string
           created_by: string | null
           description: string | null
@@ -344,6 +345,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          contract_data?: Json
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -365,6 +367,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          contract_data?: Json
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -1849,6 +1852,72 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      payment_ledger: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          description: string | null
+          external_id: string
+          id: string
+          import_batch_id: string | null
+          invoice_id: string | null
+          kind: string
+          occurred_at: string
+          source: string
+          status: string
+          workspace_id: string | null
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          external_id: string
+          id?: string
+          import_batch_id?: string | null
+          invoice_id?: string | null
+          kind: string
+          occurred_at: string
+          source: string
+          status?: string
+          workspace_id?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          description?: string | null
+          external_id?: string
+          id?: string
+          import_batch_id?: string | null
+          invoice_id?: string | null
+          kind?: string
+          occurred_at?: string
+          source?: string
+          status?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_ledger_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "client_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_ledger_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       post_variants: {
         Row: {
