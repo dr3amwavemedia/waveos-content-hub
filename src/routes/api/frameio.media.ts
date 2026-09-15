@@ -56,7 +56,15 @@ export const Route = createFileRoute("/api/frameio/media")({
               .from("workspace_frameio_sources" as never)
               .update({ sync_status: "error", sync_error: message } as never)
               .eq("workspace_id", workspaceId);
-            return json({ error: message }, 502);
+            return json(
+              {
+                error:
+                  message === "frameio_reconnect_required" || message === "frameio_not_connected"
+                    ? "Frame.io needs to be reconnected. Reconnect Frame.io in Settings, then sync again."
+                    : message,
+              },
+              502,
+            );
           }
         }
 
