@@ -24,7 +24,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { useCurrentUser } from "@/hooks/use-waveos";
-import { accountDisplayName } from "@/lib/identity-display";
+
 import {
   ContractCard,
   InvoiceCard,
