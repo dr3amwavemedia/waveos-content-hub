@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { createSignwellDocument, signwellTestMode } from "@/lib/signwell.server";
 import { businessProfile, businessFooterLine } from "@/lib/business-profile";
+import { providerReturnOrigin } from "@/lib/provider-return-origin.server";
 
 const escapeHtml = (value: string) =>
   value.replace(
@@ -60,8 +60,7 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
       .eq("id", contract.workspace_id)
       .maybeSingle();
 
-    const requestUrl = new URL(getRequest().url);
-    const origin = `${requestUrl.protocol}//${requestUrl.host}`;
+    const origin = providerReturnOrigin();
     const document = await createSignwellDocument({
       name: contract.title,
       html: contractHtml({

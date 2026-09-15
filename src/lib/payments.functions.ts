@@ -1,13 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { stripeRequest, stripeIsTestMode, type StripeCheckoutSession } from "@/lib/stripe.server";
-
-function originFromRequest(): string {
-  const request = getRequest();
-  const url = new URL(request.url);
-  return `${url.protocol}//${url.host}`;
-}
+import { providerReturnOrigin } from "@/lib/provider-return-origin.server";
 
 /**
  * Create a Stripe Checkout session for one invoice.
@@ -66,7 +60,7 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
       }
     }
 
-    const origin = originFromRequest();
+    const origin = providerReturnOrigin();
     const session = await stripeRequest<StripeCheckoutSession>("/checkout/sessions", {
       body: {
         mode: "payment",
