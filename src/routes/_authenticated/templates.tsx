@@ -39,10 +39,10 @@ export const Route = createFileRoute("/_authenticated/templates")({
 function TemplatesPage() {
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-6">
-        <header>
-          <h1 className="text-xl font-semibold text-foreground">DOCUMENTS</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <div className="w-full space-y-8">
+        <header className="border-b border-border pb-6">
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Documents</h1>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Create priced invoice item collections and reusable contract or form templates. Editing
             saves a new version, so past documents stay traceable.
           </p>

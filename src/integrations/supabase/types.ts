@@ -323,6 +323,7 @@ export type Database = {
       }
       client_contracts: {
         Row: {
+          contract_data: Json
           created_at: string
           created_by: string | null
           description: string | null
@@ -344,6 +345,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          contract_data?: Json
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -365,6 +367,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          contract_data?: Json
           created_at?: string
           created_by?: string | null
           description?: string | null
