@@ -330,8 +330,12 @@ export type Database = {
           hosted_url: string
           id: string
           provider: string
+          provider_document_id: string | null
+          published_at: string | null
           sent_at: string | null
           signed_at: string | null
+          signer_email: string | null
+          signer_name: string | null
           status: string
           title: string
           updated_at: string
@@ -345,8 +349,12 @@ export type Database = {
           hosted_url: string
           id?: string
           provider?: string
+          provider_document_id?: string | null
+          published_at?: string | null
           sent_at?: string | null
           signed_at?: string | null
+          signer_email?: string | null
+          signer_name?: string | null
           status?: string
           title: string
           updated_at?: string
@@ -360,8 +368,12 @@ export type Database = {
           hosted_url?: string
           id?: string
           provider?: string
+          provider_document_id?: string | null
+          published_at?: string | null
           sent_at?: string | null
           signed_at?: string | null
+          signer_email?: string | null
+          signer_name?: string | null
           status?: string
           title?: string
           updated_at?: string
@@ -427,6 +439,114 @@ export type Database = {
           },
         ]
       }
+      client_form_responses: {
+        Row: {
+          answers: Json
+          form_id: string
+          form_version: number
+          id: string
+          submitted_at: string
+          submitted_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          answers?: Json
+          form_id: string
+          form_version?: number
+          id?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          answers?: Json
+          form_id?: string
+          form_version?: number
+          id?: string
+          submitted_at?: string
+          submitted_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_form_responses_form_id_fkey"
+            columns: ["form_id"]
+            isOneToOne: false
+            referencedRelation: "client_forms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_form_responses_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      client_forms: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          due_at: string | null
+          fields: Json
+          id: string
+          published_at: string | null
+          status: string
+          template_id: string | null
+          title: string
+          updated_at: string
+          version: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_at?: string | null
+          fields?: Json
+          id?: string
+          published_at?: string | null
+          status?: string
+          template_id?: string | null
+          title: string
+          updated_at?: string
+          version?: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          due_at?: string | null
+          fields?: Json
+          id?: string
+          published_at?: string | null
+          status?: string
+          template_id?: string | null
+          title?: string
+          updated_at?: string
+          version?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_forms_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "client_forms_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_invoices: {
         Row: {
           amount_cents: number | null
@@ -440,9 +560,15 @@ export type Database = {
           hosted_url: string | null
           id: string
           issued_at: string
+          last_reminder_at: string | null
           number: string | null
           paid_at: string | null
           payment_plan: string
+          payment_provider: string
+          provider_payment_id: string | null
+          provider_session_id: string | null
+          published_at: string | null
+          refund_flagged_at: string | null
           status: Database["public"]["Enums"]["invoice_status"]
           updated_at: string
           workspace_id: string
@@ -459,9 +585,15 @@ export type Database = {
           hosted_url?: string | null
           id?: string
           issued_at?: string
+          last_reminder_at?: string | null
           number?: string | null
           paid_at?: string | null
           payment_plan?: string
+          payment_provider?: string
+          provider_payment_id?: string | null
+          provider_session_id?: string | null
+          published_at?: string | null
+          refund_flagged_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           updated_at?: string
           workspace_id: string
@@ -478,9 +610,15 @@ export type Database = {
           hosted_url?: string | null
           id?: string
           issued_at?: string
+          last_reminder_at?: string | null
           number?: string | null
           paid_at?: string | null
           payment_plan?: string
+          payment_provider?: string
+          provider_payment_id?: string | null
+          provider_session_id?: string | null
+          published_at?: string | null
+          refund_flagged_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
           updated_at?: string
           workspace_id?: string
@@ -1027,6 +1165,164 @@ export type Database = {
           },
         ]
       }
+      delivery_payment_holds: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          reason: string | null
+          release_condition: string
+          released_at: string | null
+          released_by: string | null
+          scope: string
+          target_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          reason?: string | null
+          release_condition?: string
+          released_at?: string | null
+          released_by?: string | null
+          scope?: string
+          target_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          reason?: string | null
+          release_condition?: string
+          released_at?: string | null
+          released_by?: string | null
+          scope?: string
+          target_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_payment_holds_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_templates: {
+        Row: {
+          body: Json
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          kind: string
+          name: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          body?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          kind: string
+          name: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          body?: Json
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          kind?: string
+          name?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      expense_receipts: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          file_path: string | null
+          id: string
+          note: string | null
+          project_id: string | null
+          shared_at: string | null
+          shared_with_client: boolean
+          spent_on: string
+          updated_at: string
+          vendor: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          file_path?: string | null
+          id?: string
+          note?: string | null
+          project_id?: string | null
+          shared_at?: string | null
+          shared_with_client?: boolean
+          spent_on?: string
+          updated_at?: string
+          vendor: string
+          workspace_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          file_path?: string | null
+          id?: string
+          note?: string | null
+          project_id?: string | null
+          shared_at?: string | null
+          shared_with_client?: boolean
+          spent_on?: string
+          updated_at?: string
+          vendor?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_receipts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_receipts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       external_media_connections: {
         Row: {
           access_token_encrypted: string
@@ -1250,6 +1546,32 @@ export type Database = {
             foreignKeyName: "invites_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_number_counters: {
+        Row: {
+          last_value: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          last_value?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          last_value?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_number_counters_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -2962,6 +3284,14 @@ export type Database = {
         Args: { _confirmation: string; _workspace_id: string }
         Returns: string
       }
+      deliverables_unlocked: {
+        Args: {
+          _delivery_id?: string
+          _project_id?: string
+          _workspace_id: string
+        }
+        Returns: boolean
+      }
       ensure_production_checklist: {
         Args: { _project_id: string }
         Returns: number
@@ -3095,6 +3425,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      next_invoice_number: { Args: { _workspace_id: string }; Returns: string }
       notify_delivery_revisions_updated: {
         Args: { _delivery_id: string }
         Returns: number
