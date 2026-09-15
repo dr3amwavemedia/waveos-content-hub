@@ -1,4 +1,5 @@
 import { DocumentDraftTools } from "@/components/app/document-draft-tools";
+import { DocumentsTab } from "@/components/documents/documents-tab";
 import { ContractExportTools } from "@/components/app/contract-export-tools";
 import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
 import { InvoiceDocumentTools } from "@/components/app/invoice-document-tools";
@@ -608,7 +609,7 @@ function TierBadge({ tier }: { tier: ClientAccessTier }) {
 
 // ─── Drawer with tabs ─────────────────────────────────────────────────────
 
-type DrawerTab = "info" | "branding" | "access" | "media" | "deliveries" | "contracts" | "invoices" | "invites";
+type DrawerTab = "info" | "branding" | "access" | "media" | "deliveries" | "documents" | "contracts" | "invoices" | "invites";
 
 function WorkspaceDrawer({
   workspace,
@@ -702,7 +703,7 @@ function WorkspaceDrawer({
       </div>
 
       <div className="mb-4 grid grid-cols-2 gap-1 border-b border-border sm:grid-cols-4">
-        {(["info", "branding", "access", "media", "deliveries", "contracts", "invoices", "invites"] as const).map((t) => (
+        {(["info", "branding", "access", "media", "deliveries", "documents", "contracts", "invoices", "invites"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -732,6 +733,14 @@ function WorkspaceDrawer({
       )}
       {tab === "media" && <WorkspaceMediaSourcesTab workspaceId={workspace.id} />}
       {tab === "deliveries" && <DeliveriesTab workspaceId={workspace.id} />}
+      {tab === "documents" && (
+        <DocumentsTab
+          workspaceId={workspace.id}
+          clientName={workspace.name}
+          invoicesSlot={<InvoicesTab workspaceId={workspace.id} clientName={workspace.name} />}
+          contractsSlot={<ContractsTab workspaceId={workspace.id} />}
+        />
+      )}
       {tab === "contracts" && <ContractsTab workspaceId={workspace.id} />}
       {tab === "invoices" && (
         <InvoicesTab workspaceId={workspace.id} clientName={workspace.name} />

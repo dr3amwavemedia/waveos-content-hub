@@ -24,6 +24,7 @@ import {
   BriefcaseBusiness,
   Mail,
   Camera,
+  FileStack,
   QrCode,
   FolderKanban,
 } from "lucide-react";
@@ -106,6 +107,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true, ownerOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
+  { to: "/templates", label: "Template Library", icon: FileStack, staffOnly: true, ownerOnly: true },
   { to: "/tools", label: "Tools", icon: QrCode, staffOnly: true, ownerOnly: true },
   { to: "/admin", label: "Staff", icon: ShieldCheck, staffOnly: true, ownerOnly: true },
 ];
