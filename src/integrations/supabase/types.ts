@@ -323,7 +323,6 @@ export type Database = {
       }
       client_contracts: {
         Row: {
-          contract_data: Json
           created_at: string
           created_by: string | null
           description: string | null
@@ -345,7 +344,6 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
-          contract_data?: Json
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -367,7 +365,6 @@ export type Database = {
           workspace_id: string
         }
         Update: {
-          contract_data?: Json
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -652,57 +649,6 @@ export type Database = {
           },
         ]
       }
-      payment_ledger: {
-        Row: {
-          id: string;
-          source: "stripe" | "bloom_csv" | "invoice_backfill";
-          external_id: string;
-          import_batch_id: string | null;
-          invoice_id: string | null;
-          workspace_id: string | null;
-          kind: "payment" | "refund" | "invoice" | "expense";
-          amount_cents: number;
-          currency: string;
-          occurred_at: string;
-          description: string | null;
-          status: "posted" | "unmatched";
-          created_by: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          source: "stripe" | "bloom_csv" | "invoice_backfill";
-          external_id: string;
-          import_batch_id?: string | null;
-          invoice_id?: string | null;
-          workspace_id?: string | null;
-          kind: "payment" | "refund" | "invoice" | "expense";
-          amount_cents: number;
-          currency?: string;
-          occurred_at: string;
-          description?: string | null;
-          status?: "posted" | "unmatched";
-          created_by?: string | null;
-          created_at?: string;
-        };
-        Update: { status?: "posted" | "unmatched" };
-        Relationships: [
-          {
-            foreignKeyName: "payment_ledger_invoice_id_fkey";
-            columns: ["invoice_id"];
-            isOneToOne: false;
-            referencedRelation: "client_invoices";
-            referencedColumns: ["id"];
-          },
-          {
-            foreignKeyName: "payment_ledger_workspace_id_fkey";
-            columns: ["workspace_id"];
-            isOneToOne: false;
-            referencedRelation: "workspaces";
-            referencedColumns: ["id"];
-          },
-        ];
-      };
       client_request_internal_notes: {
         Row: {
           body: string
