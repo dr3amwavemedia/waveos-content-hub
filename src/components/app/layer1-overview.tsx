@@ -2,6 +2,8 @@ import { ContractExportTools } from "./contract-export-tools";
 import { ExpandableSection } from "./expandable-section";
 import { InvoiceExportTools } from "./invoice-export-tools";
 import { PaymentProgress } from "./payment-progress";
+import { PayInvoiceButton } from "./pay-invoice-button";
+
 import { useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
