@@ -8,10 +8,16 @@ import { cn } from "@/lib/utils";
 import { errorMessage } from "@/lib/error-message";
 import { businessProfile } from "@/lib/business-profile";
 import { invoiceDocumentHtml } from "@/lib/invoice-document";
+import {
+  invoiceItemTotal,
+  moneyInputToCents,
+  validInvoiceItems,
+  invoiceItemsFromJson,
+} from "@/lib/invoice-items";
 import { useTemplates, type TemplateKind, type TemplateRow } from "./template-picker";
 
 const KINDS: Array<{ key: TemplateKind; label: string }> = [
-  { key: "invoice", label: "Invoice templates" },
+  { key: "invoice", label: "Invoice item templates" },
   { key: "contract", label: "Contract templates" },
   { key: "form", label: "Form templates" },
 ];
@@ -19,7 +25,13 @@ const KINDS: Array<{ key: TemplateKind; label: string }> = [
 const inputCls =
   "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
 
-type Body = { title?: string; description?: string; content?: string; fields?: Array<{ label: string; type: string }> };
+type Body = {
+  title?: string;
+  description?: string;
+  content?: string;
+  items?: unknown;
+  fields?: Array<{ label: string; type: string }>;
+};
 
 /**
  * Owner-only reusable document templates. Editing an existing template bumps
@@ -36,7 +48,10 @@ export function TemplateLibrary() {
 
   const archive = useMutation({
     mutationFn: async ({ id, active }: { id: string; active: boolean }) => {
-      const { error } = await supabase.from("document_templates").update({ is_active: active }).eq("id", id);
+      const { error } = await supabase
+        .from("document_templates")
+        .update({ is_active: active })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: refresh,
@@ -52,6 +67,7 @@ export function TemplateLibrary() {
     }
     win.opener = null;
     if (template.kind === "invoice") {
+      const items = invoiceItemsFromJson(body.items);
       win.document.write(
         invoiceDocumentHtml(
           {
@@ -59,7 +75,7 @@ export function TemplateLibrary() {
             number: "DWM-PREVIEW",
             description: body.description ?? template.description ?? null,
             currency: "USD",
-            amountCents: 100000,
+            amountCents: items.length ? invoiceItemTotal(items) : 0,
             amountPaidCents: 0,
             status: "draft",
             issuedAt: new Date().toISOString(),
@@ -67,6 +83,7 @@ export function TemplateLibrary() {
             paidAt: null,
             billTo: { name: "Sample client" },
             projectReference: null,
+            lineItems: items,
             isDraft: true,
           },
           { portalUrl: `${window.location.origin}/home` },
@@ -114,7 +131,11 @@ export function TemplateLibrary() {
           </button>
         ))}
         <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+          />
           Show archived
         </label>
         <button
@@ -123,12 +144,17 @@ export function TemplateLibrary() {
           className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
         >
           {editing === "new" ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-          {editing === "new" ? "Cancel" : "New template"}
+          {editing === "new"
+            ? "Cancel"
+            : kind === "invoice"
+              ? "New invoice item template"
+              : "New document template"}
         </button>
       </div>
 
       {editing && (
         <TemplateEditor
+          key={editing === "new" ? `new-${kind}` : editing.id}
           kind={kind}
           template={editing === "new" ? null : editing}
           onDone={async () => {
@@ -216,14 +242,44 @@ function TemplateEditor({
   const [description, setDescription] = useState(template?.description ?? "");
   const [content, setContent] = useState(body.content ?? "");
   const [questions, setQuestions] = useState((body.fields ?? []).map((f) => f.label).join("\n"));
+  const existingItems = invoiceItemsFromJson(body.items);
+  const [items, setItems] = useState(() =>
+    existingItems.length
+      ? existingItems.map((item) => ({
+          description: item.description,
+          quantity: String(item.quantity),
+          price: (item.unitCents / 100).toFixed(2),
+        }))
+      : [{ description: "", quantity: "1", price: "0.00" }],
+  );
 
   const save = useMutation({
     mutationFn: async () => {
       if (!name.trim()) throw new Error("Give the template a name.");
+      const pricedItems =
+        kind === "invoice"
+          ? items.map((item) => ({
+              description: item.description.trim(),
+              quantity: Number(item.quantity),
+              unitCents: moneyInputToCents(item.price),
+            }))
+          : [];
+      if (
+        kind === "invoice" &&
+        (pricedItems.length === 0 ||
+          pricedItems.some((item) => item.unitCents === null) ||
+          !validInvoiceItems(
+            pricedItems.map((item) => ({ ...item, unitCents: item.unitCents ?? -1 })),
+          ))
+      )
+        throw new Error(
+          "Add at least one item with a description, whole-number quantity, and valid price.",
+        );
       const nextBody: Body = {
         title: name.trim(),
         description: description.trim() || undefined,
         content: content.trim() || undefined,
+        ...(kind === "invoice" ? { items: pricedItems } : {}),
         ...(kind === "form"
           ? {
               fields: questions
@@ -272,14 +328,114 @@ function TemplateEditor({
       }}
       className="space-y-3 rounded-xl border border-primary/25 bg-primary/5 p-4"
     >
-      <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Template name" className={inputCls} />
+      <input
+        required
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder={kind === "invoice" ? "Item collection name" : "Template name"}
+        className={inputCls}
+      />
       <input
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Short description"
         className={inputCls}
       />
-      {kind === "form" ? (
+      {kind === "invoice" ? (
+        <div className="space-y-3">
+          <p className="text-sm font-medium text-foreground">Priced invoice items</p>
+          <p className="text-xs text-muted-foreground">
+            Each item can be clicked and added to a client's invoice. Prices are copied into that
+            invoice when selected.
+          </p>
+          {items.map((item, index) => (
+            <div
+              key={index}
+              className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-[1fr_90px_130px_auto]"
+            >
+              <label className="text-xs text-muted-foreground">
+                Item description
+                <input
+                  required
+                  value={item.description}
+                  onChange={(e) =>
+                    setItems((current) =>
+                      current.map((row, i) =>
+                        i === index ? { ...row, description: e.target.value } : row,
+                      ),
+                    )
+                  }
+                  className={inputCls}
+                  placeholder="Wedding video coverage"
+                />
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Qty
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={item.quantity}
+                  onChange={(e) =>
+                    setItems((current) =>
+                      current.map((row, i) =>
+                        i === index ? { ...row, quantity: e.target.value } : row,
+                      ),
+                    )
+                  }
+                  className={inputCls}
+                />
+              </label>
+              <label className="text-xs text-muted-foreground">
+                Price (USD)
+                <input
+                  required
+                  inputMode="decimal"
+                  value={item.price}
+                  onChange={(e) =>
+                    setItems((current) =>
+                      current.map((row, i) =>
+                        i === index ? { ...row, price: e.target.value } : row,
+                      ),
+                    )
+                  }
+                  className={inputCls}
+                  placeholder="1250.00"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
+                className="min-h-11 rounded-lg border border-border px-3 text-sm"
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setItems((current) => [...current, { description: "", quantity: "1", price: "0.00" }])
+            }
+            className="min-h-11 rounded-lg border border-border px-3 text-sm"
+          >
+            + Add priced item
+          </button>
+          {items.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Template total:{" "}
+              {new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
+                items.reduce(
+                  (sum, item) =>
+                    sum + Number(item.quantity || 0) * (moneyInputToCents(item.price) ?? 0),
+                  0,
+                ) / 100,
+              )}
+            </p>
+          )}
+        </div>
+      ) : kind === "form" ? (
         <textarea
           value={questions}
           onChange={(e) => setQuestions(e.target.value)}
@@ -290,7 +446,7 @@ function TemplateEditor({
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder={kind === "invoice" ? "Default line-item wording and terms" : "Approved contract wording"}
+          placeholder="Approved contract wording"
           className="min-h-40 w-full rounded-lg border border-border bg-background p-3 text-sm outline-none focus:border-primary"
         />
       )}
@@ -300,7 +456,7 @@ function TemplateEditor({
         className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
       >
         {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-        {template ? `Save as version ${template.version + 1}` : "Create template"}
+          {template ? `Save as version ${template.version + 1}` : kind === "invoice" ? "Create priced items" : "Create document template"}
       </button>
     </form>
   );

@@ -327,7 +327,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           expires_at: string | null
-          hosted_url: string
+          hosted_url: string | null
           id: string
           provider: string
           provider_document_id: string | null
@@ -336,6 +336,8 @@ export type Database = {
           signed_at: string | null
           signer_email: string | null
           signer_name: string | null
+          source_template_id: string | null
+          source_template_version: number | null
           status: string
           title: string
           updated_at: string
@@ -346,7 +348,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           expires_at?: string | null
-          hosted_url: string
+          hosted_url?: string | null
           id?: string
           provider?: string
           provider_document_id?: string | null
@@ -355,6 +357,8 @@ export type Database = {
           signed_at?: string | null
           signer_email?: string | null
           signer_name?: string | null
+          source_template_id?: string | null
+          source_template_version?: number | null
           status?: string
           title: string
           updated_at?: string
@@ -365,7 +369,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           expires_at?: string | null
-          hosted_url?: string
+          hosted_url?: string | null
           id?: string
           provider?: string
           provider_document_id?: string | null
@@ -374,6 +378,8 @@ export type Database = {
           signed_at?: string | null
           signer_email?: string | null
           signer_name?: string | null
+          source_template_id?: string | null
+          source_template_version?: number | null
           status?: string
           title?: string
           updated_at?: string
@@ -561,6 +567,7 @@ export type Database = {
           id: string
           issued_at: string
           last_reminder_at: string | null
+          line_items: Json
           number: string | null
           paid_at: string | null
           payment_plan: string
@@ -586,6 +593,7 @@ export type Database = {
           id?: string
           issued_at?: string
           last_reminder_at?: string | null
+          line_items?: Json
           number?: string | null
           paid_at?: string | null
           payment_plan?: string
@@ -611,6 +619,7 @@ export type Database = {
           id?: string
           issued_at?: string
           last_reminder_at?: string | null
+          line_items?: Json
           number?: string | null
           paid_at?: string | null
           payment_plan?: string

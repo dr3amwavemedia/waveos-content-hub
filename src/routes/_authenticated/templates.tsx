@@ -18,13 +18,13 @@ export const Route = createFileRoute("/_authenticated/templates")({
   component: TemplatesPage,
   head: () => ({
     meta: [
-      { title: "Template Library — WaveOS" },
+      { title: "DOCUMENTS — WaveOS" },
       {
         name: "description",
         content:
           "Create, preview, version and archive reusable invoice, contract and form templates for Dream Wave Media clients.",
       },
-      { property: "og:title", content: "Template Library — WaveOS" },
+      { property: "og:title", content: "DOCUMENTS — WaveOS" },
       {
         property: "og:description",
         content: "Reusable invoice, contract and form templates for Dream Wave Media.",
@@ -41,10 +41,10 @@ function TemplatesPage() {
     <AppShell>
       <div className="mx-auto w-full max-w-5xl space-y-6 p-4 sm:p-6">
         <header>
-          <h1 className="text-xl font-semibold text-foreground">Template Library</h1>
+          <h1 className="text-xl font-semibold text-foreground">DOCUMENTS</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Reusable invoice, contract and form templates. Editing saves a new version, so past
-            documents stay traceable.
+            Create priced invoice item collections and reusable contract or form templates. Editing
+            saves a new version, so past documents stay traceable.
           </p>
         </header>
         <TemplateLibrary />

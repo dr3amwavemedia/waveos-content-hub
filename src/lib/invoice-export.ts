@@ -9,6 +9,7 @@ export type ExportInvoice = {
   issued_at: string;
   due_at: string | null;
   paid_at: string | null;
+  line_items?: unknown;
 };
 const columns = [
   "Record ID",
