@@ -13,6 +13,7 @@ export function validInvoiceItems(items: InvoiceLineItem[]): boolean {
   return (
     items.every(
       (item) =>
+        (item.title === undefined || item.title.trim().length > 0) &&
         item.description.trim().length > 0 &&
         Number.isSafeInteger(item.quantity) &&
         item.quantity > 0 &&
@@ -28,9 +29,11 @@ export function invoiceItemsFromJson(value: unknown): DraftInvoiceItem[] {
     if (!raw || typeof raw !== "object") return [];
     const item = raw as Record<string, unknown>;
     const description = String(item.description ?? "").trim();
+    const title = typeof item.title === "string" ? item.title.trim() : undefined;
     const quantity = Number(item.quantity);
     const unitCents = Number(item.unitCents);
     const normalized: DraftInvoiceItem = {
+      ...(title ? { title } : {}),
       description,
       quantity,
       unitCents,

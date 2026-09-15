@@ -1,6 +1,11 @@
 -- Prepared for isolated staging first. Existing invoice rows keep an empty item list.
 ALTER TABLE public.client_invoices
-  ADD COLUMN IF NOT EXISTS line_items jsonb NOT NULL DEFAULT '[]'::jsonb;
+  ADD COLUMN IF NOT EXISTS line_items jsonb NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS published_at timestamptz;
+
+UPDATE public.client_invoices
+SET published_at = COALESCE(published_at, issued_at, created_at)
+WHERE status <> 'draft' AND published_at IS NULL;
 
 CREATE OR REPLACE FUNCTION public.invoice_line_items_total(_items jsonb)
 RETURNS bigint
@@ -53,6 +58,7 @@ ALTER TABLE public.client_invoices
     OR amount_cents = public.invoice_line_items_total(line_items)
   );
 
+-- Drafts remain owner-only; clients see an invoice only after publication.
 DROP POLICY IF EXISTS "Client members view their invoices" ON public.client_invoices;
 CREATE POLICY "Client members view their invoices"
   ON public.client_invoices FOR SELECT TO authenticated
@@ -65,15 +71,3 @@ CREATE POLICY "Client members view their invoices"
       AND status <> 'draft'
     )
   );
-
--- A template-based contract begins as a private draft without an external URL.
-ALTER TABLE public.client_contracts
-  ALTER COLUMN hosted_url DROP NOT NULL,
-  ADD COLUMN IF NOT EXISTS source_template_id uuid REFERENCES public.document_templates(id) ON DELETE SET NULL,
-  ADD COLUMN IF NOT EXISTS source_template_version integer;
-
-ALTER TABLE public.client_contracts
-  DROP CONSTRAINT IF EXISTS client_contracts_external_link_when_sent;
-ALTER TABLE public.client_contracts
-  ADD CONSTRAINT client_contracts_external_link_when_sent
-  CHECK (status = 'draft' OR provider NOT IN ('bloom', 'other') OR hosted_url IS NOT NULL);

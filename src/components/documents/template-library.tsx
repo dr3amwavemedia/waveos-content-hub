@@ -246,11 +246,12 @@ function TemplateEditor({
   const [items, setItems] = useState(() =>
     existingItems.length
       ? existingItems.map((item) => ({
+          title: item.title ?? item.description,
           description: item.description,
           quantity: String(item.quantity),
           price: (item.unitCents / 100).toFixed(2),
         }))
-      : [{ description: "", quantity: "1", price: "0.00" }],
+      : [{ title: "", description: "", quantity: "1", price: "0.00" }],
   );
 
   const save = useMutation({
@@ -259,6 +260,7 @@ function TemplateEditor({
       const pricedItems =
         kind === "invoice"
           ? items.map((item) => ({
+              title: item.title.trim(),
               description: item.description.trim(),
               quantity: Number(item.quantity),
               unitCents: moneyInputToCents(item.price),
@@ -273,7 +275,7 @@ function TemplateEditor({
           ))
       )
         throw new Error(
-          "Add at least one item with a description, whole-number quantity, and valid price.",
+          "Add at least one item with a title, description, whole-number quantity, and valid price.",
         );
       const nextBody: Body = {
         title: name.trim(),
@@ -351,8 +353,24 @@ function TemplateEditor({
           {items.map((item, index) => (
             <div
               key={index}
-              className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-[1fr_90px_130px_auto]"
+              className="grid gap-2 rounded-lg border border-border p-3 sm:grid-cols-[1fr_1fr_90px_130px_auto]"
             >
+              <label className="text-xs text-muted-foreground">
+                Item title
+                <input
+                  required
+                  value={item.title}
+                  onChange={(e) =>
+                    setItems((current) =>
+                      current.map((row, i) =>
+                        i === index ? { ...row, title: e.target.value } : row,
+                      ),
+                    )
+                  }
+                  className={inputCls}
+                  placeholder="Video coverage"
+                />
+              </label>
               <label className="text-xs text-muted-foreground">
                 Item description
                 <input
@@ -366,7 +384,7 @@ function TemplateEditor({
                     )
                   }
                   className={inputCls}
-                  placeholder="Wedding video coverage"
+                  placeholder="Coverage with camera operator and tripod"
                 />
               </label>
               <label className="text-xs text-muted-foreground">
@@ -416,7 +434,7 @@ function TemplateEditor({
           <button
             type="button"
             onClick={() =>
-              setItems((current) => [...current, { description: "", quantity: "1", price: "0.00" }])
+              setItems((current) => [...current, { title: "", description: "", quantity: "1", price: "0.00" }])
             }
             className="min-h-11 rounded-lg border border-border px-3 text-sm"
           >
