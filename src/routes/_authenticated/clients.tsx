@@ -732,7 +732,9 @@ function WorkspaceDrawer({
       {tab === "media" && <WorkspaceMediaSourcesTab workspaceId={workspace.id} />}
       {tab === "deliveries" && <DeliveriesTab workspaceId={workspace.id} />}
       {tab === "contracts" && <ContractsTab workspaceId={workspace.id} />}
-      {tab === "invoices" && <InvoicesTab workspaceId={workspace.id} />}
+      {tab === "invoices" && (
+        <InvoicesTab workspaceId={workspace.id} clientName={workspace.name} />
+      )}
       {tab === "invites" && <InvitesTab workspace={workspace} onNewInvite={onNewInvite} />}
     </ModalShell>
   );
