@@ -1,6 +1,7 @@
 import { DocumentDraftTools } from "@/components/app/document-draft-tools";
 import { ContractExportTools } from "@/components/app/contract-export-tools";
 import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
+import { InvoiceDocumentTools } from "@/components/app/invoice-document-tools";
 import { PaymentProgress } from "@/components/app/payment-progress";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -732,7 +733,9 @@ function WorkspaceDrawer({
       {tab === "media" && <WorkspaceMediaSourcesTab workspaceId={workspace.id} />}
       {tab === "deliveries" && <DeliveriesTab workspaceId={workspace.id} />}
       {tab === "contracts" && <ContractsTab workspaceId={workspace.id} />}
-      {tab === "invoices" && <InvoicesTab workspaceId={workspace.id} />}
+      {tab === "invoices" && (
+        <InvoicesTab workspaceId={workspace.id} clientName={workspace.name} />
+      )}
       {tab === "invites" && <InvitesTab workspace={workspace} onNewInvite={onNewInvite} />}
     </ModalShell>
   );
@@ -2156,7 +2159,13 @@ function ContractsTab({ workspaceId }: { workspaceId: string }) {
 
 // ─── Invoices tab ─────────────────────────────────────────────────────────
 
-function InvoicesTab({ workspaceId }: { workspaceId: string }) {
+function InvoicesTab({
+  workspaceId,
+  clientName,
+}: {
+  workspaceId: string;
+  clientName?: string | null;
+}) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceListItem | null>(null);
@@ -2201,6 +2210,13 @@ function InvoicesTab({ workspaceId }: { workspaceId: string }) {
 
   return (
     <div className="space-y-3">
+      {q.isSuccess && (
+        <InvoiceDocumentTools
+          key={`doc-${workspaceId}`}
+          invoices={q.data ?? []}
+          clientName={clientName ?? null}
+        />
+      )}
       {q.isSuccess && <InvoiceExportTools key={workspaceId} invoices={q.data ?? []} />}
       <div className="flex justify-end">
         <button
