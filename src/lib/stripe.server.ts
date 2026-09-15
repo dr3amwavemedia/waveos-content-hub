@@ -6,14 +6,14 @@
 const STRIPE_API = "https://api.stripe.com/v1";
 
 function stripeKey(): string {
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = process.env.WAVEOS_STRIPE_TEST_SECRET_KEY;
   if (!key) throw new Error("stripe_not_configured");
   return key;
 }
 
 /** True when the configured key is a test-mode key. */
 export function stripeIsTestMode(): boolean {
-  return (process.env.STRIPE_SECRET_KEY ?? "").startsWith("sk_test_");
+  return (process.env.WAVEOS_STRIPE_TEST_SECRET_KEY ?? "").startsWith("sk_test_");
 }
 
 function encodeForm(value: unknown, prefix = "", out: string[] = []): string[] {
