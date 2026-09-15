@@ -456,7 +456,7 @@ function TemplateEditor({
         className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
       >
         {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-        {template ? `Save as version ${template.version + 1}` : "Create template"}
+          {template ? `Save as version ${template.version + 1}` : kind === "invoice" ? "Create priced items" : "Create document template"}
       </button>
     </form>
   );

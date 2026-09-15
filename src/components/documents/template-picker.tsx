@@ -61,7 +61,7 @@ export function TemplatePicker({
             <Loader2 className="m-3 h-4 w-4 animate-spin text-muted-foreground" />
           ) : (q.data ?? []).length === 0 ? (
             <p className="p-3 text-xs text-muted-foreground">
-              No {kind} templates yet. Create one in the Template Library.
+              No {kind} templates yet. Create one in DOCUMENTS.
             </p>
           ) : (
             <ul className="max-h-64 space-y-1 overflow-auto">
