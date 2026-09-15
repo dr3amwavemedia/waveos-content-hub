@@ -56,14 +56,38 @@ export const Route = createFileRoute("/api/frameio/media")({
               .from("workspace_frameio_sources" as never)
               .update({ sync_status: "error", sync_error: message } as never)
               .eq("workspace_id", workspaceId);
-            return json({ error: message }, 502);
+            return json(
+              {
+                error:
+                  message === "frameio_reconnect_required" || message === "frameio_not_connected"
+                    ? "Frame.io needs to be reconnected. Reconnect Frame.io in Settings, then sync again."
+                    : message,
+              },
+              502,
+            );
           }
         }
 
         if (!source.frameio_account_id || !source.frameio_share_id || source.sync_status !== "ready")
           return json({ error: "frameio_share_not_ready" }, 409);
         const { listFrameioShareFiles } = await import("@/lib/frameio.server");
-        const allFiles = await listFrameioShareFiles(source.frameio_account_id, source.frameio_share_id);
+        let allFiles;
+        try {
+          allFiles = await listFrameioShareFiles(source.frameio_account_id, source.frameio_share_id);
+        } catch (error) {
+          const code = error instanceof Error ? error.message : "frameio_request_failed";
+          if (code === "frameio_reconnect_required" || code === "frameio_not_connected") {
+            await supabaseAdmin
+              .from("workspace_frameio_sources" as never)
+              .update({ sync_status: "error", sync_error: code } as never)
+              .eq("workspace_id", workspaceId);
+            return json(
+              { error: "Frame.io needs to be reconnected. Ask a Dream Wave owner to reconnect Frame.io in Settings." },
+              409,
+            );
+          }
+          return json({ error: "Frame.io could not be reached. Try again in a moment." }, 502);
+        }
         const query = typeof body.query === "string" ? body.query.trim().toLowerCase() : "";
         const files = query ? allFiles.filter((file) => file.name.toLowerCase().includes(query)) : allFiles;
 
