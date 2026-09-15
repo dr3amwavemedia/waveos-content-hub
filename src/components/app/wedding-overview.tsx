@@ -23,7 +23,7 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/components/app/workspace-context";
-import { useCurrentUser } from "@/hooks/use-waveos";
+
 
 import {
   ContractCard,
@@ -54,7 +54,7 @@ const externalDb = supabase as unknown as {
 
 export function WeddingOverview() {
   const { activeWorkspace } = useWorkspace();
-  const { data: user } = useCurrentUser();
+  
   const wsId = activeWorkspace?.id;
 
   const workspaceQ = useWeddingWorkspace(wsId);
