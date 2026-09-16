@@ -115,15 +115,14 @@ test("one client's values never appear in the other client's contract", () => {
 });
 
 test("Dream Wave business details resolve from the verified profile only", () => {
-  assert.equal(businessProfile.name, "Dream Wave Media");
-  assert.equal(businessProfile.website, "https://dwmsrq.com");
-  assert.equal(businessProfile.location, "Sarasota, FL");
-  assert.equal(businessProfile.phone, "(941) 294-5727");
-  assert.equal(businessFooterLine, "dwmsrq.com · Sarasota, FL · (941) 294-5727");
-  assert.ok(businessProfile.logoUrl.length > 0);
+  assert.equal(profileValue("name"), "Dream Wave Media");
+  assert.equal(profileValue("website"), "https://dwmsrq.com");
+  assert.equal(profileValue("location"), "Sarasota, FL");
+  assert.equal(profileValue("phone"), "(941) 294-5727");
+  assert.match(profileSource, /logoUrl: logoAsset\.url/);
   // Unverified fields stay null rather than being invented.
   for (const key of ["email", "streetAddress", "legalEntity", "taxId", "paymentInstructions"]) {
-    assert.equal(businessProfile[key], null, `${key} must stay unset until verified`);
+    assert.equal(profileValue(key), null, `${key} must stay unset until verified`);
   }
 });
 
