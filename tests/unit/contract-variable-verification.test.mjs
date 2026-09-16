@@ -13,7 +13,14 @@ import {
   renderContract,
   todayLocalDate,
 } from "../../src/lib/contract-variables.ts";
-import { businessFooterLine, businessProfile } from "../../src/lib/business-profile.ts";
+import { readFileSync } from "node:fs";
+
+// business-profile.ts imports a bundler-aliased asset, so read its literals here.
+const profileSource = readFileSync("src/lib/business-profile.ts", "utf8");
+const profileValue = (key) => {
+  const match = profileSource.match(new RegExp(`\\n  ${key}: (null|"([^"]*)")`));
+  return match ? (match[1] === "null" ? null : match[2]) : undefined;
+};
 
 const TEMPLATE = `MEDIA SERVICES AGREEMENT
 Date: {{today_date}}
