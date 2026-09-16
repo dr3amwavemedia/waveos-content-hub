@@ -126,3 +126,34 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
 
     return { url: session.url, testMode: stripeIsTestMode() };
   });
+
+/**
+ * Authorized read of one invoice's payment state, used by the return page while
+ * it waits for the verified Stripe webhook. RLS scopes the read to the client
+ * who owns the invoice (or Dream Wave staff); nothing here changes any state.
+ */
+export const getInvoicePaymentState = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { invoiceId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: invoice, error } = await context.supabase
+      .from("client_invoices")
+      .select("id,number,status,amount_cents,amount_paid_cents,currency,paid_at,published_at")
+      .eq("id", data.invoiceId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!invoice) throw new Error("This invoice is not available on your account.");
+    const total = invoice.amount_cents ?? 0;
+    const paid = invoice.amount_paid_cents ?? 0;
+    return {
+      id: invoice.id,
+      number: invoice.number,
+      status: invoice.status,
+      currency: invoice.currency ?? "usd",
+      amountCents: total,
+      paidCents: paid,
+      dueCents: Math.max(total - paid, 0),
+      paidAt: invoice.paid_at,
+      confirmed: invoice.status === "paid" || paid > 0,
+    };
+  });
