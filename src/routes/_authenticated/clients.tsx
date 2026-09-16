@@ -73,6 +73,9 @@ type ContractRow = {
   expires_at: string | null;
   contract_data: Database["public"]["Tables"]["client_contracts"]["Row"]["contract_data"];
   signer_email: string | null;
+  signer_name: string | null;
+  published_at: string | null;
+  provider_document_id: string | null;
   source_template_id: string | null;
   source_template_version: number | null;
 };
