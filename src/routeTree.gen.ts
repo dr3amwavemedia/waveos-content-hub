@@ -45,6 +45,7 @@ import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDeliveriesRouteImport } from './routes/_authenticated/deliveries'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated/create'
+import { Route as AuthenticatedContractReturnRouteImport } from './routes/_authenticated/contract-return'
 import { Route as AuthenticatedContentRouteImport } from './routes/_authenticated/content'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
@@ -260,6 +261,12 @@ const AuthenticatedCreateRoute = AuthenticatedCreateRouteImport.update({
   path: '/create',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedContractReturnRoute =
+  AuthenticatedContractReturnRouteImport.update({
+    id: '/contract-return',
+    path: '/contract-return',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedContentRoute = AuthenticatedContentRouteImport.update({
   id: '/content',
   path: '/content',
@@ -429,6 +436,7 @@ export interface FileRoutesByFullPath {
   '/calendar': typeof AuthenticatedCalendarRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/content': typeof AuthenticatedContentRoute
+  '/contract-return': typeof AuthenticatedContractReturnRoute
   '/create': typeof AuthenticatedCreateRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/deliveries': typeof AuthenticatedDeliveriesRoute
@@ -494,6 +502,7 @@ export interface FileRoutesByTo {
   '/calendar': typeof AuthenticatedCalendarRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/content': typeof AuthenticatedContentRoute
+  '/contract-return': typeof AuthenticatedContractReturnRoute
   '/create': typeof AuthenticatedCreateRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/deliveries': typeof AuthenticatedDeliveriesRoute
@@ -561,6 +570,7 @@ export interface FileRoutesById {
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/content': typeof AuthenticatedContentRoute
+  '/_authenticated/contract-return': typeof AuthenticatedContractReturnRoute
   '/_authenticated/create': typeof AuthenticatedCreateRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/deliveries': typeof AuthenticatedDeliveriesRoute
@@ -628,6 +638,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/clients'
     | '/content'
+    | '/contract-return'
     | '/create'
     | '/crm'
     | '/deliveries'
@@ -693,6 +704,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/clients'
     | '/content'
+    | '/contract-return'
     | '/create'
     | '/crm'
     | '/deliveries'
@@ -759,6 +771,7 @@ export interface FileRouteTypes {
     | '/_authenticated/calendar'
     | '/_authenticated/clients'
     | '/_authenticated/content'
+    | '/_authenticated/contract-return'
     | '/_authenticated/create'
     | '/_authenticated/crm'
     | '/_authenticated/deliveries'
@@ -1094,6 +1107,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCreateRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/contract-return': {
+      id: '/_authenticated/contract-return'
+      path: '/contract-return'
+      fullPath: '/contract-return'
+      preLoaderRoute: typeof AuthenticatedContractReturnRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/content': {
       id: '/_authenticated/content'
       path: '/content'
@@ -1315,6 +1335,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedContentRoute: typeof AuthenticatedContentRoute
+  AuthenticatedContractReturnRoute: typeof AuthenticatedContractReturnRoute
   AuthenticatedCreateRoute: typeof AuthenticatedCreateRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDeliveriesRoute: typeof AuthenticatedDeliveriesRoute
@@ -1346,6 +1367,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedContentRoute: AuthenticatedContentRoute,
+  AuthenticatedContractReturnRoute: AuthenticatedContractReturnRoute,
   AuthenticatedCreateRoute: AuthenticatedCreateRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDeliveriesRoute: AuthenticatedDeliveriesRoute,
