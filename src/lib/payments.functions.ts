@@ -39,6 +39,10 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
         "Payments are in test mode only. The saved Stripe key is a live key, so no checkout can open. Add a Stripe test key to enable test payments.",
       );
 
+    // Validate the public return address BEFORE touching any Stripe session, so
+    // a misconfigured setting can never expire a client's existing checkout.
+    const origin = publicReturnOrigin();
+
     // A retry must leave the client with a new hosted session. Expire an old
     // open session before creating another; never recycle a fixed idempotency key.
     if (invoice.provider_session_id?.startsWith("cs_test_")) {
