@@ -1,5 +1,6 @@
 import { DocumentDraftTools } from "@/components/app/document-draft-tools";
 import { DocumentsTab } from "@/components/documents/documents-tab";
+import { ContractSigningActions } from "@/components/documents/contract-signing-actions";
 import { ContractBuilder } from "@/components/documents/contract-builder";
 import { InvoiceItemPicker } from "@/components/documents/invoice-item-picker";
 import {
@@ -73,6 +74,9 @@ type ContractRow = {
   expires_at: string | null;
   contract_data: Database["public"]["Tables"]["client_contracts"]["Row"]["contract_data"];
   signer_email: string | null;
+  signer_name: string | null;
+  published_at: string | null;
+  provider_document_id: string | null;
   source_template_id: string | null;
   source_template_version: number | null;
 };
@@ -2499,6 +2503,9 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
                     Private template draft · no signing link sent
                   </p>
                 )}
+                <div className="mt-2">
+                  <ContractSigningActions contract={contract} onChanged={refresh} />
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {contract.status === "draft" && !contract.hosted_url && (

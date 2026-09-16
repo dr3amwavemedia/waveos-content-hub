@@ -1,13 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { stripeRequest, stripeIsTestMode, type StripeCheckoutSession } from "@/lib/stripe.server";
-
-function originFromRequest(): string {
-  const request = getRequest();
-  const url = new URL(request.url);
-  return `${url.protocol}//${url.host}`;
-}
+import { publicReturnOrigin } from "@/lib/public-origin.server";
 
 /**
  * Create a Stripe Checkout session for one invoice.
@@ -45,6 +39,10 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
         "Payments are in test mode only. The saved Stripe key is a live key, so no checkout can open. Add a Stripe test key to enable test payments.",
       );
 
+    // Validate the public return address BEFORE touching any Stripe session, so
+    // a misconfigured setting can never expire a client's existing checkout.
+    const origin = publicReturnOrigin();
+
     // A retry must leave the client with a new hosted session. Expire an old
     // open session before creating another; never recycle a fixed idempotency key.
     if (invoice.provider_session_id?.startsWith("cs_test_")) {
@@ -69,12 +67,13 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
       }
     }
 
-    const origin = originFromRequest();
+    const returnBase = `${origin}/payment-return?invoice=${invoice.id}`;
     const session = await stripeRequest<StripeCheckoutSession>("/checkout/sessions", {
       body: {
         mode: "payment",
-        success_url: `${origin}/home?invoice=${invoice.id}&payment=success`,
-        cancel_url: `${origin}/home?invoice=${invoice.id}&payment=cancelled`,
+        // {CHECKOUT_SESSION_ID} is substituted by Stripe on redirect.
+        success_url: `${returnBase}&status=submitted&session={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${returnBase}&status=cancelled`,
         client_reference_id: invoice.id,
         metadata: {
           invoice_id: invoice.id,
@@ -126,4 +125,35 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
     }
 
     return { url: session.url, testMode: stripeIsTestMode() };
+  });
+
+/**
+ * Authorized read of one invoice's payment state, used by the return page while
+ * it waits for the verified Stripe webhook. RLS scopes the read to the client
+ * who owns the invoice (or Dream Wave staff); nothing here changes any state.
+ */
+export const getInvoicePaymentState = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { invoiceId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: invoice, error } = await context.supabase
+      .from("client_invoices")
+      .select("id,number,status,amount_cents,amount_paid_cents,currency,paid_at,published_at")
+      .eq("id", data.invoiceId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!invoice) throw new Error("This invoice is not available on your account.");
+    const total = invoice.amount_cents ?? 0;
+    const paid = invoice.amount_paid_cents ?? 0;
+    return {
+      id: invoice.id,
+      number: invoice.number,
+      status: invoice.status,
+      currency: invoice.currency ?? "usd",
+      amountCents: total,
+      paidCents: paid,
+      dueCents: Math.max(total - paid, 0),
+      paidAt: invoice.paid_at,
+      confirmed: invoice.status === "paid" || paid > 0,
+    };
   });

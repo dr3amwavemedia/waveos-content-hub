@@ -738,7 +738,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
         {contract.expires_at && !signed && <span>Expires {formatDate(contract.expires_at)}</span>}
       </div>
       {canOpen && !expired && <a href={contract.hosted_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 sm:w-auto">
-        {signed ? "View signed contract" : "View & sign contract"}<ExternalLink className="h-4 w-4" />
+        {signed ? "View signed contract" : "Review & sign contract"}<ExternalLink className="h-4 w-4" />
       </a>}
       {canOpen && !expired && <PortalReturnHint />}
       <p className="text-xs text-muted-foreground">Signing and certification are completed securely by {contract.provider === "bloom" ? "Bloom.io" : "the contract provider"}.</p>

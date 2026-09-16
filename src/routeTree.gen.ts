@@ -36,6 +36,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedPostsRouteImport } from './routes/_authenticated/posts'
 import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
+import { Route as AuthenticatedPaymentReturnRouteImport } from './routes/_authenticated/payment-return'
 import { Route as AuthenticatedOutlookRouteImport } from './routes/_authenticated/outlook'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedMyProjectsRouteImport } from './routes/_authenticated/my-projects'
@@ -44,6 +45,7 @@ import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedDeliveriesRouteImport } from './routes/_authenticated/deliveries'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated/create'
+import { Route as AuthenticatedContractReturnRouteImport } from './routes/_authenticated/contract-return'
 import { Route as AuthenticatedContentRouteImport } from './routes/_authenticated/content'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
@@ -213,6 +215,12 @@ const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
   path: '/payments',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPaymentReturnRoute =
+  AuthenticatedPaymentReturnRouteImport.update({
+    id: '/payment-return',
+    path: '/payment-return',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedOutlookRoute = AuthenticatedOutlookRouteImport.update({
   id: '/outlook',
   path: '/outlook',
@@ -253,6 +261,12 @@ const AuthenticatedCreateRoute = AuthenticatedCreateRouteImport.update({
   path: '/create',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedContractReturnRoute =
+  AuthenticatedContractReturnRouteImport.update({
+    id: '/contract-return',
+    path: '/contract-return',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedContentRoute = AuthenticatedContentRouteImport.update({
   id: '/content',
   path: '/content',
@@ -422,6 +436,7 @@ export interface FileRoutesByFullPath {
   '/calendar': typeof AuthenticatedCalendarRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/content': typeof AuthenticatedContentRoute
+  '/contract-return': typeof AuthenticatedContractReturnRoute
   '/create': typeof AuthenticatedCreateRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/deliveries': typeof AuthenticatedDeliveriesRoute
@@ -430,6 +445,7 @@ export interface FileRoutesByFullPath {
   '/my-projects': typeof AuthenticatedMyProjectsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/outlook': typeof AuthenticatedOutlookRoute
+  '/payment-return': typeof AuthenticatedPaymentReturnRoute
   '/payments': typeof AuthenticatedPaymentsRoute
   '/posts': typeof AuthenticatedPostsRoute
   '/projects': typeof AuthenticatedProjectsRoute
@@ -486,6 +502,7 @@ export interface FileRoutesByTo {
   '/calendar': typeof AuthenticatedCalendarRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/content': typeof AuthenticatedContentRoute
+  '/contract-return': typeof AuthenticatedContractReturnRoute
   '/create': typeof AuthenticatedCreateRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/deliveries': typeof AuthenticatedDeliveriesRoute
@@ -494,6 +511,7 @@ export interface FileRoutesByTo {
   '/my-projects': typeof AuthenticatedMyProjectsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/outlook': typeof AuthenticatedOutlookRoute
+  '/payment-return': typeof AuthenticatedPaymentReturnRoute
   '/payments': typeof AuthenticatedPaymentsRoute
   '/posts': typeof AuthenticatedPostsRoute
   '/projects': typeof AuthenticatedProjectsRoute
@@ -552,6 +570,7 @@ export interface FileRoutesById {
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/content': typeof AuthenticatedContentRoute
+  '/_authenticated/contract-return': typeof AuthenticatedContractReturnRoute
   '/_authenticated/create': typeof AuthenticatedCreateRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/deliveries': typeof AuthenticatedDeliveriesRoute
@@ -560,6 +579,7 @@ export interface FileRoutesById {
   '/_authenticated/my-projects': typeof AuthenticatedMyProjectsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/outlook': typeof AuthenticatedOutlookRoute
+  '/_authenticated/payment-return': typeof AuthenticatedPaymentReturnRoute
   '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
   '/_authenticated/posts': typeof AuthenticatedPostsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
@@ -618,6 +638,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/clients'
     | '/content'
+    | '/contract-return'
     | '/create'
     | '/crm'
     | '/deliveries'
@@ -626,6 +647,7 @@ export interface FileRouteTypes {
     | '/my-projects'
     | '/onboarding'
     | '/outlook'
+    | '/payment-return'
     | '/payments'
     | '/posts'
     | '/projects'
@@ -682,6 +704,7 @@ export interface FileRouteTypes {
     | '/calendar'
     | '/clients'
     | '/content'
+    | '/contract-return'
     | '/create'
     | '/crm'
     | '/deliveries'
@@ -690,6 +713,7 @@ export interface FileRouteTypes {
     | '/my-projects'
     | '/onboarding'
     | '/outlook'
+    | '/payment-return'
     | '/payments'
     | '/posts'
     | '/projects'
@@ -747,6 +771,7 @@ export interface FileRouteTypes {
     | '/_authenticated/calendar'
     | '/_authenticated/clients'
     | '/_authenticated/content'
+    | '/_authenticated/contract-return'
     | '/_authenticated/create'
     | '/_authenticated/crm'
     | '/_authenticated/deliveries'
@@ -755,6 +780,7 @@ export interface FileRouteTypes {
     | '/_authenticated/my-projects'
     | '/_authenticated/onboarding'
     | '/_authenticated/outlook'
+    | '/_authenticated/payment-return'
     | '/_authenticated/payments'
     | '/_authenticated/posts'
     | '/_authenticated/projects'
@@ -1018,6 +1044,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedPaymentsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/payment-return': {
+      id: '/_authenticated/payment-return'
+      path: '/payment-return'
+      fullPath: '/payment-return'
+      preLoaderRoute: typeof AuthenticatedPaymentReturnRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/outlook': {
       id: '/_authenticated/outlook'
       path: '/outlook'
@@ -1072,6 +1105,13 @@ declare module '@tanstack/react-router' {
       path: '/create'
       fullPath: '/create'
       preLoaderRoute: typeof AuthenticatedCreateRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/contract-return': {
+      id: '/_authenticated/contract-return'
+      path: '/contract-return'
+      fullPath: '/contract-return'
+      preLoaderRoute: typeof AuthenticatedContractReturnRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/content': {
@@ -1295,6 +1335,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedContentRoute: typeof AuthenticatedContentRoute
+  AuthenticatedContractReturnRoute: typeof AuthenticatedContractReturnRoute
   AuthenticatedCreateRoute: typeof AuthenticatedCreateRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDeliveriesRoute: typeof AuthenticatedDeliveriesRoute
@@ -1303,6 +1344,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMyProjectsRoute: typeof AuthenticatedMyProjectsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOutlookRoute: typeof AuthenticatedOutlookRoute
+  AuthenticatedPaymentReturnRoute: typeof AuthenticatedPaymentReturnRoute
   AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
   AuthenticatedPostsRoute: typeof AuthenticatedPostsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
@@ -1325,6 +1367,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedContentRoute: AuthenticatedContentRoute,
+  AuthenticatedContractReturnRoute: AuthenticatedContractReturnRoute,
   AuthenticatedCreateRoute: AuthenticatedCreateRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDeliveriesRoute: AuthenticatedDeliveriesRoute,
@@ -1333,6 +1376,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMyProjectsRoute: AuthenticatedMyProjectsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOutlookRoute: AuthenticatedOutlookRoute,
+  AuthenticatedPaymentReturnRoute: AuthenticatedPaymentReturnRoute,
   AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
   AuthenticatedPostsRoute: AuthenticatedPostsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
