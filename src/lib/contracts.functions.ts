@@ -79,6 +79,7 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
       }),
       signerName: contract.signer_name,
       signerEmail: contract.signer_email,
+      redirectUrl: `${returnOrigin}/contract-return?contract=${contract.id}`,
       metadata: { contract_id: contract.id, workspace_id: contract.workspace_id },
     });
 
