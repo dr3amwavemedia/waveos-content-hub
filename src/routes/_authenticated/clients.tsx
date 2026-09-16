@@ -2502,6 +2502,9 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
                     Private template draft · no signing link sent
                   </p>
                 )}
+                <div className="mt-2">
+                  <ContractSigningActions contract={contract} onChanged={refresh} />
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {contract.status === "draft" && !contract.hosted_url && (
