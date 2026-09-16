@@ -42,6 +42,7 @@ function ContractReturn() {
   const query = useQuery({
     queryKey: ["contract-return", contractId],
     enabled: Boolean(contractId),
+    retry: false,
     queryFn: () => fetchState({ data: { contractId: contractId! } }),
     // Only the verified document_completed webhook flips this to signed.
     refetchInterval: (q) => (q.state.data?.signed || waitedOut ? false : 3000),

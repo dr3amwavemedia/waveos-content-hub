@@ -50,6 +50,7 @@ function PaymentReturn() {
   const query = useQuery({
     queryKey: ["payment-return", invoiceId],
     enabled: Boolean(invoiceId) && !cancelled,
+    retry: false,
     queryFn: () => fetchState({ data: { invoiceId: invoiceId! } }),
     refetchInterval: (q) => (q.state.data?.confirmed || waitedOut ? false : 3000),
   });
