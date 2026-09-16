@@ -63,12 +63,13 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
       }
     }
 
-    const origin = originFromRequest();
+    const returnBase = `${origin}/payment-return?invoice=${invoice.id}`;
     const session = await stripeRequest<StripeCheckoutSession>("/checkout/sessions", {
       body: {
         mode: "payment",
-        success_url: `${origin}/home?invoice=${invoice.id}&payment=success`,
-        cancel_url: `${origin}/home?invoice=${invoice.id}&payment=cancelled`,
+        // {CHECKOUT_SESSION_ID} is substituted by Stripe on redirect.
+        success_url: `${returnBase}&status=submitted&session={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${returnBase}&status=cancelled`,
         client_reference_id: invoice.id,
         metadata: {
           invoice_id: invoice.id,
