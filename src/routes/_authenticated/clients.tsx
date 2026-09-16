@@ -1,5 +1,6 @@
 import { DocumentDraftTools } from "@/components/app/document-draft-tools";
 import { DocumentsTab } from "@/components/documents/documents-tab";
+import { ContractSigningActions } from "@/components/documents/contract-signing-actions";
 import { ContractBuilder } from "@/components/documents/contract-builder";
 import { InvoiceItemPicker } from "@/components/documents/invoice-item-picker";
 import {
