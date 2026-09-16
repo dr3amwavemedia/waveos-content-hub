@@ -2,6 +2,13 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { createSignwellDocument, signwellTestMode } from "@/lib/signwell.server";
 import { businessProfile, businessFooterLine } from "@/lib/business-profile";
+import { publicReturnOrigin } from "@/lib/public-origin.server";
+
+/** Any leftover {{token}} must never reach a signer. */
+const unresolvedTokens = (text: string) =>
+  [...new Set([...text.matchAll(/{{\s*([^{}]+?)\s*}}/g)].map((m) => m[1].trim()))].filter(
+    (token) => !/^s\d+:(signature|date|text|initials)$/i.test(token),
+  );
 
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
