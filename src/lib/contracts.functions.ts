@@ -55,6 +55,14 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
     if (contract.provider_document_id) {
       throw new Error("This contract has already been sent for signature.");
     }
+    const leftover = unresolvedTokens(`${contract.title} ${contract.description ?? ""}`);
+    if (leftover.length) {
+      throw new Error(
+        `This contract still has unfilled details (${leftover.join(", ")}). Complete them before creating a signing link.`,
+      );
+    }
+    // Validated public address the signer returns to after signing.
+    const returnOrigin = publicReturnOrigin();
 
     const { data: workspace } = await supabase
       .from("workspaces")
