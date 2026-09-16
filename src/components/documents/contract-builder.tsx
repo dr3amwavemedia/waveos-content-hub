@@ -284,6 +284,7 @@ export function ContractBuilder({
             .eq("id", draft.id)
             .eq("workspace_id", workspaceId)
             .eq("status", "draft")
+            .is("published_at", null)
             .select("id")
             .single()
         : await supabase

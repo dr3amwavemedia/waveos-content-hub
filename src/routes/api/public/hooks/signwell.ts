@@ -95,18 +95,61 @@ export const Route = createFileRoute("/api/public/hooks/signwell")({
                     : null;
         if (!status) return new Response("ok", { status: 200 });
 
+        const completedAt = new Date().toISOString();
         const patch = {
           status,
-          ...(status === "signed" ? { signed_at: new Date().toISOString() } : {}),
+          ...(status === "signed" ? { signed_at: completedAt } : {}),
         };
 
-        if (metadata.contract_id) {
-          await supabaseAdmin.from("client_contracts").update(patch).eq("id", metadata.contract_id);
-        } else if (documentId) {
-          await supabaseAdmin
-            .from("client_contracts")
-            .update(patch)
-            .eq("provider_document_id", documentId);
+        const locate = supabaseAdmin
+          .from("client_contracts")
+          .select("id,workspace_id,description,contract_data,source_template_version,provider_document_id");
+        const { data: contract } = metadata.contract_id
+          ? await locate.eq("id", metadata.contract_id).maybeSingle()
+          : documentId
+            ? await locate.eq("provider_document_id", documentId).maybeSingle()
+            : { data: null };
+
+        if (!contract) return new Response("ok", { status: 200 });
+
+        await supabaseAdmin.from("client_contracts").update(patch).eq("id", contract.id);
+
+        // Only a verified completion produces the private signed archive.
+        if (status === "signed") {
+          const providerDocumentId = contract.provider_document_id ?? documentId;
+          if (providerDocumentId) {
+            try {
+              const { archiveCompletedContract } = await import("@/lib/signwell-archive.server");
+              const outcome = await archiveCompletedContract({
+                contractId: contract.id,
+                workspaceId: contract.workspace_id,
+                providerDocumentId,
+                completedAt,
+                templateVersion: contract.source_template_version ?? null,
+                contractData: contract.contract_data ?? {},
+                renderedText: contract.description ?? null,
+                auditEvidence: {
+                  event_type: eventType,
+                  event_id: eventId,
+                  event_time: eventTime,
+                  provider: "signwell",
+                  recipients: Array.isArray(object.recipients)
+                    ? (object.recipients as Array<Record<string, unknown>>).map((r) => ({
+                        id: r.id ?? null,
+                        status: r.status ?? null,
+                        completed_at: r.completed_at ?? null,
+                      }))
+                    : [],
+                },
+              });
+              // Reason codes only — never document contents or links.
+              if (!outcome.archived) {
+                console.error("[signwell webhook] archive skipped:", outcome.reason);
+              }
+            } catch {
+              console.error("[signwell webhook] archive failed for contract", contract.id);
+            }
+          }
         }
 
         return new Response("ok", { status: 200 });
