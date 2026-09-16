@@ -43,6 +43,8 @@ export async function createSignwellDocument(input: {
   html: string;
   signerName: string;
   signerEmail: string;
+  /** Public https page the signer lands on after finishing. */
+  redirectUrl?: string;
   metadata?: Record<string, string>;
 }): Promise<SignwellDocument> {
   return signwellRequest<SignwellDocument>("/documents", {
@@ -51,9 +53,13 @@ export async function createSignwellDocument(input: {
     subject: input.name,
     draft: false,
     embedded_signing: true,
+    // Turns the {{s1:signature}} / {{s1:date}} placeholders in the HTML into
+    // real, required SignWell fields instead of visible literal text.
+    text_tags: true,
     // No client emails during the test phase.
     reminders: false,
     apply_signing_order: false,
+    ...(input.redirectUrl ? { redirect_url: input.redirectUrl } : {}),
     files: [{ name: `${input.name}.html`, file_base64: Buffer.from(input.html, "utf8").toString("base64") }],
     recipients: [{ id: "1", name: input.signerName, email: input.signerEmail, send_email: false }],
     metadata: input.metadata ?? {},
