@@ -100,3 +100,69 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
 
     return { documentId: document.id, signingUrl, testMode: signwellTestMode() };
   });
+
+/**
+ * Explicit staff action that makes a finished draft eligible for a signing
+ * link. It never contacts the provider and never emails anyone; it only records
+ * that an authorized person reviewed the rendered contract.
+ */
+export const publishContractForSigning = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { contractId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: isStaff } = await supabase.rpc("is_dream_wave_staff", { _user_id: userId });
+    if (!isStaff) throw new Error("Only Dream Wave staff can publish contracts.");
+
+    const { data: contract, error } = await supabase
+      .from("client_contracts")
+      .select("id,title,description,status,signer_name,signer_email,published_at")
+      .eq("id", data.contractId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!contract) throw new Error("Contract not found.");
+    if (contract.published_at) return { publishedAt: contract.published_at };
+    if (contract.status !== "draft") throw new Error("Only a draft contract can be published.");
+    if (!contract.signer_name || !contract.signer_email)
+      throw new Error("Add the signer's name and email before publishing.");
+    const leftover = unresolvedTokens(`${contract.title} ${contract.description ?? ""}`);
+    if (leftover.length)
+      throw new Error(`Complete these details first: ${leftover.join(", ")}.`);
+
+    const publishedAt = new Date().toISOString();
+    const { error: updateError } = await supabase
+      .from("client_contracts")
+      .update({ published_at: publishedAt })
+      .eq("id", contract.id)
+      .is("published_at", null);
+    if (updateError) throw updateError;
+    return { publishedAt };
+  });
+
+/**
+ * Authorized read of one contract's signing state, used by the return page.
+ * RLS restricts it to the assigned client or Dream Wave staff. Only a verified
+ * document_completed webhook ever sets the signed state this reports.
+ */
+export const getContractSigningState = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { contractId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: contract, error } = await context.supabase
+      .from("client_contracts")
+      .select("id,title,status,sent_at,signed_at,provider")
+      .eq("id", data.contractId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!contract) throw new Error("This contract is not available on your account.");
+    return {
+      id: contract.id,
+      title: contract.title,
+      status: contract.status,
+      provider: contract.provider,
+      sentAt: contract.sent_at,
+      signedAt: contract.signed_at,
+      signed: contract.status === "signed",
+      declined: contract.status === "declined" || contract.status === "expired",
+    };
+  });
