@@ -164,7 +164,8 @@ function AuthenticatedLayout() {
   );
 }
 
-function AuthenticatedError({ error, reset }: { error: Error; reset: () => void }) {
+function AuthenticatedError({ error, reset }: { error: unknown; reset: () => void }) {
+  const message = error instanceof Error ? error.message : "An unexpected error occurred.";
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 py-10 text-foreground">
       <div className="surface-card w-full max-w-lg p-6 text-center sm:p-8">
@@ -177,7 +178,7 @@ function AuthenticatedError({ error, reset }: { error: Error; reset: () => void 
         </p>
         {import.meta.env.DEV && (
           <p className="mt-3 break-words rounded-lg border border-border bg-background/60 p-3 text-left font-mono text-xs text-muted-foreground">
-            {error.message}
+            {message}
           </p>
         )}
         <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">

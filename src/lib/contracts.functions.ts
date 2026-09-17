@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { createSignwellDocument, signwellTestMode } from "@/lib/signwell.server";
+import {
+  createSignwellDocument,
+  getSignwellDocument,
+  signwellTestMode,
+} from "@/lib/signwell.server";
 import { businessProfile, businessFooterLine } from "@/lib/business-profile";
 import { publicReturnOrigin } from "@/lib/public-origin.server";
 
@@ -11,7 +15,10 @@ const unresolvedTokens = (text: string) =>
   );
 
 const escapeHtml = (value: string) =>
-  value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+  value.replace(
+    /[&<>"']/g,
+    (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!,
+  );
 
 function contractHtml(input: { title: string; body: string; clientName: string }): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(input.title)}</title>
@@ -42,12 +49,15 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
 
     const { data: contract, error } = await supabase
       .from("client_contracts")
-      .select("id,workspace_id,title,description,status,signer_name,signer_email,published_at,provider_document_id")
+      .select(
+        "id,workspace_id,title,description,status,signer_name,signer_email,published_at,provider_document_id",
+      )
       .eq("id", data.contractId)
       .maybeSingle();
     if (error) throw error;
     if (!contract) throw new Error("Contract not found.");
-    if (!contract.published_at) throw new Error("Publish this contract before sending it for signature.");
+    if (!contract.published_at)
+      throw new Error("Publish this contract before sending it for signature.");
     if (contract.status === "signed") throw new Error("This contract is already signed.");
     if (!contract.signer_email || !contract.signer_name) {
       throw new Error("Add the signer's name and email before sending.");
@@ -94,11 +104,56 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
         provider_document_id: document.id,
         status: "sent",
         sent_at: new Date().toISOString(),
-        ...(signingUrl && signingUrl.startsWith("https://") ? { hosted_url: signingUrl } : {}),
+        // Embedded signing links are short-lived credentials. Retrieve one
+        // only after an authorized signer clicks the button; never persist it.
+        hosted_url: null,
       })
       .eq("id", contract.id);
 
     return { documentId: document.id, signingUrl, testMode: signwellTestMode() };
+  });
+
+/**
+ * Return a fresh SignWell signing destination to an authorized workspace
+ * member or owner. The RLS-scoped query and explicit state checks prevent
+ * draft, unrelated, completed, or expired contracts from exposing a link.
+ */
+export const getContractSigningLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { contractId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: contract, error } = await context.supabase
+      .from("client_contracts")
+      .select("id,provider,provider_document_id,status,published_at,signer_email")
+      .eq("id", data.contractId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!contract) throw new Error("This contract is not available on your account.");
+    if (contract.provider !== "signwell" || !contract.provider_document_id) {
+      throw new Error("This contract does not have a SignWell signing request.");
+    }
+    if (!contract.published_at || contract.status === "draft") {
+      throw new Error("This contract has not been published for signing.");
+    }
+    if (["signed", "declined", "expired", "void"].includes(contract.status)) {
+      throw new Error("This contract is no longer available for signing.");
+    }
+
+    const document = await getSignwellDocument(contract.provider_document_id);
+    const recipient =
+      document.recipients?.find(
+        (row) => row.email?.toLowerCase() === contract.signer_email?.toLowerCase(),
+      ) ?? document.recipients?.[0];
+    const url = recipient?.embedded_signing_url ?? document.embedded_signing_url ?? null;
+    if (!url)
+      throw new Error(
+        "SignWell did not return an active signing link. Ask Dream Wave Media to resend it.",
+      );
+    const destination = new URL(url);
+    if (destination.protocol !== "https:" || !/(^|\.)signwell\.com$/i.test(destination.hostname)) {
+      throw new Error("SignWell returned an invalid signing destination.");
+    }
+    return { url: destination.toString() };
   });
 
 /**
@@ -126,8 +181,7 @@ export const publishContractForSigning = createServerFn({ method: "POST" })
     if (!contract.signer_name || !contract.signer_email)
       throw new Error("Add the signer's name and email before publishing.");
     const leftover = unresolvedTokens(`${contract.title} ${contract.description ?? ""}`);
-    if (leftover.length)
-      throw new Error(`Complete these details first: ${leftover.join(", ")}.`);
+    if (leftover.length) throw new Error(`Complete these details first: ${leftover.join(", ")}.`);
 
     const publishedAt = new Date().toISOString();
     const { error: updateError } = await supabase

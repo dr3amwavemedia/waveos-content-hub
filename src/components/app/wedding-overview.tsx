@@ -1,6 +1,4 @@
-import { ContractExportTools } from "./contract-export-tools";
 import { ExpandableSection } from "./expandable-section";
-import { InvoiceExportTools } from "./invoice-export-tools";
 import { Link } from "@tanstack/react-router";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
@@ -84,8 +82,9 @@ export function WeddingOverview() {
     queryFn: async (): Promise<Contract[]> => {
       const { data, error } = await externalDb
         .from("client_contracts")
-        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at")
+        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,published_at,provider_document_id")
         .eq("workspace_id", wsId!)
+        .neq("status", "draft")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -633,7 +632,6 @@ function WeddingContractsSection({
       style={{ borderColor: palette.border }}
     >
       <div className="mt-4 space-y-3">
-        {contractsQ.isSuccess && <ContractExportTools contracts={contractsQ.data ?? []} />}
         {contractsQ.isLoading ? (
           <Muted text="Loading your contract…" wash={palette.wash} />
         ) : contractsQ.isError ? (
@@ -666,7 +664,6 @@ function WeddingInvoicesSection({
       style={{ borderColor: palette.border }}
     >
       <div className="mt-4 space-y-3">
-        {invoicesQ.isSuccess && <InvoiceExportTools invoices={invoicesQ.data ?? []} />}
         {invoicesQ.isLoading ? (
           <Muted text="Loading your payments…" wash={palette.wash} />
         ) : invoicesQ.isError ? (

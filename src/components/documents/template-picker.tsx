@@ -47,16 +47,16 @@ export function TemplatePicker({
   const q = useTemplates(kind);
 
   return (
-    <div className="relative">
+    <div className="relative max-w-full">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground hover:bg-elevated"
+        className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-lg border border-border px-3 text-sm text-foreground hover:bg-elevated"
       >
         <FileStack className="h-3.5 w-3.5" /> {label}
       </button>
       {open && (
-        <div className="absolute right-0 z-20 mt-1 w-72 rounded-xl border border-border bg-surface p-2 shadow-xl">
+        <div className="absolute left-0 z-20 mt-1 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-2 shadow-xl sm:left-auto sm:right-0">
           {q.isLoading ? (
             <Loader2 className="m-3 h-4 w-4 animate-spin text-muted-foreground" />
           ) : (q.data ?? []).length === 0 ? (
@@ -73,12 +73,14 @@ export function TemplatePicker({
                       onPick(template);
                       setOpen(false);
                     }}
-                    className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-elevated"
+                    className="w-full min-w-0 overflow-hidden rounded-lg px-3 py-2 text-left text-sm hover:bg-elevated"
                   >
-                    <span className="font-medium text-foreground">{template.name}</span>
-                    <span className="ml-1 text-[10px] text-muted-foreground">v{template.version}</span>
+                    <span className="break-words font-medium text-foreground">{template.name}</span>
+                    <span className="ml-1 text-[10px] text-muted-foreground">
+                      v{template.version}
+                    </span>
                     {template.description && (
-                      <span className="block truncate text-xs text-muted-foreground">
+                      <span className="mt-0.5 block line-clamp-2 break-words text-xs text-muted-foreground">
                         {template.description}
                       </span>
                     )}

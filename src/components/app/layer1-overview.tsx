@@ -1,8 +1,7 @@
-import { ContractExportTools } from "./contract-export-tools";
 import { ExpandableSection } from "./expandable-section";
-import { InvoiceExportTools } from "./invoice-export-tools";
 import { PaymentProgress } from "./payment-progress";
 import { PayInvoiceButton } from "./pay-invoice-button";
+import { ContractSignButton } from "@/components/documents/contract-sign-button";
 
 import { useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
@@ -45,12 +44,14 @@ export type Contract = {
   id: string;
   title: string;
   description: string | null;
-  provider: "bloom" | "other";
-  hosted_url: string;
+  provider: "bloom" | "other" | "signwell";
+  hosted_url: string | null;
   status: "draft" | "sent" | "viewed" | "signed" | "declined" | "expired" | "void";
   sent_at: string | null;
   signed_at: string | null;
   expires_at: string | null;
+  published_at: string | null;
+  provider_document_id: string | null;
 };
 const externalDb = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -208,8 +209,9 @@ export function Layer1Overview() {
     queryFn: async (): Promise<Contract[]> => {
       const { data, error } = await externalDb
         .from("client_contracts")
-        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at")
+        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,published_at,provider_document_id")
         .eq("workspace_id", wsId!)
+        .neq("status", "draft")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
@@ -402,7 +404,6 @@ export function Layer1Overview() {
 
       {/* Contracts */}
       <ExpandableSection title="Contracts" id="contracts" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
-        {contractsQ.isSuccess && <ContractExportTools key={wsId} contracts={contractsQ.data ?? []} />}
         <div className="flex flex-wrap items-end justify-between gap-2">
           <h2 className="text-lg font-semibold text-foreground">Contracts & Agreements</h2>
           {(contractsQ.data?.length ?? 0) > 1 && <span className="text-xs text-muted-foreground">{contractsQ.data!.length} contracts</span>}
@@ -415,7 +416,6 @@ export function Layer1Overview() {
 
       {/* Invoices */}
       <ExpandableSection title="Invoices & Payments" id="invoices" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
-        {invoicesQ.isSuccess && <InvoiceExportTools key={wsId} invoices={invoicesQ.data ?? []} />}
         <div className="flex flex-wrap items-end justify-between gap-2">
 
           {(invoicesQ.data?.length ?? 0) > 1 && (
@@ -721,12 +721,21 @@ export function ContractCard({ contract }: { contract: Contract }) {
   const signed = contract.status === "signed";
   const expired = contract.status === "expired" || contract.status === "void";
   const canOpen = isValidHttpsUrl(contract.hosted_url);
+  const canSignWithSignWell =
+    contract.provider === "signwell" &&
+    Boolean(contract.provider_document_id) &&
+    Boolean(contract.published_at) &&
+    !signed &&
+    !expired &&
+    contract.status !== "declined";
   return (
     <div className="surface-card space-y-4 p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-foreground sm:text-lg">{contract.title}</h3>
-          {contract.description && <p className="mt-1 text-sm text-muted-foreground">{contract.description}</p>}
+          <p className="mt-1 text-sm text-muted-foreground">
+            {signed ? "Your completed agreement is on file." : "Review the agreement, then continue to secure electronic signing."}
+          </p>
         </div>
         <span className={cn("rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ring-inset", signed ? "bg-success/15 text-success ring-success/30" : expired ? "bg-muted/20 text-muted-foreground ring-border" : "bg-primary/15 text-primary ring-primary/30")}>
           {contract.status}
@@ -737,11 +746,25 @@ export function ContractCard({ contract }: { contract: Contract }) {
         {contract.signed_at && <span>Signed {formatDate(contract.signed_at)}</span>}
         {contract.expires_at && !signed && <span>Expires {formatDate(contract.expires_at)}</span>}
       </div>
-      {canOpen && !expired && <a href={contract.hosted_url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 sm:w-auto">
+      {contract.description && (
+        <details className="rounded-xl border border-border/60 bg-surface/40 p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-foreground">View agreement</summary>
+          <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
+            {contract.description}
+          </div>
+        </details>
+      )}
+      {canSignWithSignWell && (
+        <ContractSignButton
+          contractId={contract.id}
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-60 sm:w-auto"
+        />
+      )}
+      {canOpen && !expired && contract.provider !== "signwell" && <a href={contract.hosted_url!} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 sm:w-auto">
         {signed ? "View signed contract" : "Review & sign contract"}<ExternalLink className="h-4 w-4" />
       </a>}
-      {canOpen && !expired && <PortalReturnHint />}
-      <p className="text-xs text-muted-foreground">Signing and certification are completed securely by {contract.provider === "bloom" ? "Bloom.io" : "the contract provider"}.</p>
+      {(canSignWithSignWell || (canOpen && !expired)) && <PortalReturnHint />}
+      <p className="text-xs text-muted-foreground">Signing and certification are completed securely by {contract.provider === "bloom" ? "Bloom.io" : contract.provider === "signwell" ? "SignWell" : "the contract provider"}.</p>
     </div>
   );
 }

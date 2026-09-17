@@ -95,7 +95,7 @@ function PaymentReturn() {
 
         <p className="text-sm text-muted-foreground">
           {view === "confirmed"
-            ? "Your payment has been received and your invoice is up to date. Thank you."
+            ? "Your project is booked and we are so excited to be working with you."
             : view === "cancelled"
               ? "Nothing was charged. Your invoice is unchanged and you can pay it whenever you're ready."
               : view === "missing"
