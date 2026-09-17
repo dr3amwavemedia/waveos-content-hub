@@ -1,13 +1,11 @@
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ExternalLink, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
-import {
-  publishContractForSigning,
-  sendContractForSignature,
-} from "@/lib/contracts.functions";
+import { publishContractForSigning, sendContractForSignature } from "@/lib/contracts.functions";
 import { errorMessage } from "@/lib/error-message";
+import { ContractSignButton } from "./contract-sign-button";
 
 export type SigningContract = {
   id: string;
@@ -26,7 +24,7 @@ export function signingState(contract: SigningContract) {
   if (contract.status === "signed") return "signed" as const;
   if (contract.status === "declined") return "declined" as const;
   if (contract.status === "expired" || contract.status === "void") return "expired" as const;
-  if (contract.provider_document_id && contract.hosted_url) {
+  if (contract.provider_document_id) {
     return contract.status === "viewed" ? ("viewed" as const) : ("with_client" as const);
   }
   if (contract.provider_document_id) return "provider_error" as const;
@@ -124,18 +122,13 @@ export function ContractSigningActions({
         </button>
       )}
 
-      {(state === "with_client" || state === "viewed" || state === "signed") &&
-        contract.hosted_url && (
-          <a
-            href={contract.hosted_url}
-            target="_blank"
-            rel="noreferrer"
-            className={`${btn} inline-flex items-center gap-1`}
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            Open signing page
-          </a>
-        )}
+      {(state === "with_client" || state === "viewed") && (
+        <ContractSignButton
+          contractId={contract.id}
+          label="Open SignWell"
+          className={`${btn} inline-flex items-center gap-1`}
+        />
+      )}
 
       {state === "missing_info" && (
         <span className="text-[11px] text-muted-foreground">

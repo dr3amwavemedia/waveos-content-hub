@@ -3099,7 +3099,7 @@ function InvoiceForm({
             <option value="one_time">One-time payment</option>
             <option value="deposit_balance">Deposit + remaining balance</option>
             <option value="installments">Installments / partial payments</option>
-            <option value="monthly_retainer">Monthly retainer</option>
+            <option value="monthly_retainer">Monthly retainer / subscription</option>
           </select>
         </Field>
         <Field label="Total received so far">
@@ -3140,8 +3140,8 @@ function InvoiceForm({
               className={inputCls}
             />
             <p className="mt-1 text-xs text-muted-foreground">
-              Add a separate invoice for each month to preserve payment history. Payments are
-              recorded manually.
+              This option is saved on the invoice and can be changed later. Add one invoice per
+              billing month so each retainer payment keeps its own receipt and history.
             </p>
           </Field>
         )}

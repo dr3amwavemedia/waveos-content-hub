@@ -22,7 +22,23 @@ async function signwellRequest<T>(path: string, body: Record<string, unknown>): 
     headers: { "X-Api-Key": signwellKey(), "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  const json = (await response.json().catch(() => ({}))) as T & { errors?: unknown; message?: string };
+  const json = (await response.json().catch(() => ({}))) as T & {
+    errors?: unknown;
+    message?: string;
+  };
+  if (!response.ok) {
+    console.error("[signwell] request failed", path, response.status);
+    throw new Error(typeof json?.message === "string" ? json.message : "signwell_request_failed");
+  }
+  return json;
+}
+
+async function signwellGet<T>(path: string): Promise<T> {
+  const response = await fetch(`${SIGNWELL_API}${path}`, {
+    method: "GET",
+    headers: { "X-Api-Key": signwellKey(), Accept: "application/json" },
+  });
+  const json = (await response.json().catch(() => ({}))) as T & { message?: string };
   if (!response.ok) {
     console.error("[signwell] request failed", path, response.status);
     throw new Error(typeof json?.message === "string" ? json.message : "signwell_request_failed");
@@ -60,8 +76,18 @@ export async function createSignwellDocument(input: {
     reminders: false,
     apply_signing_order: false,
     ...(input.redirectUrl ? { redirect_url: input.redirectUrl } : {}),
-    files: [{ name: `${input.name}.html`, file_base64: Buffer.from(input.html, "utf8").toString("base64") }],
+    files: [
+      {
+        name: `${input.name}.html`,
+        file_base64: Buffer.from(input.html, "utf8").toString("base64"),
+      },
+    ],
     recipients: [{ id: "1", name: input.signerName, email: input.signerEmail, send_email: false }],
     metadata: input.metadata ?? {},
   });
+}
+
+/** Retrieve a fresh embedded signing URL. SignWell links can expire after use. */
+export async function getSignwellDocument(documentId: string): Promise<SignwellDocument> {
+  return signwellGet<SignwellDocument>(`/documents/${encodeURIComponent(documentId)}`);
 }
