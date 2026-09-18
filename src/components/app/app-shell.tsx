@@ -27,6 +27,7 @@ import {
   FileStack,
   QrCode,
   FolderKanban,
+  Tag,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clearAuthenticatedBrowserState } from "@/lib/auth-session-state";
