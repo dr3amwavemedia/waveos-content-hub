@@ -63,4 +63,20 @@ const report = contracts.contractReportHtml([{ id: "1", title: "<img onerror=bad
 assert.ok(report.includes("&lt;img onerror=bad&gt;"));
 assert.ok(!report.includes("https://secret.example"));
 assert.ok(report.includes("2026-09-14"));
+const paymentsRoute = readFileSync("src/routes/_authenticated/payments.tsx", "utf8");
+const appShell = readFileSync("src/components/app/app-shell.tsx", "utf8");
+const clientsRoute = readFileSync("src/routes/_authenticated/clients.tsx", "utf8");
+assert.ok(!paymentsRoute.includes("<AppShell"), "Payments must use the authenticated parent shell");
+assert.ok(
+  appShell.includes('const useWideCanvas = pathname === "/payments"'),
+  "Payments must use the wide authenticated canvas",
+);
+assert.ok(
+  clientsRoute.includes('supabase.rpc("next_invoice_number"'),
+  "New invoices must receive an agency-wide number automatically",
+);
+assert.ok(
+  clientsRoute.includes("Assigned automatically"),
+  "The new-invoice form must not imply that an invoice number is entered manually",
+);
 console.log("Local workflow preservation, amounts and export escaping passed");

@@ -59,6 +59,7 @@ SIGNATURES
 
 const TOKEN = /{{\s*([^{}]+?)\s*}}/g;
 const SAFE_TOKEN = /^[a-z][a-z0-9_]*$/;
+const DREAM_WAVE_TOKEN = /^dwm_[a-z0-9_]+$/;
 const longTextTokens =
   /(?:services|scope|strategy|deliverables|description|notes|terms|schedule|timeline|rights|revisions)$/;
 const labels = new Map<string, string>(CONTRACT_FIELDS.map(({ key, label }) => [key, label]));
@@ -79,7 +80,7 @@ export function contractFieldLabel(token: string): string {
 
 export function contractFieldsForTemplate(text: string): ContractFieldDefinition[] {
   return contractTokens(text)
-    .filter((token) => SAFE_TOKEN.test(token))
+    .filter((token) => SAFE_TOKEN.test(token) && !DREAM_WAVE_TOKEN.test(token))
     .map((key) => ({
       key,
       label: contractFieldLabel(key),
@@ -88,9 +89,16 @@ export function contractFieldsForTemplate(text: string): ContractFieldDefinition
 }
 
 export function renderContract(text: string, values: ContractValues) {
-  const unknown = contractTokens(text).filter((token) => !SAFE_TOKEN.test(token));
+  const unknown = contractTokens(text).filter(
+    (token) =>
+      !SAFE_TOKEN.test(token) ||
+      (DREAM_WAVE_TOKEN.test(token) && !(values[token] ?? "").trim()),
+  );
   const missing = contractTokens(text).filter(
-    (token) => SAFE_TOKEN.test(token) && !(values[token] ?? "").trim(),
+    (token) =>
+      SAFE_TOKEN.test(token) &&
+      !DREAM_WAVE_TOKEN.test(token) &&
+      !(values[token] ?? "").trim(),
   );
   const content = text.replace(TOKEN, (match, rawToken: string) => {
     const token = rawToken.trim();

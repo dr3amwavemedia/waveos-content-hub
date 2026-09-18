@@ -11,7 +11,6 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import { AppShell } from "@/components/app/app-shell";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import {
@@ -422,8 +421,7 @@ function PaymentsPage() {
   }
 
   return (
-    <AppShell fullWidth>
-      <div className="w-full min-w-0 space-y-6 pb-12 sm:space-y-8">
+    <div className="w-full min-w-0 space-y-6 pb-12 sm:space-y-8">
         <header className="max-w-3xl">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Payments</h1>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
@@ -701,7 +699,6 @@ function PaymentsPage() {
             )}
           </div>
         </section>
-      </div>
-    </AppShell>
+    </div>
   );
 }

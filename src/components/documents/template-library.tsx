@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { errorMessage } from "@/lib/error-message";
-import { businessProfile } from "@/lib/business-profile";
+import { businessContractValues, businessProfile } from "@/lib/business-profile";
 import { invoiceDocumentHtml } from "@/lib/invoice-document";
 import { CONTRACT_FIELDS, CONTRACT_STARTER, contractFieldsForTemplate, renderContract, todayLocalDate } from "@/lib/contract-variables";
 import {
@@ -102,7 +102,10 @@ export function TemplateLibrary() {
               : `Sample ${label.toLowerCase()}`,
         ]),
       );
-      const sampleContract = renderContract(content, sampleValues).content;
+      const sampleContract = renderContract(content, {
+        ...sampleValues,
+        ...businessContractValues,
+      }).content;
       const lines =
         template.kind === "form"
           ? (body.fields ?? []).map((f) => `<li>${escapeHtml(f.label)}</li>`).join("")
@@ -325,7 +328,7 @@ function TemplateEditor({
       if (kind === "contract" && !content.trim())
         throw new Error("Add the contract wording before saving this template.");
       if (kind === "contract") {
-        const unknown = renderContract(content, {}).unknown;
+        const unknown = renderContract(content, businessContractValues).unknown;
         if (unknown.length)
           throw new Error(`Use the supported contract variables: ${unknown.join(", ")}.`);
       }
