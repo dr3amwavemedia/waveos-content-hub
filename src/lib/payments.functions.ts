@@ -1,6 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { stripeRequest, stripeIsTestMode, type StripeCheckoutSession } from "@/lib/stripe.server";
+import {
+  stripeRequest,
+  stripeIsTestMode,
+  stripeModeMatches,
+  type StripeCheckoutSession,
+} from "@/lib/stripe.server";
 import { publicReturnOrigin } from "@/lib/public-origin.server";
 
 /**
@@ -34,18 +39,13 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
     const paid = invoice.amount_paid_cents ?? 0;
     const due = total - paid;
     if (due <= 0) throw new Error("This invoice has no balance due.");
-    if (!stripeIsTestMode())
-      throw new Error(
-        "Payments are in test mode only. The saved Stripe key is a live key, so no checkout can open. Add a Stripe test key to enable test payments.",
-      );
-
     // Validate the public return address BEFORE touching any Stripe session, so
     // a misconfigured setting can never expire a client's existing checkout.
     const origin = publicReturnOrigin();
 
     // A retry must leave the client with a new hosted session. Expire an old
     // open session before creating another; never recycle a fixed idempotency key.
-    if (invoice.provider_session_id?.startsWith("cs_test_")) {
+    if (invoice.provider_session_id?.startsWith("cs_")) {
       try {
         const previous = await stripeRequest<StripeCheckoutSession>(
           `/checkout/sessions/${encodeURIComponent(invoice.provider_session_id)}`,
@@ -102,8 +102,8 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
       idempotencyKey: `invoice:${invoice.id}:${crypto.randomUUID()}`,
     });
 
-    if (!session.url || session.status !== "open" || session.livemode !== false) {
-      throw new Error("Stripe did not return an open test payment link.");
+    if (!session.url || session.status !== "open" || !stripeModeMatches(session.livemode)) {
+      throw new Error("Stripe did not return an open payment link for the configured mode.");
     }
     const checkoutUrl = new URL(session.url);
     if (checkoutUrl.protocol !== "https:" || checkoutUrl.hostname !== "checkout.stripe.com") {

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { verifyStripeSignature, stripeIsTestMode } from "@/lib/stripe.server";
+import { verifyStripeSignature, stripeModeMatches } from "@/lib/stripe.server";
 
 /**
  * Stripe webhook receiver.
@@ -37,8 +37,8 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
         } catch {
           return new Response("invalid_payload", { status: 400 });
         }
-        if (!stripeIsTestMode() || event.livemode !== false) {
-          return new Response("test_events_only", { status: 403 });
+        if (!stripeModeMatches(event.livemode)) {
+          return new Response("stripe_mode_mismatch", { status: 403 });
         }
         const eventId = String(event.id ?? "");
         if (!eventId) return new Response("missing_event_id", { status: 400 });

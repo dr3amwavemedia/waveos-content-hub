@@ -25,6 +25,11 @@ export function stripeIsTestMode(): boolean {
   return key.startsWith("sk_test_") || key.startsWith("rk_test_");
 }
 
+/** Stripe objects and events must come from the mode selected by the active key. */
+export function stripeModeMatches(livemode: boolean | undefined): boolean {
+  return typeof livemode === "boolean" && livemode === !stripeIsTestMode();
+}
+
 function encodeForm(value: unknown, prefix = "", out: string[] = []): string[] {
   if (value === undefined || value === null) return out;
   if (Array.isArray(value)) {
