@@ -26,9 +26,11 @@ export const businessProfile: BusinessProfile = {
   location: "Sarasota, FL",
   phone: "(941) 294-5727",
   logoUrl: logoAsset.url,
-  email: null,
-  streetAddress: null,
-  legalEntity: null,
+  // Verified directly by the owner on September 18, 2026.
+  email: "jessehayes@dwmsrq.com",
+  streetAddress: "290 Via Anina Dr, Sarasota, FL 34243",
+  legalEntity: "Dream Wave Media LLC",
+  // Still unverified — never invent these.
   taxId: null,
   paymentInstructions: null,
 };
