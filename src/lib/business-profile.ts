@@ -41,6 +41,25 @@ export const businessFooterLine = [
   businessProfile.phone,
 ].join(" · ");
 
+/**
+ * Protected contract variables supplied by WaveOS. These never belong in the
+ * per-client contract form and are intentionally derived from the verified
+ * business profile above.
+ */
+export const businessContractValues: Readonly<Record<string, string>> = {
+  dwm_name: businessProfile.name,
+  dwm_business_name: businessProfile.name,
+  dwm_legal_name: businessProfile.legalEntity ?? businessProfile.name,
+  dwm_legal_entity: businessProfile.legalEntity ?? businessProfile.name,
+  dwm_logo_url: businessProfile.logoUrl,
+  dwm_street_address: businessProfile.streetAddress ?? "",
+  dwm_address: businessProfile.streetAddress ?? "",
+  dwm_email: businessProfile.email ?? "",
+  dwm_phone: businessProfile.phone,
+  dwm_website: businessProfile.website,
+  dwm_location: businessProfile.location,
+};
+
 /** Fields a valid production invoice still needs from the owner. */
 export function missingBusinessProfileFields(
   profile: BusinessProfile = businessProfile,

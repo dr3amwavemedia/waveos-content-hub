@@ -49,3 +49,34 @@ test("turns template-specific placeholders into required fill-in fields", () => 
     1,
   );
 });
+
+test("keeps Dream Wave business variables out of the client contract form", () => {
+  const template =
+    "{{dwm_logo_url}} {{dwm_street_address}} {{dwm_email}} {{dwm_phone}} {{dwm_website}} {{client_legal_name}} {{project_date}}";
+  assert.deepEqual(contractFieldsForTemplate(template), [
+    { key: "client_legal_name", label: "Client Legal Name", input: "text" },
+    { key: "project_date", label: "Project date", input: "date" },
+  ]);
+
+  const result = renderContract(template, {
+    dwm_logo_url: "https://example.test/logo.png",
+    dwm_street_address: "290 Via Anina Dr, Sarasota, FL 34243",
+    dwm_email: "jessehayes@dwmsrq.com",
+    dwm_phone: "(941) 294-5727",
+    dwm_website: "https://dwmsrq.com",
+    client_legal_name: "Sample Client LLC",
+    project_date: "2026-10-04",
+  });
+  assert.deepEqual(result.missing, []);
+  assert.deepEqual(result.unknown, []);
+  assert.doesNotMatch(result.content, /{{dwm_/);
+});
+
+test("flags an unsupported Dream Wave variable instead of asking the client form for it", () => {
+  assert.deepEqual(contractFieldsForTemplate("{{dwm_unverified_detail}} {{client_name}}"), [
+    { key: "client_name", label: "Client name", input: "text" },
+  ]);
+  const result = renderContract("{{dwm_unverified_detail}}", {});
+  assert.deepEqual(result.missing, []);
+  assert.deepEqual(result.unknown, ["dwm_unverified_detail"]);
+});

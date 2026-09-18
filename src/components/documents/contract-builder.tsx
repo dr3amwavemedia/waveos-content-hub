@@ -5,7 +5,11 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { businessFooterLine, businessProfile } from "@/lib/business-profile";
+import {
+  businessContractValues,
+  businessFooterLine,
+  businessProfile,
+} from "@/lib/business-profile";
 import { formatMoney } from "@/lib/invoice-document";
 import { invoiceItemsFromJson } from "@/lib/invoice-items";
 import { errorMessage } from "@/lib/error-message";
@@ -285,7 +289,7 @@ export function ContractBuilder({
     const invoice = context.data?.invoices.find((row) => row.id === id);
     if (invoice) updateValue("services", invoiceServiceText(invoice));
   };
-  const rendered = renderContract(templateText, values);
+  const rendered = renderContract(templateText, { ...values, ...businessContractValues });
   const requiredFields = useMemo(() => contractFieldsForTemplate(templateText), [templateText]);
   const guidancePrompts = contractGuidancePrompts(templateText);
   const canSave =
@@ -418,8 +422,8 @@ export function ContractBuilder({
           <div>
             <h4 className="text-base font-semibold">Contract details</h4>
             <p className="mt-1 text-xs text-muted-foreground">
-              These fields come directly from the selected template. Known client details are filled
-              automatically.
+              Only client, signer, project, and agreement details appear here. Dream Wave branding
+              and business information is added automatically.
             </p>
             <button
               type="button"

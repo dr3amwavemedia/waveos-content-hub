@@ -2973,14 +2973,23 @@ function InvoiceForm({
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Field label="Number">
-          <input
-            value={number}
-            onChange={(e) => setNumber(e.target.value)}
-            className={inputCls}
-            placeholder="INV-2026-014"
-          />
-        </Field>
+        {invoice ? (
+          <Field label="Number">
+            <input
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+        ) : (
+          <div className="rounded-lg border border-border bg-background px-3 py-2">
+            <p className="text-xs font-medium text-muted-foreground">Invoice number</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">Assigned automatically</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              WaveOS assigns the next agency invoice number when you save.
+            </p>
+          </div>
+        )}
         <Field label="Amount">
           <input
             type="number"
