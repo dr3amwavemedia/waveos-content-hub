@@ -88,6 +88,21 @@ export type StripeCheckoutSession = {
   livemode?: boolean;
 };
 
+export type StripeSetupIntent = {
+  id: string;
+  payment_method: string | null;
+  status: string;
+  livemode?: boolean;
+};
+export type StripePaymentIntent = {
+  id: string;
+  amount_received: number;
+  currency: string;
+  status: string;
+  livemode?: boolean;
+  metadata?: Record<string, string>;
+};
+
 /** Verify a Stripe webhook signature header (scheme v1, HMAC-SHA256). */
 export async function verifyStripeSignature(
   rawBody: string,

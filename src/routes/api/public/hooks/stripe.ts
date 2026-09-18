@@ -1,5 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { verifyStripeSignature, stripeModeMatches } from "@/lib/stripe.server";
+import {
+  verifyStripeSignature,
+  stripeModeMatches,
+  stripeRequest,
+  type StripeSetupIntent,
+} from "@/lib/stripe.server";
 import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
 
 /**
@@ -70,6 +75,152 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
           processed_at: new Date().toISOString(),
         });
         if (eventError) return new Response("event_store_failed", { status: 503 });
+
+        const autopayScheduleId = metadata.autopay_schedule_id;
+        if (
+          autopayScheduleId &&
+          eventType === "checkout.session.completed" &&
+          object.setup_intent
+        ) {
+          const setup = await stripeRequest<StripeSetupIntent>(
+            `/setup_intents/${encodeURIComponent(String(object.setup_intent))}`,
+            { method: "GET" },
+          );
+          if (
+            setup.status !== "succeeded" ||
+            !setup.payment_method ||
+            !stripeModeMatches(setup.livemode)
+          ) {
+            return new Response("autopay_setup_incomplete", { status: 400 });
+          }
+          await supabaseAdmin
+            .from("invoice_autopay_schedules")
+            .update({
+              stripe_payment_method_id: setup.payment_method,
+              status: "active",
+              authorized_at: new Date().toISOString(),
+              last_error: null,
+            })
+            .eq("id", autopayScheduleId)
+            .eq("stripe_setup_session_id", String(object.id ?? ""));
+          return new Response("ok", { status: 200 });
+        }
+
+        if (autopayScheduleId && eventType === "payment_intent.succeeded") {
+          const { data: schedule } = await supabaseAdmin
+            .from("invoice_autopay_schedules")
+            .select("*")
+            .eq("id", autopayScheduleId)
+            .maybeSingle();
+          const targetInvoiceId = metadata.invoice_id;
+          if (!schedule || !targetInvoiceId)
+            return new Response("autopay_schedule_missing", { status: 400 });
+          const received = Number(object.amount_received ?? object.amount ?? 0);
+          if (
+            received !== schedule.amount_cents ||
+            String(object.currency ?? "").toUpperCase() !== schedule.currency.toUpperCase()
+          ) {
+            await supabaseAdmin
+              .from("invoice_autopay_schedules")
+              .update({ status: "failed", last_error: "amount_or_currency_mismatch" })
+              .eq("id", schedule.id);
+            return new Response("payment_requires_review", { status: 200 });
+          }
+          const { data: target } = await supabaseAdmin
+            .from("client_invoices")
+            .select("id,number,amount_cents,amount_paid_cents,currency,workspace_id")
+            .eq("id", targetInvoiceId)
+            .eq("workspace_id", schedule.workspace_id)
+            .maybeSingle();
+          if (!target) return new Response("invoice_missing", { status: 400 });
+          const paymentId = String(object.id ?? "");
+          const ledger = await supabaseAdmin.from("payment_ledger").insert({
+            source: "stripe",
+            external_id: paymentId,
+            invoice_id: target.id,
+            workspace_id: target.workspace_id,
+            kind: "payment",
+            amount_cents: received,
+            currency: target.currency,
+            occurred_at: new Date().toISOString(),
+            description: `Automatic Stripe charge for invoice ${target.id}`,
+            status: "posted",
+          });
+          if (ledger.error?.code === "23505")
+            return new Response("duplicate_ignored", { status: 200 });
+          if (ledger.error) return new Response("ledger_write_failed", { status: 503 });
+          const paidNow = Math.min(
+            (target.amount_paid_cents ?? 0) + received,
+            target.amount_cents ?? received,
+          );
+          await supabaseAdmin
+            .from("client_invoices")
+            .update({
+              amount_paid_cents: paidNow,
+              status: "paid",
+              paid_at: new Date().toISOString(),
+              payment_provider: "stripe",
+              provider_payment_id: paymentId,
+            })
+            .eq("id", target.id);
+          if (schedule.frequency === "monthly") {
+            const next = new Date(schedule.charge_at);
+            next.setUTCMonth(next.getUTCMonth() + 1);
+            await supabaseAdmin
+              .from("invoice_autopay_schedules")
+              .update({
+                status: "active",
+                charge_at: next.toISOString(),
+                current_invoice_id: null,
+                last_succeeded_at: new Date().toISOString(),
+                last_error: null,
+              })
+              .eq("id", schedule.id);
+          } else {
+            await supabaseAdmin
+              .from("invoice_autopay_schedules")
+              .update({
+                status: "completed",
+                enabled: false,
+                last_succeeded_at: new Date().toISOString(),
+                last_error: null,
+              })
+              .eq("id", schedule.id);
+          }
+          try {
+            const { sendPaymentReceiptEmail } =
+              await import("@/lib/document-completion-email.server");
+            await sendPaymentReceiptEmail(
+              target.workspace_id,
+              {
+                invoiceNumber: target.number || `Invoice ${target.id.slice(0, 8).toUpperCase()}`,
+                receivedCents: received,
+                totalPaidCents: paidNow,
+                balanceCents: Math.max(0, (target.amount_cents ?? received) - paidNow),
+                currency: target.currency,
+              },
+              null,
+            );
+          } catch {
+            console.error("[stripe webhook] automatic payment receipt email failed", target.id);
+          }
+          return new Response("ok", { status: 200 });
+        }
+
+        if (autopayScheduleId && eventType === "payment_intent.payment_failed") {
+          const failureMessage =
+            typeof object.last_payment_error === "object" && object.last_payment_error
+              ? String(
+                  (object.last_payment_error as Record<string, unknown>).message ??
+                    "The automatic card charge failed.",
+                )
+              : "The automatic card charge failed.";
+          await supabaseAdmin
+            .from("invoice_autopay_schedules")
+            .update({ status: "action_required", last_error: failureMessage.slice(0, 200) })
+            .eq("id", autopayScheduleId);
+          return new Response("ok", { status: 200 });
+        }
 
         if (
           !invoiceId &&

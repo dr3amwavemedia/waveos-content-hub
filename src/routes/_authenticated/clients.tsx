@@ -61,6 +61,7 @@ import { ClientBrandingEditor } from "@/components/branding/client-branding-edit
 import { sendInviteEmail, sendWorkspaceEmail, tryEmail } from "@/lib/transactional-email";
 import { invitationContact } from "@/lib/invitation-contact";
 import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display";
+import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -287,21 +288,17 @@ function ClientsPage() {
       }
       setWeddingColumnsMissing(missing);
 
-      const [
-        { data: members },
-        { data: invites },
-        { data: media },
-        { data: crmAccounts },
-      ] = await Promise.all([
-        supabase.from("workspace_members").select("workspace_id"),
-        supabase.from("invites_admin").select("workspace_id").eq("status", "pending"),
-        supabase.from("media_assets").select("workspace_id").is("archived_at", null),
-        supabase
-          .from("crm_accounts")
-          .select(
-            "linked_workspace_id,business_name,crm_contacts(first_name,last_name,is_primary)",
-          ),
-      ]);
+      const [{ data: members }, { data: invites }, { data: media }, { data: crmAccounts }] =
+        await Promise.all([
+          supabase.from("workspace_members").select("workspace_id"),
+          supabase.from("invites_admin").select("workspace_id").eq("status", "pending"),
+          supabase.from("media_assets").select("workspace_id").is("archived_at", null),
+          supabase
+            .from("crm_accounts")
+            .select(
+              "linked_workspace_id,business_name,crm_contacts(first_name,last_name,is_primary)",
+            ),
+        ]);
       const bump = (m: Map<string, number>, k: string | null) => {
         if (!k) return;
         m.set(k, (m.get(k) ?? 0) + 1);
@@ -732,7 +729,9 @@ function WorkspaceDrawer({
           contractsSlot={<ContractsTab workspaceId={workspace.id} clientLabel={workspace.name} />}
         />
       )}
-      {tab === "contracts" && <ContractsTab workspaceId={workspace.id} clientLabel={workspace.name} />}
+      {tab === "contracts" && (
+        <ContractsTab workspaceId={workspace.id} clientLabel={workspace.name} />
+      )}
       {tab === "invoices" && <InvoicesTab workspaceId={workspace.id} clientName={workspace.name} />}
       {tab === "invites" && <InvitesTab workspace={workspace} onNewInvite={onNewInvite} />}
     </ModalShell>
@@ -2184,7 +2183,8 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
   const q = useQuery({
     queryKey: ["client-contracts", workspaceId],
     queryFn: async (): Promise<ContractRow[]> => {
-      const legacyColumns = "id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,signer_name,signer_email,published_at,provider_document_id,source_template_id,source_template_version";
+      const legacyColumns =
+        "id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,signer_name,signer_email,published_at,provider_document_id,source_template_id,source_template_version";
       const { data, error } = await db
         .from("client_contracts")
         .select(`${legacyColumns},contract_data`)
@@ -2227,14 +2227,14 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
         .single();
       if (error) throw error;
       await tryEmail(() =>
-          sendWorkspaceEmail({
-            workspaceId,
-            event: "contract_ready",
-            title: title.trim(),
-            status: "sent",
-            url,
-          }),
-        );
+        sendWorkspaceEmail({
+          workspaceId,
+          event: "contract_ready",
+          title: title.trim(),
+          status: "sent",
+          url,
+        }),
+      );
       return data;
     },
     onSuccess: async () => {
@@ -2308,14 +2308,20 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
           <button
             type="button"
             onClick={() => setCreationMode("template")}
-            className={cn("min-h-11 rounded-lg border px-3 text-sm", creationMode === "template" ? "border-primary bg-primary/10" : "border-border")}
+            className={cn(
+              "min-h-11 rounded-lg border px-3 text-sm",
+              creationMode === "template" ? "border-primary bg-primary/10" : "border-border",
+            )}
           >
             Contract template
           </button>
           <button
             type="button"
             onClick={() => setCreationMode("external")}
-            className={cn("min-h-11 rounded-lg border px-3 text-sm", creationMode === "external" ? "border-primary bg-primary/10" : "border-border")}
+            className={cn(
+              "min-h-11 rounded-lg border px-3 text-sm",
+              creationMode === "external" ? "border-primary bg-primary/10" : "border-border",
+            )}
           >
             External signing link
           </button>
@@ -2353,21 +2359,21 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
             />
           </Field>
           <Field label="Contract link">
-              <input
-                required
-                type="text"
-                inputMode="url"
-                autoCapitalize="none"
-                autoCorrect="off"
-                value={hostedUrl}
-                onChange={(event) => setHostedUrl(event.target.value)}
-                onBlur={() => setHostedUrl(normalizeHttpsUrl(hostedUrl))}
-                placeholder="bloom.io/your-contract"
-                className={inputCls}
-              />
-              {hostedUrl && !isValidHttpsUrl(normalizeHttpsUrl(hostedUrl)) && (
-                <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
-              )}
+            <input
+              required
+              type="text"
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              value={hostedUrl}
+              onChange={(event) => setHostedUrl(event.target.value)}
+              onBlur={() => setHostedUrl(normalizeHttpsUrl(hostedUrl))}
+              placeholder="bloom.io/your-contract"
+              className={inputCls}
+            />
+            {hostedUrl && !isValidHttpsUrl(normalizeHttpsUrl(hostedUrl)) && (
+              <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
+            )}
           </Field>
           <Field label="Description">
             <textarea
@@ -2423,7 +2429,9 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">{contract.title}</p>
                 {contract.description && (
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{contract.description}</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+                    {contract.description}
+                  </p>
                 )}
                 {contract.hosted_url && (
                   <a
@@ -2455,7 +2463,9 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
                     }}
                     className="min-h-10 rounded-lg border border-border px-3 text-xs font-semibold hover:border-primary/40"
                   >
-                    {!contract.signer_name || !contract.signer_email ? "Complete details" : "Edit details"}
+                    {!contract.signer_name || !contract.signer_email
+                      ? "Complete details"
+                      : "Edit details"}
                   </button>
                 )}
                 <select
@@ -2531,20 +2541,29 @@ function InvoicesTab({
   const q = useQuery({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
-      const invoiceColumns = "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,checkout_payment_type,checkout_payment_cents";
+      const invoiceColumns =
+        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,checkout_payment_type,checkout_payment_cents";
       const { data, error } = await supabase
         .from("client_invoices")
         .select(`${invoiceColumns},line_items`)
         .eq("workspace_id", workspaceId)
         .order("issued_at", { ascending: false });
-      if (error && (error.code === "42703" || error.code === "PGRST204" || error.message.includes("line_items"))) {
+      if (
+        error &&
+        (error.code === "42703" ||
+          error.code === "PGRST204" ||
+          error.message.includes("line_items"))
+      ) {
         const fallback = await supabase
           .from("client_invoices")
           .select(invoiceColumns)
           .eq("workspace_id", workspaceId)
           .order("issued_at", { ascending: false });
         if (fallback.error) throw fallback.error;
-        return (fallback.data ?? []).map((row) => ({ ...row, line_items: [] })) as InvoiceListItem[];
+        return (fallback.data ?? []).map((row) => ({
+          ...row,
+          line_items: [],
+        })) as InvoiceListItem[];
       }
       if (error) throw error;
       return (data ?? []) as InvoiceListItem[];
@@ -2794,6 +2813,28 @@ function InvoiceForm({
     invoice?.issued_at.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
   );
   const [dueAt, setDueAt] = useState(invoice?.due_at?.slice(0, 10) ?? "");
+  const [autopayEnabled, setAutopayEnabled] = useState(false);
+  const [autopayFrequency, setAutopayFrequency] = useState("one_time");
+  const [autopayAt, setAutopayAt] = useState("");
+  const autopayQ = useQuery({
+    queryKey: ["invoice-autopay", invoice?.id],
+    enabled: Boolean(invoice?.id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoice_autopay_schedules")
+        .select("*")
+        .eq("source_invoice_id", invoice!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  useEffect(() => {
+    if (!autopayQ.data) return;
+    setAutopayEnabled(autopayQ.data.enabled);
+    setAutopayFrequency(autopayQ.data.frequency);
+    setAutopayAt(isoToDateTimeLocal(autopayQ.data.charge_at, "America/New_York"));
+  }, [autopayQ.data]);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -2816,7 +2857,16 @@ function InvoiceForm({
         value: Number(discountValue || 0),
       });
       const cents = discount.totalCents;
-      if (cents <= 0) throw new Error("The discount must leave an invoice total greater than zero.");
+      if (cents <= 0)
+        throw new Error("The discount must leave an invoice total greater than zero.");
+      let autopayChargeAt: string | null = null;
+      if (autopayEnabled) {
+        if (!autopayAt) throw new Error("Choose the automatic charge date and time.");
+        autopayChargeAt = zonedDateTimeToIso(autopayAt, "America/New_York");
+        if (new Date(autopayChargeAt).getTime() <= Date.now()) {
+          throw new Error("Automatic charge time must be in the future.");
+        }
+      }
       const received =
         status === "paid" ? cents : amountPaid === "" ? null : Math.round(Number(amountPaid) * 100);
       const scheduledCents =
@@ -2830,7 +2880,9 @@ function InvoiceForm({
           scheduledCents <= 0 ||
           scheduledCents > cents)
       ) {
-        throw new Error("Enter a scheduled payment greater than zero and no more than the invoice total.");
+        throw new Error(
+          "Enter a scheduled payment greater than zero and no more than the invoice total.",
+        );
       }
       const effectiveStatus =
         status !== "void" && status !== "draft" && cents != null && cents > 0 && received === cents
@@ -2858,7 +2910,8 @@ function InvoiceForm({
         billing_month: paymentPlan === "monthly_retainer" ? `${billingMonth}-01` : null,
         currency: currency.trim().toUpperCase(),
         status: effectiveStatus,
-        published_at: effectiveStatus === "draft" ? null : invoice?.published_at ?? new Date().toISOString(),
+        published_at:
+          effectiveStatus === "draft" ? null : (invoice?.published_at ?? new Date().toISOString()),
         hosted_url: trimmedUrl || null,
         issued_at: dateInputToIso(issuedAt)!,
         due_at: dateInputToIso(dueAt),
@@ -2888,9 +2941,15 @@ function InvoiceForm({
       }
       const { data, error } = result;
       if (error) {
-        if ((error.message.includes("line_items") || error.message.includes("published_at")) &&
-            (error.code === "PGRST204" || error.code === "42703" || error.message.includes("schema cache"))) {
-          throw new Error("Invoice items cannot be saved until the invoice line-items database migration is applied. Your draft is still on this screen.");
+        if (
+          (error.message.includes("line_items") || error.message.includes("published_at")) &&
+          (error.code === "PGRST204" ||
+            error.code === "42703" ||
+            error.message.includes("schema cache"))
+        ) {
+          throw new Error(
+            "Invoice items cannot be saved until the invoice line-items database migration is applied. Your draft is still on this screen.",
+          );
         }
         if (error.message.includes("client_invoices_hosted_url_https")) {
           throw new Error(URL_VALIDATION_MESSAGE);
@@ -2898,11 +2957,40 @@ function InvoiceForm({
         throw error;
       }
       if (!data?.id) throw new Error("The invoice changes were not saved. Please try again.");
+      if (autopayEnabled) {
+        const { data: auth } = await supabase.auth.getUser();
+        const schedule = {
+          source_invoice_id: data.id,
+          current_invoice_id: data.id,
+          workspace_id: workspaceId,
+          enabled: true,
+          frequency: autopayFrequency,
+          charge_at: autopayChargeAt!,
+          timezone: "America/New_York",
+          amount_cents: cents,
+          currency: currency.trim().toUpperCase(),
+          description: description.trim() || invoiceNumber || "Dream Wave Media service",
+          status: autopayQ.data?.stripe_payment_method_id ? "active" : "pending_authorization",
+          created_by: auth.user?.id ?? null,
+        };
+        const autoResult = await supabase
+          .from("invoice_autopay_schedules")
+          .upsert(schedule, { onConflict: "source_invoice_id" });
+        if (autoResult.error) throw autoResult.error;
+      } else if (invoice?.id) {
+        const autoResult = await supabase
+          .from("invoice_autopay_schedules")
+          .update({ enabled: false, status: "disabled" })
+          .eq("source_invoice_id", invoice.id);
+        if (autoResult.error) throw autoResult.error;
+      }
     },
     onSuccess: async () => {
       await Promise.all([
         qc.invalidateQueries({ queryKey: ["client-invoices", workspaceId] }),
         qc.invalidateQueries({ queryKey: ["layer1", "invoices", workspaceId] }),
+        qc.invalidateQueries({ queryKey: ["layer1", "autopay", workspaceId] }),
+        qc.invalidateQueries({ queryKey: ["invoice-autopay", invoice?.id] }),
         qc.invalidateQueries({ queryKey: ["wedding", "invoices", workspaceId] }),
       ]);
       toast.success(invoice ? "Invoice updated." : "Invoice added.");
@@ -2955,6 +3043,7 @@ function InvoiceForm({
     previewDiscount.totalCents > 0 &&
     paidValid &&
     checkoutPaymentValid &&
+    (!invoice || !autopayQ.isLoading) &&
     Boolean(issuedAt) &&
     (paymentPlan !== "monthly_retainer" || Boolean(billingMonth));
 
@@ -3084,57 +3173,57 @@ function InvoiceForm({
                 className={inputCls}
               />
               <div className="grid gap-2 sm:grid-cols-[1fr_80px_120px_auto]">
-              <input
-                aria-label={`Item ${index + 1} description`}
-                value={item.description}
-                onChange={(e) =>
-                  setItems((current) =>
-                    current.map((row, i) =>
-                      i === index ? { ...row, description: e.target.value } : row,
-                    ),
-                  )
-                }
-                className={inputCls}
-              />
-              <input
-                aria-label={`Item ${index + 1} quantity`}
-                type="number"
-                min="1"
-                step="1"
-                value={item.quantity}
-                onChange={(e) =>
-                  setItems((current) =>
-                    current.map((row, i) =>
-                      i === index ? { ...row, quantity: Number(e.target.value) } : row,
-                    ),
-                  )
-                }
-                className={inputCls}
-              />
-              <input
-                aria-label={`Item ${index + 1} unit price`}
-                type="number"
-                min="0"
-                step="0.01"
-                value={(item.unitCents / 100).toFixed(2)}
-                onChange={(e) =>
-                  setItems((current) =>
-                    current.map((row, i) =>
-                      i === index
-                        ? { ...row, unitCents: Math.round(Number(e.target.value) * 100) }
-                        : row,
-                    ),
-                  )
-                }
-                className={inputCls}
-              />
-              <button
-                type="button"
-                onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
-                className="min-h-11 rounded-lg border border-border px-3 text-sm"
-              >
-                Remove
-              </button>
+                <input
+                  aria-label={`Item ${index + 1} description`}
+                  value={item.description}
+                  onChange={(e) =>
+                    setItems((current) =>
+                      current.map((row, i) =>
+                        i === index ? { ...row, description: e.target.value } : row,
+                      ),
+                    )
+                  }
+                  className={inputCls}
+                />
+                <input
+                  aria-label={`Item ${index + 1} quantity`}
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={item.quantity}
+                  onChange={(e) =>
+                    setItems((current) =>
+                      current.map((row, i) =>
+                        i === index ? { ...row, quantity: Number(e.target.value) } : row,
+                      ),
+                    )
+                  }
+                  className={inputCls}
+                />
+                <input
+                  aria-label={`Item ${index + 1} unit price`}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={(item.unitCents / 100).toFixed(2)}
+                  onChange={(e) =>
+                    setItems((current) =>
+                      current.map((row, i) =>
+                        i === index
+                          ? { ...row, unitCents: Math.round(Number(e.target.value) * 100) }
+                          : row,
+                      ),
+                    )
+                  }
+                  className={inputCls}
+                />
+                <button
+                  type="button"
+                  onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
+                  className="min-h-11 rounded-lg border border-border px-3 text-sm"
+                >
+                  Remove
+                </button>
               </div>
             </div>
           ))}
@@ -3196,7 +3285,9 @@ function InvoiceForm({
           </button>
         </Field>
         {checkoutPaymentType !== "remaining" && (
-          <Field label={checkoutPaymentType === "deposit" ? "Deposit amount" : "Fixed payment amount"}>
+          <Field
+            label={checkoutPaymentType === "deposit" ? "Deposit amount" : "Fixed payment amount"}
+          >
             <input
               type="number"
               min="0.01"
@@ -3255,6 +3346,54 @@ function InvoiceForm({
           className={inputCls}
         />
       </Field>
+      <div className="space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
+        <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-foreground">
+          <input
+            type="checkbox"
+            checked={autopayEnabled}
+            onChange={(event) => setAutopayEnabled(event.target.checked)}
+            className="h-4 w-4"
+          />
+          Enable automatic card charges
+        </label>
+        {autopayEnabled && (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Automatic charge type">
+              <select
+                value={autopayFrequency}
+                onChange={(event) => setAutopayFrequency(event.target.value)}
+                className={inputCls}
+              >
+                <option value="one_time">One-time fixed service</option>
+                <option value="monthly">Monthly retainer</option>
+              </select>
+            </Field>
+            <Field
+              label={
+                autopayFrequency === "monthly" ? "First monthly charge" : "Charge date and time"
+              }
+            >
+              <input
+                type="datetime-local"
+                value={autopayAt}
+                onChange={(event) => setAutopayAt(event.target.value)}
+                className={inputCls}
+                required
+              />
+            </Field>
+            <p className="text-xs leading-5 text-muted-foreground sm:col-span-2">
+              The client must authorize their card in Stripe before any automatic charge. Admins can
+              edit this date until the charge is processed. Monthly retainers repeat on the same
+              calendar day.
+            </p>
+            {autopayQ.data && (
+              <p className="text-xs font-medium text-primary sm:col-span-2">
+                Authorization status: {autopayQ.data.status.replaceAll("_", " ")}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Status">
           <select

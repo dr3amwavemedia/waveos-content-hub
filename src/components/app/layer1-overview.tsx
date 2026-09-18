@@ -42,8 +42,23 @@ import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/us
 import { UpcomingShootPanel } from "@/components/app/upcoming-shoot";
 import { PortalReturnHint } from "@/components/app/portal-return-hint";
 import { nextInvoicePaymentCents, nextInvoicePaymentLabel } from "@/lib/invoice-payment-schedule";
+import { AuthorizeAutopayButton } from "@/components/app/authorize-autopay-button";
 
 export type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
+type AutopaySchedule = Pick<
+  Database["public"]["Tables"]["invoice_autopay_schedules"]["Row"],
+  | "id"
+  | "source_invoice_id"
+  | "current_invoice_id"
+  | "workspace_id"
+  | "enabled"
+  | "frequency"
+  | "charge_at"
+  | "timezone"
+  | "amount_cents"
+  | "currency"
+  | "status"
+>;
 type Delivery = Database["public"]["Tables"]["client_deliveries"]["Row"];
 type DeliveryKind = Database["public"]["Enums"]["delivery_kind"];
 export type Contract = {
@@ -162,7 +177,9 @@ export function Layer1Overview() {
   }, [wsId]);
   const branding = useWorkspaceBranding(wsId);
 
-  const firstName = activeWorkspace?.businessNameOnly ? activeWorkspace.name : user?.firstName?.trim().split(/\s+/)[0] || null;
+  const firstName = activeWorkspace?.businessNameOnly
+    ? activeWorkspace.name
+    : user?.firstName?.trim().split(/\s+/)[0] || null;
 
   const brandQ = useQuery({
     queryKey: ["layer1", "brand", wsId],
@@ -207,6 +224,22 @@ export function Layer1Overview() {
       return (data ?? []) as Invoice[];
     },
   });
+  const autopayQ = useQuery({
+    queryKey: ["layer1", "autopay", wsId],
+    enabled: !!wsId,
+    staleTime: 15_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("invoice_autopay_schedules")
+        .select(
+          "id,source_invoice_id,current_invoice_id,workspace_id,enabled,frequency,charge_at,timezone,amount_cents,currency,status",
+        )
+        .eq("workspace_id", wsId!)
+        .eq("enabled", true);
+      if (error) throw error;
+      return (data ?? []) as AutopaySchedule[];
+    },
+  });
 
   const contractsQ = useQuery({
     queryKey: ["layer1", "contracts", wsId],
@@ -215,7 +248,9 @@ export function Layer1Overview() {
     queryFn: async (): Promise<Contract[]> => {
       const { data, error } = await externalDb
         .from("client_contracts")
-        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,published_at,provider_document_id")
+        .select(
+          "id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,published_at,provider_document_id",
+        )
         .eq("workspace_id", wsId!)
         .neq("status", "draft")
         .order("created_at", { ascending: false });
@@ -325,17 +360,38 @@ export function Layer1Overview() {
       </div>
 
       <nav aria-label="Your workspace tools" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[{ id: "invoices", label: "Invoices", count: invoicesQ.data?.length },
-          { id: "contracts", label: "Contracts", count: contractsQ.data?.length }].map(item =>
-          <a key={item.id} href={`#${item.id}`} onClick={() => {
-            const section = document.getElementById(item.id);
-            if (section instanceof HTMLDetailsElement) section.open = true;
-          }} className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary">
-            <FileText className="mb-2 h-5 w-5 text-primary" />{item.label}
+        {[
+          { id: "invoices", label: "Invoices", count: invoicesQ.data?.length },
+          { id: "contracts", label: "Contracts", count: contractsQ.data?.length },
+        ].map((item) => (
+          <a
+            key={item.id}
+            href={`#${item.id}`}
+            onClick={() => {
+              const section = document.getElementById(item.id);
+              if (section instanceof HTMLDetailsElement) section.open = true;
+            }}
+            className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary"
+          >
+            <FileText className="mb-2 h-5 w-5 text-primary" />
+            {item.label}
             <span className="ml-2 text-xs text-muted-foreground">{item.count ?? "—"}</span>
-          </a>)}
-        <Link to="/deliveries" className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary"><ImageIcon className="mb-2 h-5 w-5 text-primary" />Deliverables</Link>
-        <Link to="/my-projects" className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary"><Film className="mb-2 h-5 w-5 text-primary" />Projects</Link>
+          </a>
+        ))}
+        <Link
+          to="/deliveries"
+          className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary"
+        >
+          <ImageIcon className="mb-2 h-5 w-5 text-primary" />
+          Deliverables
+        </Link>
+        <Link
+          to="/my-projects"
+          className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary"
+        >
+          <Film className="mb-2 h-5 w-5 text-primary" />
+          Projects
+        </Link>
       </nav>
 
       {/* Primary action */}
@@ -354,7 +410,9 @@ export function Layer1Overview() {
         <section className="space-y-3">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">Frame.io</p>
+              <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
+                Frame.io
+              </p>
               <h2 className="mt-1 text-lg font-semibold text-foreground">{frameioQ.data.label}</h2>
             </div>
             <Link to="/create" className="text-sm font-medium text-primary hover:underline">
@@ -372,11 +430,20 @@ export function Layer1Overview() {
                 aria-label={`Open ${file.name} in Frame.io`}
               >
                 {file.thumbnailUrl ? (
-                  <img src={file.thumbnailUrl} alt={file.name} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                  <img
+                    src={file.thumbnailUrl}
+                    alt={file.name}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    loading="lazy"
+                  />
                 ) : (
-                  <div className="flex h-full items-center justify-center p-3 text-center text-xs text-muted-foreground">{file.name}</div>
+                  <div className="flex h-full items-center justify-center p-3 text-center text-xs text-muted-foreground">
+                    {file.name}
+                  </div>
                 )}
-                <span className="absolute inset-x-0 bottom-0 truncate bg-background/80 px-2 py-1.5 text-[10px] text-foreground backdrop-blur">{file.name}</span>
+                <span className="absolute inset-x-0 bottom-0 truncate bg-background/80 px-2 py-1.5 text-[10px] text-foreground backdrop-blur">
+                  {file.name}
+                </span>
               </a>
             ))}
           </div>
@@ -409,21 +476,43 @@ export function Layer1Overview() {
       </section>
 
       {/* Contracts */}
-      <ExpandableSection title="Contracts" id="contracts" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
+      <ExpandableSection
+        title="Contracts"
+        id="contracts"
+        className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4"
+      >
         <div className="flex flex-wrap items-end justify-between gap-2">
           <h2 className="text-lg font-semibold text-foreground">Contracts & Agreements</h2>
-          {(contractsQ.data?.length ?? 0) > 1 && <span className="text-xs text-muted-foreground">{contractsQ.data!.length} contracts</span>}
+          {(contractsQ.data?.length ?? 0) > 1 && (
+            <span className="text-xs text-muted-foreground">
+              {contractsQ.data!.length} contracts
+            </span>
+          )}
         </div>
-        {contractsQ.isLoading ? <div className="surface-card p-5 text-sm text-muted-foreground">Loading contracts…</div> : contractsQ.isError ?
-          <div className="surface-card p-5 text-sm text-destructive">Contracts could not be loaded. Refresh the page to try again.</div> :
-          (contractsQ.data ?? []).length > 0 ? <div className="space-y-3">{contractsQ.data?.map((contract) => <ContractCard key={contract.id} contract={contract} />)}</div> :
-          <PolishedEmpty icon={FileText} body="You currently have no contracts requiring action." />}
+        {contractsQ.isLoading ? (
+          <div className="surface-card p-5 text-sm text-muted-foreground">Loading contracts…</div>
+        ) : contractsQ.isError ? (
+          <div className="surface-card p-5 text-sm text-destructive">
+            Contracts could not be loaded. Refresh the page to try again.
+          </div>
+        ) : (contractsQ.data ?? []).length > 0 ? (
+          <div className="space-y-3">
+            {contractsQ.data?.map((contract) => (
+              <ContractCard key={contract.id} contract={contract} />
+            ))}
+          </div>
+        ) : (
+          <PolishedEmpty icon={FileText} body="You currently have no contracts requiring action." />
+        )}
       </ExpandableSection>
 
       {/* Invoices */}
-      <ExpandableSection title="Invoices & Payments" id="invoices" className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4">
+      <ExpandableSection
+        title="Invoices & Payments"
+        id="invoices"
+        className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4"
+      >
         <div className="flex flex-wrap items-end justify-between gap-2">
-
           {(invoicesQ.data?.length ?? 0) > 1 && (
             <span className="text-xs text-muted-foreground">
               {invoicesQ.data!.length} invoices · newest first
@@ -439,7 +528,18 @@ export function Layer1Overview() {
         ) : (invoicesQ.data ?? []).length > 0 ? (
           <div className="space-y-3">
             {invoicesQ.data!.map((invoice) => (
-              <InvoiceCard key={invoice.id} invoice={invoice} clientName={projectName} />
+              <InvoiceCard
+                key={invoice.id}
+                invoice={invoice}
+                clientName={projectName}
+                autopay={
+                  (autopayQ.data ?? []).find((schedule) =>
+                    schedule.current_invoice_id
+                      ? schedule.current_invoice_id === invoice.id
+                      : schedule.source_invoice_id === invoice.id,
+                  ) ?? null
+                }
+              />
             ))}
           </div>
         ) : (
@@ -529,7 +629,9 @@ function AttentionCenter({
     <section className="space-y-3" aria-labelledby="attention-heading">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">At a glance</p>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">
+            At a glance
+          </p>
           <h2 id="attention-heading" className="mt-1 text-lg font-semibold text-foreground">
             Needs your attention
           </h2>
@@ -557,7 +659,9 @@ function AttentionCenter({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-foreground">{item.label}</span>
-                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">{item.detail}</span>
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                    {item.detail}
+                  </span>
                 </span>
                 <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </Link>
@@ -740,10 +844,21 @@ export function ContractCard({ contract }: { contract: Contract }) {
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-foreground sm:text-lg">{contract.title}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            {signed ? "Your completed agreement is on file." : "Review the agreement, then continue to secure electronic signing."}
+            {signed
+              ? "Your completed agreement is on file."
+              : "Review the agreement, then continue to secure electronic signing."}
           </p>
         </div>
-        <span className={cn("rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ring-inset", signed ? "bg-success/15 text-success ring-success/30" : expired ? "bg-muted/20 text-muted-foreground ring-border" : "bg-primary/15 text-primary ring-primary/30")}>
+        <span
+          className={cn(
+            "rounded-full px-3 py-1 text-xs font-semibold capitalize ring-1 ring-inset",
+            signed
+              ? "bg-success/15 text-success ring-success/30"
+              : expired
+                ? "bg-muted/20 text-muted-foreground ring-border"
+                : "bg-primary/15 text-primary ring-primary/30",
+          )}
+        >
           {contract.status}
         </span>
       </div>
@@ -754,7 +869,9 @@ export function ContractCard({ contract }: { contract: Contract }) {
       </div>
       {contract.description && (
         <details className="rounded-xl border border-border/60 bg-surface/40 p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-foreground">View agreement</summary>
+          <summary className="cursor-pointer text-sm font-semibold text-foreground">
+            View agreement
+          </summary>
           <div className="mt-4 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
             {contract.description}
           </div>
@@ -776,16 +893,40 @@ export function ContractCard({ contract }: { contract: Contract }) {
           />
         </>
       )}
-      {canOpen && !expired && contract.provider !== "signwell" && <a href={contract.hosted_url!} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 sm:w-auto">
-        {signed ? "View signed contract" : "Review & sign contract"}<ExternalLink className="h-4 w-4" />
-      </a>}
+      {canOpen && !expired && contract.provider !== "signwell" && (
+        <a
+          href={contract.hosted_url!}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 sm:w-auto"
+        >
+          {signed ? "View signed contract" : "Review & sign contract"}
+          <ExternalLink className="h-4 w-4" />
+        </a>
+      )}
       {(canSignWithSignWell || (canOpen && !expired)) && <PortalReturnHint />}
-      <p className="text-xs text-muted-foreground">Signing and certification are completed securely by {contract.provider === "bloom" ? "Bloom.io" : contract.provider === "signwell" ? "SignWell" : "the contract provider"}.</p>
+      <p className="text-xs text-muted-foreground">
+        Signing and certification are completed securely by{" "}
+        {contract.provider === "bloom"
+          ? "Bloom.io"
+          : contract.provider === "signwell"
+            ? "SignWell"
+            : "the contract provider"}
+        .
+      </p>
     </div>
   );
 }
 
-export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoice; clientName?: string }) {
+export function InvoiceCard({
+  invoice,
+  clientName = "Client",
+  autopay = null,
+}: {
+  invoice: Invoice;
+  clientName?: string;
+  autopay?: AutopaySchedule | null;
+}) {
   const lineItems = invoiceItemsFromJson(invoice.line_items);
   const amount = formatMoney(invoice.amount_cents, invoice.currency);
   const due = formatDate(invoice.due_at);
@@ -794,7 +935,10 @@ export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoi
   const isPaid = invoice.status === "paid";
   const ctaLabel = isPaid
     ? "View Receipt"
-    : invoice.status === "sent" || invoice.status === "unpaid" || invoice.status === "overdue" || invoice.status === "deposit"
+    : invoice.status === "sent" ||
+        invoice.status === "unpaid" ||
+        invoice.status === "overdue" ||
+        invoice.status === "deposit"
       ? "Make Payment"
       : "View Invoice";
   const canOpen = isValidHttpsUrl(invoice.hosted_url);
@@ -820,7 +964,11 @@ export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoi
                 INVOICE_STATUS_TONE[invoice.status]
               }
             >
-              {(invoice.amount_paid_cents ?? 0) > 0 && invoice.amount_paid_cents! < (invoice.amount_cents ?? 0) && ["unpaid", "sent", "deposit"].includes(invoice.status) ? "Partially paid" : INVOICE_STATUS_LABEL[invoice.status]}
+              {(invoice.amount_paid_cents ?? 0) > 0 &&
+              invoice.amount_paid_cents! < (invoice.amount_cents ?? 0) &&
+              ["unpaid", "sent", "deposit"].includes(invoice.status)
+                ? "Partially paid"
+                : INVOICE_STATUS_LABEL[invoice.status]}
             </span>
           </div>
           {invoice.description && (
@@ -838,15 +986,56 @@ export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoi
       </div>
 
       <PaymentProgress invoice={invoice} />
+      {autopay && (
+        <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <strong className="text-foreground">Automatic payment</strong>
+            <span className="rounded-full bg-primary/10 px-2 py-1 text-xs font-medium capitalize text-primary">
+              {autopay.status.replaceAll("_", " ")}
+            </span>
+          </div>
+          <p className="text-muted-foreground">
+            {autopay.frequency === "monthly" ? "Monthly retainer" : "One-time automatic charge"} ·{" "}
+            {formatMoney(autopay.amount_cents, autopay.currency)} on{" "}
+            {new Date(autopay.charge_at).toLocaleString("en-US", {
+              timeZone: autopay.timezone,
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </p>
+          {["pending_authorization", "failed", "action_required"].includes(autopay.status) && (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Authorize your card securely with Stripe. Nothing is charged during authorization.
+              </p>
+              <AuthorizeAutopayButton scheduleId={autopay.id} />
+            </>
+          )}
+          {autopay.status === "active" && (
+            <p className="text-xs text-success">
+              Card authorized. Stripe will charge it automatically on the date shown.
+            </p>
+          )}
+        </div>
+      )}
       {!isPaid && nextPaymentCents > 0 && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm">
           <span className="text-muted-foreground">Due with next payment</span>
-          <strong className="text-foreground">{formatMoney(nextPaymentCents, invoice.currency)}</strong>
+          <strong className="text-foreground">
+            {formatMoney(nextPaymentCents, invoice.currency)}
+          </strong>
         </div>
       )}
       {(invoice.subtotal_cents ?? invoice.amount_cents ?? 0) > (invoice.amount_cents ?? 0) && (
         <p className="text-sm text-emerald-400">
-          Discount applied: {formatMoney((invoice.subtotal_cents ?? 0) - (invoice.amount_cents ?? 0), invoice.currency)}
+          Discount applied:{" "}
+          {formatMoney(
+            (invoice.subtotal_cents ?? 0) - (invoice.amount_cents ?? 0),
+            invoice.currency,
+          )}
           {invoice.discount_type === "percentage" && invoice.discount_value != null
             ? ` (${(invoice.discount_value / 100).toFixed(2).replace(/\.00$/, "")}%)`
             : ""}
@@ -879,18 +1068,21 @@ export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoi
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <ClientInvoiceCopyButton invoice={invoice} clientName={clientName} />
-        {!isPaid && invoice.published_at && (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0) > 0 && (
-          <PayInvoiceButton
-            invoiceId={invoice.id}
-            label={nextInvoicePaymentLabel({
-              amountCents: invoice.amount_cents,
-              amountPaidCents: invoice.amount_paid_cents,
-              paymentPlan: invoice.payment_plan,
-              checkoutPaymentType: invoice.checkout_payment_type,
-              checkoutPaymentCents: invoice.checkout_payment_cents,
-            })}
-          />
-        )}
+        {!autopay?.enabled &&
+          !isPaid &&
+          invoice.published_at &&
+          (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0) > 0 && (
+            <PayInvoiceButton
+              invoiceId={invoice.id}
+              label={nextInvoicePaymentLabel({
+                amountCents: invoice.amount_cents,
+                amountPaidCents: invoice.amount_paid_cents,
+                paymentPlan: invoice.payment_plan,
+                checkoutPaymentType: invoice.checkout_payment_type,
+                checkoutPaymentCents: invoice.checkout_payment_cents,
+              })}
+            />
+          )}
         {canOpen && (
           <a
             href={invoice.hosted_url!}
@@ -904,7 +1096,6 @@ export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoi
         )}
       </div>
       {canOpen && <PortalReturnHint />}
-
     </div>
   );
 }
