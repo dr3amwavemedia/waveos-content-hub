@@ -10,6 +10,10 @@ type Entry = Database["public"]["Tables"]["payment_ledger"]["Row"];
 type Kind = Entry["kind"];
 type Mapping = { id: string; amount: string; date: string; invoice: string; description: string };
 type ImportRow = Database["public"]["Tables"]["payment_ledger"]["Insert"];
+type SalesInvoice = Pick<
+  Database["public"]["Tables"]["client_invoices"]["Row"],
+  "id" | "amount_cents" | "currency" | "status" | "issued_at"
+>;
 const KINDS: Kind[] = ["payment", "refund", "invoice", "expense"];
 const ZONE = "America/New_York";
 
@@ -53,12 +57,13 @@ function periodStart(period: "day" | "week" | "month" | "year"): string {
 }
 function PaymentsPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [truncated, setTruncated] = useState(false);
   const [period, setPeriod] = useState<"day" | "week" | "month" | "year">("month");
   const [csv, setCsv] = useState<CsvTable | null>(null);
   const [fileName, setFileName] = useState("");
-  const [kind, setKind] = useState<Kind>("invoice");
+  const [kind, setKind] = useState<Kind>("payment");
   const [map, setMap] = useState<Mapping>({
     id: "",
     amount: "",
@@ -72,6 +77,7 @@ function PaymentsPage() {
   async function reload() {
     setLoading(true);
     const all: Entry[] = [];
+    const allInvoices: SalesInvoice[] = [];
     for (let offset = 0; offset < 20000; offset += 1000) {
       const { data, error } = await supabase
         .from("payment_ledger")
@@ -85,8 +91,22 @@ function PaymentsPage() {
       all.push(...(data ?? []));
       if ((data ?? []).length < 1000) break;
     }
-    setTruncated(all.length >= 20000);
+    for (let offset = 0; offset < 20000; offset += 1000) {
+      const { data, error } = await supabase
+        .from("client_invoices")
+        .select("id,amount_cents,currency,status,issued_at")
+        .order("issued_at", { ascending: false })
+        .range(offset, offset + 999);
+      if (error) {
+        toast.error(`Sales totals could not load: ${error.message}`);
+        break;
+      }
+      allInvoices.push(...(data ?? []));
+      if ((data ?? []).length < 1000) break;
+    }
+    setTruncated(all.length >= 20000 || allInvoices.length >= 20000);
     setEntries(all);
+    setSalesInvoices(allInvoices);
     setLoading(false);
   }
   useEffect(() => {
@@ -109,6 +129,17 @@ function PaymentsPage() {
   const invoiced = selected
     .filter((entry) => entry.kind === "invoice")
     .reduce((sum, entry) => sum + entry.amount_cents, 0);
+  const issuedSales = salesInvoices
+    .filter(
+      (invoice) =>
+        invoice.currency === "USD" &&
+        invoice.status !== "draft" &&
+        invoice.status !== "void" &&
+        dateKey(invoice.issued_at) >= start &&
+        dateKey(invoice.issued_at) <= today,
+    )
+    .reduce((sum, invoice) => sum + (invoice.amount_cents ?? 0), 0);
+  const netSales = Math.max(0, issuedSales - refunded);
   const progress =
     invoiced > 0
       ? Math.min(100, Math.round((Math.max(0, collected - refunded) / invoiced) * 100))
@@ -139,17 +170,21 @@ function PaymentsPage() {
     }
     try {
       const table = parseBloomCsv(await file.text());
-      const suggest = (pattern: RegExp) =>
-        table.headers.find((header) => pattern.test(header)) ?? "";
+      const suggest = (exact: string, pattern: RegExp) =>
+        table.headers.find((header) => header.toLowerCase() === exact.toLowerCase()) ??
+        table.headers.find((header) => pattern.test(header)) ??
+        "";
+      const bloomTransactions = table.headers.includes("Transaction ID");
       setCsv(table);
       setFileName(file.name);
       setPreview([]);
+      if (bloomTransactions) setKind("payment");
       setMap({
-        id: suggest(/^(id|invoice.?number|transaction.?id)$/i),
-        amount: suggest(/amount|total|paid/i),
-        date: suggest(/date|issued|paid/i),
-        invoice: suggest(/invoice.?number/i),
-        description: suggest(/description|title|service/i),
+        id: suggest("Transaction ID", /^(id|transaction.?id)$/i),
+        amount: suggest("Transaction Amount", /amount|total|paid/i),
+        date: suggest("Transaction DateTime", /date|issued|paid/i),
+        invoice: suggest("Invoice Number", /invoice.?number/i),
+        description: suggest("Transaction Name", /description|title|service|name/i),
       });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not read CSV.");
@@ -157,6 +192,10 @@ function PaymentsPage() {
   }
   function mapped(row: string[], header: string): string {
     return header && csv ? (row[csv.headers.indexOf(header)] ?? "") : "";
+  }
+  function transactionKind(row: string[]): Kind {
+    const raw = mapped(row, "Transaction Type").trim().toUpperCase();
+    return raw.includes("REFUND") ? "refund" : kind;
   }
   function makePreview() {
     if (!csv || !map.id || !map.amount || !map.date) {
@@ -174,18 +213,29 @@ function PaymentsPage() {
         const date = new Date(rawDate);
         if (!rawDate || Number.isNaN(date.getTime()))
           throw new Error(`Invalid date at CSV row ${index + 2}. Use ISO or a clear date format.`);
+        const rowKind = transactionKind(row);
+        const bloomStatus = mapped(row, "Transaction Status").trim().toUpperCase();
+        const description = [
+          mapped(row, map.invoice).trim(),
+          mapped(row, map.description).trim(),
+          mapped(row, "Project Name").trim(),
+          mapped(row, "Client Full Name").trim(),
+        ].filter((value, position, values) => Boolean(value) && values.indexOf(value) === position);
+        const currency = mapped(row, "Currency Code").trim().toUpperCase() || "USD";
+        if (!/^[A-Z]{3}$/.test(currency))
+          throw new Error(`Invalid currency at CSV row ${index + 2}.`);
         return {
           source: "bloom_csv",
-          external_id: `bloom:${kind}:${id}`,
-          kind,
+          external_id: `bloom:${rowKind}:${id}`,
+          kind: rowKind,
           amount_cents: dollarsToCents(mapped(row, map.amount)),
-          currency: "USD",
+          currency,
           occurred_at: date.toISOString(),
-          description: [mapped(row, map.invoice).trim(), mapped(row, map.description).trim()]
-            .filter(Boolean)
-            .join(" · ")
-            .slice(0, 500),
-          status: kind === "invoice" || kind === "expense" ? "posted" : "unmatched",
+          description: description.join(" · ").slice(0, 500),
+          status:
+            bloomStatus === "COMPLETE" || rowKind === "invoice" || rowKind === "expense"
+              ? "posted"
+              : "unmatched",
         };
       });
       setPreview(rows);
@@ -224,7 +274,7 @@ function PaymentsPage() {
     const fresh = preview.filter((row) => !existing.has(row.external_id));
     const sourceNumbers = new Map(
       (csv?.rows ?? []).map((row) => [
-        `bloom:${kind}:${mapped(row, map.id).trim()}`,
+        `bloom:${transactionKind(row)}:${mapped(row, map.id).trim()}`,
         mapped(row, map.invoice).trim() || (kind === "invoice" ? mapped(row, map.id).trim() : ""),
       ]),
     );
@@ -267,7 +317,7 @@ function PaymentsPage() {
       }
     }
     toast.success(
-      `Saved ${fresh.length} rows; skipped ${existing.size} already imported. Payment rows await review.`,
+      `Saved ${fresh.length} rows; skipped ${existing.size} already imported. Completed Bloom transactions are posted automatically.`,
     );
     setPreview([]);
     setCsv(null);
@@ -293,8 +343,8 @@ function PaymentsPage() {
         <header>
           <h1 className="text-3xl font-semibold">Payments</h1>
           <p className="mt-2 text-muted-foreground">
-            Money received, refunds, Bloom imports, and invoice progress. USD totals use Sarasota
-            dates.
+            Booked sales, money received, refunds, Bloom imports, and invoice progress. USD totals
+            use Sarasota dates.
           </p>
         </header>
         {truncated && (
@@ -316,12 +366,13 @@ function PaymentsPage() {
               </button>
             ))}
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-4">
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {[
-              ["Collected", money(collected)],
+              ["Net sales", money(netSales)],
+              ["Cash collected", money(collected)],
               ["Refunds", money(refunded)],
-              ["Net received", money(collected - refunded)],
-              ["Bloom invoiced", money(invoiced)],
+              ["Net cash", money(collected - refunded)],
+              ["Bloom invoices imported", money(invoiced)],
             ].map(([label, value]) => (
               <div key={label} className="rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">{label}</p>
@@ -329,6 +380,11 @@ function PaymentsPage() {
               </div>
             ))}
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Net sales counts every issued WaveOS invoice in the selected period, including unpaid
+            and partially paid invoices, then subtracts recorded refunds. Draft and void invoices
+            are excluded. Cash collected only counts posted payments.
+          </p>
           <div className="mt-6">
             <div className="flex justify-between text-sm">
               <span>Collected against imported Bloom invoices</span>
@@ -434,8 +490,8 @@ function PaymentsPage() {
           {preview.length > 0 && (
             <div className="mt-5">
               <p className="text-sm">
-                Review: {preview.length} {kind} rows. Payments and refunds will be pending until
-                posted. First five:
+                Review: {preview.length} rows. Completed Bloom transactions will post immediately;
+                incomplete transactions will stay pending. First five:
               </p>
               <div className="mt-2 overflow-x-auto">
                 <table className="w-full text-left text-sm">

@@ -2231,7 +2231,7 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
 
 function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clientLabel: string }) {
   const qc = useQueryClient();
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true);
   const [creationMode, setCreationMode] = useState<"external" | "template">("template");
   const [editingDraft, setEditingDraft] = useState<ContractRow | null>(null);
   const [title, setTitle] = useState("");
@@ -2351,7 +2351,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
       {q.isSuccess && <ContractExportTools key={workspaceId} contracts={q.data ?? []} />}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
-          Build a client-specific draft or connect an existing secure signing link.
+          Choose a template, complete its required details, then review and send it in SignWell.
         </p>
         <button
           type="button"
@@ -2362,7 +2362,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
           className="inline-flex min-h-12 items-center gap-1.5 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground"
         >
           {showForm ? <X className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
-          {showForm ? "Cancel" : "Add contract"}
+          {showForm ? "Hide new contract" : "New contract"}
         </button>
       </div>
       {showForm && (
@@ -2372,7 +2372,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
             onClick={() => setCreationMode("template")}
             className={cn("min-h-11 rounded-lg border px-3 text-sm", creationMode === "template" ? "border-primary bg-primary/10" : "border-border")}
           >
-            Build contract
+            Contract template
           </button>
           <button
             type="button"
@@ -2517,7 +2517,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
                     }}
                     className="min-h-10 rounded-lg border border-border px-3 text-xs font-semibold hover:border-primary/40"
                   >
-                    {!contract.signer_name || !contract.signer_email ? "Add signer details" : "Edit draft"}
+                    {!contract.signer_name || !contract.signer_email ? "Complete details" : "Edit details"}
                   </button>
                 )}
                 <select

@@ -8,13 +8,13 @@ import { errorMessage } from "@/lib/error-message";
 
 const SIGNWELL_EMBED_SCRIPT = "https://static.signwell.com/assets/embedded.js";
 
-type SignWellEmbedEvent = { id?: string; url?: string; declineReason?: string };
+export type SignWellEmbedEvent = { id?: string; url?: string; declineReason?: string };
 
 type SignWellEmbedInstance = {
   open: () => void;
 };
 
-type SignWellEmbedConstructor = new (options: {
+export type SignWellEmbedConstructor = new (options: {
   url: string;
   redirectionUrl?: string;
   declineRedirectionUrl?: string;
@@ -23,10 +23,16 @@ type SignWellEmbedConstructor = new (options: {
   showHeader?: boolean;
   allowDownload?: boolean;
   signatureDefaultName?: boolean;
+  requestingRedirectUrl?: string;
+  start?: "document_view" | "edit_recipients" | "edit_files";
+  showSendButton?: boolean;
+  allowAddContacts?: boolean;
+  allowCC?: boolean;
   events?: {
     completed?: (event: SignWellEmbedEvent) => void;
     declined?: (event: SignWellEmbedEvent) => void;
     error?: (event: unknown) => void;
+    closed?: (event: SignWellEmbedEvent) => void;
   };
 }) => SignWellEmbedInstance;
 
@@ -38,7 +44,7 @@ declare global {
 
 let signWellScriptPromise: Promise<SignWellEmbedConstructor> | null = null;
 
-function loadSignWellEmbed(): Promise<SignWellEmbedConstructor> {
+export function loadSignWellEmbed(): Promise<SignWellEmbedConstructor> {
   if (window.SignWellEmbed) return Promise.resolve(window.SignWellEmbed);
   if (signWellScriptPromise) return signWellScriptPromise;
 

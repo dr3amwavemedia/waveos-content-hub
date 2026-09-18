@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  contractFieldsForTemplate,
   contractGuidancePrompts,
   contractValuesFromJson,
   renderContract,
@@ -33,11 +34,18 @@ test("fills the selected client's fields and purchased services without changing
   assert.match(template, /{{client_name}}/);
 });
 
-test("flags missing and unsupported placeholders before a draft is saved", () => {
+test("turns template-specific placeholders into required fill-in fields", () => {
   const values = contractValuesFromJson({ client_name: "Alex" });
   const result = renderContract("{{client_name}} · {{services}} · {{custom_fee}}", values);
-  assert.deepEqual(result.missing, ["services"]);
-  assert.deepEqual(result.unknown, ["custom_fee"]);
+  assert.deepEqual(result.missing, ["services", "custom_fee"]);
+  assert.deepEqual(result.unknown, []);
   assert.match(result.content, /{{services}}/);
-  assert.equal(contractGuidancePrompts("PAYMENT TERMS\n[Enter the agreed price.]\nFinal text.").length, 1);
+  assert.deepEqual(contractFieldsForTemplate("{{wedding_date}} {{creative_strategy}}"), [
+    { key: "wedding_date", label: "Wedding Date", input: "date" },
+    { key: "creative_strategy", label: "Creative Strategy", input: "textarea" },
+  ]);
+  assert.equal(
+    contractGuidancePrompts("PAYMENT TERMS\n[Enter the agreed price.]\nFinal text.").length,
+    1,
+  );
 });

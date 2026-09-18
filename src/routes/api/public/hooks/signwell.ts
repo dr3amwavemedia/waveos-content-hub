@@ -54,7 +54,10 @@ export const Route = createFileRoute("/api/public/hooks/signwell")({
         const sentAt = Number.isFinite(Number(eventTime))
           ? Number(eventTime) * 1000
           : Date.parse(eventTime);
-        if (!Number.isFinite(sentAt) || Math.abs(Date.now() - sentAt) > REPLAY_TOLERANCE_SECONDS * 1000) {
+        if (
+          !Number.isFinite(sentAt) ||
+          Math.abs(Date.now() - sentAt) > REPLAY_TOLERANCE_SECONDS * 1000
+        ) {
           return new Response("stale_event", { status: 400 });
         }
 
@@ -84,26 +87,31 @@ export const Route = createFileRoute("/api/public/hooks/signwell")({
         const status =
           eventType === "document_completed"
             ? "signed"
-            : eventType === "document_signed"
-              ? "sent" // one recipient signed; the document is not complete yet
-              : eventType === "document_viewed"
-                ? "viewed"
-                : eventType === "document_declined"
-                  ? "declined"
-                  : eventType === "document_expired"
-                    ? "expired"
-                    : null;
+            : eventType === "document_sent"
+              ? "sent"
+              : eventType === "document_signed"
+                ? "sent" // one recipient signed; the document is not complete yet
+                : eventType === "document_viewed"
+                  ? "viewed"
+                  : eventType === "document_declined"
+                    ? "declined"
+                    : eventType === "document_expired"
+                      ? "expired"
+                      : null;
         if (!status) return new Response("ok", { status: 200 });
 
         const completedAt = new Date().toISOString();
         const patch = {
           status,
+          ...(status === "sent" ? { sent_at: completedAt, published_at: completedAt } : {}),
           ...(status === "signed" ? { signed_at: completedAt } : {}),
         };
 
         const locate = supabaseAdmin
           .from("client_contracts")
-          .select("id,workspace_id,description,contract_data,source_template_version,provider_document_id");
+          .select(
+            "id,workspace_id,description,contract_data,source_template_version,provider_document_id",
+          );
         const { data: contract } = metadata.contract_id
           ? await locate.eq("id", metadata.contract_id).maybeSingle()
           : documentId
