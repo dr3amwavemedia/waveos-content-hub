@@ -227,6 +227,92 @@ export type Database = {
           },
         ]
       }
+      catalog_items: {
+        Row: {
+          active: boolean
+          annual_price_cents: number | null
+          category: string
+          contract_template_id: string | null
+          created_at: string
+          currency: string
+          description: string | null
+          id: string
+          import_id: string
+          import_version: string | null
+          item_type: string
+          maximum_price_cents: number | null
+          minimum_price_cents: number | null
+          monthly_price_cents: number | null
+          name: string
+          price_cents: number | null
+          price_display: string | null
+          price_note: string | null
+          pricing_type: string
+          quantity_default: number
+          source: string | null
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          annual_price_cents?: number | null
+          category: string
+          contract_template_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          import_id: string
+          import_version?: string | null
+          item_type?: string
+          maximum_price_cents?: number | null
+          minimum_price_cents?: number | null
+          monthly_price_cents?: number | null
+          name: string
+          price_cents?: number | null
+          price_display?: string | null
+          price_note?: string | null
+          pricing_type?: string
+          quantity_default?: number
+          source?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          annual_price_cents?: number | null
+          category?: string
+          contract_template_id?: string | null
+          created_at?: string
+          currency?: string
+          description?: string | null
+          id?: string
+          import_id?: string
+          import_version?: string | null
+          item_type?: string
+          maximum_price_cents?: number | null
+          minimum_price_cents?: number | null
+          monthly_price_cents?: number | null
+          name?: string
+          price_cents?: number | null
+          price_display?: string | null
+          price_note?: string | null
+          pricing_type?: string
+          quantity_default?: number
+          source?: string | null
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "catalog_items_contract_template_id_fkey"
+            columns: ["contract_template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_checklist_items: {
         Row: {
           checklist_type: string
@@ -1244,6 +1330,7 @@ export type Database = {
           created_by: string | null
           description: string | null
           id: string
+          import_id: string | null
           is_active: boolean
           kind: string
           name: string
@@ -1256,6 +1343,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          import_id?: string | null
           is_active?: boolean
           kind: string
           name: string
@@ -1268,6 +1356,7 @@ export type Database = {
           created_by?: string | null
           description?: string | null
           id?: string
+          import_id?: string | null
           is_active?: boolean
           kind?: string
           name?: string
@@ -1489,6 +1578,30 @@ export type Database = {
           refresh_token_encrypted?: string
           scopes?: string
           token_expires_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      global_invoice_number_counter: {
+        Row: {
+          last_value: number
+          pad_width: number
+          prefix: string
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          last_value: number
+          pad_width: number
+          prefix: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          last_value?: number
+          pad_width?: number
+          prefix?: string
+          singleton?: boolean
           updated_at?: string
         }
         Relationships: []

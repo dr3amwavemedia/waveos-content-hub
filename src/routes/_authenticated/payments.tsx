@@ -4,18 +4,35 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { dollarsToCents, parseBloomCsv, type CsvTable } from "@/lib/bloom-payments-csv";
+import {
+  parseBloomFile,
+  matchInvoice,
+  invoiceUpdate,
+  type BloomRecord,
+  type InvoiceCandidate,
+  type ParsedBloomFile,
+} from "@/lib/bloom-import";
 
 type Entry = Database["public"]["Tables"]["payment_ledger"]["Row"];
-type Kind = Entry["kind"];
-type Mapping = { id: string; amount: string; date: string; invoice: string; description: string };
 type ImportRow = Database["public"]["Tables"]["payment_ledger"]["Insert"];
 type SalesInvoice = Pick<
   Database["public"]["Tables"]["client_invoices"]["Row"],
   "id" | "amount_cents" | "currency" | "status" | "issued_at"
 >;
-const KINDS: Kind[] = ["payment", "refund", "invoice", "expense"];
+type PlanRow = {
+  record: BloomRecord;
+  invoice: InvoiceCandidate | null;
+  reason: string;
+  duplicate: boolean;
+};
 const ZONE = "America/New_York";
+const REASONS: Record<string, string> = {
+  number: "Matched by invoice number",
+  email_amount: "Matched by client e-mail",
+  name_amount: "Matched by client name and amount",
+  ambiguous: "Several invoices match — needs review",
+  none: "No matching invoice — needs review",
+};
 
 export const Route = createFileRoute("/_authenticated/payments")({
   beforeLoad: async () => {
@@ -61,18 +78,10 @@ function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [truncated, setTruncated] = useState(false);
   const [period, setPeriod] = useState<"day" | "week" | "month" | "year">("month");
-  const [csv, setCsv] = useState<CsvTable | null>(null);
   const [fileName, setFileName] = useState("");
-  const [kind, setKind] = useState<Kind>("payment");
-  const [map, setMap] = useState<Mapping>({
-    id: "",
-    amount: "",
-    date: "",
-    invoice: "",
-    description: "",
-  });
+  const [parsed, setParsed] = useState<ParsedBloomFile | null>(null);
+  const [plan, setPlan] = useState<PlanRow[] | null>(null);
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<ImportRow[]>([]);
 
   async function reload() {
     setLoading(true);
@@ -98,7 +107,7 @@ function PaymentsPage() {
         .order("issued_at", { ascending: false })
         .range(offset, offset + 999);
       if (error) {
-        toast.error(`Sales totals could not load: ${error.message}`);
+        toast.error(`Could not load invoice sales: ${error.message}`);
         break;
       }
       allInvoices.push(...(data ?? []));
@@ -130,14 +139,12 @@ function PaymentsPage() {
     .filter((entry) => entry.kind === "invoice")
     .reduce((sum, entry) => sum + entry.amount_cents, 0);
   const issuedSales = salesInvoices
-    .filter(
-      (invoice) =>
-        invoice.currency === "USD" &&
-        invoice.status !== "draft" &&
-        invoice.status !== "void" &&
-        dateKey(invoice.issued_at) >= start &&
-        dateKey(invoice.issued_at) <= today,
-    )
+    .filter((invoice) => {
+      if (invoice.currency !== "USD" || invoice.status === "draft" || invoice.status === "void")
+        return false;
+      const day = dateKey(invoice.issued_at);
+      return day >= start && day <= today;
+    })
     .reduce((sum, invoice) => sum + (invoice.amount_cents ?? 0), 0);
   const netSales = Math.max(0, issuedSales - refunded);
   const progress =
@@ -168,84 +175,73 @@ function PaymentsPage() {
       toast.error("Choose a CSV file under 5 MB.");
       return;
     }
+    setPlan(null);
     try {
-      const table = parseBloomCsv(await file.text());
-      const suggest = (exact: string, pattern: RegExp) =>
-        table.headers.find((header) => header.toLowerCase() === exact.toLowerCase()) ??
-        table.headers.find((header) => pattern.test(header)) ??
-        "";
-      const bloomTransactions = table.headers.includes("Transaction ID");
-      setCsv(table);
+      const result = parseBloomFile(await file.text());
+      setParsed(result);
       setFileName(file.name);
-      setPreview([]);
-      if (bloomTransactions) setKind("payment");
-      setMap({
-        id: suggest("Transaction ID", /^(id|transaction.?id)$/i),
-        amount: suggest("Transaction Amount", /amount|total|paid/i),
-        date: suggest("Transaction DateTime", /date|issued|paid/i),
-        invoice: suggest("Invoice Number", /invoice.?number/i),
-        description: suggest("Transaction Name", /description|title|service|name/i),
-      });
+      await runScan(result);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read CSV.");
+      setParsed(null);
+      toast.error(error instanceof Error ? error.message : "Could not read this CSV.");
     }
   }
-  function mapped(row: string[], header: string): string {
-    return header && csv ? (row[csv.headers.indexOf(header)] ?? "") : "";
-  }
-  function transactionKind(row: string[]): Kind {
-    const raw = mapped(row, "Transaction Type").trim().toUpperCase();
-    return raw.includes("REFUND") ? "refund" : kind;
-  }
-  function makePreview() {
-    if (!csv || !map.id || !map.amount || !map.date) {
-      toast.error("Map an ID, amount, and date column first.");
-      return;
-    }
+
+  /** Read every row, find its invoice, and show what the import will change. */
+  async function runScan(source: ParsedBloomFile) {
+    setBusy(true);
     try {
-      const ids = new Set<string>();
-      const rows = csv.rows.map((row, index): ImportRow => {
-        const id = mapped(row, map.id).trim();
-        if (!id || ids.has(id))
-          throw new Error(`Missing or repeated source ID at CSV row ${index + 2}.`);
-        ids.add(id);
-        const rawDate = mapped(row, map.date).trim();
-        const date = new Date(rawDate);
-        if (!rawDate || Number.isNaN(date.getTime()))
-          throw new Error(`Invalid date at CSV row ${index + 2}. Use ISO or a clear date format.`);
-        const rowKind = transactionKind(row);
-        const bloomStatus = mapped(row, "Transaction Status").trim().toUpperCase();
-        const description = [
-          mapped(row, map.invoice).trim(),
-          mapped(row, map.description).trim(),
-          mapped(row, "Project Name").trim(),
-          mapped(row, "Client Full Name").trim(),
-        ].filter((value, position, values) => Boolean(value) && values.indexOf(value) === position);
-        const currency = mapped(row, "Currency Code").trim().toUpperCase() || "USD";
-        if (!/^[A-Z]{3}$/.test(currency))
-          throw new Error(`Invalid currency at CSV row ${index + 2}.`);
-        return {
-          source: "bloom_csv",
-          external_id: `bloom:${rowKind}:${id}`,
-          kind: rowKind,
-          amount_cents: dollarsToCents(mapped(row, map.amount)),
-          currency,
-          occurred_at: date.toISOString(),
-          description: description.join(" · ").slice(0, 500),
-          status:
-            bloomStatus === "COMPLETE" || rowKind === "invoice" || rowKind === "expense"
-              ? "posted"
-              : "unmatched",
-        };
+      const [invoiceResult, workspaceResult, crmResult, ledgerResult] = await Promise.all([
+        supabase
+          .from("client_invoices")
+          .select("id,workspace_id,number,amount_cents,amount_paid_cents,currency,status"),
+        supabase.from("workspaces").select("id,name,client_name,business_name"),
+        supabase.from("crm_accounts").select("linked_workspace_id,email,business_name"),
+        supabase.from("payment_ledger").select("external_id").eq("source", "bloom_csv"),
+      ]);
+      const failure = invoiceResult.error ?? workspaceResult.error ?? ledgerResult.error;
+      if (failure) throw failure;
+
+      const names = new Map(
+        (workspaceResult.data ?? []).map((workspace) => [
+          workspace.id,
+          workspace.client_name || workspace.business_name || workspace.name,
+        ]),
+      );
+      const emails = new Map<string, string>();
+      (crmResult.data ?? []).forEach((account) => {
+        if (account.linked_workspace_id && account.email)
+          emails.set(account.linked_workspace_id, account.email.toLowerCase());
       });
-      setPreview(rows);
-      toast.success(`Preview ready: ${rows.length} rows. Review before saving.`);
+      const candidates: InvoiceCandidate[] = (invoiceResult.data ?? []).map((invoice) => ({
+        ...invoice,
+        amount_cents: invoice.amount_cents ?? 0,
+        clientName: names.get(invoice.workspace_id) ?? null,
+        clientEmail: emails.get(invoice.workspace_id) ?? null,
+      }));
+      const imported = new Set((ledgerResult.data ?? []).map((row) => row.external_id));
+
+      setPlan(
+        source.records.map((record) => {
+          const match = matchInvoice(record, candidates);
+          return {
+            record,
+            invoice: match.invoice,
+            reason: match.reason,
+            duplicate: imported.has(`bloom:${record.sourceId}`),
+          };
+        }),
+      );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "CSV mapping failed.");
+      toast.error(error instanceof Error ? error.message : "Could not scan this CSV.");
+    } finally {
+      setBusy(false);
     }
   }
-  async function saveImport() {
-    if (!preview.length) return;
+
+  /** Save the scanned rows and roll matched payments onto their invoices. */
+  async function applyScan() {
+    if (!plan) return;
     setBusy(true);
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) {
@@ -254,76 +250,73 @@ function PaymentsPage() {
       return;
     }
     const batch = crypto.randomUUID();
-    const existing = new Set<string>();
-    for (let i = 0; i < preview.length; i += 100) {
-      const { data, error } = await supabase
-        .from("payment_ledger")
-        .select("external_id")
-        .eq("source", "bloom_csv")
-        .in(
-          "external_id",
-          preview.slice(i, i + 100).map((row) => row.external_id),
-        );
+    const fresh = plan.filter((row) => !row.duplicate);
+    const rows: ImportRow[] = fresh.map((row) => ({
+      source: "bloom_csv",
+      external_id: `bloom:${row.record.sourceId}`,
+      kind: row.record.kind,
+      amount_cents: row.record.amountCents,
+      currency: row.record.currency,
+      occurred_at: row.record.occurredAt,
+      description: row.record.description || null,
+      invoice_id: row.invoice?.id ?? null,
+      workspace_id: row.invoice?.workspace_id ?? null,
+      import_batch_id: batch,
+      created_by: auth.user.id,
+      // Refunds and unmatched money always wait for the owner.
+      status:
+        row.record.kind === "refund" || (!row.invoice && row.record.kind === "payment")
+          ? "unmatched"
+          : "posted",
+    }));
+
+    for (let index = 0; index < rows.length; index += 100) {
+      const { error } = await supabase.from("payment_ledger").insert(rows.slice(index, index + 100));
       if (error) {
-        toast.error(error.message);
-        setBusy(false);
-        return;
-      }
-      data?.forEach((row) => existing.add(row.external_id));
-    }
-    const fresh = preview.filter((row) => !existing.has(row.external_id));
-    const sourceNumbers = new Map(
-      (csv?.rows ?? []).map((row) => [
-        `bloom:${transactionKind(row)}:${mapped(row, map.id).trim()}`,
-        mapped(row, map.invoice).trim() || (kind === "invoice" ? mapped(row, map.id).trim() : ""),
-      ]),
-    );
-    const numbers = [...new Set([...sourceNumbers.values()].filter(Boolean))];
-    const matches = new Map<string, { id: string; workspace_id: string }[]>();
-    for (let i = 0; i < numbers.length; i += 100) {
-      const { data, error } = await supabase
-        .from("client_invoices")
-        .select("id,workspace_id,number")
-        .in("number", numbers.slice(i, i + 100));
-      if (error) {
-        toast.error(`Could not match invoice numbers: ${error.message}`);
-        setBusy(false);
-        return;
-      }
-      data?.forEach((invoice) => {
-        if (!invoice.number) return;
-        matches.set(invoice.number, [...(matches.get(invoice.number) ?? []), invoice]);
-      });
-    }
-    for (let i = 0; i < fresh.length; i += 100) {
-      const { error } = await supabase.from("payment_ledger").insert(
-        fresh.slice(i, i + 100).map((row) => {
-          const linked = matches.get(sourceNumbers.get(row.external_id) ?? "") ?? [];
-          return {
-            ...row,
-            ...(linked.length === 1
-              ? { invoice_id: linked[0].id, workspace_id: linked[0].workspace_id }
-              : {}),
-            import_batch_id: batch,
-            created_by: auth.user!.id,
-          };
-        }),
-      );
-      if (error) {
-        toast.error(`Import stopped after ${i} rows: ${error.message}`);
+        toast.error(`Import stopped after ${index} rows: ${error.message}`);
         setBusy(false);
         await reload();
         return;
       }
     }
+
+    // Roll every matched payment in this file onto its invoice, once per invoice.
+    const totals = new Map<string, { invoice: InvoiceCandidate; cents: number; at: string }>();
+    fresh.forEach((row) => {
+      if (row.record.kind !== "payment" || !row.invoice) return;
+      const current = totals.get(row.invoice.id);
+      totals.set(row.invoice.id, {
+        invoice: row.invoice,
+        cents: (current?.cents ?? 0) + row.record.amountCents,
+        at:
+          !current || row.record.occurredAt > current.at
+            ? row.record.occurredAt
+            : current.at,
+      });
+    });
+    let updated = 0;
+    for (const { invoice, cents, at } of totals.values()) {
+      const patch = invoiceUpdate(invoice, cents, at);
+      if (!patch) continue;
+      const { error } = await supabase
+        .from("client_invoices")
+        .update(patch)
+        .eq("id", invoice.id)
+        .eq("amount_paid_cents", invoice.amount_paid_cents ?? 0);
+      if (error) toast.error(`Invoice ${invoice.number ?? invoice.id}: ${error.message}`);
+      else updated += 1;
+    }
+
     toast.success(
-      `Saved ${fresh.length} rows; skipped ${existing.size} already imported. Completed Bloom transactions are posted automatically.`,
+      `Imported ${rows.length} rows, skipped ${plan.length - rows.length} already-imported rows, updated ${updated} invoices.`,
     );
-    setPreview([]);
-    setCsv(null);
+    setPlan(null);
+    setParsed(null);
+    setFileName("");
     setBusy(false);
     await reload();
   }
+
   async function postRow(entry: Entry) {
     const { error } = await supabase
       .from("payment_ledger")
@@ -381,9 +374,9 @@ function PaymentsPage() {
             ))}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Net sales counts every issued WaveOS invoice in the selected period, including unpaid
-            and partially paid invoices, then subtracts recorded refunds. Draft and void invoices
-            are excluded. Cash collected only counts posted payments.
+            Net sales includes every issued WaveOS invoice in this period, even when unpaid or only
+            partially paid, and subtracts recorded refunds. Draft and void invoices are excluded.
+            Cash collected only counts posted payments.
           </p>
           <div className="mt-6">
             <div className="flex justify-between text-sm">
@@ -420,8 +413,10 @@ function PaymentsPage() {
         <section className="rounded-2xl border border-border bg-card p-6">
           <h2 className="text-xl font-semibold">Import Bloom CSV</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Choose a CSV export, map its columns, preview every row, then save. Existing records are
-            skipped by source ID. This never edits client invoices.
+            Drop in a full Bloom export. WaveOS reads the columns on its own, works out which rows
+            are payments, refunds or invoices, finds the matching invoice, and updates what each
+            client has paid. Rows already imported are skipped. Refunds and anything it cannot match
+            wait for you below.
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-4">
             <input
@@ -432,102 +427,91 @@ function PaymentsPage() {
                 void pickFile(event.target.files?.[0]);
               }}
             />
-            <label className="text-sm">
-              Record type{" "}
-              <select
-                className="ml-2 rounded-lg border border-border bg-background p-2"
-                value={kind}
-                onChange={(event) => {
-                  setKind(event.target.value as Kind);
-                  setPreview([]);
-                }}
-              >
-                {KINDS.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {busy && !plan && <span className="text-sm text-muted-foreground">Scanning…</span>}
           </div>
-          {csv && (
+          {parsed && plan && (
             <>
-              <p className="mt-4 text-sm">
-                {fileName}: {csv.rows.length} rows
-              </p>
-              <div className="mt-4 grid gap-3 md:grid-cols-5">
-                {(["id", "amount", "date", "invoice", "description"] as const).map((field) => (
-                  <label key={field} className="text-sm capitalize">
-                    {field}
-                    {["id", "amount", "date"].includes(field) && " *"}
-                    <select
-                      value={map[field]}
-                      onChange={(event) => {
-                        setMap({ ...map, [field]: event.target.value });
-                        setPreview([]);
-                      }}
-                      className="mt-1 w-full rounded-lg border border-border bg-background p-2"
-                    >
-                      <option value="">Select column</option>
-                      {csv.headers.map((header) => (
-                        <option key={header} value={header}>
-                          {header}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+              <div className="mt-5 grid gap-3 sm:grid-cols-4">
+                {[
+                  ["Rows read", String(plan.length)],
+                  ["Matched to an invoice", String(plan.filter((row) => row.invoice).length)],
+                  [
+                    "Already imported",
+                    String(plan.filter((row) => row.duplicate).length),
+                  ],
+                  [
+                    "Needs review",
+                    String(plan.filter((row) => !row.invoice && !row.duplicate).length),
+                  ],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl border border-border p-3">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="mt-1 text-xl font-semibold">{value}</p>
+                  </div>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={makePreview}
-                className="mt-5 rounded-lg bg-primary px-4 py-2 text-primary-foreground"
-              >
-                Preview import
-              </button>
-            </>
-          )}
-          {preview.length > 0 && (
-            <div className="mt-5">
-              <p className="text-sm">
-                Review: {preview.length} rows. Completed Bloom transactions will post immediately;
-                incomplete transactions will stay pending. First five:
+              <p className="mt-3 text-xs text-muted-foreground">
+                {fileName} · columns used:{" "}
+                {Object.entries(parsed.columns)
+                  .map(([field, header]) => `${field} → ${header}`)
+                  .join(", ") || "none detected"}
+                {parsed.skipped.length > 0 &&
+                  ` · ${parsed.skipped.length} rows skipped (no readable amount or date)`}
               </p>
-              <div className="mt-2 overflow-x-auto">
+              <div className="mt-4 max-h-96 overflow-auto rounded-xl border border-border">
                 <table className="w-full text-left text-sm">
-                  <thead>
+                  <thead className="sticky top-0 bg-card">
                     <tr>
-                      <th>ID</th>
-                      <th>Date</th>
-                      <th>Amount</th>
-                      <th>Description</th>
+                      <th className="p-2">Date</th>
+                      <th className="p-2">Type</th>
+                      <th className="p-2">Amount</th>
+                      <th className="p-2">Client / invoice</th>
+                      <th className="p-2">Match</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.slice(0, 5).map((row) => (
-                      <tr key={row.external_id} className="border-t border-border">
-                        <td>{row.external_id}</td>
-                        <td>{dateKey(row.occurred_at)}</td>
-                        <td>{money(row.amount_cents)}</td>
-                        <td>{row.description}</td>
+                    {plan.slice(0, 200).map((row) => (
+                      <tr key={row.record.sourceId} className="border-t border-border">
+                        <td className="p-2">{dateKey(row.record.occurredAt)}</td>
+                        <td className="p-2 capitalize">{row.record.kind}</td>
+                        <td className="p-2">{money(row.record.amountCents)}</td>
+                        <td className="p-2">
+                          {row.record.invoiceNumber ||
+                            row.record.clientName ||
+                            row.record.clientEmail ||
+                            "—"}
+                        </td>
+                        <td className="p-2 text-muted-foreground">
+                          {row.duplicate
+                            ? "Already imported"
+                            : (REASONS[row.reason] ?? "Needs review")}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {plan.length > 200 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Showing the first 200 of {plan.length} rows. All rows are imported.
+                </p>
+              )}
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || plan.every((row) => row.duplicate)}
                 onClick={() => {
-                  void saveImport();
+                  void applyScan();
                 }}
                 className="mt-5 rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
               >
-                {busy ? "Saving…" : `Save ${preview.length} reviewed rows`}
+                {busy
+                  ? "Importing…"
+                  : `Import ${plan.filter((row) => !row.duplicate).length} rows and update invoices`}
               </button>
-            </div>
+            </>
           )}
         </section>
+
         <section className="rounded-2xl border border-border bg-card p-6">
           <h2 className="text-xl font-semibold">Pending payments and refunds ({pending.length})</h2>
           <p className="mt-1 text-sm text-muted-foreground">

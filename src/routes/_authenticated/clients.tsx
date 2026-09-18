@@ -3,6 +3,7 @@ import { DocumentsTab } from "@/components/documents/documents-tab";
 import { ContractSigningActions } from "@/components/documents/contract-signing-actions";
 import { ContractBuilder } from "@/components/documents/contract-builder";
 import { InvoiceItemPicker } from "@/components/documents/invoice-item-picker";
+import { CatalogItemPicker } from "@/components/documents/catalog-item-picker";
 import {
   invoiceItemsFromJson,
   invoiceItemTotal,
@@ -3004,6 +3005,10 @@ function InvoiceForm({
           )}
         </Field>
       </div>
+      <CatalogItemPicker
+        currency={currency}
+        onAdd={(item) => setItems((current) => [...current, item])}
+      />
       <InvoiceItemPicker
         currency={currency}
         onAdd={(item) => setItems((current) => [...current, item])}
