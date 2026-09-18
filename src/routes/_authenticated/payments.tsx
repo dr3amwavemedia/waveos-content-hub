@@ -146,65 +146,72 @@ function PaymentsPage() {
       toast.error("Choose a CSV file under 5 MB.");
       return;
     }
+    setPlan(null);
     try {
-      const table = parseBloomCsv(await file.text());
-      const suggest = (pattern: RegExp) =>
-        table.headers.find((header) => pattern.test(header)) ?? "";
-      setCsv(table);
+      const result = parseBloomFile(await file.text());
+      setParsed(result);
       setFileName(file.name);
-      setPreview([]);
-      setMap({
-        id: suggest(/^(id|invoice.?number|transaction.?id)$/i),
-        amount: suggest(/amount|total|paid/i),
-        date: suggest(/date|issued|paid/i),
-        invoice: suggest(/invoice.?number/i),
-        description: suggest(/description|title|service/i),
-      });
+      await runScan(result);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not read CSV.");
+      setParsed(null);
+      toast.error(error instanceof Error ? error.message : "Could not read this CSV.");
     }
   }
-  function mapped(row: string[], header: string): string {
-    return header && csv ? (row[csv.headers.indexOf(header)] ?? "") : "";
-  }
-  function makePreview() {
-    if (!csv || !map.id || !map.amount || !map.date) {
-      toast.error("Map an ID, amount, and date column first.");
-      return;
-    }
+
+  /** Read every row, find its invoice, and show what the import will change. */
+  async function runScan(source: ParsedBloomFile) {
+    setBusy(true);
     try {
-      const ids = new Set<string>();
-      const rows = csv.rows.map((row, index): ImportRow => {
-        const id = mapped(row, map.id).trim();
-        if (!id || ids.has(id))
-          throw new Error(`Missing or repeated source ID at CSV row ${index + 2}.`);
-        ids.add(id);
-        const rawDate = mapped(row, map.date).trim();
-        const date = new Date(rawDate);
-        if (!rawDate || Number.isNaN(date.getTime()))
-          throw new Error(`Invalid date at CSV row ${index + 2}. Use ISO or a clear date format.`);
-        return {
-          source: "bloom_csv",
-          external_id: `bloom:${kind}:${id}`,
-          kind,
-          amount_cents: dollarsToCents(mapped(row, map.amount)),
-          currency: "USD",
-          occurred_at: date.toISOString(),
-          description: [mapped(row, map.invoice).trim(), mapped(row, map.description).trim()]
-            .filter(Boolean)
-            .join(" · ")
-            .slice(0, 500),
-          status: kind === "invoice" || kind === "expense" ? "posted" : "unmatched",
-        };
+      const [invoiceResult, workspaceResult, crmResult, ledgerResult] = await Promise.all([
+        supabase
+          .from("client_invoices")
+          .select("id,workspace_id,number,amount_cents,amount_paid_cents,currency,status"),
+        supabase.from("workspaces").select("id,name,client_name,business_name"),
+        supabase.from("crm_accounts").select("linked_workspace_id,email,business_name"),
+        supabase.from("payment_ledger").select("external_id").eq("source", "bloom_csv"),
+      ]);
+      const failure = invoiceResult.error ?? workspaceResult.error ?? ledgerResult.error;
+      if (failure) throw failure;
+
+      const names = new Map(
+        (workspaceResult.data ?? []).map((workspace) => [
+          workspace.id,
+          workspace.client_name || workspace.business_name || workspace.name,
+        ]),
+      );
+      const emails = new Map<string, string>();
+      (crmResult.data ?? []).forEach((account) => {
+        if (account.linked_workspace_id && account.email)
+          emails.set(account.linked_workspace_id, account.email.toLowerCase());
       });
-      setPreview(rows);
-      toast.success(`Preview ready: ${rows.length} rows. Review before saving.`);
+      const candidates: InvoiceCandidate[] = (invoiceResult.data ?? []).map((invoice) => ({
+        ...invoice,
+        clientName: names.get(invoice.workspace_id) ?? null,
+        clientEmail: emails.get(invoice.workspace_id) ?? null,
+      }));
+      const imported = new Set((ledgerResult.data ?? []).map((row) => row.external_id));
+
+      setPlan(
+        source.records.map((record) => {
+          const match = matchInvoice(record, candidates);
+          return {
+            record,
+            invoice: match.invoice,
+            reason: match.reason,
+            duplicate: imported.has(`bloom:${record.sourceId}`),
+          };
+        }),
+      );
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "CSV mapping failed.");
+      toast.error(error instanceof Error ? error.message : "Could not scan this CSV.");
+    } finally {
+      setBusy(false);
     }
   }
-  async function saveImport() {
-    if (!preview.length) return;
+
+  /** Save the scanned rows and roll matched payments onto their invoices. */
+  async function applyScan() {
+    if (!plan) return;
     setBusy(true);
     const { data: auth } = await supabase.auth.getUser();
     if (!auth.user) {
@@ -213,76 +220,73 @@ function PaymentsPage() {
       return;
     }
     const batch = crypto.randomUUID();
-    const existing = new Set<string>();
-    for (let i = 0; i < preview.length; i += 100) {
-      const { data, error } = await supabase
-        .from("payment_ledger")
-        .select("external_id")
-        .eq("source", "bloom_csv")
-        .in(
-          "external_id",
-          preview.slice(i, i + 100).map((row) => row.external_id),
-        );
+    const fresh = plan.filter((row) => !row.duplicate);
+    const rows: ImportRow[] = fresh.map((row) => ({
+      source: "bloom_csv",
+      external_id: `bloom:${row.record.sourceId}`,
+      kind: row.record.kind,
+      amount_cents: row.record.amountCents,
+      currency: row.record.currency,
+      occurred_at: row.record.occurredAt,
+      description: row.record.description || null,
+      invoice_id: row.invoice?.id ?? null,
+      workspace_id: row.invoice?.workspace_id ?? null,
+      import_batch_id: batch,
+      created_by: auth.user.id,
+      // Refunds and unmatched money always wait for the owner.
+      status:
+        row.record.kind === "refund" || (!row.invoice && row.record.kind === "payment")
+          ? "unmatched"
+          : "posted",
+    }));
+
+    for (let index = 0; index < rows.length; index += 100) {
+      const { error } = await supabase.from("payment_ledger").insert(rows.slice(index, index + 100));
       if (error) {
-        toast.error(error.message);
-        setBusy(false);
-        return;
-      }
-      data?.forEach((row) => existing.add(row.external_id));
-    }
-    const fresh = preview.filter((row) => !existing.has(row.external_id));
-    const sourceNumbers = new Map(
-      (csv?.rows ?? []).map((row) => [
-        `bloom:${kind}:${mapped(row, map.id).trim()}`,
-        mapped(row, map.invoice).trim() || (kind === "invoice" ? mapped(row, map.id).trim() : ""),
-      ]),
-    );
-    const numbers = [...new Set([...sourceNumbers.values()].filter(Boolean))];
-    const matches = new Map<string, { id: string; workspace_id: string }[]>();
-    for (let i = 0; i < numbers.length; i += 100) {
-      const { data, error } = await supabase
-        .from("client_invoices")
-        .select("id,workspace_id,number")
-        .in("number", numbers.slice(i, i + 100));
-      if (error) {
-        toast.error(`Could not match invoice numbers: ${error.message}`);
-        setBusy(false);
-        return;
-      }
-      data?.forEach((invoice) => {
-        if (!invoice.number) return;
-        matches.set(invoice.number, [...(matches.get(invoice.number) ?? []), invoice]);
-      });
-    }
-    for (let i = 0; i < fresh.length; i += 100) {
-      const { error } = await supabase.from("payment_ledger").insert(
-        fresh.slice(i, i + 100).map((row) => {
-          const linked = matches.get(sourceNumbers.get(row.external_id) ?? "") ?? [];
-          return {
-            ...row,
-            ...(linked.length === 1
-              ? { invoice_id: linked[0].id, workspace_id: linked[0].workspace_id }
-              : {}),
-            import_batch_id: batch,
-            created_by: auth.user!.id,
-          };
-        }),
-      );
-      if (error) {
-        toast.error(`Import stopped after ${i} rows: ${error.message}`);
+        toast.error(`Import stopped after ${index} rows: ${error.message}`);
         setBusy(false);
         await reload();
         return;
       }
     }
+
+    // Roll every matched payment in this file onto its invoice, once per invoice.
+    const totals = new Map<string, { invoice: InvoiceCandidate; cents: number; at: string }>();
+    fresh.forEach((row) => {
+      if (row.record.kind !== "payment" || !row.invoice) return;
+      const current = totals.get(row.invoice.id);
+      totals.set(row.invoice.id, {
+        invoice: row.invoice,
+        cents: (current?.cents ?? 0) + row.record.amountCents,
+        at:
+          !current || row.record.occurredAt > current.at
+            ? row.record.occurredAt
+            : current.at,
+      });
+    });
+    let updated = 0;
+    for (const { invoice, cents, at } of totals.values()) {
+      const patch = invoiceUpdate(invoice, cents, at);
+      if (!patch) continue;
+      const { error } = await supabase
+        .from("client_invoices")
+        .update(patch)
+        .eq("id", invoice.id)
+        .eq("amount_paid_cents", invoice.amount_paid_cents ?? 0);
+      if (error) toast.error(`Invoice ${invoice.number ?? invoice.id}: ${error.message}`);
+      else updated += 1;
+    }
+
     toast.success(
-      `Saved ${fresh.length} rows; skipped ${existing.size} already imported. Payment rows await review.`,
+      `Imported ${rows.length} rows, skipped ${plan.length - rows.length} already-imported rows, updated ${updated} invoices.`,
     );
-    setPreview([]);
-    setCsv(null);
+    setPlan(null);
+    setParsed(null);
+    setFileName("");
     setBusy(false);
     await reload();
   }
+
   async function postRow(entry: Entry) {
     const { error } = await supabase
       .from("payment_ledger")
