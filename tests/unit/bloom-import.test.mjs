@@ -22,6 +22,17 @@ test("detects Bloom columns without manual mapping", () => {
   assert.equal(columns.paidDate, "Paid On");
 });
 
+test("reads Bloom transaction export column names", () => {
+  const csv = [
+    "Invoice Number,Transaction ID,Transaction Type,Transaction DateTime,Transaction Amount,Transaction Status,Currency Code",
+    "02026-00053,e2y9wk01895lv,PAYMENT,2026-09-04T18:27:13-04:00,6000.00,COMPLETE,USD",
+  ].join("\n");
+  const result = parseBloomFile(csv);
+  assert.equal(result.records.length, 1);
+  assert.equal(result.records[0].amountCents, 600000);
+  assert.equal(result.records[0].sourceId, "payment:e2y9wk01895lv");
+});
+
 test("infers payment, invoice and refund rows from one bulk export", () => {
   const { records } = parseBloomFile(CSV.join("\n"));
   assert.deepEqual(
@@ -83,8 +94,6 @@ test("payments raise the paid amount and never exceed the invoice", () => {
 });
 
 test("unmatched rows stay unmatched rather than guessing", () => {
-  const { records } = parseBloomFile(
-    "id,client,amount,date\nA-9,Unknown Co,100.00,2026-08-01\n",
-  );
+  const { records } = parseBloomFile("id,client,amount,date\nA-9,Unknown Co,100.00,2026-08-01\n");
   assert.equal(matchInvoice(records[0], []).invoice, null);
 });

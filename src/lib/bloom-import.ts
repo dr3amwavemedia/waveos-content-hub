@@ -40,11 +40,11 @@ const ALIASES: Array<[keyof ColumnMap, RegExp]> = [
     "amountPaid",
     /(amount\s*paid|paid\s*amount|payment\s*amount|amount\s*received|received|^paid$|collected)/i,
   ],
+  ["amountDue", /(amount\s*due|balance(\s*due)?|outstanding|remaining|unpaid\s*amount)/i],
   [
-    "amountDue",
-    /(amount\s*due|balance(\s*due)?|outstanding|remaining|unpaid\s*amount)/i,
+    "amount",
+    /(^amount$|transaction\s*amount|total|grand\s*total|invoice\s*total|subtotal|^price$|^value$)/i,
   ],
-  ["amount", /(^amount$|total|grand\s*total|invoice\s*total|subtotal|^price$|^value$)/i],
   ["paidDate", /(paid\s*(on|at|date)|payment\s*date|date\s*paid|settled)/i],
   ["date", /(^date$|issue|issued|created|invoice\s*date|transaction\s*date|due)/i],
   ["clientEmail", /(e-?mail)/i],
@@ -120,9 +120,12 @@ function toIso(raw: string): string | null {
 }
 
 /** Decide what a single row represents from its own values. */
-export function inferKind(
-  values: { status: string; type: string; paidCents: number | null; amountCents: number | null },
-): LedgerKind {
+export function inferKind(values: {
+  status: string;
+  type: string;
+  paidCents: number | null;
+  amountCents: number | null;
+}): LedgerKind {
   const text = `${values.type} ${values.status}`.toLowerCase();
   if (/refund|credit|chargeback|reversal/.test(text)) return "refund";
   if (/expense|cost|purchase/.test(text)) return "expense";
@@ -151,13 +154,17 @@ export function parseBloomFile(text: string): ParsedBloomFile {
     const totalCents = toCents(get("amount"));
     const kind = inferKind({ status, type, paidCents, amountCents: totalCents });
     const chosen =
-      kind === "payment" || kind === "refund" ? (paidCents ?? totalCents) : (totalCents ?? paidCents);
+      kind === "payment" || kind === "refund"
+        ? (paidCents ?? totalCents)
+        : (totalCents ?? paidCents);
     const amountCents = chosen == null ? null : Math.abs(chosen);
     if (!amountCents) {
       skipped.push({ rowNumber, reason: "No readable amount" });
       return;
     }
-    const occurredAt = toIso(kind === "payment" ? get("paidDate") || get("date") : get("date") || get("paidDate"));
+    const occurredAt = toIso(
+      kind === "payment" ? get("paidDate") || get("date") : get("date") || get("paidDate"),
+    );
     if (!occurredAt) {
       skipped.push({ rowNumber, reason: "No readable date" });
       return;
