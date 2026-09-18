@@ -753,6 +753,84 @@ export type Database = {
           },
         ]
       }
+      invoice_autopay_schedules: {
+        Row: {
+          amount_cents: number
+          authorized_at: string | null
+          charge_at: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          current_invoice_id: string | null
+          description: string | null
+          enabled: boolean
+          frequency: string
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          last_succeeded_at: string | null
+          source_invoice_id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_last_payment_intent_id: string | null
+          stripe_payment_method_id: string | null
+          stripe_setup_session_id: string | null
+          timezone: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents: number
+          authorized_at?: string | null
+          charge_at: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          current_invoice_id?: string | null
+          description?: string | null
+          enabled?: boolean
+          frequency?: string
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_succeeded_at?: string | null
+          source_invoice_id: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_last_payment_intent_id?: string | null
+          stripe_payment_method_id?: string | null
+          stripe_setup_session_id?: string | null
+          timezone?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount_cents?: number
+          authorized_at?: string | null
+          charge_at?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          current_invoice_id?: string | null
+          description?: string | null
+          enabled?: boolean
+          frequency?: string
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_succeeded_at?: string | null
+          source_invoice_id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_last_payment_intent_id?: string | null
+          stripe_payment_method_id?: string | null
+          stripe_setup_session_id?: string | null
+          timezone?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: []
+      }
       client_request_internal_notes: {
         Row: {
           body: string
