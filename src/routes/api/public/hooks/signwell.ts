@@ -110,7 +110,7 @@ export const Route = createFileRoute("/api/public/hooks/signwell")({
         const locate = supabaseAdmin
           .from("client_contracts")
           .select(
-            "id,workspace_id,description,contract_data,source_template_version,provider_document_id",
+            "id,workspace_id,title,description,signer_email,contract_data,source_template_version,provider_document_id",
           );
         const { data: contract } = metadata.contract_id
           ? await locate.eq("id", metadata.contract_id).maybeSingle()
@@ -157,6 +157,18 @@ export const Route = createFileRoute("/api/public/hooks/signwell")({
             } catch {
               console.error("[signwell webhook] archive failed for contract", contract.id);
             }
+          }
+          try {
+            const { sendSignedContractCopyEmail } =
+              await import("@/lib/document-completion-email.server");
+            await sendSignedContractCopyEmail(
+              contract.workspace_id,
+              { contractTitle: contract.title },
+              contract.signer_email,
+            );
+          } catch {
+            // The verified signature state must not be rolled back by an email outage.
+            console.error("[signwell webhook] completion email failed for contract", contract.id);
           }
         }
 

@@ -89,7 +89,7 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
         const { data: invoice } = await supabaseAdmin
           .from("client_invoices")
           .select(
-            "id,workspace_id,amount_cents,amount_paid_cents,currency,status,provider_session_id",
+            "id,workspace_id,number,amount_cents,amount_paid_cents,currency,status,provider_session_id",
           )
           .eq("id", invoiceId)
           .maybeSingle();
@@ -224,6 +224,26 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
               .eq("source", "stripe")
               .eq("external_id", eventId);
             return new Response("hold_release_failed", { status: 503 });
+          }
+
+          try {
+            const { sendPaymentReceiptEmail } =
+              await import("@/lib/document-completion-email.server");
+            const customerDetails = (object.customer_details ?? {}) as Record<string, unknown>;
+            await sendPaymentReceiptEmail(
+              invoice.workspace_id,
+              {
+                invoiceNumber: invoice.number || `Invoice ${invoice.id.slice(0, 8).toUpperCase()}`,
+                receivedCents: received,
+                totalPaidCents: paidNow,
+                balanceCents: Math.max(0, total - paidNow),
+                currency: invoice.currency,
+              },
+              typeof customerDetails.email === "string" ? customerDetails.email : null,
+            );
+          } catch {
+            // Payment processing must remain successful if the email provider is unavailable.
+            console.error("[stripe webhook] payment receipt email failed for invoice", invoice.id);
           }
         }
 

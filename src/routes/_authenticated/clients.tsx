@@ -10,6 +10,11 @@ import {
   validInvoiceItems,
   type DraftInvoiceItem,
 } from "@/lib/invoice-items";
+import {
+  invoiceDiscount,
+  storedDiscountDisplay,
+  type InvoiceDiscountType,
+} from "@/lib/invoice-discount";
 import { ContractExportTools } from "@/components/app/contract-export-tools";
 import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
 import { InvoiceDocumentTools } from "@/components/app/invoice-document-tools";
@@ -98,6 +103,9 @@ type InvoiceListItem = Pick<
   | "billing_month"
   | "line_items"
   | "published_at"
+  | "subtotal_cents"
+  | "discount_type"
+  | "discount_value"
 >;
 type CrmAccountRow = Database["public"]["Tables"]["crm_accounts"]["Row"];
 type CrmContactRow = Pick<
@@ -2521,7 +2529,7 @@ function InvoicesTab({
   const q = useQuery({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
-      const invoiceColumns = "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at";
+      const invoiceColumns = "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value";
       const { data, error } = await supabase
         .from("client_invoices")
         .select(`${invoiceColumns},line_items`)
@@ -2752,9 +2760,18 @@ function InvoiceForm({
     invoiceItemsFromJson(invoice?.line_items),
   );
   const [amount, setAmount] = useState(
-    invoice?.amount_cents === null || invoice?.amount_cents === undefined
+    (invoice?.subtotal_cents ?? invoice?.amount_cents) === null ||
+      (invoice?.subtotal_cents ?? invoice?.amount_cents) === undefined
       ? ""
-      : (invoice.amount_cents / 100).toFixed(2),
+      : ((invoice?.subtotal_cents ?? invoice?.amount_cents ?? 0) / 100).toFixed(2),
+  );
+  const [discountType, setDiscountType] = useState<InvoiceDiscountType>(
+    invoice?.discount_type === "fixed" || invoice?.discount_type === "percentage"
+      ? invoice.discount_type
+      : "none",
+  );
+  const [discountValue, setDiscountValue] = useState(
+    storedDiscountDisplay(invoice?.discount_type, invoice?.discount_value),
   );
   const [paymentPlan, setPaymentPlan] = useState(invoice?.payment_plan ?? "one_time");
   const [billingMonth, setBillingMonth] = useState(invoice?.billing_month?.slice(0, 7) ?? "");
@@ -2777,13 +2794,20 @@ function InvoiceForm({
       }
       if (!validInvoiceItems(items))
         throw new Error("Check the item titles, descriptions, quantities, and prices.");
-      const cents = items.length
+      const subtotalCents = items.length
         ? invoiceItemTotal(items)
         : amount
           ? Math.round(parseFloat(amount) * 100)
           : null;
-      if (cents === null || !Number.isSafeInteger(cents) || cents <= 0)
+      if (subtotalCents === null || !Number.isSafeInteger(subtotalCents) || subtotalCents <= 0)
         throw new Error("Add a priced item or enter an invoice amount greater than zero.");
+      const discount = invoiceDiscount({
+        subtotalCents,
+        type: discountType,
+        value: Number(discountValue || 0),
+      });
+      const cents = discount.totalCents;
+      if (cents <= 0) throw new Error("The discount must leave an invoice total greater than zero.");
       const received =
         status === "paid" ? cents : amountPaid === "" ? null : Math.round(Number(amountPaid) * 100);
       const effectiveStatus =
@@ -2801,6 +2825,9 @@ function InvoiceForm({
         number: invoiceNumber || null,
         description: description.trim() || null,
         amount_cents: cents,
+        subtotal_cents: discount.subtotalCents,
+        discount_type: discount.discountType,
+        discount_value: discount.discountValue,
         line_items: items as never,
         amount_paid_cents: received ?? 0,
         payment_plan: paymentPlan,
@@ -2862,7 +2889,19 @@ function InvoiceForm({
 
   const hostedUrlValid = !hostedUrl.trim() || isValidHttpsUrl(hostedUrl);
   const currencyValid = /^[A-Za-z]{3}$/.test(currency.trim());
-  const effectiveAmount = items.length ? (invoiceItemTotal(items) / 100).toFixed(2) : amount;
+  const subtotalAmount = items.length ? (invoiceItemTotal(items) / 100).toFixed(2) : amount;
+  const discountValid =
+    discountType === "none" ||
+    (Number.isFinite(Number(discountValue)) &&
+      Number(discountValue) >= 0 &&
+      (discountType !== "percentage" || Number(discountValue) <= 100) &&
+      (discountType !== "fixed" || Number(discountValue) < Number(subtotalAmount)));
+  const previewDiscount = invoiceDiscount({
+    subtotalCents: Math.max(0, Math.round(Number(subtotalAmount || 0) * 100)),
+    type: discountType,
+    value: Number(discountValue || 0),
+  });
+  const effectiveAmount = (previewDiscount.totalCents / 100).toFixed(2);
   const amountValid = items.length
     ? validInvoiceItems(items)
     : Number.isFinite(Number(amount)) && Number(amount) > 0;
@@ -2877,6 +2916,8 @@ function InvoiceForm({
     hostedUrlValid &&
     currencyValid &&
     amountValid &&
+    discountValid &&
+    previewDiscount.totalCents > 0 &&
     paidValid &&
     Boolean(issuedAt) &&
     (paymentPlan !== "monthly_retainer" || Boolean(billingMonth));
@@ -2917,12 +2958,12 @@ function InvoiceForm({
             </p>
           </div>
         )}
-        <Field label="Amount">
+        <Field label="Subtotal">
           <input
             type="number"
             step="0.01"
             min="0"
-            value={effectiveAmount}
+            value={subtotalAmount}
             onChange={(e) => setAmount(e.target.value)}
             readOnly={items.length > 0}
             className={inputCls}
@@ -2940,6 +2981,42 @@ function InvoiceForm({
             <p className="mt-1 text-xs text-destructive">Use a three-letter currency code.</p>
           )}
         </Field>
+      </div>
+      <div className="grid gap-3 rounded-lg border border-border/70 bg-background/40 p-3 sm:grid-cols-3">
+        <Field label="Discount">
+          <select
+            value={discountType}
+            onChange={(event) => setDiscountType(event.target.value as InvoiceDiscountType)}
+            className={inputCls}
+          >
+            <option value="none">No discount</option>
+            <option value="fixed">Fixed amount</option>
+            <option value="percentage">Percentage</option>
+          </select>
+        </Field>
+        {discountType !== "none" && (
+          <Field label={discountType === "fixed" ? "Discount amount" : "Discount percent"}>
+            <input
+              type="number"
+              min="0"
+              max={discountType === "percentage" ? "100" : subtotalAmount || undefined}
+              step="0.01"
+              value={discountValue}
+              onChange={(event) => setDiscountValue(event.target.value)}
+              className={inputCls}
+              placeholder={discountType === "fixed" ? "100.00" : "10"}
+            />
+            {!discountValid && (
+              <p className="mt-1 text-xs text-destructive">Enter a discount below the subtotal.</p>
+            )}
+          </Field>
+        )}
+        <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
+          <p className="text-xs font-medium text-muted-foreground">Invoice total</p>
+          <p className="mt-1 text-lg font-semibold text-foreground">
+            {currency.toUpperCase()} {effectiveAmount}
+          </p>
+        </div>
       </div>
       <CatalogItemPicker
         currency={currency}

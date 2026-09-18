@@ -658,6 +658,8 @@ export type Database = {
           created_by: string | null
           currency: string
           description: string | null
+          discount_type: string | null
+          discount_value: number | null
           due_at: string | null
           hosted_url: string | null
           id: string
@@ -673,6 +675,7 @@ export type Database = {
           published_at: string | null
           refund_flagged_at: string | null
           status: Database["public"]["Enums"]["invoice_status"]
+          subtotal_cents: number | null
           updated_at: string
           workspace_id: string
         }
@@ -684,6 +687,8 @@ export type Database = {
           created_by?: string | null
           currency?: string
           description?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
           due_at?: string | null
           hosted_url?: string | null
           id?: string
@@ -699,6 +704,7 @@ export type Database = {
           published_at?: string | null
           refund_flagged_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal_cents?: number | null
           updated_at?: string
           workspace_id: string
         }
@@ -710,6 +716,8 @@ export type Database = {
           created_by?: string | null
           currency?: string
           description?: string | null
+          discount_type?: string | null
+          discount_value?: number | null
           due_at?: string | null
           hosted_url?: string | null
           id?: string
@@ -725,6 +733,7 @@ export type Database = {
           published_at?: string | null
           refund_flagged_at?: string | null
           status?: Database["public"]["Enums"]["invoice_status"]
+          subtotal_cents?: number | null
           updated_at?: string
           workspace_id?: string
         }

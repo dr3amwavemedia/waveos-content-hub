@@ -7,6 +7,7 @@ import {
 } from "@/lib/signwell.server";
 import { businessProfile, businessFooterLine } from "@/lib/business-profile";
 import { publicReturnOrigin } from "@/lib/public-origin.server";
+import { signedArchiveUrl } from "@/lib/signwell-archive.server";
 
 /** Any leftover {{token}} must never reach a signer. */
 const unresolvedTokens = (text: string) =>
@@ -24,10 +25,7 @@ function validatedSignwellUrl(url: unknown): string | null {
   if (typeof url !== "string" || !url) return null;
   try {
     const destination = new URL(url);
-    if (
-      destination.protocol !== "https:" ||
-      !/(^|\.)signwell\.com$/i.test(destination.hostname)
-    ) {
+    if (destination.protocol !== "https:" || !/(^|\.)signwell\.com$/i.test(destination.hostname)) {
       return null;
     }
     return destination.toString();
@@ -191,9 +189,7 @@ export const getContractSigningLink = createServerFn({ method: "POST" })
         document.recipients?.find(
           (row) => row.email?.toLowerCase() === contract.signer_email?.toLowerCase(),
         ) ?? document.recipients?.[0];
-      url = validatedSignwellUrl(
-        recipient?.embedded_signing_url ?? document.embedded_signing_url,
-      );
+      url = validatedSignwellUrl(recipient?.embedded_signing_url ?? document.embedded_signing_url);
     }
     if (!url)
       throw new Error(
@@ -267,5 +263,38 @@ export const getContractSigningState = createServerFn({ method: "POST" })
       signedAt: contract.signed_at,
       signed: contract.status === "signed",
       declined: contract.status === "declined" || contract.status === "expired",
+    };
+  });
+
+/** Return a short-lived certified PDF URL after an RLS-scoped authorization check. */
+export const getSignedContractArchiveLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { contractId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: contract, error } = await context.supabase
+      .from("client_contracts")
+      .select("id,status,provider")
+      .eq("id", data.contractId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!contract || contract.status !== "signed" || contract.provider !== "signwell") {
+      throw new Error("A certified signed copy is not available on your account.");
+    }
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const archive = await supabaseAdmin
+      .from("contract_signature_archive" as never)
+      .select("storage_path")
+      .eq("contract_id", contract.id)
+      .order("completed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (archive.error || !archive.data) {
+      throw new Error(
+        "The certified PDF is still being prepared. The recorded contract copy remains available.",
+      );
+    }
+    return {
+      url: await signedArchiveUrl((archive.data as { storage_path: string }).storage_path),
     };
   });

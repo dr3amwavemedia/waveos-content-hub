@@ -10,6 +10,9 @@ export type ExportInvoice = {
   due_at: string | null;
   paid_at: string | null;
   line_items?: unknown;
+  subtotal_cents?: number | null;
+  discount_type?: string | null;
+  discount_value?: number | null;
 };
 const columns = [
   "Record ID",
