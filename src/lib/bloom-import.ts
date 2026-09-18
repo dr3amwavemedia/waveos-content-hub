@@ -1,4 +1,4 @@
-import { dollarsToCents, parseBloomCsv, type CsvTable } from "@/lib/bloom-payments-csv";
+import { dollarsToCents, parseBloomCsv, type CsvTable } from "./bloom-payments-csv.ts";
 
 /**
  * Automatic Bloom CSV understanding.

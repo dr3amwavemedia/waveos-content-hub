@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { errorMessage } from "@/lib/error-message";
 import { businessProfile } from "@/lib/business-profile";
 import { invoiceDocumentHtml } from "@/lib/invoice-document";
-import { CONTRACT_FIELDS, CONTRACT_STARTER, emptyContractValues, renderContract, todayLocalDate } from "@/lib/contract-variables";
+import { CONTRACT_FIELDS, CONTRACT_STARTER, contractFieldsForTemplate, renderContract, todayLocalDate } from "@/lib/contract-variables";
 import {
   invoiceItemTotal,
   moneyInputToCents,
@@ -91,15 +91,18 @@ export function TemplateLibrary() {
         ),
       );
     } else {
-      const sampleContract = renderContract(body.content ?? "", {
-        client_name: "Sample Client",
-        business_name: "Sample Business",
-        services: "Sample service package",
-        project_date: "2026-10-01",
-        today_date: todayLocalDate(),
-        location: "Sarasota, FL",
-        project_name: "Sample Project",
-      }).content;
+      const content = body.content ?? "";
+      const sampleValues = Object.fromEntries(
+        contractFieldsForTemplate(content).map(({ key, label, input }) => [
+          key,
+          key === "today_date"
+            ? todayLocalDate()
+            : input === "date"
+              ? "2026-10-01"
+              : `Sample ${label.toLowerCase()}`,
+        ]),
+      );
+      const sampleContract = renderContract(content, sampleValues).content;
       const lines =
         template.kind === "form"
           ? (body.fields ?? []).map((f) => `<li>${escapeHtml(f.label)}</li>`).join("")
@@ -277,6 +280,7 @@ function TemplateEditor({
   const [content, setContent] = useState(
     body.content ?? (kind === "contract" && !template ? CONTRACT_STARTER : ""),
   );
+  const [customField, setCustomField] = useState("");
   const contractTextRef = useRef<HTMLTextAreaElement>(null);
   const insertVariable = (token: string) => {
     const input = contractTextRef.current;
@@ -288,6 +292,19 @@ function TemplateEditor({
       input?.focus();
       input?.setSelectionRange(start + token.length + 4, start + token.length + 4);
     });
+  };
+  const addCustomField = () => {
+    const token = customField
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    if (!/^[a-z][a-z0-9_]*$/.test(token)) {
+      toast.error("Use a field name that starts with a letter.");
+      return;
+    }
+    insertVariable(token);
+    setCustomField("");
   };
   const [questions, setQuestions] = useState((body.fields ?? []).map((f) => f.label).join("\n"));
   const existingItems = invoiceItemsFromJson(body.items);
@@ -308,7 +325,7 @@ function TemplateEditor({
       if (kind === "contract" && !content.trim())
         throw new Error("Add the contract wording before saving this template.");
       if (kind === "contract") {
-        const unknown = renderContract(content, emptyContractValues()).unknown;
+        const unknown = renderContract(content, {}).unknown;
         if (unknown.length)
           throw new Error(`Use the supported contract variables: ${unknown.join(", ")}.`);
       }
@@ -535,6 +552,26 @@ function TemplateEditor({
                 </button>
               ))}
             </div>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <input
+                value={customField}
+                onChange={(event) => setCustomField(event.target.value)}
+                placeholder="Custom field, e.g. contract term"
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={addCustomField}
+                className="min-h-11 shrink-0 rounded-lg border border-border px-3 text-xs font-medium hover:border-primary/50"
+              >
+                + Add fill-in field
+              </button>
+            </div>
+            {content && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                This template will ask for: {contractFieldsForTemplate(content).map(({ label }) => label).join(", ") || "no fill-in fields"}.
+              </p>
+            )}
           </div>
           <label className="block text-sm font-medium text-foreground">
             Editable contract wording

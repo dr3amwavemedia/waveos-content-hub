@@ -49,11 +49,12 @@ async function signwellGet<T>(path: string): Promise<T> {
 export type SignwellDocument = {
   id: string;
   status?: string;
+  embedded_edit_url?: string | null;
   embedded_signing_url?: string | null;
   recipients?: Array<{ id: string; email?: string; embedded_signing_url?: string | null }>;
 };
 
-/** Create a signature request from raw HTML contract contents. */
+/** Create an editable SignWell draft from raw HTML contract contents. */
 export async function createSignwellDocument(input: {
   name: string;
   html: string;
@@ -67,7 +68,7 @@ export async function createSignwellDocument(input: {
     test_mode: signwellTestMode(),
     name: input.name,
     subject: input.name,
-    draft: false,
+    draft: true,
     embedded_signing: true,
     // Turns the {{signature:1:y}} / {{date:1:y}} placeholders in the HTML into
     // real, required SignWell fields instead of visible literal text.

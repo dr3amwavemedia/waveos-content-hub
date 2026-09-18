@@ -15,6 +15,10 @@ import {
 
 type Entry = Database["public"]["Tables"]["payment_ledger"]["Row"];
 type ImportRow = Database["public"]["Tables"]["payment_ledger"]["Insert"];
+type SalesInvoice = Pick<
+  Database["public"]["Tables"]["client_invoices"]["Row"],
+  "id" | "amount_cents" | "currency" | "status" | "issued_at"
+>;
 type PlanRow = {
   record: BloomRecord;
   invoice: InvoiceCandidate | null;
@@ -70,6 +74,7 @@ function periodStart(period: "day" | "week" | "month" | "year"): string {
 }
 function PaymentsPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [truncated, setTruncated] = useState(false);
   const [period, setPeriod] = useState<"day" | "week" | "month" | "year">("month");
@@ -81,6 +86,7 @@ function PaymentsPage() {
   async function reload() {
     setLoading(true);
     const all: Entry[] = [];
+    const allInvoices: SalesInvoice[] = [];
     for (let offset = 0; offset < 20000; offset += 1000) {
       const { data, error } = await supabase
         .from("payment_ledger")
@@ -94,8 +100,22 @@ function PaymentsPage() {
       all.push(...(data ?? []));
       if ((data ?? []).length < 1000) break;
     }
-    setTruncated(all.length >= 20000);
+    for (let offset = 0; offset < 20000; offset += 1000) {
+      const { data, error } = await supabase
+        .from("client_invoices")
+        .select("id,amount_cents,currency,status,issued_at")
+        .order("issued_at", { ascending: false })
+        .range(offset, offset + 999);
+      if (error) {
+        toast.error(`Could not load invoice sales: ${error.message}`);
+        break;
+      }
+      allInvoices.push(...(data ?? []));
+      if ((data ?? []).length < 1000) break;
+    }
+    setTruncated(all.length >= 20000 || allInvoices.length >= 20000);
     setEntries(all);
+    setSalesInvoices(allInvoices);
     setLoading(false);
   }
   useEffect(() => {
@@ -118,6 +138,15 @@ function PaymentsPage() {
   const invoiced = selected
     .filter((entry) => entry.kind === "invoice")
     .reduce((sum, entry) => sum + entry.amount_cents, 0);
+  const issuedSales = salesInvoices
+    .filter((invoice) => {
+      if (invoice.currency !== "USD" || invoice.status === "draft" || invoice.status === "void")
+        return false;
+      const day = dateKey(invoice.issued_at);
+      return day >= start && day <= today;
+    })
+    .reduce((sum, invoice) => sum + (invoice.amount_cents ?? 0), 0);
+  const netSales = Math.max(0, issuedSales - refunded);
   const progress =
     invoiced > 0
       ? Math.min(100, Math.round((Math.max(0, collected - refunded) / invoiced) * 100))
@@ -307,8 +336,8 @@ function PaymentsPage() {
         <header>
           <h1 className="text-3xl font-semibold">Payments</h1>
           <p className="mt-2 text-muted-foreground">
-            Money received, refunds, Bloom imports, and invoice progress. USD totals use Sarasota
-            dates.
+            Booked sales, money received, refunds, Bloom imports, and invoice progress. USD totals
+            use Sarasota dates.
           </p>
         </header>
         {truncated && (
@@ -330,12 +359,13 @@ function PaymentsPage() {
               </button>
             ))}
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-4">
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {[
-              ["Collected", money(collected)],
+              ["Net sales", money(netSales)],
+              ["Cash collected", money(collected)],
               ["Refunds", money(refunded)],
-              ["Net received", money(collected - refunded)],
-              ["Bloom invoiced", money(invoiced)],
+              ["Net cash", money(collected - refunded)],
+              ["Bloom invoices imported", money(invoiced)],
             ].map(([label, value]) => (
               <div key={label} className="rounded-xl border border-border p-4">
                 <p className="text-sm text-muted-foreground">{label}</p>
@@ -343,6 +373,11 @@ function PaymentsPage() {
               </div>
             ))}
           </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Net sales includes every issued WaveOS invoice in this period, even when unpaid or only
+            partially paid, and subtracts recorded refunds. Draft and void invoices are excluded.
+            Cash collected only counts posted payments.
+          </p>
           <div className="mt-6">
             <div className="flex justify-between text-sm">
               <span>Collected against imported Bloom invoices</span>

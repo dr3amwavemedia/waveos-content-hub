@@ -3,9 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-import { publishContractForSigning, sendContractForSignature } from "@/lib/contracts.functions";
+import { sendContractForSignature } from "@/lib/contracts.functions";
 import { errorMessage } from "@/lib/error-message";
 import { ContractSignButton } from "./contract-sign-button";
+import { ContractAdminEditButton } from "./contract-admin-edit-button";
 
 export type SigningContract = {
   id: string;
@@ -25,12 +26,11 @@ export function signingState(contract: SigningContract) {
   if (contract.status === "declined") return "declined" as const;
   if (contract.status === "expired" || contract.status === "void") return "expired" as const;
   if (contract.provider_document_id) {
+    if (contract.status === "draft") return "signwell_draft" as const;
     return contract.status === "viewed" ? ("viewed" as const) : ("with_client" as const);
   }
-  if (contract.provider_document_id) return "provider_error" as const;
   if (!contract.signer_name || !contract.signer_email) return "missing_info" as const;
-  if (!contract.published_at) return "ready_to_publish" as const;
-  return "ready_for_link" as const;
+  return "ready_for_signwell" as const;
 }
 
 const LABELS: Record<ReturnType<typeof signingState>, string> = {
@@ -40,10 +40,9 @@ const LABELS: Record<ReturnType<typeof signingState>, string> = {
   expired: "Expired",
   with_client: "With client",
   viewed: "Viewed by client",
-  provider_error: "Provider error",
+  signwell_draft: "SignWell draft",
   missing_info: "Missing signer details",
-  ready_to_publish: "Ready to publish",
-  ready_for_link: "Ready to create signing link",
+  ready_for_signwell: "Ready for SignWell",
 };
 
 const btn =
@@ -63,30 +62,20 @@ export function ContractSigningActions({
   ]
     .filter(Boolean)
     .join(" and ");
-  const publish = useServerFn(publishContractForSigning);
   const createLink = useServerFn(sendContractForSignature);
-
-  const publishMutation = useMutation({
-    mutationFn: () => publish({ data: { contractId: contract.id } }),
-    onSuccess: async () => {
-      toast.success("Contract published. You can now create the signing link.");
-      await onChanged();
-    },
-    onError: (error) => toast.error(errorMessage(error, "Could not publish this contract.")),
-  });
 
   const linkMutation = useMutation({
     mutationFn: () => createLink({ data: { contractId: contract.id } }),
     onSuccess: async (result) => {
       toast.success(
         result.testMode
-          ? "Test signing link created. No email was sent to the signer."
-          : "Signing link created.",
+          ? "Test SignWell draft created. Open it to review and send."
+          : "SignWell draft created. Open it to review and send.",
       );
       await onChanged();
     },
     onError: (error) =>
-      toast.error(errorMessage(error, "The signing service did not accept this contract.")),
+      toast.error(errorMessage(error, "SignWell could not create the editable draft.")),
   });
 
   // Legacy externally hosted contracts keep their existing provider and link.
@@ -98,22 +87,7 @@ export function ContractSigningActions({
         {LABELS[state]}
       </span>
 
-      {state === "ready_to_publish" && (
-        <button
-          type="button"
-          onClick={() => publishMutation.mutate()}
-          disabled={publishMutation.isPending}
-          className={btn}
-        >
-          {publishMutation.isPending ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            "Publish for signing"
-          )}
-        </button>
-      )}
-
-      {state === "ready_for_link" && (
+      {state === "ready_for_signwell" && (
         <button
           type="button"
           onClick={() => linkMutation.mutate()}
@@ -123,9 +97,17 @@ export function ContractSigningActions({
           {linkMutation.isPending ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            "Create SignWell signing link"
+            "Create SignWell draft"
           )}
         </button>
+      )}
+
+      {state === "signwell_draft" && (
+        <ContractAdminEditButton
+          contractId={contract.id}
+          onChanged={onChanged}
+          className={`${btn} inline-flex items-center gap-1 border-primary/50 text-primary`}
+        />
       )}
 
       {(state === "with_client" || state === "viewed") && (
@@ -139,13 +121,6 @@ export function ContractSigningActions({
       {state === "missing_info" && (
         <span className="text-[11px] text-muted-foreground">
           Open “Add signer details,” enter {missingSignerFields}, and save the draft.
-        </span>
-      )}
-
-      {state === "provider_error" && (
-        <span className="text-[11px] text-destructive">
-          The signing service accepted the document but returned no link. Create a new contract
-          revision.
         </span>
       )}
     </div>

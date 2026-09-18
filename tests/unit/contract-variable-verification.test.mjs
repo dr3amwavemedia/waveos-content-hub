@@ -63,12 +63,16 @@ const noPlaceholders = (text) => {
 
 test("every contract variable has a defined source field", () => {
   const sources = {
-    client_name: "workspaces.client_name → crm_contacts first+last → projects.client_name → workspaces.name",
+    client_name:
+      "workspaces.client_name → crm_contacts first+last → projects.client_name → workspaces.name",
     business_name: "workspaces.business_name → crm_accounts.business_name → projects.business_name",
-    services: "client_invoices.line_items (title, description, qty × unit) → client_invoices.description + amount_cents",
-    project_date: "projects.event_date → projects.start_date → workspaces.wedding_date → production_projects.scheduled_at",
+    services:
+      "client_invoices.line_items (title, description, qty × unit) → client_invoices.description + amount_cents",
+    project_date:
+      "projects.event_date → projects.start_date → workspaces.wedding_date → production_projects.scheduled_at",
     today_date: "device local date at draft creation (todayLocalDate)",
-    location: "workspaces.wedding_location → production_projects.location → workspaces.service_area",
+    location:
+      "workspaces.wedding_location → production_projects.location → workspaces.service_area",
     project_name: "projects.name → production_projects.title",
   };
   for (const { key } of CONTRACT_FIELDS) {
@@ -106,10 +110,22 @@ test("client A and client B each resolve their own name, business, project, date
 test("one client's values never appear in the other client's contract", () => {
   const a = renderContract(TEMPLATE, clientA).content;
   const b = renderContract(TEMPLATE, clientB).content;
-  for (const leak of ["Morgan Lee", "Lee Media Group", "Winter Product Launch", "Tampa", "1,200.00"]) {
+  for (const leak of [
+    "Morgan Lee",
+    "Lee Media Group",
+    "Winter Product Launch",
+    "Tampa",
+    "1,200.00",
+  ]) {
     assert.ok(!a.includes(leak), `client B value "${leak}" leaked into client A`);
   }
-  for (const leak of ["Alex Rivera", "Rivera Studio LLC", "Fall Brand Campaign", "Sarasota", "275.00"]) {
+  for (const leak of [
+    "Alex Rivera",
+    "Rivera Studio LLC",
+    "Fall Brand Campaign",
+    "Sarasota",
+    "275.00",
+  ]) {
     assert.ok(!b.includes(leak), `client A value "${leak}" leaked into client B`);
   }
 });
@@ -137,14 +153,17 @@ test("a missing required variable blocks publication and leaves no blank hole", 
   // The token is preserved (visible, blocking) instead of rendering as empty.
   assert.match(result.content, /{{services}}/);
   // Same gate the builder's canSave uses.
-  const canSave = result.missing.length === 0 && result.unknown.length === 0 &&
+  const canSave =
+    result.missing.length === 0 &&
+    result.unknown.length === 0 &&
     contractGuidancePrompts(TEMPLATE).length === 0;
   assert.equal(canSave, false);
 });
 
-test("unsupported placeholders and unfinished starter clauses also block saving", () => {
+test("template-specific placeholders and unfinished starter clauses also block saving", () => {
   const result = renderContract(`${TEMPLATE}\nRetainer: {{monthly_fee}}`, clientA);
-  assert.deepEqual(result.unknown, ["monthly_fee"]);
+  assert.deepEqual(result.missing, ["monthly_fee"]);
+  assert.deepEqual(result.unknown, []);
   assert.equal(contractGuidancePrompts("PAYMENT TERMS\n[Enter the agreed price.]").length, 1);
 });
 
@@ -160,7 +179,11 @@ test("a published contract keeps an immutable value and template-version snapsho
   const publishedVersion = 3;
 
   // The source records change afterwards…
-  const updatedSourceRecord = { ...clientA, client_name: "Alex Rivera-Santos", business_name: "Rivera Group" };
+  const updatedSourceRecord = {
+    ...clientA,
+    client_name: "Alex Rivera-Santos",
+    business_name: "Rivera Group",
+  };
 
   // …the published agreement is re-derived from its own snapshot, not the source.
   const reRendered = renderContract(snapshot.templateText, snapshot.values).content;

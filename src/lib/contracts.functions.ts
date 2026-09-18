@@ -51,8 +51,8 @@ function contractHtml(input: { title: string; body: string; clientName: string }
 }
 
 /**
- * Send a published contract for electronic signature (SignWell).
- * Staff only. Stays in test mode until SIGNWELL_LIVE_MODE is set at cutover.
+ * Create an editable SignWell draft from a completed WaveOS contract form.
+ * Staff finish any wording/layout changes and send it from SignWell.
  */
 export const sendContractForSignature = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -72,14 +72,14 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw error;
     if (!contract) throw new Error("Contract not found.");
-    if (!contract.published_at)
-      throw new Error("Publish this contract before sending it for signature.");
     if (contract.status === "signed") throw new Error("This contract is already signed.");
+    if (contract.status !== "draft")
+      throw new Error("Only draft contracts can be opened for editing.");
     if (!contract.signer_email || !contract.signer_name) {
       throw new Error("Add the signer's name and email before sending.");
     }
     if (contract.provider_document_id) {
-      throw new Error("This contract has already been sent for signature.");
+      throw new Error("This contract already has a SignWell draft.");
     }
     const leftover = unresolvedTokens(`${contract.title} ${contract.description ?? ""}`);
     if (leftover.length) {
@@ -109,16 +109,8 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
       metadata: { contract_id: contract.id, workspace_id: contract.workspace_id },
     });
 
-    const signingUrl = validatedSignwellUrl(
-      document.recipients?.find(
-        (row) => row.email?.toLowerCase() === contract.signer_email!.toLowerCase(),
-      )?.embedded_signing_url ??
-        document.recipients?.[0]?.embedded_signing_url ??
-        document.embedded_signing_url,
-    );
-    if (!signingUrl) {
-      throw new Error("SignWell created the document without a usable embedded signing link.");
-    }
+    const editUrl = validatedSignwellUrl(document.embedded_edit_url);
+    if (!editUrl) throw new Error("SignWell did not return an admin editing link.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
@@ -126,17 +118,44 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
       .update({
         provider: "signwell",
         provider_document_id: document.id,
-        status: "sent",
-        sent_at: new Date().toISOString(),
-        // SignWell returns the embedded signer credential when the document is
-        // created, but its later GET response can omit it. Keep the validated
-        // URL on the RLS-protected contract row so only authorized members can
-        // request it through getContractSigningLink.
-        hosted_url: signingUrl,
+        status: "draft",
+        sent_at: null,
+        hosted_url: null,
       })
       .eq("id", contract.id);
 
-    return { documentId: document.id, signingUrl, testMode: signwellTestMode() };
+    return { documentId: document.id, editUrl, testMode: signwellTestMode() };
+  });
+
+/** Return a fresh, one-use SignWell admin edit URL for a staff member. */
+export const getContractAdminEditLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: { contractId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: isStaff } = await context.supabase.rpc("is_dream_wave_staff", {
+      _user_id: context.userId,
+    });
+    if (!isStaff) throw new Error("Only Dream Wave staff can edit contracts in SignWell.");
+
+    const { data: contract, error } = await context.supabase
+      .from("client_contracts")
+      .select("id,provider,provider_document_id,status")
+      .eq("id", data.contractId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!contract) throw new Error("Contract not found.");
+    if (contract.provider !== "signwell" || !contract.provider_document_id)
+      throw new Error("Create the SignWell draft first.");
+    if (contract.status !== "draft")
+      throw new Error("This contract has already left the SignWell draft stage.");
+
+    const document = await getSignwellDocument(contract.provider_document_id);
+    const url = document.embedded_edit_url;
+    if (!url) throw new Error("SignWell did not return an active admin editing link.");
+    const destination = new URL(url);
+    if (destination.protocol !== "https:" || !/(^|\.)signwell\.com$/i.test(destination.hostname))
+      throw new Error("SignWell returned an invalid editing destination.");
+    return { url: destination.toString() };
   });
 
 /**
