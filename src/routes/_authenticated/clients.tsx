@@ -2246,7 +2246,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
   const q = useQuery({
     queryKey: ["client-contracts", workspaceId],
     queryFn: async (): Promise<ContractRow[]> => {
-      const legacyColumns = "id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,signer_email,source_template_id,source_template_version";
+      const legacyColumns = "id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,signer_name,signer_email,published_at,provider_document_id,source_template_id,source_template_version";
       const { data, error } = await db
         .from("client_contracts")
         .select(`${legacyColumns},contract_data`)
@@ -2517,7 +2517,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
                     }}
                     className="min-h-10 rounded-lg border border-border px-3 text-xs font-semibold hover:border-primary/40"
                   >
-                    Edit draft
+                    {!contract.signer_name || !contract.signer_email ? "Add signer details" : "Edit draft"}
                   </button>
                 )}
                 <select

@@ -29,6 +29,7 @@ type Draft = Pick<
   | "description"
   | "status"
   | "contract_data"
+  | "signer_name"
   | "signer_email"
   | "source_template_id"
   | "source_template_version"
@@ -98,6 +99,7 @@ export function ContractBuilder({
     if (!draft) initial.today_date = todayLocalDate();
     return initial;
   });
+  const [signerName, setSignerName] = useState(draft?.signer_name ?? values.client_name ?? "");
   const [signerEmail, setSignerEmail] = useState(draft?.signer_email ?? "");
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateRow | null>(null);
   const [sourceInvoiceId, setSourceInvoiceId] = useState(snapshot.sourceInvoiceId ?? "");
@@ -185,6 +187,11 @@ export function ContractBuilder({
     }));
     if (project && !values.project_name) setSourceProjectId(project.id);
     if (invoice && !values.services) setSourceInvoiceId(invoice.id);
+    setSignerName((current) =>
+      current ||
+      (contact ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") : "") ||
+      workspace.client_name || project?.client_name || workspace.name
+    );
     if (contact?.email || account?.email)
       setSignerEmail((current) => current || contact?.email || account?.email || "");
     contextApplied.current = true;
@@ -221,6 +228,10 @@ export function ContractBuilder({
     }));
     if (project) setSourceProjectId(project.id);
     if (invoice) setSourceInvoiceId(invoice.id);
+    setSignerName(
+      (contact ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") : "") ||
+        workspace.client_name || project?.client_name || workspace.name,
+    );
     if (contact?.email || account?.email)
       setSignerEmail(contact?.email || account?.email || "");
   };
@@ -271,7 +282,7 @@ export function ContractBuilder({
         title: title.trim(),
         description: rendered.content,
         contract_data: contractData as never,
-        signer_name: values.client_name.trim() || null,
+        signer_name: signerName.trim() || null,
         signer_email: signerEmail.trim() || null,
         source_template_id: selectedTemplate?.id ?? draft?.source_template_id ?? null,
         source_template_version:
@@ -446,15 +457,40 @@ export function ContractBuilder({
               className="mt-1 min-h-36 w-full rounded-lg border border-border bg-background p-3 text-sm outline-none focus:border-primary"
             />
           </label>
-          <label className="block text-xs font-medium">
-            Signer email for a later signing request
-            <input
-              type="email"
-              value={signerEmail}
-              onChange={(event) => setSignerEmail(event.target.value)}
-              className={fieldCls}
-            />
-          </label>
+          <fieldset className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <legend className="px-1 text-sm font-semibold">Signing recipient</legend>
+            <p className="text-xs text-muted-foreground">
+              Required before “Publish for signing” becomes available. Saving these fields does not
+              send an email or create a SignWell request.
+            </p>
+            <label className="block text-xs font-medium">
+              Signer name
+              <input
+                type="text"
+                autoComplete="name"
+                value={signerName}
+                onChange={(event) => setSignerName(event.target.value)}
+                placeholder="Client's full name"
+                className={fieldCls}
+              />
+            </label>
+            <label className="block text-xs font-medium">
+              Signer email
+              <input
+                type="email"
+                autoComplete="email"
+                value={signerEmail}
+                onChange={(event) => setSignerEmail(event.target.value)}
+                placeholder="client@example.com"
+                className={fieldCls}
+              />
+            </label>
+            {(!signerName.trim() || !signerEmail.trim()) && (
+              <p className="text-xs font-medium text-warning">
+                Add both fields and save the draft to enable publishing.
+              </p>
+            )}
+          </fieldset>
         </div>
       </div>
       {(rendered.missing.length > 0 || rendered.unknown.length > 0 || guidancePrompts.length > 0) && (

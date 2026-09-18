@@ -56,7 +56,7 @@ export function TemplatePicker({
         <FileStack className="h-3.5 w-3.5" /> {label}
       </button>
       {open && (
-        <div className="absolute left-0 z-20 mt-1 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-border bg-surface p-2 shadow-xl sm:left-auto sm:right-0">
+        <div className="absolute left-0 z-20 mt-1 w-[min(22rem,calc(100vw-2rem))] max-w-[calc(100vw-2rem)] rounded-xl border border-border bg-surface p-2 shadow-xl">
           {q.isLoading ? (
             <Loader2 className="m-3 h-4 w-4 animate-spin text-muted-foreground" />
           ) : (q.data ?? []).length === 0 ? (

@@ -57,6 +57,12 @@ export function ContractSigningActions({
   onChanged: () => void | Promise<unknown>;
 }) {
   const state = signingState(contract);
+  const missingSignerFields = [
+    !contract.signer_name ? "signer name" : null,
+    !contract.signer_email ? "signer email" : null,
+  ]
+    .filter(Boolean)
+    .join(" and ");
   const publish = useServerFn(publishContractForSigning);
   const createLink = useServerFn(sendContractForSignature);
 
@@ -132,7 +138,7 @@ export function ContractSigningActions({
 
       {state === "missing_info" && (
         <span className="text-[11px] text-muted-foreground">
-          Add the signer&apos;s name and email in the draft first.
+          Open “Add signer details,” enter {missingSignerFields}, and save the draft.
         </span>
       )}
 
