@@ -78,11 +78,13 @@ export async function stripeRequest<T = Record<string, unknown>>(
 
 export type StripeCheckoutSession = {
   id: string;
-  url: string | null;
+  url?: string | null;
+  client_reference_id?: string | null;
   payment_intent: string | null;
   amount_total: number | null;
   currency: string | null;
   payment_status: string | null;
+  customer_details?: { email?: string | null } | null;
   metadata?: Record<string, string>;
   status?: "open" | "complete" | "expired";
   livemode?: boolean;

@@ -12,6 +12,7 @@ import {
   nextInvoicePaymentCents,
   nextInvoicePaymentLabel,
 } from "@/lib/invoice-payment-schedule";
+import { applyStripeCheckoutPayment } from "@/lib/stripe-invoice-payment.server";
 
 /**
  * Create a Stripe Checkout session for one invoice.
@@ -170,15 +171,56 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
  */
 export const getInvoicePaymentState = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { invoiceId: string }) => d)
+  .validator((d: { invoiceId: string; sessionId?: string }) => d)
   .handler(async ({ data, context }) => {
-    const { data: invoice, error } = await context.supabase
+    const invoiceColumns =
+      "id,workspace_id,number,status,amount_cents,amount_paid_cents,currency,paid_at,published_at,provider_session_id,payment_plan,checkout_payment_type,checkout_payment_cents";
+    const { data: initialInvoice, error } = await context.supabase
       .from("client_invoices")
-      .select("id,number,status,amount_cents,amount_paid_cents,currency,paid_at,published_at")
+      .select(invoiceColumns)
       .eq("id", data.invoiceId)
       .maybeSingle();
     if (error) throw error;
-    if (!invoice) throw new Error("This invoice is not available on your account.");
+    if (!initialInvoice) throw new Error("This invoice is not available on your account.");
+
+    let invoice = initialInvoice;
+    let outcome: "processed" | "declined" | "processing" =
+      invoice.status === "paid" || invoice.amount_paid_cents > 0 ? "processed" : "processing";
+
+    // Stripe substitutes the Checkout Session id into the signed-in return URL.
+    // Verify it belongs to this RLS-authorized invoice, then reconcile directly
+    // with Stripe. The webhook uses the same idempotent recorder, so whichever
+    // request arrives first updates the invoice exactly once.
+    if (
+      outcome !== "processed" &&
+      data.sessionId?.startsWith("cs_") &&
+      data.sessionId === invoice.provider_session_id
+    ) {
+      const session = await stripeRequest<StripeCheckoutSession>(
+        `/checkout/sessions/${encodeURIComponent(data.sessionId)}`,
+        { method: "GET" },
+      );
+      if (!stripeModeMatches(session.livemode)) {
+        throw new Error("Stripe returned a payment from the wrong mode.");
+      }
+      if (session.status === "expired") {
+        outcome = "declined";
+      } else if (session.status === "complete" && session.payment_status === "paid") {
+        const result = await applyStripeCheckoutPayment(invoice, session);
+        if (result.kind === "invalid" || result.kind === "review") {
+          throw new Error("This payment needs review before the invoice can be updated.");
+        }
+        const { data: refreshed, error: refreshError } = await context.supabase
+          .from("client_invoices")
+          .select(invoiceColumns)
+          .eq("id", data.invoiceId)
+          .maybeSingle();
+        if (refreshError) throw refreshError;
+        if (refreshed) invoice = refreshed;
+        outcome = "processed";
+      }
+    }
+
     const total = invoice.amount_cents ?? 0;
     const paid = invoice.amount_paid_cents ?? 0;
     return {
@@ -191,5 +233,6 @@ export const getInvoicePaymentState = createServerFn({ method: "POST" })
       dueCents: Math.max(total - paid, 0),
       paidAt: invoice.paid_at,
       confirmed: invoice.status === "paid" || paid > 0,
+      outcome,
     };
   });

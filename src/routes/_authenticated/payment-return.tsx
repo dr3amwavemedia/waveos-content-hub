@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Clock, Loader2, XCircle } from "lucide-react";
 
 import { getInvoicePaymentState } from "@/lib/payments.functions";
@@ -11,9 +11,9 @@ type Search = { invoice?: string; status?: string; session?: string };
 
 export const Route = createFileRoute("/_authenticated/payment-return")({
   validateSearch: (search: Record<string, unknown>): Search => ({
-    invoice: typeof search['invoice'] === "string" ? search['invoice'] : undefined,
-    status: typeof search['status'] === "string" ? search['status'] : undefined,
-    session: typeof search['session'] === "string" ? search['session'] : undefined,
+    invoice: typeof search["invoice"] === "string" ? search["invoice"] : undefined,
+    status: typeof search["status"] === "string" ? search["status"] : undefined,
+    session: typeof search["session"] === "string" ? search["session"] : undefined,
   }),
   head: () => ({
     meta: [
@@ -34,16 +34,18 @@ const money = (cents: number, currency: string) =>
   );
 
 function PaymentReturn() {
-  const { invoice: invoiceId, status } = Route.useSearch();
+  const { invoice: invoiceId, status, session: sessionId } = Route.useSearch();
   const fetchState = useServerFn(getInvoicePaymentState);
+  const queryClient = useQueryClient();
   const cancelled = status === "cancelled";
   const [waitedOut, setWaitedOut] = useState(false);
 
-  // Poll only briefly: confirmation comes from the verified Stripe webhook, not
-  // from this page. Visiting the success URL never unlocks anything by itself.
+  // Card payments normally reconcile on the first request by verifying the
+  // Checkout Session directly with Stripe. Brief polling covers a simultaneous
+  // webhook without making the client stare at an indefinite waiting screen.
   useEffect(() => {
     if (cancelled) return;
-    const timer = setTimeout(() => setWaitedOut(true), 90_000);
+    const timer = setTimeout(() => setWaitedOut(true), 15_000);
     return () => clearTimeout(timer);
   }, [cancelled]);
 
@@ -51,18 +53,26 @@ function PaymentReturn() {
     queryKey: ["payment-return", invoiceId],
     enabled: Boolean(invoiceId) && !cancelled,
     retry: false,
-    queryFn: () => fetchState({ data: { invoiceId: invoiceId! } }),
-    refetchInterval: (q) => (q.state.data?.confirmed || waitedOut ? false : 3000),
+    queryFn: () => fetchState({ data: { invoiceId: invoiceId!, sessionId } }),
+    refetchInterval: (q) =>
+      q.state.data?.confirmed || q.state.data?.outcome === "declined" || waitedOut ? false : 1000,
   });
+
+  useEffect(() => {
+    if (!query.data?.confirmed) return;
+    void queryClient.invalidateQueries({ queryKey: ["layer1", "invoices"] });
+    void queryClient.invalidateQueries({ queryKey: ["client-invoices"] });
+  }, [query.data?.confirmed, queryClient]);
 
   const view = useMemo(() => {
     if (!invoiceId) return "missing" as const;
     if (cancelled) return "cancelled" as const;
     if (query.isError) return "error" as const;
     if (query.data?.confirmed) return "confirmed" as const;
-    if (waitedOut) return "pending" as const;
+    if (query.data?.outcome === "declined") return "declined" as const;
+    if (waitedOut) return "processing" as const;
     return "submitted" as const;
-  }, [invoiceId, cancelled, query.isError, query.data?.confirmed, waitedOut]);
+  }, [invoiceId, cancelled, query.isError, query.data?.confirmed, query.data?.outcome, waitedOut]);
 
   const data = query.data;
 
@@ -71,9 +81,12 @@ function PaymentReturn() {
       <div className="surface-card space-y-5 p-6 text-center sm:p-8">
         {view === "confirmed" ? (
           <CheckCircle2 className="mx-auto h-12 w-12 text-success" />
-        ) : view === "cancelled" || view === "error" || view === "missing" ? (
+        ) : view === "cancelled" ||
+          view === "declined" ||
+          view === "error" ||
+          view === "missing" ? (
           <XCircle className="mx-auto h-12 w-12 text-muted-foreground" />
-        ) : view === "pending" ? (
+        ) : view === "processing" ? (
           <Clock className="mx-auto h-12 w-12 text-primary" />
         ) : (
           <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary" />
@@ -81,30 +94,37 @@ function PaymentReturn() {
 
         <h1 className="text-2xl font-semibold text-foreground">
           {view === "confirmed"
-            ? "Payment confirmed"
+            ? "Payment processed"
             : view === "cancelled"
               ? "Payment cancelled"
-              : view === "missing"
-                ? "Payment status unavailable"
-                : view === "error"
-                  ? "We could not load this invoice"
-                  : view === "pending"
-                    ? "Payment still processing"
-                    : "Payment submitted"}
+              : view === "declined"
+                ? "Payment declined"
+                : view === "missing"
+                  ? "Payment status unavailable"
+                  : view === "error"
+                    ? "We could not load this invoice"
+                    : view === "processing"
+                      ? "Payment not completed"
+                      : "Confirming payment"}
         </h1>
 
         <p className="text-sm text-muted-foreground">
           {view === "confirmed"
-            ? "Your project is booked and we are so excited to be working with you."
+            ? "Your payment was recorded and the invoice has been updated."
             : view === "cancelled"
               ? "Nothing was charged. Your invoice is unchanged and you can pay it whenever you're ready."
-              : view === "missing"
-                ? "We didn't receive an invoice reference. Open your invoices to check the current status."
-                : view === "error"
-                  ? errorMessage(query.error, "Please open your invoices to check the current status.")
-                  : view === "pending"
-                    ? "Some payment methods take a little longer to clear. You'll see the invoice update here and in your portal as soon as your bank confirms it — there's nothing else to do."
-                    : "We're waiting for your bank to confirm the payment. This usually takes a few seconds."}
+              : view === "declined"
+                ? "Stripe did not complete the charge. Your invoice remains unpaid and you can try again from your portal."
+                : view === "missing"
+                  ? "We didn't receive an invoice reference. Open your invoices to check the current status."
+                  : view === "error"
+                    ? errorMessage(
+                        query.error,
+                        "Please open your invoices to check the current status.",
+                      )
+                    : view === "processing"
+                      ? "Stripe has not marked this payment successful, so the invoice remains unpaid. Return to your invoices to try again or choose another card."
+                      : "Checking the completed checkout directly with Stripe."}
         </p>
 
         {data && (

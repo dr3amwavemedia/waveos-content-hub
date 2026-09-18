@@ -24,7 +24,8 @@ test("the default service fee is exactly 2.9 percent in whole cents", () => {
 test("new invoices default the fee on while existing invoices keep their stored choice", () => {
   assert.match(invoiceForm, /invoice \? invoice\.service_fee_percent > 0 : true/);
   assert.match(invoiceForm, /Add 2\.9% service fee/);
-  assert.match(invoiceForm, /Uncheck to remove it/);
+  assert.match(invoiceForm, /Fee on — remove/);
+  assert.match(invoiceForm, /Fee off — add 2\.9%/);
 });
 
 test("historical invoices are backfilled with zero and retain their totals", () => {
