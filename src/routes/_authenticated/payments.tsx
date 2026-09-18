@@ -186,6 +186,7 @@ function PaymentsPage() {
       });
       const candidates: InvoiceCandidate[] = (invoiceResult.data ?? []).map((invoice) => ({
         ...invoice,
+        amount_cents: invoice.amount_cents ?? 0,
         clientName: names.get(invoice.workspace_id) ?? null,
         clientEmail: emails.get(invoice.workspace_id) ?? null,
       }));
