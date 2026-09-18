@@ -175,27 +175,22 @@ const WEDDING_MOBILE_NAV: NavItem[] = [
   { to: "/home", hash: "wedding-contact", label: "More", icon: Menu },
 ];
 
-export function AppShell({
-  children,
-  fullWidth = false,
-}: {
-  children: ReactNode;
-  fullWidth?: boolean;
-}) {
+export function AppShell({ children }: { children: ReactNode }) {
   return (
     <WorkspaceProvider>
-      <Shell fullWidth={fullWidth}>{children}</Shell>
+      <Shell>{children}</Shell>
     </WorkspaceProvider>
   );
 }
 
-function Shell({ children, fullWidth }: { children: ReactNode; fullWidth: boolean }) {
+function Shell({ children }: { children: ReactNode }) {
   const { can, visibility, isLoading: permsLoading, access, isStaff } = usePermissions();
   const { data: user, error: userError, refetch: retryUser } = useCurrentUser();
   const { activeWorkspace, error: workspaceError, retry: retryWorkspace } = useWorkspace();
   const branding = useWorkspaceBranding(activeWorkspace?.id);
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const useWideCanvas = pathname === "/payments";
   const navigate = useNavigate();
   const isOwner = Boolean(user?.isDreamWaveOwner && isStaff);
   const isTeamMember = isStaff && !isOwner;
@@ -358,7 +353,7 @@ function Shell({ children, fullWidth }: { children: ReactNode; fullWidth: boolea
         <div
           className={cn(
             "mx-auto px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:pt-8 lg:pb-10",
-            fullWidth ? "max-w-none lg:px-8 xl:px-10" : "max-w-7xl lg:px-10",
+            useWideCanvas ? "max-w-none lg:px-8 xl:px-10" : "max-w-7xl lg:px-10",
           )}
         >
           {user && activeWorkspace && !permsLoading && (

@@ -63,4 +63,11 @@ const report = contracts.contractReportHtml([{ id: "1", title: "<img onerror=bad
 assert.ok(report.includes("&lt;img onerror=bad&gt;"));
 assert.ok(!report.includes("https://secret.example"));
 assert.ok(report.includes("2026-09-14"));
+const paymentsRoute = readFileSync("src/routes/_authenticated/payments.tsx", "utf8");
+const appShell = readFileSync("src/components/app/app-shell.tsx", "utf8");
+assert.ok(!paymentsRoute.includes("<AppShell"), "Payments must use the authenticated parent shell");
+assert.ok(
+  appShell.includes('const useWideCanvas = pathname === "/payments"'),
+  "Payments must use the wide authenticated canvas",
+);
 console.log("Local workflow preservation, amounts and export escaping passed");
