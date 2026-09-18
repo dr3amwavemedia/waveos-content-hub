@@ -11,7 +11,7 @@ import {
   useRouter,
 } from "@tanstack/react-router";
 import { ProjectNavigationGuard } from "../../src/components/production/project-navigation-guard";
-import { WorkspaceTour } from "../../src/components/app/workspace-tour";
+import { openWorkspaceTour, WorkspaceTour } from "../../src/components/app/workspace-tour";
 import { DocumentDraftTools } from "../../src/components/app/document-draft-tools";
 import "../../src/styles.css";
 import { PlanningChecklistControls } from "../../src/components/production/planning-checklist-controls";
@@ -158,6 +158,9 @@ const tools = createRoute({
           { to: "/tools", label: "Contracts", hash: "contracts" },
         ]}
       />
+      <button type="button" onClick={openWorkspaceTour}>
+        Open guide from settings
+      </button>
       <DocumentDraftTools />
       <Link to="/other">Leave tools</Link>
     </main>
