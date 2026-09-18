@@ -120,8 +120,12 @@ test("Dream Wave business details resolve from the verified profile only", () =>
   assert.equal(profileValue("location"), "Sarasota, FL");
   assert.equal(profileValue("phone"), "(941) 294-5727");
   assert.match(profileSource, /logoUrl: logoAsset\.url/);
+  // Owner-verified on 2026-09-18.
+  assert.equal(profileValue("email"), "jessehayes@dwmsrq.com");
+  assert.equal(profileValue("streetAddress"), "290 Via Anina Dr, Sarasota, FL 34243");
+  assert.equal(profileValue("legalEntity"), "Dream Wave Media LLC");
   // Unverified fields stay null rather than being invented.
-  for (const key of ["email", "streetAddress", "legalEntity", "taxId", "paymentInstructions"]) {
+  for (const key of ["taxId", "paymentInstructions"]) {
     assert.equal(profileValue(key), null, `${key} must stay unset until verified`);
   }
 });
