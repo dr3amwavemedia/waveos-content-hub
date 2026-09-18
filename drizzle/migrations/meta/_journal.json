@@ -50,6 +50,13 @@
       "when": 1789708674440,
       "tag": "0006_catalog_items_2026",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1789711185954,
+      "tag": "0007_global_invoice_numbering_2026",
+      "breakpoints": true
     }
   ]
 }
