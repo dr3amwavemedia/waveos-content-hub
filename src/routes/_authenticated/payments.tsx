@@ -36,6 +36,7 @@ type PlanRow = {
   duplicate: boolean;
 };
 const ZONE = "America/New_York";
+type Period = "all" | "day" | "week" | "month" | "year";
 const REASONS: Record<string, string> = {
   number: "Matched by invoice number",
   email_amount: "Matched by client e-mail",
@@ -78,7 +79,8 @@ function compactMoney(cents: number): string {
     maximumFractionDigits: 1,
   }).format(cents / 100);
 }
-function periodStart(period: "day" | "week" | "month" | "year"): string {
+function periodStart(period: Period): string {
+  if (period === "all") return "0000-01-01";
   const today = new Date();
   const local = dateKey(today.toISOString());
   const start = new Date(`${local}T12:00:00Z`);
@@ -95,7 +97,7 @@ function PaymentsPage() {
   const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [truncated, setTruncated] = useState(false);
-  const [period, setPeriod] = useState<"day" | "week" | "month" | "year">("year");
+  const [period, setPeriod] = useState<Period>("all");
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState<ParsedBloomFile | null>(null);
   const [plan, setPlan] = useState<PlanRow[] | null>(null);
@@ -172,24 +174,41 @@ function PaymentsPage() {
     selected.forEach((entry) => {
       if (entry.kind !== "payment" && entry.kind !== "refund") return;
       const day = dateKey(entry.occurred_at);
-      const key = period === "year" ? day.slice(0, 7) : period === "month" ? day.slice(5) : day;
+      const key =
+        period === "year" || period === "all"
+          ? day.slice(0, 7)
+          : period === "month"
+            ? day.slice(5)
+            : day;
       const current = grouped.get(key) ?? { collected: 0, refunds: 0 };
       if (entry.kind === "refund") current.refunds += entry.amount_cents;
       else current.collected += entry.amount_cents;
       grouped.set(key, current);
     });
-    return [...grouped]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-31)
-      .map(([key, values]) => ({
-        label:
-          period === "year"
-            ? new Intl.DateTimeFormat("en-US", { month: "short" }).format(
-                new Date(`${key}-01T12:00:00Z`),
-              )
-            : key,
-        ...values,
-      }));
+    let rows = [...grouped].sort(([a], [b]) => a.localeCompare(b));
+    if ((period === "year" || period === "all") && rows.length) {
+      const firstKey = period === "year" ? `${today.slice(0, 4)}-01` : rows[0][0];
+      const lastKey = today.slice(0, 7);
+      const cursor = new Date(`${firstKey}-01T12:00:00Z`);
+      const last = new Date(`${lastKey}-01T12:00:00Z`);
+      const continuous: Array<[string, { collected: number; refunds: number }]> = [];
+      while (cursor <= last) {
+        const key = cursor.toISOString().slice(0, 7);
+        continuous.push([key, grouped.get(key) ?? { collected: 0, refunds: 0 }]);
+        cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+      }
+      rows = continuous;
+    }
+    return rows.slice(-31).map(([key, values]) => ({
+      label:
+        period === "year" || period === "all"
+          ? new Intl.DateTimeFormat("en-US", {
+              month: "short",
+              year: period === "all" ? "2-digit" : undefined,
+            }).format(new Date(`${key}-01T12:00:00Z`))
+          : key,
+      ...values,
+    }));
   }, [selected, period]);
 
   async function pickFile(file?: File) {
@@ -375,14 +394,14 @@ function PaymentsPage() {
               <h2 className="mt-1 text-xl font-semibold">Sales and cash performance</h2>
             </div>
             <div className="flex w-fit flex-wrap gap-1 rounded-xl border border-border bg-background/70 p-1">
-              {(["day", "week", "month", "year"] as const).map((name) => (
+              {(["all", "year", "month", "week", "day"] as const).map((name) => (
                 <button
                   key={name}
                   type="button"
                   onClick={() => setPeriod(name)}
                   className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${period === name ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                 >
-                  {name}
+                  {name === "all" ? "All time" : name}
                 </button>
               ))}
             </div>
@@ -418,7 +437,7 @@ function PaymentsPage() {
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
               <div>
                 <h3 className="font-semibold">
-                  Cash flow by {period === "year" ? "month" : "day"}
+                  Cash flow by {period === "year" || period === "all" ? "month" : "day"}
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Green is money collected. Red is money refunded.
