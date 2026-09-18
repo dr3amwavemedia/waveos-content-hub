@@ -48,6 +48,7 @@ import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedContractReturnRouteImport } from './routes/_authenticated/contract-return'
 import { Route as AuthenticatedContentRouteImport } from './routes/_authenticated/content'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
+import { Route as AuthenticatedCatalogRouteImport } from './routes/_authenticated/catalog'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
 import { Route as AuthenticatedBrandVoiceRouteImport } from './routes/_authenticated/brand-voice'
 import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
@@ -277,6 +278,11 @@ const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
   path: '/clients',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCatalogRoute = AuthenticatedCatalogRouteImport.update({
+  id: '/catalog',
+  path: '/catalog',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   id: '/calendar',
   path: '/calendar',
@@ -434,6 +440,7 @@ export interface FileRoutesByFullPath {
   '/approvals': typeof AuthenticatedApprovalsRoute
   '/brand-voice': typeof AuthenticatedBrandVoiceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
+  '/catalog': typeof AuthenticatedCatalogRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/content': typeof AuthenticatedContentRoute
   '/contract-return': typeof AuthenticatedContractReturnRoute
@@ -500,6 +507,7 @@ export interface FileRoutesByTo {
   '/approvals': typeof AuthenticatedApprovalsRoute
   '/brand-voice': typeof AuthenticatedBrandVoiceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
+  '/catalog': typeof AuthenticatedCatalogRoute
   '/clients': typeof AuthenticatedClientsRoute
   '/content': typeof AuthenticatedContentRoute
   '/contract-return': typeof AuthenticatedContractReturnRoute
@@ -568,6 +576,7 @@ export interface FileRoutesById {
   '/_authenticated/approvals': typeof AuthenticatedApprovalsRoute
   '/_authenticated/brand-voice': typeof AuthenticatedBrandVoiceRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
+  '/_authenticated/catalog': typeof AuthenticatedCatalogRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
   '/_authenticated/content': typeof AuthenticatedContentRoute
   '/_authenticated/contract-return': typeof AuthenticatedContractReturnRoute
@@ -636,6 +645,7 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/brand-voice'
     | '/calendar'
+    | '/catalog'
     | '/clients'
     | '/content'
     | '/contract-return'
@@ -702,6 +712,7 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/brand-voice'
     | '/calendar'
+    | '/catalog'
     | '/clients'
     | '/content'
     | '/contract-return'
@@ -769,6 +780,7 @@ export interface FileRouteTypes {
     | '/_authenticated/approvals'
     | '/_authenticated/brand-voice'
     | '/_authenticated/calendar'
+    | '/_authenticated/catalog'
     | '/_authenticated/clients'
     | '/_authenticated/content'
     | '/_authenticated/contract-return'
@@ -1128,6 +1140,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/catalog': {
+      id: '/_authenticated/catalog'
+      path: '/catalog'
+      fullPath: '/catalog'
+      preLoaderRoute: typeof AuthenticatedCatalogRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/calendar': {
       id: '/_authenticated/calendar'
       path: '/calendar'
@@ -1333,6 +1352,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
   AuthenticatedBrandVoiceRoute: typeof AuthenticatedBrandVoiceRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
+  AuthenticatedCatalogRoute: typeof AuthenticatedCatalogRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
   AuthenticatedContentRoute: typeof AuthenticatedContentRoute
   AuthenticatedContractReturnRoute: typeof AuthenticatedContractReturnRoute
@@ -1365,6 +1385,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedApprovalsRoute: AuthenticatedApprovalsRoute,
   AuthenticatedBrandVoiceRoute: AuthenticatedBrandVoiceRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
+  AuthenticatedCatalogRoute: AuthenticatedCatalogRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
   AuthenticatedContentRoute: AuthenticatedContentRoute,
   AuthenticatedContractReturnRoute: AuthenticatedContractReturnRoute,
