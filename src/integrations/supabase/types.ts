@@ -1493,6 +1493,30 @@ export type Database = {
         }
         Relationships: []
       }
+      global_invoice_number_counter: {
+        Row: {
+          last_value: number
+          pad_width: number
+          prefix: string
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          last_value: number
+          pad_width: number
+          prefix: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          last_value?: number
+          pad_width?: number
+          prefix?: string
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invites: {
         Row: {
           accepted_at: string | null
