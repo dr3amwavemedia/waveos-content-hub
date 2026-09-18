@@ -153,7 +153,10 @@ export const getContractSigningLink = createServerFn({ method: "POST" })
     if (destination.protocol !== "https:" || !/(^|\.)signwell\.com$/i.test(destination.hostname)) {
       throw new Error("SignWell returned an invalid signing destination.");
     }
-    return { url: destination.toString() };
+    return {
+      url: destination.toString(),
+      returnUrl: `${publicReturnOrigin()}/contract-return?contract=${encodeURIComponent(contract.id)}`,
+    };
   });
 
 /**
