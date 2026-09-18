@@ -69,7 +69,7 @@ export async function createSignwellDocument(input: {
     subject: input.name,
     draft: false,
     embedded_signing: true,
-    // Turns the {{signature:1:y}} / {{date:1:y}} placeholders in the HTML into
+    // Turns the {{s1:signature}} / {{s1:date}} placeholders in the HTML into
     // real, required SignWell fields instead of visible literal text.
     text_tags: true,
     // No client emails during the test phase.

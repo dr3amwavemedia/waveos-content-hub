@@ -299,3 +299,8 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .animate-vision-slide-in, .vision-orb { animation: none; }
 }
+
+/* Keep SignWell's body-level signing modal above WaveOS dialogs. */
+#SignWell-Modal-Embedded {
+  z-index: 2147483647 !important;
+}
