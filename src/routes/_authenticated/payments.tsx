@@ -4,14 +4,31 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { dollarsToCents, parseBloomCsv, type CsvTable } from "@/lib/bloom-payments-csv";
+import {
+  parseBloomFile,
+  matchInvoice,
+  invoiceUpdate,
+  type BloomRecord,
+  type InvoiceCandidate,
+  type ParsedBloomFile,
+} from "@/lib/bloom-import";
 
 type Entry = Database["public"]["Tables"]["payment_ledger"]["Row"];
-type Kind = Entry["kind"];
-type Mapping = { id: string; amount: string; date: string; invoice: string; description: string };
 type ImportRow = Database["public"]["Tables"]["payment_ledger"]["Insert"];
-const KINDS: Kind[] = ["payment", "refund", "invoice", "expense"];
+type PlanRow = {
+  record: BloomRecord;
+  invoice: InvoiceCandidate | null;
+  reason: string;
+  duplicate: boolean;
+};
 const ZONE = "America/New_York";
+const REASONS: Record<string, string> = {
+  number: "Matched by invoice number",
+  email_amount: "Matched by client e-mail",
+  name_amount: "Matched by client name and amount",
+  ambiguous: "Several invoices match — needs review",
+  none: "No matching invoice — needs review",
+};
 
 export const Route = createFileRoute("/_authenticated/payments")({
   beforeLoad: async () => {
@@ -56,18 +73,10 @@ function PaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [truncated, setTruncated] = useState(false);
   const [period, setPeriod] = useState<"day" | "week" | "month" | "year">("month");
-  const [csv, setCsv] = useState<CsvTable | null>(null);
   const [fileName, setFileName] = useState("");
-  const [kind, setKind] = useState<Kind>("invoice");
-  const [map, setMap] = useState<Mapping>({
-    id: "",
-    amount: "",
-    date: "",
-    invoice: "",
-    description: "",
-  });
+  const [parsed, setParsed] = useState<ParsedBloomFile | null>(null);
+  const [plan, setPlan] = useState<PlanRow[] | null>(null);
   const [busy, setBusy] = useState(false);
-  const [preview, setPreview] = useState<ImportRow[]>([]);
 
   async function reload() {
     setLoading(true);
