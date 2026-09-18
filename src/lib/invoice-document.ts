@@ -90,6 +90,7 @@ export function invoiceDocumentHtml(
   const nextPayment = nextInvoicePaymentCents({
     amountCents: total,
     amountPaidCents: paid,
+    paymentPlan: invoice.paymentPlan,
     checkoutPaymentType: invoice.checkoutPaymentType,
     checkoutPaymentCents: invoice.checkoutPaymentCents,
   });

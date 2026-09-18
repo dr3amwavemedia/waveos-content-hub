@@ -7,7 +7,11 @@ import {
   type StripeCheckoutSession,
 } from "@/lib/stripe.server";
 import { publicReturnOrigin } from "@/lib/public-origin.server";
-import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
+import {
+  effectiveCheckoutPaymentType,
+  nextInvoicePaymentCents,
+  nextInvoicePaymentLabel,
+} from "@/lib/invoice-payment-schedule";
 
 /**
  * Create a Stripe Checkout session for one invoice.
@@ -24,7 +28,7 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
     const { data: invoice, error } = await supabase
       .from("client_invoices")
       .select(
-        "id,workspace_id,number,description,amount_cents,amount_paid_cents,currency,status,published_at,provider_session_id,checkout_payment_type,checkout_payment_cents",
+        "id,workspace_id,number,description,amount_cents,amount_paid_cents,currency,status,published_at,provider_session_id,payment_plan,checkout_payment_type,checkout_payment_cents",
       )
       .eq("id", data.invoiceId)
       .maybeSingle();
@@ -40,13 +44,31 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
     const paid = invoice.amount_paid_cents ?? 0;
     const balance = total - paid;
     if (balance <= 0) throw new Error("This invoice has no balance due.");
-    const dueNow = nextInvoicePaymentCents({
+    const paymentSchedule = {
       amountCents: total,
       amountPaidCents: paid,
+      paymentPlan: invoice.payment_plan,
       checkoutPaymentType: invoice.checkout_payment_type,
       checkoutPaymentCents: invoice.checkout_payment_cents,
-    });
+    };
+    const dueNow = nextInvoicePaymentCents(paymentSchedule);
     if (dueNow <= 0) throw new Error("This invoice has no scheduled payment due.");
+    const paymentType = effectiveCheckoutPaymentType(paymentSchedule);
+    const paymentLabel = nextInvoicePaymentLabel(paymentSchedule).replace(/^Pay /, "");
+    const checkoutItemLabel = paymentLabel === "now" ? "Invoice" : paymentLabel;
+    const invoiceLabel = invoice.number ?? "Invoice";
+    const remainingAfterPayment = Math.max(0, balance - dueNow);
+    const money = (cents: number) =>
+      new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: invoice.currency ?? "USD",
+      }).format(cents / 100);
+    const checkoutDescription =
+      paymentType === "deposit" && paid === 0
+        ? `Deposit toward a ${money(total)} invoice. ${money(remainingAfterPayment)} remains after this payment.`
+        : paymentType === "fixed"
+          ? `Installment toward a ${money(total)} invoice. ${money(remainingAfterPayment)} remains after this payment.`
+          : invoice.description;
     // Validate the public return address BEFORE touching any Stripe session, so
     // a misconfigured setting can never expire a client's existing checkout.
     const origin = publicReturnOrigin();
@@ -87,9 +109,15 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
           invoice_id: invoice.id,
           workspace_id: invoice.workspace_id,
           invoice_number: invoice.number ?? "",
+          payment_type: paymentType,
+          payment_amount_cents: String(dueNow),
         },
         payment_intent_data: {
-          metadata: { invoice_id: invoice.id, workspace_id: invoice.workspace_id },
+          metadata: {
+            invoice_id: invoice.id,
+            workspace_id: invoice.workspace_id,
+            payment_type: paymentType,
+          },
         },
         line_items: [
           {
@@ -98,8 +126,8 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
               currency: (invoice.currency ?? "usd").toLowerCase(),
               unit_amount: dueNow,
               product_data: {
-                name: invoice.number ? `Invoice ${invoice.number}` : "Invoice",
-                ...(invoice.description ? { description: invoice.description } : {}),
+                name: `${checkoutItemLabel.charAt(0).toUpperCase()}${checkoutItemLabel.slice(1)} · ${invoiceLabel}`,
+                ...(checkoutDescription ? { description: checkoutDescription } : {}),
               },
             },
           },

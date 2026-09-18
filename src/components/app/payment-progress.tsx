@@ -9,7 +9,7 @@ export function PaymentProgress({ invoice }: { invoice: PaymentInvoice }) {
   const received = invoice.status === "paid" ? total : invoice.amount_paid_cents;
   const money = (value: number) => new Intl.NumberFormat("en-US", { style: "currency", currency: invoice.currency }).format(value / 100);
   const labels: Record<string, string> = { one_time: "One-time payment", deposit_balance: "Deposit + balance", installments: "Installments", monthly_retainer: "Monthly retainer" };
-  const dueNow = nextInvoicePaymentCents({ amountCents: total, amountPaidCents: received, checkoutPaymentType: invoice.checkout_payment_type, checkoutPaymentCents: invoice.checkout_payment_cents });
+  const dueNow = nextInvoicePaymentCents({ amountCents: total, amountPaidCents: received, paymentPlan: invoice.payment_plan, checkoutPaymentType: invoice.checkout_payment_type, checkoutPaymentCents: invoice.checkout_payment_cents });
   const percent = total != null && total > 0 && received != null ? Math.min(100, Math.max(0, Math.round(received / total * 100))) : null;
   return <div className="my-3 space-y-2 rounded-lg bg-primary/5 p-3 text-sm">
     <p className="font-medium">{labels[invoice.payment_plan] ?? "Payment progress"}{invoice.billing_month && ` · ${new Date(`${invoice.billing_month}T12:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`}</p>

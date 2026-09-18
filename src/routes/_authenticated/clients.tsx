@@ -2776,12 +2776,11 @@ function InvoiceForm({
     storedDiscountDisplay(invoice?.discount_type, invoice?.discount_value),
   );
   const [paymentPlan, setPaymentPlan] = useState(invoice?.payment_plan ?? "one_time");
-  const [checkoutPaymentType, setCheckoutPaymentType] = useState(
-    invoice?.checkout_payment_type ?? "remaining",
-  );
   const [checkoutPaymentAmount, setCheckoutPaymentAmount] = useState(
     invoice?.checkout_payment_cents == null
-      ? ""
+      ? invoice?.payment_plan === "deposit_balance" && invoice.amount_cents
+        ? (Math.round(invoice.amount_cents / 2) / 100).toFixed(2)
+        : ""
       : (invoice.checkout_payment_cents / 100).toFixed(2),
   );
   const [billingMonth, setBillingMonth] = useState(invoice?.billing_month?.slice(0, 7) ?? "");
@@ -2927,6 +2926,12 @@ function InvoiceForm({
     value: Number(discountValue || 0),
   });
   const effectiveAmount = (previewDiscount.totalCents / 100).toFixed(2);
+  const checkoutPaymentType =
+    paymentPlan === "deposit_balance"
+      ? "deposit"
+      : paymentPlan === "installments"
+        ? "fixed"
+        : "remaining";
   const amountValid = items.length
     ? validInvoiceItems(items)
     : Number.isFinite(Number(amount)) && Number(amount) > 0;
@@ -3142,14 +3147,25 @@ function InvoiceForm({
         <Field label="Payment arrangement">
           <select
             value={paymentPlan}
-            onChange={(e) => setPaymentPlan(e.target.value)}
+            onChange={(e) => {
+              const nextPlan = e.target.value;
+              setPaymentPlan(nextPlan);
+              if (nextPlan === "deposit_balance" && !checkoutPaymentAmount) {
+                setCheckoutPaymentAmount((Number(effectiveAmount || 0) / 2).toFixed(2));
+              } else if (nextPlan === "one_time" || nextPlan === "monthly_retainer") {
+                setCheckoutPaymentAmount("");
+              }
+            }}
             className={inputCls}
           >
-            <option value="one_time">One-time payment</option>
-            <option value="deposit_balance">Deposit + remaining balance</option>
-            <option value="installments">Installments / partial payments</option>
+            <option value="one_time">Full remaining balance</option>
+            <option value="deposit_balance">Deposit first, then remaining balance</option>
+            <option value="installments">Fixed payment installments</option>
             <option value="monthly_retainer">Monthly retainer / subscription</option>
           </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            This selection controls the amount and wording shown in Stripe Checkout.
+          </p>
         </Field>
         <Field label="Total received so far">
           <input
@@ -3179,20 +3195,6 @@ function InvoiceForm({
             Set 50% received
           </button>
         </Field>
-        <Field label="Payment link charges">
-          <select
-            value={checkoutPaymentType}
-            onChange={(e) => setCheckoutPaymentType(e.target.value)}
-            className={inputCls}
-          >
-            <option value="remaining">Entire remaining balance</option>
-            <option value="deposit">Deposit first, then remaining balance</option>
-            <option value="fixed">Fixed amount each payment</option>
-          </select>
-          <p className="mt-1 text-xs text-muted-foreground">
-            This controls how much the secure payment button collects today.
-          </p>
-        </Field>
         {checkoutPaymentType !== "remaining" && (
           <Field label={checkoutPaymentType === "deposit" ? "Deposit amount" : "Fixed payment amount"}>
             <input
@@ -3217,6 +3219,18 @@ function InvoiceForm({
             )}
           </Field>
         )}
+        <div className="rounded-lg border border-primary/25 bg-primary/5 p-3 sm:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+            Stripe Checkout preview
+          </p>
+          <p className="mt-1 text-sm text-foreground">
+            {checkoutPaymentType === "deposit"
+              ? `Deposit · ${currency.toUpperCase()} ${checkoutPaymentAmount || "0.00"} due now, then the remaining balance.`
+              : checkoutPaymentType === "fixed"
+                ? `Installment · ${currency.toUpperCase()} ${checkoutPaymentAmount || "0.00"} per payment; the final payment adjusts to the exact balance.`
+                : `Full balance · ${currency.toUpperCase()} ${Math.max(0, Number(effectiveAmount) - Number(amountPaid || 0)).toFixed(2)} due now.`}
+          </p>
+        </div>
         {paymentPlan === "monthly_retainer" && (
           <Field label="Billing month">
             <input
