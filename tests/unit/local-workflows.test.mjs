@@ -66,6 +66,10 @@ assert.ok(report.includes("2026-09-14"));
 const paymentsRoute = readFileSync("src/routes/_authenticated/payments.tsx", "utf8");
 const appShell = readFileSync("src/components/app/app-shell.tsx", "utf8");
 const clientsRoute = readFileSync("src/routes/_authenticated/clients.tsx", "utf8");
+const addedContracts = readFileSync(
+  "supabase/migrations/20260918162000_add_campaign_and_brand_story_contracts.sql",
+  "utf8",
+);
 assert.ok(!paymentsRoute.includes("<AppShell"), "Payments must use the authenticated parent shell");
 assert.ok(
   appShell.includes('const useWideCanvas = pathname === "/payments"'),
@@ -79,4 +83,12 @@ assert.ok(
   clientsRoute.includes("Assigned automatically"),
   "The new-invoice form must not imply that an invoice number is entered manually",
 );
+assert.ok(
+  clientsRoute.includes("Search by client or business name") &&
+    clientsRoute.includes("crm_contacts(first_name,last_name,is_primary)"),
+  "The compact client directory must show searchable client and business identities",
+);
+assert.match(addedContracts, /'Campaign Contract'/);
+assert.match(addedContracts, /'Brand Story Contract 1'/);
+assert.match(addedContracts, /DELIVERABLES\s+\{\{deliverables\}\}/);
 console.log("Local workflow preservation, amounts and export escaping passed");

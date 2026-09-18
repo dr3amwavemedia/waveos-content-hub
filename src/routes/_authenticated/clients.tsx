@@ -161,6 +161,8 @@ export const Route = createFileRoute("/_authenticated/clients")({
 interface ClientWorkspace {
   id: string;
   name: string;
+  client_name: string | null;
+  business_name: string | null;
   slug: string;
   industry: string | null;
   timezone: string;
@@ -251,7 +253,7 @@ function ClientsPage() {
     queryKey: ["clients", "workspaces"],
     queryFn: async () => {
       const BASE_COLS =
-        "id,name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at";
+        "id,name,client_name,business_name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at";
       // Wedding columns are optional: if the Layer 5 migration has not reached
       // this environment yet, the client list must still load.
       let missing = false;
@@ -275,10 +277,20 @@ function ClientsPage() {
       }
       setWeddingColumnsMissing(missing);
 
-      const [{ data: members }, { data: invites }, { data: media }] = await Promise.all([
+      const [
+        { data: members },
+        { data: invites },
+        { data: media },
+        { data: crmAccounts },
+      ] = await Promise.all([
         supabase.from("workspace_members").select("workspace_id"),
         supabase.from("invites_admin").select("workspace_id").eq("status", "pending"),
         supabase.from("media_assets").select("workspace_id").is("archived_at", null),
+        supabase
+          .from("crm_accounts")
+          .select(
+            "linked_workspace_id,business_name,crm_contacts(first_name,last_name,is_primary)",
+          ),
       ]);
       const bump = (m: Map<string, number>, k: string | null) => {
         if (!k) return;
@@ -290,11 +302,24 @@ function ClientsPage() {
       (invites ?? []).forEach((i) => bump(iCount, i.workspace_id));
       const mediaCount = new Map<string, number>();
       (media ?? []).forEach((m) => bump(mediaCount, m.workspace_id));
+      const crmByWorkspace = new Map(
+        (crmAccounts ?? [])
+          .filter((account) => account.linked_workspace_id)
+          .map((account) => [account.linked_workspace_id!, account]),
+      );
       return (ws ?? []).map<ClientWorkspace>((row) => {
         const w = row as unknown as ClientWorkspace;
         const featureOverrides = (w.feature_overrides ?? {}) as Record<string, boolean>;
+        const crm = crmByWorkspace.get(w.id);
+        const primaryContact =
+          crm?.crm_contacts?.find((contact) => contact.is_primary) ?? crm?.crm_contacts?.[0];
+        const primaryContactName = primaryContact
+          ? [primaryContact.first_name, primaryContact.last_name].filter(Boolean).join(" ")
+          : "";
         return {
           ...w,
+          client_name: w.client_name?.trim() || primaryContactName || w.name,
+          business_name: w.business_name?.trim() || crm?.business_name?.trim() || w.name,
           wedding_display_name: w.wedding_display_name ?? null,
           wedding_theme: w.wedding_theme === "gold" ? "gold" : "olive",
           wedding_scheduling_url: w.wedding_scheduling_url ?? null,
@@ -322,6 +347,8 @@ function ClientsPage() {
     if (!normalizedClientSearch) return true;
     return [
       workspace.name,
+      workspace.client_name,
+      workspace.business_name,
       workspace.slug,
       workspace.industry,
       workspace.account_status,
@@ -360,8 +387,8 @@ function ClientsPage() {
             Clients
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Provision a workspace, choose the tier, and send a single-use invite. Access is granted
-            only after the client accepts.
+            Find a client by name or business, then open their profile to manage projects,
+            documents, contracts, invoices, and access.
           </p>
         </div>
         <button
@@ -383,7 +410,7 @@ function ClientsPage() {
           type="search"
           value={clientSearch}
           onChange={(event) => setClientSearch(event.target.value)}
-          placeholder="Search clients by name, industry, status, or workspace…"
+          placeholder="Search by client or business name…"
           aria-label="Search clients"
           className="h-11 w-full rounded-xl border border-border bg-surface pl-11 pr-10 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
@@ -414,178 +441,78 @@ function ClientsPage() {
         </div>
       )}
 
-      <div className="surface-card overflow-hidden">
-        {workspacesQ.isLoading ? (
-          <div className="flex h-32 items-center justify-center text-sm text-muted-foreground">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading workspaces…
+      <section className="space-y-3">
+        {!workspacesQ.isLoading && !workspacesQ.isError && visibleWorkspaces.length > 0 && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <p>
+              {visibleWorkspaces.length} client{visibleWorkspaces.length === 1 ? "" : "s"}
+            </p>
+            <p>Choose a client to open their profile</p>
           </div>
-        ) : workspacesQ.isError ? (
-          <div className="p-6 text-sm text-muted-foreground">
-            Client list unavailable — see the error above.
-          </div>
-        ) : (workspacesQ.data ?? []).length === 0 ? (
-          <div className="p-6">
-            <EmptyState
-              icon={Users2}
-              title="No client workspaces yet"
-              body="Click New client to create your first workspace and send an invite."
-            />
-          </div>
-        ) : visibleWorkspaces.length === 0 ? (
-          <div className="p-6">
-            <EmptyState
-              icon={Search}
-              title="No clients found"
-              body={`No clients match “${clientSearch.trim()}”. Try a different search.`}
-            />
-          </div>
-        ) : (
-          <>
-            <div className="divide-y divide-border/60 md:hidden">
-              {visibleWorkspaces.map((w) => (
-                <article key={w.id} className="space-y-3 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h3>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedWs(w)}
-                          className="min-h-11 text-left font-semibold text-foreground hover:text-primary"
-                        >
-                          {w.name}
-                        </button>
-                      </h3>
-                      <p className="truncate text-xs text-muted-foreground">
-                        /{w.slug} · {w.industry ?? "Industry not set"}
-                      </p>
-                      <button
-                        onClick={() => setSelectedWs(w)}
-                        className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-                      >
-                        <Pencil className="h-3.5 w-3.5" /> Edit info
-                      </button>
-                    </div>
-                    <button
-                      onClick={() => setSelectedWs(w)}
-                      className="min-h-10 min-w-10 rounded-lg border border-border p-2.5 text-muted-foreground"
-                      aria-label={`Manage ${w.name}`}
-                    >
-                      <span className="text-xs font-semibold">Profile</span>
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <TierBadge tier={w.access_tier} />
-                    <span
-                      className={cn(
-                        "rounded-md px-2 py-0.5 text-xs font-medium capitalize ring-1",
-                        STATUS_TONE[w.account_status],
-                      )}
-                    >
-                      {w.account_status}
-                    </span>
-                  </div>
-                  <dl className="grid grid-cols-3 gap-2 text-xs">
-                    <div>
-                      <dt className="text-muted-foreground">Members</dt>
-                      <dd className="mt-1 font-medium">{w.member_count}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Invites</dt>
-                      <dd className="mt-1 font-medium">{w.invite_count}</dd>
-                    </div>
-                    <div>
-                      <dt className="text-muted-foreground">Ends</dt>
-                      <dd className="mt-1 truncate font-medium">
-                        {w.access_expires_at
-                          ? new Date(w.access_expires_at).toLocaleDateString()
-                          : "—"}
-                      </dd>
-                    </div>
-                  </dl>
-                </article>
-              ))}
-            </div>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full text-sm">
-                <thead className="bg-surface/60 text-xs uppercase tracking-wider text-muted-foreground">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">Workspace</th>
-                    <th className="px-4 py-3 text-left font-medium">Tier</th>
-                    <th className="px-4 py-3 text-left font-medium">Status</th>
-                    <th className="px-4 py-3 text-left font-medium">Term ends</th>
-                    <th className="px-4 py-3 text-left font-medium">Members</th>
-                    <th className="px-4 py-3 text-left font-medium">Pending</th>
-                    <th className="px-4 py-3"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleWorkspaces.map((w) => (
-                    <tr key={w.id} className="border-t border-border/60 hover:bg-elevated/40">
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedWs(w)}
-                            className="min-h-11 text-left font-semibold text-foreground hover:text-primary"
-                          >
-                            {w.name}
-                          </button>
-                          <button
-                            onClick={() => setSelectedWs(w)}
-                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                          >
-                            <Pencil className="h-3 w-3" /> Edit info
-                          </button>
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          /{w.slug} · {w.industry ?? "—"}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <TierBadge tier={w.access_tier} />
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={cn(
-                            "rounded-md px-2 py-0.5 text-xs font-medium capitalize ring-1",
-                            STATUS_TONE[w.account_status],
-                          )}
-                        >
-                          {w.account_status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
-                        {w.access_expires_at
-                          ? new Date(w.access_expires_at).toLocaleDateString()
-                          : "—"}
-                      </td>
-                      <td className="px-4 py-3 text-foreground">{w.member_count}</td>
-                      <td className="px-4 py-3">
-                        {w.invite_count > 0 ? (
-                          <span className="rounded-md bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning ring-1 ring-warning/30">
-                            {w.invite_count}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-muted-foreground">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => setSelectedWs(w)}
-                          className="rounded-lg p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
-                          aria-label={`Open ${w.name}`}
-                        >
-                          <span className="text-xs font-semibold">Profile</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
         )}
-      </div>
+        <div>
+          {workspacesQ.isLoading ? (
+            <div className="surface-card flex h-32 items-center justify-center text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading workspaces…
+            </div>
+          ) : workspacesQ.isError ? (
+            <div className="surface-card p-6 text-sm text-muted-foreground">
+              Client list unavailable — see the error above.
+            </div>
+          ) : (workspacesQ.data ?? []).length === 0 ? (
+            <div className="surface-card p-6">
+              <EmptyState
+                icon={Users2}
+                title="No client workspaces yet"
+                body="Click New client to create your first workspace and send an invite."
+              />
+            </div>
+          ) : visibleWorkspaces.length === 0 ? (
+            <div className="surface-card p-6">
+              <EmptyState
+                icon={Search}
+                title="No clients found"
+                body={`No clients match “${clientSearch.trim()}”. Try a different search.`}
+              />
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {visibleWorkspaces.map((w) => {
+                const clientName = w.client_name?.trim() || w.name;
+                const businessName = w.business_name?.trim() || w.name;
+                const initials = clientName
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((part) => part.charAt(0))
+                  .join("")
+                  .toUpperCase();
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setSelectedWs(w)}
+                    className="group flex min-h-24 items-center gap-4 rounded-2xl border border-border bg-surface/70 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-elevated/70 hover:shadow-[var(--shadow-glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label={`Open ${clientName} profile`}
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-sm font-semibold text-primary transition group-hover:border-primary/40 group-hover:bg-primary/15">
+                      {initials || "CL"}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-foreground transition group-hover:text-primary">
+                        {clientName}
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-muted-foreground">
+                        {businessName}
+                      </span>
+                    </span>
+                    <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" />
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </section>
 
       {open && (
         <OnboardingModal
