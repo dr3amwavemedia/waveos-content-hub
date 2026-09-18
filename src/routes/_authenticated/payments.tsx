@@ -377,8 +377,10 @@ function PaymentsPage() {
         <section className="rounded-2xl border border-border bg-card p-6">
           <h2 className="text-xl font-semibold">Import Bloom CSV</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Choose a CSV export, map its columns, preview every row, then save. Existing records are
-            skipped by source ID. This never edits client invoices.
+            Drop in a full Bloom export. WaveOS reads the columns on its own, works out which rows
+            are payments, refunds or invoices, finds the matching invoice, and updates what each
+            client has paid. Rows already imported are skipped. Refunds and anything it cannot match
+            wait for you below.
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-4">
             <input
@@ -389,102 +391,91 @@ function PaymentsPage() {
                 void pickFile(event.target.files?.[0]);
               }}
             />
-            <label className="text-sm">
-              Record type{" "}
-              <select
-                className="ml-2 rounded-lg border border-border bg-background p-2"
-                value={kind}
-                onChange={(event) => {
-                  setKind(event.target.value as Kind);
-                  setPreview([]);
-                }}
-              >
-                {KINDS.map((value) => (
-                  <option key={value} value={value}>
-                    {value}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {busy && !plan && <span className="text-sm text-muted-foreground">Scanning…</span>}
           </div>
-          {csv && (
+          {parsed && plan && (
             <>
-              <p className="mt-4 text-sm">
-                {fileName}: {csv.rows.length} rows
-              </p>
-              <div className="mt-4 grid gap-3 md:grid-cols-5">
-                {(["id", "amount", "date", "invoice", "description"] as const).map((field) => (
-                  <label key={field} className="text-sm capitalize">
-                    {field}
-                    {["id", "amount", "date"].includes(field) && " *"}
-                    <select
-                      value={map[field]}
-                      onChange={(event) => {
-                        setMap({ ...map, [field]: event.target.value });
-                        setPreview([]);
-                      }}
-                      className="mt-1 w-full rounded-lg border border-border bg-background p-2"
-                    >
-                      <option value="">Select column</option>
-                      {csv.headers.map((header) => (
-                        <option key={header} value={header}>
-                          {header}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+              <div className="mt-5 grid gap-3 sm:grid-cols-4">
+                {[
+                  ["Rows read", String(plan.length)],
+                  ["Matched to an invoice", String(plan.filter((row) => row.invoice).length)],
+                  [
+                    "Already imported",
+                    String(plan.filter((row) => row.duplicate).length),
+                  ],
+                  [
+                    "Needs review",
+                    String(plan.filter((row) => !row.invoice && !row.duplicate).length),
+                  ],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl border border-border p-3">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="mt-1 text-xl font-semibold">{value}</p>
+                  </div>
                 ))}
               </div>
-              <button
-                type="button"
-                onClick={makePreview}
-                className="mt-5 rounded-lg bg-primary px-4 py-2 text-primary-foreground"
-              >
-                Preview import
-              </button>
-            </>
-          )}
-          {preview.length > 0 && (
-            <div className="mt-5">
-              <p className="text-sm">
-                Review: {preview.length} {kind} rows. Payments and refunds will be pending until
-                posted. First five:
+              <p className="mt-3 text-xs text-muted-foreground">
+                {fileName} · columns used:{" "}
+                {Object.entries(parsed.columns)
+                  .map(([field, header]) => `${field} → ${header}`)
+                  .join(", ") || "none detected"}
+                {parsed.skipped.length > 0 &&
+                  ` · ${parsed.skipped.length} rows skipped (no readable amount or date)`}
               </p>
-              <div className="mt-2 overflow-x-auto">
+              <div className="mt-4 max-h-96 overflow-auto rounded-xl border border-border">
                 <table className="w-full text-left text-sm">
-                  <thead>
+                  <thead className="sticky top-0 bg-card">
                     <tr>
-                      <th>ID</th>
-                      <th>Date</th>
-                      <th>Amount</th>
-                      <th>Description</th>
+                      <th className="p-2">Date</th>
+                      <th className="p-2">Type</th>
+                      <th className="p-2">Amount</th>
+                      <th className="p-2">Client / invoice</th>
+                      <th className="p-2">Match</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {preview.slice(0, 5).map((row) => (
-                      <tr key={row.external_id} className="border-t border-border">
-                        <td>{row.external_id}</td>
-                        <td>{dateKey(row.occurred_at)}</td>
-                        <td>{money(row.amount_cents)}</td>
-                        <td>{row.description}</td>
+                    {plan.slice(0, 200).map((row) => (
+                      <tr key={row.record.sourceId} className="border-t border-border">
+                        <td className="p-2">{dateKey(row.record.occurredAt)}</td>
+                        <td className="p-2 capitalize">{row.record.kind}</td>
+                        <td className="p-2">{money(row.record.amountCents)}</td>
+                        <td className="p-2">
+                          {row.record.invoiceNumber ||
+                            row.record.clientName ||
+                            row.record.clientEmail ||
+                            "—"}
+                        </td>
+                        <td className="p-2 text-muted-foreground">
+                          {row.duplicate
+                            ? "Already imported"
+                            : (REASONS[row.reason] ?? "Needs review")}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+              {plan.length > 200 && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Showing the first 200 of {plan.length} rows. All rows are imported.
+                </p>
+              )}
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || plan.every((row) => row.duplicate)}
                 onClick={() => {
-                  void saveImport();
+                  void applyScan();
                 }}
                 className="mt-5 rounded-lg bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50"
               >
-                {busy ? "Saving…" : `Save ${preview.length} reviewed rows`}
+                {busy
+                  ? "Importing…"
+                  : `Import ${plan.filter((row) => !row.duplicate).length} rows and update invoices`}
               </button>
-            </div>
+            </>
           )}
         </section>
+
         <section className="rounded-2xl border border-border bg-card p-6">
           <h2 className="text-xl font-semibold">Pending payments and refunds ({pending.length})</h2>
           <p className="mt-1 text-sm text-muted-foreground">
