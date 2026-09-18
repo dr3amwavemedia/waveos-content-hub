@@ -20,6 +20,22 @@ const escapeHtml = (value: string) =>
     (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!,
   );
 
+function validatedSignwellUrl(url: unknown): string | null {
+  if (typeof url !== "string" || !url) return null;
+  try {
+    const destination = new URL(url);
+    if (
+      destination.protocol !== "https:" ||
+      !/(^|\.)signwell\.com$/i.test(destination.hostname)
+    ) {
+      return null;
+    }
+    return destination.toString();
+  } catch {
+    return null;
+  }
+}
+
 function contractHtml(input: { title: string; body: string; clientName: string }): string {
   return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(input.title)}</title>
 <style>@page{margin:18mm}body{font:13px/1.6 Georgia,serif;color:#16222b}h1{font-size:22px;margin:0 0 4px}
@@ -93,8 +109,16 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
       metadata: { contract_id: contract.id, workspace_id: contract.workspace_id },
     });
 
-    const signingUrl =
-      document.recipients?.[0]?.embedded_signing_url ?? document.embedded_signing_url ?? null;
+    const signingUrl = validatedSignwellUrl(
+      document.recipients?.find(
+        (row) => row.email?.toLowerCase() === contract.signer_email!.toLowerCase(),
+      )?.embedded_signing_url ??
+        document.recipients?.[0]?.embedded_signing_url ??
+        document.embedded_signing_url,
+    );
+    if (!signingUrl) {
+      throw new Error("SignWell created the document without a usable embedded signing link.");
+    }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     await supabaseAdmin
@@ -104,9 +128,11 @@ export const sendContractForSignature = createServerFn({ method: "POST" })
         provider_document_id: document.id,
         status: "sent",
         sent_at: new Date().toISOString(),
-        // Embedded signing links are short-lived credentials. Retrieve one
-        // only after an authorized signer clicks the button; never persist it.
-        hosted_url: null,
+        // SignWell returns the embedded signer credential when the document is
+        // created, but its later GET response can omit it. Keep the validated
+        // URL on the RLS-protected contract row so only authorized members can
+        // request it through getContractSigningLink.
+        hosted_url: signingUrl,
       })
       .eq("id", contract.id);
 
@@ -124,7 +150,7 @@ export const getContractSigningLink = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: contract, error } = await context.supabase
       .from("client_contracts")
-      .select("id,provider,provider_document_id,status,published_at,signer_email")
+      .select("id,provider,provider_document_id,status,published_at,signer_email,hosted_url")
       .eq("id", data.contractId)
       .maybeSingle();
     if (error) throw error;
@@ -139,22 +165,23 @@ export const getContractSigningLink = createServerFn({ method: "POST" })
       throw new Error("This contract is no longer available for signing.");
     }
 
-    const document = await getSignwellDocument(contract.provider_document_id);
-    const recipient =
-      document.recipients?.find(
-        (row) => row.email?.toLowerCase() === contract.signer_email?.toLowerCase(),
-      ) ?? document.recipients?.[0];
-    const url = recipient?.embedded_signing_url ?? document.embedded_signing_url ?? null;
+    let url = validatedSignwellUrl(contract.hosted_url);
+    if (!url) {
+      const document = await getSignwellDocument(contract.provider_document_id);
+      const recipient =
+        document.recipients?.find(
+          (row) => row.email?.toLowerCase() === contract.signer_email?.toLowerCase(),
+        ) ?? document.recipients?.[0];
+      url = validatedSignwellUrl(
+        recipient?.embedded_signing_url ?? document.embedded_signing_url,
+      );
+    }
     if (!url)
       throw new Error(
-        "SignWell did not return an active signing link. Ask Dream Wave Media to resend it.",
+        "This SignWell request does not have an active signing link. Ask Dream Wave Media to recover or replace this test request.",
       );
-    const destination = new URL(url);
-    if (destination.protocol !== "https:" || !/(^|\.)signwell\.com$/i.test(destination.hostname)) {
-      throw new Error("SignWell returned an invalid signing destination.");
-    }
     return {
-      url: destination.toString(),
+      url,
       returnUrl: `${publicReturnOrigin()}/contract-return?contract=${encodeURIComponent(contract.id)}`,
     };
   });
