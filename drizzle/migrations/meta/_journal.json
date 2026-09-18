@@ -43,6 +43,13 @@
       "when": 1789493434751,
       "tag": "0005_payment_ledger",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1789708674440,
+      "tag": "0006_catalog_items_2026",
+      "breakpoints": true
     }
   ]
 }
