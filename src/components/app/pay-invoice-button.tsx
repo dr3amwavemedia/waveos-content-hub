@@ -15,19 +15,29 @@ export function PayInvoiceButton({ invoiceId, label = "Pay now" }: { invoiceId: 
     setBusy(true);
     // Open the tab synchronously: popup blockers only trust a tab opened
     // during the click, and Stripe Checkout refuses to render inside an iframe
-    // (the app preview), which shows up as a blank screen.
-    const tab = window.open("", "_blank", "noopener,noreferrer");
+    // (the app preview), which shows up as a blank screen. Note: passing
+    // "noopener" to window.open makes it return null by design, so we open
+    // without it to keep a usable handle and sever the opener reference
+    // manually instead.
+    const tab = window.open("", "_blank");
+    if (tab) tab.opener = null;
     try {
       const result = await startCheckout({ data: { invoiceId } });
       if (tab && !tab.closed) {
         tab.location.href = result.url;
       } else {
         // Popup was blocked before we could use it. Opening a new tab now is
-        // async so blockers may reject it; as a last resort navigate this tab
-        // (never window.top — cross-origin frame navigation is forbidden).
-        const fallback = window.open(result.url, "_blank", "noopener,noreferrer");
-        if (!fallback || fallback.closed) {
+        // async so blockers may reject it; only as a last resort navigate this
+        // tab (never window.top — cross-origin frame navigation is forbidden).
+        const fallback = window.open(result.url, "_blank");
+        if (fallback) {
+          fallback.opener = null;
+        } else if (window.top === window.self) {
+          // Only navigate the current window when it is not embedded; inside
+          // the preview iframe this navigation would be blocked anyway.
           window.location.href = result.url;
+        } else {
+          toast.error("Your browser blocked the payment tab. Please allow pop-ups and try again.");
         }
       }
       setBusy(false);
