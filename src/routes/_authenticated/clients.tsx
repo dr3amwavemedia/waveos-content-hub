@@ -3082,6 +3082,44 @@ function InvoiceForm({
             : "Add an invoice to this client's account."}
         </p>
       </div>
+      <div className="flex flex-col gap-3 rounded-xl border border-primary/50 bg-primary/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-foreground">Service fee</p>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
+                serviceFeeEnabled
+                  ? "bg-emerald-500/15 text-emerald-400"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {serviceFeeEnabled ? "On" : "Off"}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Add 2.9% to this invoice. It is on automatically for every new invoice.
+          </p>
+          {serviceFeeEnabled && (
+            <p className="mt-1 text-xs font-medium text-primary">
+              Current fee: {currency.toUpperCase()} {(previewServiceFeeCents / 100).toFixed(2)}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={serviceFeeEnabled}
+          aria-label="Add 2.9% service fee"
+          onClick={() => setServiceFeeEnabled((enabled) => !enabled)}
+          className={`inline-flex min-h-11 min-w-36 items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
+            serviceFeeEnabled
+              ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+              : "border-border bg-background text-foreground hover:border-primary/50 hover:text-primary"
+          }`}
+        >
+          {serviceFeeEnabled ? "Fee on — remove" : "Fee off — add 2.9%"}
+        </button>
+      </div>
       <div className="grid gap-3 sm:grid-cols-3">
         {invoice ? (
           <Field label="Number">
@@ -3124,7 +3162,7 @@ function InvoiceForm({
           )}
         </Field>
       </div>
-      <div className="grid gap-3 rounded-lg border border-border/70 bg-background/40 p-3 sm:grid-cols-3">
+      <div className="grid gap-3 rounded-lg border border-border/70 bg-background/40 p-3 sm:grid-cols-2">
         <Field label="Discount">
           <select
             value={discountType}
@@ -3153,20 +3191,6 @@ function InvoiceForm({
             )}
           </Field>
         )}
-        <label className="flex min-h-11 items-center gap-3 rounded-lg border border-border bg-surface/70 px-3 py-2 text-sm">
-          <input
-            type="checkbox"
-            checked={serviceFeeEnabled}
-            onChange={(event) => setServiceFeeEnabled(event.target.checked)}
-            className="h-4 w-4"
-          />
-          <span>
-            <strong className="block text-foreground">Add 2.9% service fee</strong>
-            <span className="text-xs text-muted-foreground">
-              On by default for new invoices. Uncheck to remove it.
-            </span>
-          </span>
-        </label>
         <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
           <p className="text-xs font-medium text-muted-foreground">Invoice total</p>
           <p className="mt-1 text-lg font-semibold text-foreground">
@@ -3179,7 +3203,7 @@ function InvoiceForm({
             </p>
           )}
         </div>
-        <p className="text-xs text-muted-foreground sm:col-span-3">
+        <p className="text-xs text-muted-foreground sm:col-span-2">
           The service fee is part of the invoice price and applies regardless of payment method.
         </p>
       </div>
