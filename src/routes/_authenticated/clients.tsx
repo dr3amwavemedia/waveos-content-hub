@@ -3004,6 +3004,10 @@ function InvoiceForm({
           )}
         </Field>
       </div>
+      <CatalogItemPicker
+        currency={currency}
+        onAdd={(item) => setItems((current) => [...current, item])}
+      />
       <InvoiceItemPicker
         currency={currency}
         onAdd={(item) => setItems((current) => [...current, item])}
