@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { verifyStripeSignature, stripeModeMatches } from "@/lib/stripe.server";
+import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
 
 /**
  * Stripe webhook receiver.
@@ -89,7 +90,7 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
         const { data: invoice } = await supabaseAdmin
           .from("client_invoices")
           .select(
-            "id,workspace_id,number,amount_cents,amount_paid_cents,currency,status,provider_session_id",
+            "id,workspace_id,number,amount_cents,amount_paid_cents,currency,status,provider_session_id,checkout_payment_type,checkout_payment_cents",
           )
           .eq("id", invoiceId)
           .maybeSingle();
@@ -122,10 +123,12 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
           if (!paymentId || !Number.isSafeInteger(received) || received <= 0) {
             return new Response("invalid_payment", { status: 400 });
           }
-          const expectedDue = Math.max(
-            0,
-            (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0),
-          );
+          const expectedDue = nextInvoicePaymentCents({
+            amountCents: invoice.amount_cents,
+            amountPaidCents: invoice.amount_paid_cents,
+            checkoutPaymentType: invoice.checkout_payment_type,
+            checkoutPaymentCents: invoice.checkout_payment_cents,
+          });
           const matchesInvoice =
             String(object.id ?? "") === invoice.provider_session_id &&
             String(object.currency ?? "").toUpperCase() === invoice.currency.toUpperCase() &&

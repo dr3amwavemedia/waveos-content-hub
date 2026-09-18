@@ -41,6 +41,7 @@ import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
 import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
 import { UpcomingShootPanel } from "@/components/app/upcoming-shoot";
 import { PortalReturnHint } from "@/components/app/portal-return-hint";
+import { nextInvoicePaymentCents, nextInvoicePaymentLabel } from "@/lib/invoice-payment-schedule";
 
 export type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
 type Delivery = Database["public"]["Tables"]["client_deliveries"]["Row"];
@@ -797,6 +798,12 @@ export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoi
       ? "Make Payment"
       : "View Invoice";
   const canOpen = isValidHttpsUrl(invoice.hosted_url);
+  const nextPaymentCents = nextInvoicePaymentCents({
+    amountCents: invoice.amount_cents,
+    amountPaidCents: invoice.amount_paid_cents,
+    checkoutPaymentType: invoice.checkout_payment_type,
+    checkoutPaymentCents: invoice.checkout_payment_cents,
+  });
 
   return (
     <div className="surface-card space-y-5 p-5 sm:p-6">
@@ -830,6 +837,12 @@ export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoi
       </div>
 
       <PaymentProgress invoice={invoice} />
+      {!isPaid && nextPaymentCents > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm">
+          <span className="text-muted-foreground">Due with next payment</span>
+          <strong className="text-foreground">{formatMoney(nextPaymentCents, invoice.currency)}</strong>
+        </div>
+      )}
       {(invoice.subtotal_cents ?? invoice.amount_cents ?? 0) > (invoice.amount_cents ?? 0) && (
         <p className="text-sm text-emerald-400">
           Discount applied: {formatMoney((invoice.subtotal_cents ?? 0) - (invoice.amount_cents ?? 0), invoice.currency)}
@@ -868,7 +881,12 @@ export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoi
         {!isPaid && invoice.published_at && (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0) > 0 && (
           <PayInvoiceButton
             invoiceId={invoice.id}
-            label={(invoice.amount_paid_cents ?? 0) > 0 ? "Pay balance" : "Pay now"}
+            label={nextInvoicePaymentLabel({
+              amountCents: invoice.amount_cents,
+              amountPaidCents: invoice.amount_paid_cents,
+              checkoutPaymentType: invoice.checkout_payment_type,
+              checkoutPaymentCents: invoice.checkout_payment_cents,
+            })}
           />
         )}
         {canOpen && (

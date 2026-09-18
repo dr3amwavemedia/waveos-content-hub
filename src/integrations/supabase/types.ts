@@ -654,6 +654,8 @@ export type Database = {
           amount_cents: number | null
           amount_paid_cents: number
           billing_month: string | null
+          checkout_payment_cents: number | null
+          checkout_payment_type: string
           created_at: string
           created_by: string | null
           currency: string
@@ -683,6 +685,8 @@ export type Database = {
           amount_cents?: number | null
           amount_paid_cents?: number
           billing_month?: string | null
+          checkout_payment_cents?: number | null
+          checkout_payment_type?: string
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -712,6 +716,8 @@ export type Database = {
           amount_cents?: number | null
           amount_paid_cents?: number
           billing_month?: string | null
+          checkout_payment_cents?: number | null
+          checkout_payment_type?: string
           created_at?: string
           created_by?: string | null
           currency?: string
