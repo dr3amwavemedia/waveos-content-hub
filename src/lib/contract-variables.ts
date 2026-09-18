@@ -17,6 +17,25 @@ export type ContractFieldDefinition = {
   input: "text" | "date" | "textarea";
 };
 
+export type ContractClientProfile = {
+  clientName?: string | null;
+  businessName?: string | null;
+  businessEmail?: string | null;
+  businessPhone?: string | null;
+  website?: string | null;
+  addressLine1?: string | null;
+  addressLine2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  postalCode?: string | null;
+  country?: string | null;
+  contactFirstName?: string | null;
+  contactLastName?: string | null;
+  contactTitle?: string | null;
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+};
+
 export const emptyContractValues = (): ContractValues => ({
   client_name: "",
   business_name: "",
@@ -26,6 +45,69 @@ export const emptyContractValues = (): ContractValues => ({
   location: "",
   project_name: "",
 });
+
+const compactAddress = (...parts: Array<string | null | undefined>) =>
+  parts.map((part) => part?.trim()).filter(Boolean).join(", ");
+
+/** Maps saved client-profile details to the common aliases used by contract templates. */
+export function contractValuesFromClientProfile(profile: ContractClientProfile): ContractValues {
+  const contactName = [profile.contactFirstName, profile.contactLastName]
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
+  const clientName = profile.clientName?.trim() || contactName;
+  const businessName = profile.businessName?.trim() ?? "";
+  const clientEmail = profile.contactEmail?.trim() || profile.businessEmail?.trim() || "";
+  const clientPhone = profile.contactPhone?.trim() || profile.businessPhone?.trim() || "";
+  const streetAddress = compactAddress(profile.addressLine1, profile.addressLine2);
+  const cityStatePostal = compactAddress(
+    profile.city,
+    [profile.state?.trim(), profile.postalCode?.trim()].filter(Boolean).join(" "),
+  );
+  const fullAddress = compactAddress(streetAddress, cityStatePostal, profile.country);
+
+  return {
+    client_name: clientName,
+    client_legal_name: clientName,
+    client_business_name: businessName,
+    client_business_trade_name: businessName,
+    client_trade_name: businessName,
+    business_name: businessName,
+    client_email: clientEmail,
+    client_phone: clientPhone,
+    client_website: profile.website?.trim() ?? "",
+    client_address: fullAddress,
+    client_street_address: streetAddress,
+    client_address_line1: profile.addressLine1?.trim() ?? "",
+    client_address_line2: profile.addressLine2?.trim() ?? "",
+    client_city: profile.city?.trim() ?? "",
+    client_state: profile.state?.trim() ?? "",
+    client_postal_code: profile.postalCode?.trim() ?? "",
+    client_zip_code: profile.postalCode?.trim() ?? "",
+    client_country: profile.country?.trim() ?? "",
+    contact_name: contactName || clientName,
+    contact_first_name: profile.contactFirstName?.trim() ?? "",
+    contact_last_name: profile.contactLastName?.trim() ?? "",
+    contact_title: profile.contactTitle?.trim() ?? "",
+    contact_email: clientEmail,
+    contact_phone: clientPhone,
+    signer_name: contactName || clientName,
+    signer_title: profile.contactTitle?.trim() ?? "",
+    signer_email: clientEmail,
+    signer_phone: clientPhone,
+  };
+}
+
+export function fillMissingContractValues(
+  current: ContractValues,
+  defaults: ContractValues,
+): ContractValues {
+  const next = { ...current };
+  for (const [key, value] of Object.entries(defaults)) {
+    if (!(next[key] ?? "").trim() && value.trim()) next[key] = value;
+  }
+  return next;
+}
 
 export const CONTRACT_STARTER = `MEDIA SERVICES AGREEMENT
 
