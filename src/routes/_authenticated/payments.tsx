@@ -27,7 +27,14 @@ type Entry = Database["public"]["Tables"]["payment_ledger"]["Row"];
 type ImportRow = Database["public"]["Tables"]["payment_ledger"]["Insert"];
 type SalesInvoice = Pick<
   Database["public"]["Tables"]["client_invoices"]["Row"],
-  "id" | "amount_cents" | "currency" | "status" | "issued_at"
+  | "id"
+  | "amount_cents"
+  | "amount_paid_cents"
+  | "currency"
+  | "status"
+  | "issued_at"
+  | "due_at"
+  | "billing_month"
 >;
 type PlanRow = {
   record: BloomRecord;
@@ -37,6 +44,7 @@ type PlanRow = {
 };
 const ZONE = "America/New_York";
 type Period = "all" | "day" | "week" | "month" | "year";
+const OPEN_INVOICE_STATUSES = new Set(["sent", "overdue", "deposit", "unpaid"]);
 const REASONS: Record<string, string> = {
   number: "Matched by invoice number",
   email_amount: "Matched by client e-mail",
@@ -92,6 +100,13 @@ function periodStart(period: Period): string {
   }
   return dateKey(start.toISOString());
 }
+function periodEnd(period: Period): string {
+  const today = dateKey(new Date().toISOString());
+  if (period === "all") return "9999-12-31";
+  if (period === "year") return `${today.slice(0, 4)}-12-31`;
+  if (period === "month") return `${today.slice(0, 7)}-31`;
+  return today;
+}
 function PaymentsPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
@@ -123,7 +138,7 @@ function PaymentsPage() {
     for (let offset = 0; offset < 20000; offset += 1000) {
       const { data, error } = await supabase
         .from("client_invoices")
-        .select("id,amount_cents,currency,status,issued_at")
+        .select("id,amount_cents,amount_paid_cents,currency,status,issued_at,due_at,billing_month")
         .order("issued_at", { ascending: false })
         .range(offset, offset + 999);
       if (error) {
@@ -144,6 +159,7 @@ function PaymentsPage() {
 
   const posted = entries.filter((entry) => entry.status === "posted" && entry.currency === "USD");
   const start = periodStart(period);
+  const end = periodEnd(period);
   const today = dateKey(new Date().toISOString());
   const selected = posted.filter((entry) => {
     const day = dateKey(entry.occurred_at);
@@ -167,10 +183,21 @@ function PaymentsPage() {
     })
     .reduce((sum, invoice) => sum + (invoice.amount_cents ?? 0), 0);
   const netSales = Math.max(0, issuedSales - refunded);
+  const expectedInvoices = salesInvoices.filter((invoice) => {
+    if (invoice.currency !== "USD" || !OPEN_INVOICE_STATUSES.has(invoice.status)) return false;
+    const expectedDate = invoice.due_at ?? invoice.billing_month ?? invoice.issued_at;
+    const day = dateKey(expectedDate);
+    return day >= start && day <= end;
+  });
+  const expectedIncoming = expectedInvoices.reduce(
+    (sum, invoice) =>
+      sum + Math.max(0, (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0)),
+    0,
+  );
   const pending = entries.filter((entry) => entry.status === "unmatched");
 
   const chartData = useMemo(() => {
-    const grouped = new Map<string, { collected: number; refunds: number }>();
+    const grouped = new Map<string, { collected: number; refunds: number; expected: number }>();
     selected.forEach((entry) => {
       if (entry.kind !== "payment" && entry.kind !== "refund") return;
       const day = dateKey(entry.occurred_at);
@@ -180,21 +207,43 @@ function PaymentsPage() {
           : period === "month"
             ? day.slice(5)
             : day;
-      const current = grouped.get(key) ?? { collected: 0, refunds: 0 };
+      const current = grouped.get(key) ?? { collected: 0, refunds: 0, expected: 0 };
       if (entry.kind === "refund") current.refunds += entry.amount_cents;
       else current.collected += entry.amount_cents;
+      grouped.set(key, current);
+    });
+    expectedInvoices.forEach((invoice) => {
+      const expectedDate = invoice.due_at ?? invoice.billing_month ?? invoice.issued_at;
+      const day = dateKey(expectedDate);
+      const key =
+        period === "year" || period === "all"
+          ? day.slice(0, 7)
+          : period === "month"
+            ? day.slice(5)
+            : day;
+      const current = grouped.get(key) ?? { collected: 0, refunds: 0, expected: 0 };
+      current.expected += Math.max(
+        0,
+        (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0),
+      );
       grouped.set(key, current);
     });
     let rows = [...grouped].sort(([a], [b]) => a.localeCompare(b));
     if ((period === "year" || period === "all") && rows.length) {
       const firstKey = period === "year" ? `${today.slice(0, 4)}-01` : rows[0][0];
-      const lastKey = today.slice(0, 7);
+      const lastKey =
+        period === "year"
+          ? end.slice(0, 7)
+          : rows[rows.length - 1][0] > today.slice(0, 7)
+            ? rows[rows.length - 1][0]
+            : today.slice(0, 7);
       const cursor = new Date(`${firstKey}-01T12:00:00Z`);
       const last = new Date(`${lastKey}-01T12:00:00Z`);
-      const continuous: Array<[string, { collected: number; refunds: number }]> = [];
+      const continuous: Array<[string, { collected: number; refunds: number; expected: number }]> =
+        [];
       while (cursor <= last) {
         const key = cursor.toISOString().slice(0, 7);
-        continuous.push([key, grouped.get(key) ?? { collected: 0, refunds: 0 }]);
+        continuous.push([key, grouped.get(key) ?? { collected: 0, refunds: 0, expected: 0 }]);
         cursor.setUTCMonth(cursor.getUTCMonth() + 1);
       }
       rows = continuous;
@@ -209,7 +258,7 @@ function PaymentsPage() {
           : key,
       ...values,
     }));
-  }, [selected, period]);
+  }, [selected, expectedInvoices, period]);
 
   async function pickFile(file?: File) {
     if (!file) return;
@@ -394,7 +443,7 @@ function PaymentsPage() {
               <h2 className="mt-1 text-xl font-semibold">Sales and cash performance</h2>
             </div>
             <div className="flex w-fit flex-wrap gap-1 rounded-xl border border-border bg-background/70 p-1">
-              {(["all", "year", "month", "week", "day"] as const).map((name) => (
+              {(["year", "all", "month", "week", "day"] as const).map((name) => (
                 <button
                   key={name}
                   type="button"
@@ -406,11 +455,17 @@ function PaymentsPage() {
               ))}
             </div>
           </div>
-          <div className="grid gap-px bg-border/70 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-px bg-border/70 sm:grid-cols-2 xl:grid-cols-6">
             {[
               ["Net sales", money(netSales), "Issued invoices less refunds", "text-sky-400"],
               ["Cash collected", money(collected), "Posted payments", "text-emerald-400"],
               ["Refunds", money(refunded), "Money returned", "text-rose-400"],
+              [
+                "Expected incoming",
+                money(expectedIncoming),
+                "Open invoice balances",
+                "text-violet-400",
+              ],
               [
                 "Net cash",
                 money(collected - refunded),
@@ -440,7 +495,7 @@ function PaymentsPage() {
                   Cash flow by {period === "year" || period === "all" ? "month" : "day"}
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Green is money collected. Red is money refunded.
+                  Green is collected, red is refunded, and purple is expected from open invoices.
                 </p>
               </div>
               <p className="text-sm text-muted-foreground">
@@ -484,6 +539,12 @@ function PaymentsPage() {
                       radius={[7, 7, 0, 0]}
                     />
                     <Bar dataKey="refunds" name="Refunds" fill="#ef4444" radius={[7, 7, 0, 0]} />
+                    <Bar
+                      dataKey="expected"
+                      name="Expected incoming"
+                      fill="#a78bfa"
+                      radius={[7, 7, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -494,7 +555,8 @@ function PaymentsPage() {
             )}
             <p className="mt-4 text-xs text-muted-foreground">
               Net sales includes issued WaveOS invoices, including unpaid and partially paid
-              invoices, less refunds. Draft and void invoices are excluded.
+              invoices, less refunds. Expected incoming is the remaining balance on sent, unpaid,
+              deposit and overdue invoices. Draft and void invoices are excluded.
             </p>
           </div>
         </section>
