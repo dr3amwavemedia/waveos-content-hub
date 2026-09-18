@@ -1,5 +1,15 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app/app-shell";
 import { supabase } from "@/integrations/supabase/client";
@@ -60,6 +70,14 @@ function dateKey(value: string): string {
 function money(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 }
+function compactMoney(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(cents / 100);
+}
 function periodStart(period: "day" | "week" | "month" | "year"): string {
   const today = new Date();
   const local = dateKey(today.toISOString());
@@ -77,7 +95,7 @@ function PaymentsPage() {
   const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [truncated, setTruncated] = useState(false);
-  const [period, setPeriod] = useState<"day" | "week" | "month" | "year">("month");
+  const [period, setPeriod] = useState<"day" | "week" | "month" | "year">("year");
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState<ParsedBloomFile | null>(null);
   const [plan, setPlan] = useState<PlanRow[] | null>(null);
@@ -135,8 +153,8 @@ function PaymentsPage() {
   const refunded = selected
     .filter((entry) => entry.kind === "refund")
     .reduce((sum, entry) => sum + entry.amount_cents, 0);
-  const invoiced = selected
-    .filter((entry) => entry.kind === "invoice")
+  const bloomImported = selected
+    .filter((entry) => entry.source === "bloom_csv" && entry.kind === "payment")
     .reduce((sum, entry) => sum + entry.amount_cents, 0);
   const issuedSales = salesInvoices
     .filter((invoice) => {
@@ -147,27 +165,32 @@ function PaymentsPage() {
     })
     .reduce((sum, invoice) => sum + (invoice.amount_cents ?? 0), 0);
   const netSales = Math.max(0, issuedSales - refunded);
-  const progress =
-    invoiced > 0
-      ? Math.min(100, Math.round((Math.max(0, collected - refunded) / invoiced) * 100))
-      : 0;
   const pending = entries.filter((entry) => entry.status === "unmatched");
 
-  const bars = useMemo(() => {
-    const grouped = new Map<string, number>();
+  const chartData = useMemo(() => {
+    const grouped = new Map<string, { collected: number; refunds: number }>();
     selected.forEach((entry) => {
       if (entry.kind !== "payment" && entry.kind !== "refund") return;
       const day = dateKey(entry.occurred_at);
       const key = period === "year" ? day.slice(0, 7) : period === "month" ? day.slice(5) : day;
-      grouped.set(
-        key,
-        (grouped.get(key) ?? 0) +
-          (entry.kind === "refund" ? -entry.amount_cents : entry.amount_cents),
-      );
+      const current = grouped.get(key) ?? { collected: 0, refunds: 0 };
+      if (entry.kind === "refund") current.refunds += entry.amount_cents;
+      else current.collected += entry.amount_cents;
+      grouped.set(key, current);
     });
-    return [...grouped].sort(([a], [b]) => a.localeCompare(b)).slice(-31);
+    return [...grouped]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-31)
+      .map(([key, values]) => ({
+        label:
+          period === "year"
+            ? new Intl.DateTimeFormat("en-US", { month: "short" }).format(
+                new Date(`${key}-01T12:00:00Z`),
+              )
+            : key,
+        ...values,
+      }));
   }, [selected, period]);
-  const maxBar = Math.max(1, ...bars.map(([, amount]) => Math.abs(amount)));
 
   async function pickFile(file?: File) {
     if (!file) return;
@@ -271,7 +294,9 @@ function PaymentsPage() {
     }));
 
     for (let index = 0; index < rows.length; index += 100) {
-      const { error } = await supabase.from("payment_ledger").insert(rows.slice(index, index + 100));
+      const { error } = await supabase
+        .from("payment_ledger")
+        .insert(rows.slice(index, index + 100));
       if (error) {
         toast.error(`Import stopped after ${index} rows: ${error.message}`);
         setBusy(false);
@@ -288,10 +313,7 @@ function PaymentsPage() {
       totals.set(row.invoice.id, {
         invoice: row.invoice,
         cents: (current?.cents ?? 0) + row.record.amountCents,
-        at:
-          !current || row.record.occurredAt > current.at
-            ? row.record.occurredAt
-            : current.at,
+        at: !current || row.record.occurredAt > current.at ? row.record.occurredAt : current.at,
       });
     });
     let updated = 0;
@@ -346,68 +368,115 @@ function PaymentsPage() {
             aggregate the full ledger before using them for reporting.
           </p>
         )}
-        <section className="rounded-2xl border border-border bg-card p-6">
-          <div className="flex flex-wrap gap-2">
-            {(["day", "week", "month", "year"] as const).map((name) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => setPeriod(name)}
-                className={`rounded-lg border px-4 py-2 capitalize ${period === name ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
-              >
-                {name}
-              </button>
-            ))}
+        <section className="overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-card via-card to-primary/5 shadow-[0_24px_80px_-48px_rgba(14,165,233,0.65)]">
+          <div className="flex flex-col gap-5 border-b border-border/70 p-6 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-medium text-primary">Financial overview</p>
+              <h2 className="mt-1 text-xl font-semibold">Sales and cash performance</h2>
+            </div>
+            <div className="flex w-fit flex-wrap gap-1 rounded-xl border border-border bg-background/70 p-1">
+              {(["day", "week", "month", "year"] as const).map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setPeriod(name)}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${period === name ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                >
+                  {name}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-px bg-border/70 sm:grid-cols-2 xl:grid-cols-5">
             {[
-              ["Net sales", money(netSales)],
-              ["Cash collected", money(collected)],
-              ["Refunds", money(refunded)],
-              ["Net cash", money(collected - refunded)],
-              ["Bloom invoices imported", money(invoiced)],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-xl border border-border p-4">
+              ["Net sales", money(netSales), "Issued invoices less refunds", "text-sky-400"],
+              ["Cash collected", money(collected), "Posted payments", "text-emerald-400"],
+              ["Refunds", money(refunded), "Money returned", "text-rose-400"],
+              [
+                "Net cash",
+                money(collected - refunded),
+                "Collected less refunds",
+                "text-emerald-400",
+              ],
+              [
+                "Bloom imported",
+                money(bloomImported),
+                "Completed Bloom payments",
+                "text-violet-400",
+              ],
+            ].map(([label, value, detail, color]) => (
+              <div key={label} className="bg-card/95 p-5">
                 <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="mt-2 text-2xl font-semibold">{loading ? "Loading…" : value}</p>
+                <p className={`mt-2 text-2xl font-semibold tracking-tight ${color}`}>
+                  {loading ? "Loading…" : value}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
               </div>
             ))}
           </div>
-          <p className="mt-3 text-xs text-muted-foreground">
-            Net sales includes every issued WaveOS invoice in this period, even when unpaid or only
-            partially paid, and subtracts recorded refunds. Draft and void invoices are excluded.
-            Cash collected only counts posted payments.
-          </p>
-          <div className="mt-6">
-            <div className="flex justify-between text-sm">
-              <span>Collected against imported Bloom invoices</span>
-              <span>{progress}%</span>
+          <div className="p-6">
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="font-semibold">
+                  Cash flow by {period === "year" ? "month" : "day"}
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Green is money collected. Red is money refunded.
+                </p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Net cash{" "}
+                <span className="ml-1 font-semibold text-foreground">
+                  {money(collected - refunded)}
+                </span>
+              </p>
             </div>
-            <div className="mt-2 h-3 rounded-full bg-muted">
-              <div className="h-full rounded-full bg-primary" style={{ width: `${progress}%` }} />
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Invoice imports are billed amounts, not earnings. Stripe and Bloom payment rows count
-              only after posting. Unmatched rows are excluded.
-            </p>
-          </div>
-          <div className="mt-6 flex h-32 items-end gap-2 overflow-x-auto">
-            {bars.length ? (
-              bars.map(([label, amount]) => (
-                <div key={label} className="flex min-w-10 flex-1 flex-col items-center gap-1">
-                  <div
-                    title={`${label}: ${money(amount)}`}
-                    className={`w-full rounded-t ${amount < 0 ? "bg-amber-500" : "bg-primary"}`}
-                    style={{ height: `${Math.max(4, (Math.abs(amount) / maxBar) * 96)}px` }}
-                  />
-                  <span className="text-[10px] text-muted-foreground">{label}</span>
-                </div>
-              ))
+            {chartData.length ? (
+              <div className="h-80 w-full" aria-label="Cash collected and refunds chart">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
+                    <CartesianGrid
+                      strokeDasharray="4 4"
+                      vertical={false}
+                      stroke="hsl(var(--border))"
+                    />
+                    <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={12} />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      fontSize={12}
+                      width={64}
+                      tickFormatter={(value: number) => compactMoney(value)}
+                    />
+                    <Tooltip
+                      cursor={{ fill: "rgba(148, 163, 184, 0.08)" }}
+                      formatter={(value: number) => money(value)}
+                      contentStyle={{
+                        background: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: 12,
+                      }}
+                    />
+                    <Legend iconType="circle" />
+                    <Bar
+                      dataKey="collected"
+                      name="Collected"
+                      fill="#22c55e"
+                      radius={[7, 7, 0, 0]}
+                    />
+                    <Bar dataKey="refunds" name="Refunds" fill="#ef4444" radius={[7, 7, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             ) : (
-              <p className="self-center text-sm text-muted-foreground">
+              <p className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
                 No posted payments in this period.
               </p>
             )}
+            <p className="mt-4 text-xs text-muted-foreground">
+              Net sales includes issued WaveOS invoices, including unpaid and partially paid
+              invoices, less refunds. Draft and void invoices are excluded.
+            </p>
           </div>
         </section>
         <section className="rounded-2xl border border-border bg-card p-6">
@@ -435,10 +504,7 @@ function PaymentsPage() {
                 {[
                   ["Rows read", String(plan.length)],
                   ["Matched to an invoice", String(plan.filter((row) => row.invoice).length)],
-                  [
-                    "Already imported",
-                    String(plan.filter((row) => row.duplicate).length),
-                  ],
+                  ["Already imported", String(plan.filter((row) => row.duplicate).length)],
                   [
                     "Needs review",
                     String(plan.filter((row) => !row.invoice && !row.duplicate).length),
