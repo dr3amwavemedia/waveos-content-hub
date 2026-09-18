@@ -1,6 +1,8 @@
 import { test, expect, type Dialog } from "@playwright/test";
 
-test("first visit guide supports topics, skip, reload and restart on mobile", async ({ page }) => {
+test("first-login guide disappears and can be reopened from settings on mobile", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/tools");
   const dialog = page.getByRole("dialog");
@@ -8,10 +10,10 @@ test("first visit guide supports topics, skip, reload and restart on mobile", as
   await expect(dialog.getByRole("heading", { name: "Invoices" })).toBeVisible();
   await dialog.getByLabel("Jump to a topic").selectOption("1");
   await expect(dialog.getByRole("heading", { name: "Contracts" })).toBeVisible();
-  await dialog.getByRole("button", { name: "Skip guide" }).click();
+  await dialog.getByRole("button", { name: "Close guide" }).click();
   await page.reload();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await page.getByRole("button", { name: "Restart guide" }).click();
+  await page.getByRole("button", { name: "Open guide from settings" }).click();
   await expect(page.getByRole("dialog").getByRole("heading", { name: "Invoices" })).toBeVisible();
 });
 
@@ -19,7 +21,7 @@ test("document drafts validate input, download editable data and protect navigat
   page,
 }) => {
   await page.goto("/tools");
-  await page.getByRole("dialog").getByRole("button", { name: "Skip guide" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close guide" }).click();
   await page.getByRole("button", { name: "Prepare vendor or white-label documents" }).click();
   const print = page.getByRole("button", { name: "Print draft / Save PDF" });
   await expect(print).toBeDisabled();
@@ -46,14 +48,14 @@ test("guide completion remains complete after reload", async ({ page }) => {
   await page.getByRole("dialog").getByRole("button", { name: "Done", exact: true }).click();
   await page.reload();
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Restart guide" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Open guide from settings" })).toBeVisible();
 });
 
 for (const width of [320, 375, 430])
   test(`draft preview, services and focused form fit ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/tools");
-    await page.getByRole("dialog").getByRole("button", { name: "Skip guide" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Close guide" }).click();
     await page.getByRole("button", { name: "Prepare vendor or white-label documents" }).click();
     await page.getByLabel("Recipient / vendor", { exact: true }).fill("LongClientName".repeat(18));
     await page.getByRole("button", { name: "Add service", exact: true }).click();
@@ -79,7 +81,7 @@ test("saved import preserves fields, replacement confirms all changes and reset 
   page,
 }) => {
   await page.goto("/tools");
-  await page.getByRole("dialog").getByRole("button", { name: "Skip guide" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Close guide" }).click();
   await page.getByRole("button", { name: "Prepare vendor or white-label documents" }).click();
   await page.getByLabel("Reference number").fill("Unsaved reference only");
   const file = {

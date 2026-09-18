@@ -194,6 +194,7 @@ function PaymentsPage() {
       sum + Math.max(0, (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0)),
     0,
   );
+  const netCashWithExpected = collected - refunded + expectedIncoming;
   const pending = entries.filter((entry) => entry.status === "unmatched");
 
   const chartData = useMemo(() => {
@@ -421,11 +422,11 @@ function PaymentsPage() {
   }
 
   return (
-    <AppShell>
-      <main className="w-full space-y-8 pb-12">
-        <header>
-          <h1 className="text-3xl font-semibold">Payments</h1>
-          <p className="mt-2 text-muted-foreground">
+    <AppShell fullWidth>
+      <div className="w-full min-w-0 space-y-6 pb-12 sm:space-y-8">
+        <header className="max-w-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Payments</h1>
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
             Booked sales, money received, refunds, Bloom imports, and invoice progress. USD totals
             use Sarasota dates.
           </p>
@@ -436,41 +437,35 @@ function PaymentsPage() {
             aggregate the full ledger before using them for reporting.
           </p>
         )}
-        <section className="overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-card via-card to-primary/5 shadow-[0_24px_80px_-48px_rgba(14,165,233,0.65)]">
-          <div className="flex flex-col gap-5 border-b border-border/70 p-6 lg:flex-row lg:items-center lg:justify-between">
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-card via-card to-primary/5 shadow-[0_24px_80px_-48px_rgba(14,165,233,0.65)] sm:rounded-3xl">
+          <div className="flex flex-col gap-5 border-b border-border/70 p-4 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-sm font-medium text-primary">Financial overview</p>
               <h2 className="mt-1 text-xl font-semibold">Sales and cash performance</h2>
             </div>
-            <div className="flex w-fit flex-wrap gap-1 rounded-xl border border-border bg-background/70 p-1">
+            <div className="grid w-full grid-cols-3 gap-1 rounded-xl border border-border bg-background/70 p-1 sm:flex sm:w-fit sm:flex-wrap">
               {(["year", "all", "month", "week", "day"] as const).map((name) => (
                 <button
                   key={name}
                   type="button"
                   onClick={() => setPeriod(name)}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium capitalize transition ${period === name ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                  className={`min-h-11 rounded-lg px-3 py-2 text-sm font-medium capitalize transition sm:px-4 ${period === name ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
                 >
                   {name === "all" ? "All time" : name}
                 </button>
               ))}
             </div>
           </div>
-          <div className="grid gap-px bg-border/70 sm:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-px bg-border/70 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {[
               ["Net sales", money(netSales), "Issued invoices less refunds", "text-sky-400"],
               ["Cash collected", money(collected), "Posted payments", "text-emerald-400"],
               ["Refunds", money(refunded), "Money returned", "text-rose-400"],
               [
-                "Expected incoming",
-                money(expectedIncoming),
-                "Open invoice balances",
-                "text-violet-400",
-              ],
-              [
-                "Net cash",
-                money(collected - refunded),
-                "Collected less refunds",
-                "text-emerald-400",
+                "Net cash + expected",
+                money(netCashWithExpected),
+                `Includes ${money(expectedIncoming)} still expected`,
+                "text-violet-300",
               ],
               [
                 "Bloom imported",
@@ -479,17 +474,19 @@ function PaymentsPage() {
                 "text-violet-400",
               ],
             ].map(([label, value, detail, color]) => (
-              <div key={label} className="bg-card/95 p-5">
+              <div key={label} className="min-w-0 bg-card/95 p-4 sm:p-5">
                 <p className="text-sm text-muted-foreground">{label}</p>
-                <p className={`mt-2 text-2xl font-semibold tracking-tight ${color}`}>
+                <p
+                  className={`mt-2 break-words text-xl font-semibold tracking-tight sm:text-2xl ${color}`}
+                >
                   {loading ? "Loading…" : value}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
               </div>
             ))}
           </div>
-          <div className="p-6">
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div className="min-w-0 p-4 sm:p-6">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <h3 className="font-semibold">
                   Cash flow by {period === "year" || period === "all" ? "month" : "day"}
@@ -498,55 +495,66 @@ function PaymentsPage() {
                   Green is collected, red is refunded, and purple is expected from open invoices.
                 </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Net cash{" "}
-                <span className="ml-1 font-semibold text-foreground">
-                  {money(collected - refunded)}
+              <p className="text-sm text-muted-foreground sm:text-right">
+                Net cash + expected{" "}
+                <span className="ml-1 font-semibold text-violet-300">
+                  {money(netCashWithExpected)}
                 </span>
               </p>
             </div>
             {chartData.length ? (
-              <div className="h-80 w-full" aria-label="Cash collected and refunds chart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
-                    <CartesianGrid
-                      strokeDasharray="4 4"
-                      vertical={false}
-                      stroke="hsl(var(--border))"
-                    />
-                    <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={12} />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      fontSize={12}
-                      width={64}
-                      tickFormatter={(value: number) => compactMoney(value)}
-                    />
-                    <Tooltip
-                      cursor={{ fill: "rgba(148, 163, 184, 0.08)" }}
-                      formatter={(value: number) => money(value)}
-                      contentStyle={{
-                        background: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: 12,
-                      }}
-                    />
-                    <Legend iconType="circle" />
-                    <Bar
-                      dataKey="collected"
-                      name="Collected"
-                      fill="#22c55e"
-                      radius={[7, 7, 0, 0]}
-                    />
-                    <Bar dataKey="refunds" name="Refunds" fill="#ef4444" radius={[7, 7, 0, 0]} />
-                    <Bar
-                      dataKey="expected"
-                      name="Expected incoming"
-                      fill="#a78bfa"
-                      radius={[7, 7, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+              <div
+                className="w-full overflow-x-auto pb-2"
+                aria-label="Cash collected, refunds, and expected incoming chart"
+              >
+                <div className="h-72 min-w-[42rem] sm:h-80 sm:min-w-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
+                      <CartesianGrid
+                        strokeDasharray="4 4"
+                        vertical={false}
+                        stroke="hsl(var(--border))"
+                      />
+                      <XAxis
+                        dataKey="label"
+                        axisLine={false}
+                        tickLine={false}
+                        fontSize={12}
+                        minTickGap={24}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        fontSize={12}
+                        width={64}
+                        tickFormatter={(value: number) => compactMoney(value)}
+                      />
+                      <Tooltip
+                        cursor={{ fill: "rgba(148, 163, 184, 0.08)" }}
+                        formatter={(value: number) => money(value)}
+                        contentStyle={{
+                          background: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: 12,
+                        }}
+                      />
+                      <Legend iconType="circle" />
+                      <Bar
+                        dataKey="collected"
+                        name="Collected"
+                        fill="#22c55e"
+                        radius={[7, 7, 0, 0]}
+                      />
+                      <Bar dataKey="refunds" name="Refunds" fill="#ef4444" radius={[7, 7, 0, 0]} />
+                      <Bar
+                        dataKey="expected"
+                        name="Expected incoming"
+                        fill="#a78bfa"
+                        radius={[7, 7, 0, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             ) : (
               <p className="flex h-48 items-center justify-center rounded-2xl border border-dashed border-border text-sm text-muted-foreground">
@@ -555,8 +563,9 @@ function PaymentsPage() {
             )}
             <p className="mt-4 text-xs text-muted-foreground">
               Net sales includes issued WaveOS invoices, including unpaid and partially paid
-              invoices, less refunds. Expected incoming is the remaining balance on sent, unpaid,
-              deposit and overdue invoices. Draft and void invoices are excluded.
+              invoices, less refunds. Net cash + expected combines posted payments with the
+              remaining balance on sent, unpaid, deposit and overdue invoices, then subtracts
+              refunds. Draft and void invoices are excluded.
             </p>
           </div>
         </section>
@@ -692,7 +701,7 @@ function PaymentsPage() {
             )}
           </div>
         </section>
-      </main>
+      </div>
     </AppShell>
   );
 }

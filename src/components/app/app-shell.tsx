@@ -175,15 +175,21 @@ const WEDDING_MOBILE_NAV: NavItem[] = [
   { to: "/home", hash: "wedding-contact", label: "More", icon: Menu },
 ];
 
-export function AppShell({ children }: { children: ReactNode }) {
+export function AppShell({
+  children,
+  fullWidth = false,
+}: {
+  children: ReactNode;
+  fullWidth?: boolean;
+}) {
   return (
     <WorkspaceProvider>
-      <Shell>{children}</Shell>
+      <Shell fullWidth={fullWidth}>{children}</Shell>
     </WorkspaceProvider>
   );
 }
 
-function Shell({ children }: { children: ReactNode }) {
+function Shell({ children, fullWidth }: { children: ReactNode; fullWidth: boolean }) {
   const { can, visibility, isLoading: permsLoading, access, isStaff } = usePermissions();
   const { data: user, error: userError, refetch: retryUser } = useCurrentUser();
   const { activeWorkspace, error: workspaceError, retry: retryWorkspace } = useWorkspace();
@@ -349,7 +355,12 @@ function Shell({ children }: { children: ReactNode }) {
         {isMediaManager && <ManagedClientBanner />}
         <ProductionHealthBanner enabled={isOwner} />
         <AccountStatusBanner />
-        <div className="mx-auto max-w-7xl px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:px-10 lg:pt-8 lg:pb-10">
+        <div
+          className={cn(
+            "mx-auto px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:pt-8 lg:pb-10",
+            fullWidth ? "max-w-none lg:px-8 xl:px-10" : "max-w-7xl lg:px-10",
+          )}
+        >
           {user && activeWorkspace && !permsLoading && (
             <WorkspaceTour
               key={`${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
