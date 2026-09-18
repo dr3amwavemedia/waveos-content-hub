@@ -53,11 +53,27 @@ test("photography agreement exposes client and shoot details but hides Dream Wav
 
 test("webhooks trigger completion email delivery only after verified provider events", () => {
   const stripe = readFileSync("src/routes/api/public/hooks/stripe.ts", "utf8");
+  const recorder = readFileSync("src/lib/stripe-invoice-payment.server.ts", "utf8");
   const signwell = readFileSync("src/routes/api/public/hooks/signwell.ts", "utf8");
   assert.match(stripe, /String\(object\.payment_status \?\? ""\) !== "paid"/);
-  assert.match(stripe, /sendPaymentReceiptEmail/);
+  assert.match(stripe, /applyStripeCheckoutPayment/);
+  assert.match(recorder, /sendPaymentReceiptEmail/);
   assert.match(signwell, /eventType === "document_completed"/);
   assert.match(signwell, /sendSignedContractCopyEmail/);
+});
+
+test("Stripe return confirmation records deposits immediately and refreshes portal invoices", () => {
+  const paymentServer = readFileSync("src/lib/payments.functions.ts", "utf8");
+  const paymentReturn = readFileSync("src/routes/_authenticated/payment-return.tsx", "utf8");
+  const recorder = readFileSync("src/lib/stripe-invoice-payment.server.ts", "utf8");
+  assert.match(paymentServer, /checkout\/sessions\/\$\{encodeURIComponent\(data\.sessionId\)\}/);
+  assert.match(paymentServer, /applyStripeCheckoutPayment/);
+  assert.match(recorder, /status: settled \? "paid" : "deposit"/);
+  assert.match(recorder, /provider_session_id: null/);
+  assert.match(paymentReturn, /Payment processed/);
+  assert.match(paymentReturn, /Payment declined/);
+  assert.match(paymentReturn, /invalidateQueries\(\{ queryKey: \["layer1", "invoices"\] \}\)/);
+  assert.doesNotMatch(paymentReturn, /We're waiting for your bank/);
 });
 
 test("portal provides authenticated record copies without relying on external hosted links", () => {
