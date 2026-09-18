@@ -67,7 +67,6 @@ import { Route as ApiOutlookCallbackRouteImport } from './routes/api/outlook/cal
 import { Route as ApiOutlookContactsRouteImport } from './routes/api/outlook/contacts'
 import { Route as ApiOutlookMailRouteImport } from './routes/api/outlook/mail'
 import { Route as ApiOutlookOauthRouteImport } from './routes/api/outlook/oauth'
-import { Route as ApiPublicEmailPreviewBundleRouteImport } from './routes/api/public/email-preview-bundle'
 import { Route as ApiPublicVisionAssetRouteImport } from './routes/api/public/vision-asset'
 import { Route as ApiExternalMediaProviderCallbackRouteImport } from './routes/api/external-media/$provider.callback'
 import { Route as ApiExternalMediaProviderFilesRouteImport } from './routes/api/external-media/$provider.files'
@@ -379,12 +378,6 @@ const ApiOutlookOauthRoute = ApiOutlookOauthRouteImport.update({
   path: '/api/outlook/oauth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicEmailPreviewBundleRoute =
-  ApiPublicEmailPreviewBundleRouteImport.update({
-    id: '/api/public/email-preview-bundle',
-    path: '/api/public/email-preview-bundle',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 const ApiPublicVisionAssetRoute = ApiPublicVisionAssetRouteImport.update({
   id: '/api/public/vision-asset',
   path: '/api/public/vision-asset',
@@ -488,7 +481,6 @@ export interface FileRoutesByFullPath {
   '/api/outlook/contacts': typeof ApiOutlookContactsRoute
   '/api/outlook/mail': typeof ApiOutlookMailRoute
   '/api/outlook/oauth': typeof ApiOutlookOauthRoute
-  '/api/public/email-preview-bundle': typeof ApiPublicEmailPreviewBundleRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/external-media/$provider/callback': typeof ApiExternalMediaProviderCallbackRoute
   '/api/external-media/$provider/files': typeof ApiExternalMediaProviderFilesRoute
@@ -556,7 +548,6 @@ export interface FileRoutesByTo {
   '/api/outlook/contacts': typeof ApiOutlookContactsRoute
   '/api/outlook/mail': typeof ApiOutlookMailRoute
   '/api/outlook/oauth': typeof ApiOutlookOauthRoute
-  '/api/public/email-preview-bundle': typeof ApiPublicEmailPreviewBundleRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/external-media/$provider/callback': typeof ApiExternalMediaProviderCallbackRoute
   '/api/external-media/$provider/files': typeof ApiExternalMediaProviderFilesRoute
@@ -626,7 +617,6 @@ export interface FileRoutesById {
   '/api/outlook/contacts': typeof ApiOutlookContactsRoute
   '/api/outlook/mail': typeof ApiOutlookMailRoute
   '/api/outlook/oauth': typeof ApiOutlookOauthRoute
-  '/api/public/email-preview-bundle': typeof ApiPublicEmailPreviewBundleRoute
   '/api/public/vision-asset': typeof ApiPublicVisionAssetRoute
   '/api/external-media/$provider/callback': typeof ApiExternalMediaProviderCallbackRoute
   '/api/external-media/$provider/files': typeof ApiExternalMediaProviderFilesRoute
@@ -696,7 +686,6 @@ export interface FileRouteTypes {
     | '/api/outlook/contacts'
     | '/api/outlook/mail'
     | '/api/outlook/oauth'
-    | '/api/public/email-preview-bundle'
     | '/api/public/vision-asset'
     | '/api/external-media/$provider/callback'
     | '/api/external-media/$provider/files'
@@ -764,7 +753,6 @@ export interface FileRouteTypes {
     | '/api/outlook/contacts'
     | '/api/outlook/mail'
     | '/api/outlook/oauth'
-    | '/api/public/email-preview-bundle'
     | '/api/public/vision-asset'
     | '/api/external-media/$provider/callback'
     | '/api/external-media/$provider/files'
@@ -833,7 +821,6 @@ export interface FileRouteTypes {
     | '/api/outlook/contacts'
     | '/api/outlook/mail'
     | '/api/outlook/oauth'
-    | '/api/public/email-preview-bundle'
     | '/api/public/vision-asset'
     | '/api/external-media/$provider/callback'
     | '/api/external-media/$provider/files'
@@ -870,7 +857,6 @@ export interface RootRouteChildren {
   ApiOutlookContactsRoute: typeof ApiOutlookContactsRoute
   ApiOutlookMailRoute: typeof ApiOutlookMailRoute
   ApiOutlookOauthRoute: typeof ApiOutlookOauthRoute
-  ApiPublicEmailPreviewBundleRoute: typeof ApiPublicEmailPreviewBundleRoute
   ApiPublicVisionAssetRoute: typeof ApiPublicVisionAssetRoute
   ApiPublicExternalMediaAssetIdRoute: typeof ApiPublicExternalMediaAssetIdRoute
   ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
@@ -1287,13 +1273,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOutlookOauthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/email-preview-bundle': {
-      id: '/api/public/email-preview-bundle'
-      path: '/api/public/email-preview-bundle'
-      fullPath: '/api/public/email-preview-bundle'
-      preLoaderRoute: typeof ApiPublicEmailPreviewBundleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/vision-asset': {
       id: '/api/public/vision-asset'
       path: '/api/public/vision-asset'
@@ -1494,7 +1473,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOutlookContactsRoute: ApiOutlookContactsRoute,
   ApiOutlookMailRoute: ApiOutlookMailRoute,
   ApiOutlookOauthRoute: ApiOutlookOauthRoute,
-  ApiPublicEmailPreviewBundleRoute: ApiPublicEmailPreviewBundleRoute,
   ApiPublicVisionAssetRoute: ApiPublicVisionAssetRoute,
   ApiPublicExternalMediaAssetIdRoute: ApiPublicExternalMediaAssetIdRoute,
   ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,
