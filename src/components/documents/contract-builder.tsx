@@ -45,10 +45,8 @@ type Snapshot = {
 const fieldCls =
   "mt-1 min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
 const escapeHtml = (value: string) =>
-  value.replace(
-    /[&<>"']/g,
-    (character) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!,
+  value.replace(/[&<>"']/g, (character) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!,
   );
 
 function draftHtml(title: string, content: string): string {
@@ -74,9 +72,8 @@ function invoiceServiceText(invoice: {
       ? `${invoice.description} — ${formatMoney(invoice.amount_cents, invoice.currency)}`
       : "";
   return items
-    .map(
-      (item) =>
-        `${item.title ?? item.description}: ${item.description} — ${item.quantity} × ${formatMoney(item.unitCents, invoice.currency)} = ${formatMoney(item.quantity * item.unitCents, invoice.currency)}`,
+    .map((item) =>
+      `${item.title ?? item.description}: ${item.description} — ${item.quantity} × ${formatMoney(item.unitCents, invoice.currency)} = ${formatMoney(item.quantity * item.unitCents, invoice.currency)}`,
     )
     .join("\n");
 }
@@ -157,9 +154,9 @@ export function ContractBuilder({
       return {
         workspace: workspace.data,
         account: account.error ? null : account.data,
-        contact: contact?.error ? null : (contact?.data ?? null),
+        contact: contact?.error ? null : contact?.data ?? null,
         projects: projects.data ?? [],
-        production: productions.error ? null : (productions.data?.[0] ?? null),
+        production: productions.error ? null : productions.data?.[0] ?? null,
         invoices: invoices.data ?? [],
       };
     },
@@ -170,50 +167,30 @@ export function ContractBuilder({
     const { workspace, account, contact, projects, production, invoices } = context.data;
     const project = projects[0];
     const invoice = invoices.find(
-      (row) =>
-        row.status !== "draft" &&
-        row.status !== "void" &&
+      (row) => row.status !== "draft" && row.status !== "void" &&
         invoiceItemsFromJson(row.line_items).length > 0,
     );
     setValues((current) => ({
       ...current,
       client_name:
-        current.client_name ||
-        workspace.client_name ||
+        current.client_name || workspace.client_name ||
         (contact ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") : "") ||
-        project?.client_name ||
-        workspace.name,
+        project?.client_name || workspace.name,
       business_name:
-        current.business_name ||
-        workspace.business_name ||
-        account?.business_name ||
-        project?.business_name ||
-        "",
+        current.business_name || workspace.business_name || account?.business_name || project?.business_name || "",
       project_name: current.project_name || project?.name || production?.title || "",
       project_date:
-        current.project_date ||
-        project?.event_date ||
-        project?.start_date ||
-        workspace.wedding_date ||
-        production?.scheduled_at?.slice(0, 10) ||
-        "",
+        current.project_date || project?.event_date || project?.start_date || workspace.wedding_date || production?.scheduled_at?.slice(0, 10) || "",
       location:
-        current.location ||
-        workspace.wedding_location ||
-        production?.location ||
-        workspace.service_area ||
-        "",
+        current.location || workspace.wedding_location || production?.location || workspace.service_area || "",
       services: current.services || (invoice ? invoiceServiceText(invoice) : ""),
     }));
     if (project && !values.project_name) setSourceProjectId(project.id);
     if (invoice && !values.services) setSourceInvoiceId(invoice.id);
-    setSignerName(
-      (current) =>
-        current ||
-        (contact ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") : "") ||
-        workspace.client_name ||
-        project?.client_name ||
-        workspace.name,
+    setSignerName((current) =>
+      current ||
+      (contact ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") : "") ||
+      workspace.client_name || project?.client_name || workspace.name
     );
     if (contact?.email || account?.email)
       setSignerEmail((current) => current || contact?.email || account?.email || "");
@@ -233,30 +210,18 @@ export function ContractBuilder({
     if (!context.data) return;
     const { workspace, account, contact, projects, production, invoices } = context.data;
     const project = projects.find((row) => row.id === sourceProjectId) ?? projects[0];
-    const invoice =
-      invoices.find((row) => row.id === sourceInvoiceId) ??
-      invoices.find(
-        (row) =>
-          row.status !== "draft" &&
-          row.status !== "void" &&
-          invoiceItemsFromJson(row.line_items).length > 0,
-      );
+    const invoice = invoices.find((row) => row.id === sourceInvoiceId) ??
+      invoices.find((row) => row.status !== "draft" && row.status !== "void" &&
+        invoiceItemsFromJson(row.line_items).length > 0);
     setValues((current) => ({
       ...current,
-      client_name:
-        workspace.client_name ||
+      client_name: workspace.client_name ||
         (contact ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") : "") ||
-        project?.client_name ||
-        workspace.name,
-      business_name:
-        workspace.business_name || account?.business_name || project?.business_name || "",
+        project?.client_name || workspace.name,
+      business_name: workspace.business_name || account?.business_name || project?.business_name || "",
       project_name: project?.name || production?.title || "",
-      project_date:
-        project?.event_date ||
-        project?.start_date ||
-        workspace.wedding_date ||
-        production?.scheduled_at?.slice(0, 10) ||
-        "",
+      project_date: project?.event_date || project?.start_date || workspace.wedding_date ||
+        production?.scheduled_at?.slice(0, 10) || "",
       today_date: todayLocalDate(),
       location: workspace.wedding_location || production?.location || workspace.service_area || "",
       services: invoice ? invoiceServiceText(invoice) : current.services,
@@ -265,11 +230,10 @@ export function ContractBuilder({
     if (invoice) setSourceInvoiceId(invoice.id);
     setSignerName(
       (contact ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") : "") ||
-        workspace.client_name ||
-        project?.client_name ||
-        workspace.name,
+        workspace.client_name || project?.client_name || workspace.name,
     );
-    if (contact?.email || account?.email) setSignerEmail(contact?.email || account?.email || "");
+    if (contact?.email || account?.email)
+      setSignerEmail(contact?.email || account?.email || "");
   };
   const chooseTemplate = (template: TemplateRow) => {
     const body = (template.body ?? {}) as { title?: string; content?: string };
@@ -349,15 +313,9 @@ export function ContractBuilder({
             .select("id")
             .single();
       if (result.error) {
-        if (
-          result.error.message.includes("contract_data") &&
-          (result.error.code === "PGRST204" ||
-            result.error.code === "42703" ||
-            result.error.message.includes("schema cache"))
-        ) {
-          throw new Error(
-            "Contract variables cannot be saved until the contract snapshot migration is applied. Your draft is still on this screen.",
-          );
+        if (result.error.message.includes("contract_data") &&
+            (result.error.code === "PGRST204" || result.error.code === "42703" || result.error.message.includes("schema cache"))) {
+          throw new Error("Contract variables cannot be saved until the contract snapshot migration is applied. Your draft is still on this screen.");
         }
         throw result.error;
       }
@@ -391,9 +349,7 @@ export function ContractBuilder({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h3 className="text-lg font-semibold">
-            {draft ? "Edit private contract draft" : "Create contract"}
-          </h3>
+          <h3 className="text-lg font-semibold">{draft ? "Edit private contract draft" : "Create contract"}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Assigned to {clientLabel}. Review the filled details before saving. Nothing is sent.
           </p>
@@ -412,19 +368,14 @@ export function ContractBuilder({
       )}
       <label className="block text-sm font-medium">
         Contract title
-        <input
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          className={fieldCls}
-        />
+        <input value={title} onChange={(event) => setTitle(event.target.value)} className={fieldCls} />
       </label>
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,1fr)]">
         <div className="space-y-4">
           <div>
             <h4 className="text-sm font-semibold">Agreement wording</h4>
             <p className="mt-1 text-xs text-muted-foreground">
-              Edit scope, payment, schedule, delivery, revisions, cancellation, rights and
-              signatures.
+              Edit scope, payment, schedule, delivery, revisions, cancellation, rights and signatures.
             </p>
           </div>
           <textarea
@@ -465,16 +416,10 @@ export function ContractBuilder({
           {context.data?.projects.length ? (
             <label className="block text-xs font-medium">
               Copy from project
-              <select
-                value={sourceProjectId}
-                onChange={(event) => chooseProject(event.target.value)}
-                className={fieldCls}
-              >
+              <select value={sourceProjectId} onChange={(event) => chooseProject(event.target.value)} className={fieldCls}>
                 <option value="">Choose project</option>
                 {context.data.projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
-                  </option>
+                  <option key={project.id} value={project.id}>{project.name}</option>
                 ))}
               </select>
             </label>
@@ -493,16 +438,11 @@ export function ContractBuilder({
           {context.data?.invoices.length ? (
             <label className="block text-xs font-medium">
               Copy purchased items from invoice
-              <select
-                value={sourceInvoiceId}
-                onChange={(event) => chooseInvoice(event.target.value)}
-                className={fieldCls}
-              >
+              <select value={sourceInvoiceId} onChange={(event) => chooseInvoice(event.target.value)} className={fieldCls}>
                 <option value="">Choose invoice</option>
                 {context.data.invoices.map((invoice) => (
                   <option key={invoice.id} value={invoice.id}>
-                    {invoice.number || invoice.id.slice(0, 8)} ·{" "}
-                    {formatMoney(invoice.amount_cents, invoice.currency)} · {invoice.status}
+                    {invoice.number || invoice.id.slice(0, 8)} · {formatMoney(invoice.amount_cents, invoice.currency)} · {invoice.status}
                   </option>
                 ))}
               </select>
@@ -553,29 +493,18 @@ export function ContractBuilder({
           </fieldset>
         </div>
       </div>
-      {(rendered.missing.length > 0 ||
-        rendered.unknown.length > 0 ||
-        guidancePrompts.length > 0) && (
+      {(rendered.missing.length > 0 || rendered.unknown.length > 0 || guidancePrompts.length > 0) && (
         <p className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs text-foreground">
           {rendered.missing.length > 0 && `Complete: ${rendered.missing.join(", ")}. `}
           {rendered.unknown.length > 0 && `Unknown variables: ${rendered.unknown.join(", ")}.`}
-          {guidancePrompts.length > 0 &&
-            `Replace ${guidancePrompts.length} starter clause prompt${guidancePrompts.length === 1 ? "" : "s"} before saving.`}
+          {guidancePrompts.length > 0 && `Replace ${guidancePrompts.length} starter clause prompt${guidancePrompts.length === 1 ? "" : "s"} before saving.`}
         </p>
       )}
       <div className="flex flex-wrap justify-end gap-3">
-        <button
-          type="button"
-          onClick={openPreview}
-          className="min-h-11 rounded-lg border border-border px-4 text-sm"
-        >
+        <button type="button" onClick={openPreview} className="min-h-11 rounded-lg border border-border px-4 text-sm">
           Preview filled contract
         </button>
-        <button
-          type="button"
-          onClick={onDone}
-          className="min-h-11 rounded-lg border border-border px-4 text-sm"
-        >
+        <button type="button" onClick={onDone} className="min-h-11 rounded-lg border border-border px-4 text-sm">
           Cancel
         </button>
         <button

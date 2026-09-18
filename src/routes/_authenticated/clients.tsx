@@ -794,9 +794,7 @@ function WorkspaceDrawer({
           contractsSlot={<ContractsTab workspaceId={workspace.id} clientLabel={workspace.name} />}
         />
       )}
-      {tab === "contracts" && (
-        <ContractsTab workspaceId={workspace.id} clientLabel={workspace.name} />
-      )}
+      {tab === "contracts" && <ContractsTab workspaceId={workspace.id} clientLabel={workspace.name} />}
       {tab === "invoices" && <InvoicesTab workspaceId={workspace.id} clientName={workspace.name} />}
       {tab === "invites" && <InvitesTab workspace={workspace} onNewInvite={onNewInvite} />}
     </ModalShell>
@@ -2248,8 +2246,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
   const q = useQuery({
     queryKey: ["client-contracts", workspaceId],
     queryFn: async (): Promise<ContractRow[]> => {
-      const legacyColumns =
-        "id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,signer_name,signer_email,published_at,provider_document_id,source_template_id,source_template_version";
+      const legacyColumns = "id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,signer_name,signer_email,published_at,provider_document_id,source_template_id,source_template_version";
       const { data, error } = await db
         .from("client_contracts")
         .select(`${legacyColumns},contract_data`)
@@ -2292,14 +2289,14 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
         .single();
       if (error) throw error;
       await tryEmail(() =>
-        sendWorkspaceEmail({
-          workspaceId,
-          event: "contract_ready",
-          title: title.trim(),
-          status: "sent",
-          url,
-        }),
-      );
+          sendWorkspaceEmail({
+            workspaceId,
+            event: "contract_ready",
+            title: title.trim(),
+            status: "sent",
+            url,
+          }),
+        );
       return data;
     },
     onSuccess: async () => {
@@ -2373,20 +2370,14 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
           <button
             type="button"
             onClick={() => setCreationMode("template")}
-            className={cn(
-              "min-h-11 rounded-lg border px-3 text-sm",
-              creationMode === "template" ? "border-primary bg-primary/10" : "border-border",
-            )}
+            className={cn("min-h-11 rounded-lg border px-3 text-sm", creationMode === "template" ? "border-primary bg-primary/10" : "border-border")}
           >
             Build contract
           </button>
           <button
             type="button"
             onClick={() => setCreationMode("external")}
-            className={cn(
-              "min-h-11 rounded-lg border px-3 text-sm",
-              creationMode === "external" ? "border-primary bg-primary/10" : "border-border",
-            )}
+            className={cn("min-h-11 rounded-lg border px-3 text-sm", creationMode === "external" ? "border-primary bg-primary/10" : "border-border")}
           >
             External signing link
           </button>
@@ -2424,21 +2415,21 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
             />
           </Field>
           <Field label="Contract link">
-            <input
-              required
-              type="text"
-              inputMode="url"
-              autoCapitalize="none"
-              autoCorrect="off"
-              value={hostedUrl}
-              onChange={(event) => setHostedUrl(event.target.value)}
-              onBlur={() => setHostedUrl(normalizeHttpsUrl(hostedUrl))}
-              placeholder="bloom.io/your-contract"
-              className={inputCls}
-            />
-            {hostedUrl && !isValidHttpsUrl(normalizeHttpsUrl(hostedUrl)) && (
-              <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
-            )}
+              <input
+                required
+                type="text"
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                value={hostedUrl}
+                onChange={(event) => setHostedUrl(event.target.value)}
+                onBlur={() => setHostedUrl(normalizeHttpsUrl(hostedUrl))}
+                placeholder="bloom.io/your-contract"
+                className={inputCls}
+              />
+              {hostedUrl && !isValidHttpsUrl(normalizeHttpsUrl(hostedUrl)) && (
+                <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
+              )}
           </Field>
           <Field label="Description">
             <textarea
@@ -2494,9 +2485,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">{contract.title}</p>
                 {contract.description && (
-                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                    {contract.description}
-                  </p>
+                  <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{contract.description}</p>
                 )}
                 {contract.hosted_url && (
                   <a
@@ -2528,9 +2517,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
                     }}
                     className="min-h-10 rounded-lg border border-border px-3 text-xs font-semibold hover:border-primary/40"
                   >
-                    {!contract.signer_name || !contract.signer_email
-                      ? "Add signer details"
-                      : "Edit draft"}
+                    {!contract.signer_name || !contract.signer_email ? "Add signer details" : "Edit draft"}
                   </button>
                 )}
                 <select
@@ -2606,29 +2593,20 @@ function InvoicesTab({
   const q = useQuery({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
-      const invoiceColumns =
-        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at";
+      const invoiceColumns = "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at";
       const { data, error } = await supabase
         .from("client_invoices")
         .select(`${invoiceColumns},line_items`)
         .eq("workspace_id", workspaceId)
         .order("issued_at", { ascending: false });
-      if (
-        error &&
-        (error.code === "42703" ||
-          error.code === "PGRST204" ||
-          error.message.includes("line_items"))
-      ) {
+      if (error && (error.code === "42703" || error.code === "PGRST204" || error.message.includes("line_items"))) {
         const fallback = await supabase
           .from("client_invoices")
           .select(invoiceColumns)
           .eq("workspace_id", workspaceId)
           .order("issued_at", { ascending: false });
         if (fallback.error) throw fallback.error;
-        return (fallback.data ?? []).map((row) => ({
-          ...row,
-          line_items: [],
-        })) as InvoiceListItem[];
+        return (fallback.data ?? []).map((row) => ({ ...row, line_items: [] })) as InvoiceListItem[];
       }
       if (error) throw error;
       return (data ?? []) as InvoiceListItem[];
@@ -2901,8 +2879,7 @@ function InvoiceForm({
         billing_month: paymentPlan === "monthly_retainer" ? `${billingMonth}-01` : null,
         currency: currency.trim().toUpperCase(),
         status: effectiveStatus,
-        published_at:
-          effectiveStatus === "draft" ? null : (invoice?.published_at ?? new Date().toISOString()),
+        published_at: effectiveStatus === "draft" ? null : invoice?.published_at ?? new Date().toISOString(),
         hosted_url: trimmedUrl || null,
         issued_at: dateInputToIso(issuedAt)!,
         due_at: dateInputToIso(dueAt),
@@ -2932,15 +2909,9 @@ function InvoiceForm({
       }
       const { data, error } = result;
       if (error) {
-        if (
-          (error.message.includes("line_items") || error.message.includes("published_at")) &&
-          (error.code === "PGRST204" ||
-            error.code === "42703" ||
-            error.message.includes("schema cache"))
-        ) {
-          throw new Error(
-            "Invoice items cannot be saved until the invoice line-items database migration is applied. Your draft is still on this screen.",
-          );
+        if ((error.message.includes("line_items") || error.message.includes("published_at")) &&
+            (error.code === "PGRST204" || error.code === "42703" || error.message.includes("schema cache"))) {
+          throw new Error("Invoice items cannot be saved until the invoice line-items database migration is applied. Your draft is still on this screen.");
         }
         if (error.message.includes("client_invoices_hosted_url_https")) {
           throw new Error(URL_VALIDATION_MESSAGE);
@@ -3059,57 +3030,57 @@ function InvoiceForm({
                 className={inputCls}
               />
               <div className="grid gap-2 sm:grid-cols-[1fr_80px_120px_auto]">
-                <input
-                  aria-label={`Item ${index + 1} description`}
-                  value={item.description}
-                  onChange={(e) =>
-                    setItems((current) =>
-                      current.map((row, i) =>
-                        i === index ? { ...row, description: e.target.value } : row,
-                      ),
-                    )
-                  }
-                  className={inputCls}
-                />
-                <input
-                  aria-label={`Item ${index + 1} quantity`}
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={item.quantity}
-                  onChange={(e) =>
-                    setItems((current) =>
-                      current.map((row, i) =>
-                        i === index ? { ...row, quantity: Number(e.target.value) } : row,
-                      ),
-                    )
-                  }
-                  className={inputCls}
-                />
-                <input
-                  aria-label={`Item ${index + 1} unit price`}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={(item.unitCents / 100).toFixed(2)}
-                  onChange={(e) =>
-                    setItems((current) =>
-                      current.map((row, i) =>
-                        i === index
-                          ? { ...row, unitCents: Math.round(Number(e.target.value) * 100) }
-                          : row,
-                      ),
-                    )
-                  }
-                  className={inputCls}
-                />
-                <button
-                  type="button"
-                  onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
-                  className="min-h-11 rounded-lg border border-border px-3 text-sm"
-                >
-                  Remove
-                </button>
+              <input
+                aria-label={`Item ${index + 1} description`}
+                value={item.description}
+                onChange={(e) =>
+                  setItems((current) =>
+                    current.map((row, i) =>
+                      i === index ? { ...row, description: e.target.value } : row,
+                    ),
+                  )
+                }
+                className={inputCls}
+              />
+              <input
+                aria-label={`Item ${index + 1} quantity`}
+                type="number"
+                min="1"
+                step="1"
+                value={item.quantity}
+                onChange={(e) =>
+                  setItems((current) =>
+                    current.map((row, i) =>
+                      i === index ? { ...row, quantity: Number(e.target.value) } : row,
+                    ),
+                  )
+                }
+                className={inputCls}
+              />
+              <input
+                aria-label={`Item ${index + 1} unit price`}
+                type="number"
+                min="0"
+                step="0.01"
+                value={(item.unitCents / 100).toFixed(2)}
+                onChange={(e) =>
+                  setItems((current) =>
+                    current.map((row, i) =>
+                      i === index
+                        ? { ...row, unitCents: Math.round(Number(e.target.value) * 100) }
+                        : row,
+                    ),
+                  )
+                }
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
+                className="min-h-11 rounded-lg border border-border px-3 text-sm"
+              >
+                Remove
+              </button>
               </div>
             </div>
           ))}
