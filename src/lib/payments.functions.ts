@@ -7,6 +7,7 @@ import {
   type StripeCheckoutSession,
 } from "@/lib/stripe.server";
 import { publicReturnOrigin } from "@/lib/public-origin.server";
+import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
 
 /**
  * Create a Stripe Checkout session for one invoice.
@@ -23,7 +24,7 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
     const { data: invoice, error } = await supabase
       .from("client_invoices")
       .select(
-        "id,workspace_id,number,description,amount_cents,amount_paid_cents,currency,status,published_at,provider_session_id",
+        "id,workspace_id,number,description,amount_cents,amount_paid_cents,currency,status,published_at,provider_session_id,checkout_payment_type,checkout_payment_cents",
       )
       .eq("id", data.invoiceId)
       .maybeSingle();
@@ -37,8 +38,15 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
 
     const total = invoice.amount_cents ?? 0;
     const paid = invoice.amount_paid_cents ?? 0;
-    const due = total - paid;
-    if (due <= 0) throw new Error("This invoice has no balance due.");
+    const balance = total - paid;
+    if (balance <= 0) throw new Error("This invoice has no balance due.");
+    const dueNow = nextInvoicePaymentCents({
+      amountCents: total,
+      amountPaidCents: paid,
+      checkoutPaymentType: invoice.checkout_payment_type,
+      checkoutPaymentCents: invoice.checkout_payment_cents,
+    });
+    if (dueNow <= 0) throw new Error("This invoice has no scheduled payment due.");
     // Validate the public return address BEFORE touching any Stripe session, so
     // a misconfigured setting can never expire a client's existing checkout.
     const origin = publicReturnOrigin();
@@ -88,7 +96,7 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
             quantity: 1,
             price_data: {
               currency: (invoice.currency ?? "usd").toLowerCase(),
-              unit_amount: due,
+              unit_amount: dueNow,
               product_data: {
                 name: invoice.number ? `Invoice ${invoice.number}` : "Invoice",
                 ...(invoice.description ? { description: invoice.description } : {}),

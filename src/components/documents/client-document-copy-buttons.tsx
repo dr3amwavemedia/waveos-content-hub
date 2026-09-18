@@ -58,6 +58,8 @@ export function ClientInvoiceCopyButton({
             dueAt: invoice.due_at,
             paidAt: invoice.paid_at,
             paymentPlan: invoice.payment_plan,
+            checkoutPaymentType: invoice.checkout_payment_type,
+            checkoutPaymentCents: invoice.checkout_payment_cents,
             billTo: { name: clientName },
             lineItems: invoiceItemsFromJson(invoice.line_items),
             isDraft: false,

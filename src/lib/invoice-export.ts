@@ -13,6 +13,9 @@ export type ExportInvoice = {
   subtotal_cents?: number | null;
   discount_type?: string | null;
   discount_value?: number | null;
+  payment_plan?: string | null;
+  checkout_payment_type?: string | null;
+  checkout_payment_cents?: number | null;
 };
 const columns = [
   "Record ID",

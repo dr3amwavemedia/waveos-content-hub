@@ -1,4 +1,5 @@
 import { businessFooterLine, businessProfile, type BusinessProfile } from "@/lib/business-profile";
+import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
 
 export interface InvoiceLineItem {
   title?: string;
@@ -22,6 +23,8 @@ export interface InvoiceDocument {
   dueAt: string | null;
   paidAt: string | null;
   paymentPlan?: string | null;
+  checkoutPaymentType?: string | null;
+  checkoutPaymentCents?: number | null;
   billTo?: { name: string | null; contact?: string | null } | null;
   projectReference?: string | null;
   lineItems?: InvoiceLineItem[] | null;
@@ -84,6 +87,12 @@ export function invoiceDocumentHtml(
 ): string {
   const profile = options.profile ?? businessProfile;
   const { subtotal, discount, total, paid, balance } = invoiceTotalsFor(invoice);
+  const nextPayment = nextInvoicePaymentCents({
+    amountCents: total,
+    amountPaidCents: paid,
+    checkoutPaymentType: invoice.checkoutPaymentType,
+    checkoutPaymentCents: invoice.checkoutPaymentCents,
+  });
   const items = invoice.lineItems?.length
     ? invoice.lineItems
     : [
@@ -118,6 +127,9 @@ export function invoiceDocumentHtml(
     ["Total", formatMoney(total, invoice.currency)],
     ["Amount paid", formatMoney(paid, invoice.currency)],
     ["Balance due", formatMoney(balance, invoice.currency)],
+    ...(nextPayment > 0 && nextPayment < (balance ?? 0)
+      ? [["Next payment", formatMoney(nextPayment, invoice.currency)]]
+      : []),
   ]
     .map(
       ([label, value]) =>

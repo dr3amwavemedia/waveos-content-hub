@@ -100,6 +100,8 @@ type InvoiceListItem = Pick<
   | "paid_at"
   | "amount_paid_cents"
   | "payment_plan"
+  | "checkout_payment_type"
+  | "checkout_payment_cents"
   | "billing_month"
   | "line_items"
   | "published_at"
@@ -2529,7 +2531,7 @@ function InvoicesTab({
   const q = useQuery({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
-      const invoiceColumns = "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value";
+      const invoiceColumns = "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,checkout_payment_type,checkout_payment_cents";
       const { data, error } = await supabase
         .from("client_invoices")
         .select(`${invoiceColumns},line_items`)
@@ -2774,6 +2776,14 @@ function InvoiceForm({
     storedDiscountDisplay(invoice?.discount_type, invoice?.discount_value),
   );
   const [paymentPlan, setPaymentPlan] = useState(invoice?.payment_plan ?? "one_time");
+  const [checkoutPaymentType, setCheckoutPaymentType] = useState(
+    invoice?.checkout_payment_type ?? "remaining",
+  );
+  const [checkoutPaymentAmount, setCheckoutPaymentAmount] = useState(
+    invoice?.checkout_payment_cents == null
+      ? ""
+      : (invoice.checkout_payment_cents / 100).toFixed(2),
+  );
   const [billingMonth, setBillingMonth] = useState(invoice?.billing_month?.slice(0, 7) ?? "");
   const [amountPaid, setAmountPaid] = useState(
     invoice?.amount_paid_cents == null ? "" : (invoice.amount_paid_cents / 100).toFixed(2),
@@ -2810,6 +2820,19 @@ function InvoiceForm({
       if (cents <= 0) throw new Error("The discount must leave an invoice total greater than zero.");
       const received =
         status === "paid" ? cents : amountPaid === "" ? null : Math.round(Number(amountPaid) * 100);
+      const scheduledCents =
+        checkoutPaymentType === "remaining"
+          ? null
+          : Math.round(Number(checkoutPaymentAmount) * 100);
+      if (
+        checkoutPaymentType !== "remaining" &&
+        (scheduledCents == null ||
+          !Number.isSafeInteger(scheduledCents) ||
+          scheduledCents <= 0 ||
+          scheduledCents > cents)
+      ) {
+        throw new Error("Enter a scheduled payment greater than zero and no more than the invoice total.");
+      }
       const effectiveStatus =
         status !== "void" && status !== "draft" && cents != null && cents > 0 && received === cents
           ? "paid"
@@ -2831,6 +2854,8 @@ function InvoiceForm({
         line_items: items as never,
         amount_paid_cents: received ?? 0,
         payment_plan: paymentPlan,
+        checkout_payment_type: checkoutPaymentType,
+        checkout_payment_cents: scheduledCents,
         billing_month: paymentPlan === "monthly_retainer" ? `${billingMonth}-01` : null,
         currency: currency.trim().toUpperCase(),
         status: effectiveStatus,
@@ -2912,6 +2937,11 @@ function InvoiceForm({
       Number.isFinite(Number(amountPaid)) &&
       Number(amountPaid) >= 0 &&
       Number(amountPaid) <= Number(effectiveAmount));
+  const checkoutPaymentValid =
+    checkoutPaymentType === "remaining" ||
+    (Number.isFinite(Number(checkoutPaymentAmount)) &&
+      Number(checkoutPaymentAmount) > 0 &&
+      Number(checkoutPaymentAmount) <= Number(effectiveAmount));
   const canSave =
     hostedUrlValid &&
     currencyValid &&
@@ -2919,6 +2949,7 @@ function InvoiceForm({
     discountValid &&
     previewDiscount.totalCents > 0 &&
     paidValid &&
+    checkoutPaymentValid &&
     Boolean(issuedAt) &&
     (paymentPlan !== "monthly_retainer" || Boolean(billingMonth));
 
@@ -3148,6 +3179,44 @@ function InvoiceForm({
             Set 50% received
           </button>
         </Field>
+        <Field label="Payment link charges">
+          <select
+            value={checkoutPaymentType}
+            onChange={(e) => setCheckoutPaymentType(e.target.value)}
+            className={inputCls}
+          >
+            <option value="remaining">Entire remaining balance</option>
+            <option value="deposit">Deposit first, then remaining balance</option>
+            <option value="fixed">Fixed amount each payment</option>
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            This controls how much the secure payment button collects today.
+          </p>
+        </Field>
+        {checkoutPaymentType !== "remaining" && (
+          <Field label={checkoutPaymentType === "deposit" ? "Deposit amount" : "Fixed payment amount"}>
+            <input
+              type="number"
+              min="0.01"
+              max={effectiveAmount || undefined}
+              step="0.01"
+              value={checkoutPaymentAmount}
+              onChange={(e) => setCheckoutPaymentAmount(e.target.value)}
+              className={inputCls}
+              placeholder={checkoutPaymentType === "deposit" ? "500.00" : "250.00"}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              {checkoutPaymentType === "deposit"
+                ? "After the first payment, the button collects the remaining balance."
+                : "Each payment uses this amount; the final payment is reduced to the exact balance."}
+            </p>
+            {!checkoutPaymentValid && (
+              <p className="mt-1 text-xs text-destructive">
+                Enter an amount greater than zero and no more than the invoice total.
+              </p>
+            )}
+          </Field>
+        )}
         {paymentPlan === "monthly_retainer" && (
           <Field label="Billing month">
             <input
