@@ -125,8 +125,10 @@ export function inferKind(
 ): LedgerKind {
   const text = `${values.type} ${values.status}`.toLowerCase();
   if (/refund|credit|chargeback|reversal/.test(text)) return "refund";
-  if (/expense|bill|cost|purchase/.test(text)) return "expense";
-  if (/payment|paid|settled|succeeded|complete/.test(text)) return "payment";
+  if (/expense|cost|purchase/.test(text)) return "expense";
+  const unpaid = /unpaid|not\s*paid|outstanding|overdue|awaiting|pending|void|draft/.test(text);
+  if (!unpaid && /payment|paid|settled|succeeded|complete/.test(text)) return "payment";
+  if (unpaid && (values.paidCents ?? 0) <= 0) return "invoice";
   if ((values.paidCents ?? 0) > 0) return "payment";
   if ((values.amountCents ?? 0) < 0) return "refund";
   return "invoice";
