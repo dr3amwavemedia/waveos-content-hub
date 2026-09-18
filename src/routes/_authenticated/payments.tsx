@@ -1,5 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, ReceiptText } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -34,6 +35,14 @@ type SalesInvoice = Pick<
   | "issued_at"
   | "due_at"
   | "billing_month"
+  | "workspace_id"
+  | "number"
+  | "description"
+  | "paid_at"
+>;
+type WorkspaceName = Pick<
+  Database["public"]["Tables"]["workspaces"]["Row"],
+  "id" | "name" | "client_name" | "business_name"
 >;
 type PlanRow = {
   record: BloomRecord;
@@ -109,6 +118,7 @@ function periodEnd(period: Period): string {
 function PaymentsPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [salesInvoices, setSalesInvoices] = useState<SalesInvoice[]>([]);
+  const [workspaceNames, setWorkspaceNames] = useState<WorkspaceName[]>([]);
   const [loading, setLoading] = useState(true);
   const [truncated, setTruncated] = useState(false);
   const [period, setPeriod] = useState<Period>("all");
@@ -121,6 +131,11 @@ function PaymentsPage() {
     setLoading(true);
     const all: Entry[] = [];
     const allInvoices: SalesInvoice[] = [];
+    const workspaceResult = await supabase
+      .from("workspaces")
+      .select("id,name,client_name,business_name");
+    if (workspaceResult.error) toast.error(`Could not load client names: ${workspaceResult.error.message}`);
+    else setWorkspaceNames(workspaceResult.data ?? []);
     for (let offset = 0; offset < 20000; offset += 1000) {
       const { data, error } = await supabase
         .from("payment_ledger")
@@ -137,7 +152,7 @@ function PaymentsPage() {
     for (let offset = 0; offset < 20000; offset += 1000) {
       const { data, error } = await supabase
         .from("client_invoices")
-        .select("id,amount_cents,amount_paid_cents,currency,status,issued_at,due_at,billing_month")
+        .select("id,workspace_id,number,description,amount_cents,amount_paid_cents,currency,status,issued_at,due_at,billing_month,paid_at")
         .order("issued_at", { ascending: false })
         .range(offset, offset + 999);
       if (error) {
@@ -154,6 +169,17 @@ function PaymentsPage() {
   }
   useEffect(() => {
     void reload();
+    const channel = supabase
+      .channel("payments-recent-invoices")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "client_invoices" },
+        () => void reload(),
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const posted = entries.filter((entry) => entry.status === "posted" && entry.currency === "USD");
@@ -195,6 +221,16 @@ function PaymentsPage() {
   );
   const netCashWithExpected = collected - refunded + expectedIncoming;
   const pending = entries.filter((entry) => entry.status === "unmatched");
+  const workspaceNameById = new Map(
+    workspaceNames.map((workspace) => [
+      workspace.id,
+      workspace.client_name || workspace.business_name || workspace.name,
+    ]),
+  );
+  const recentPaidInvoices = salesInvoices
+    .filter((invoice) => invoice.status === "paid" && invoice.paid_at)
+    .sort((a, b) => new Date(b.paid_at!).getTime() - new Date(a.paid_at!).getTime())
+    .slice(0, 10);
 
   const chartData = useMemo(() => {
     const grouped = new Map<string, { collected: number; refunds: number; expected: number }>();
@@ -566,6 +602,54 @@ function PaymentsPage() {
               refunds. Draft and void invoices are excluded.
             </p>
           </div>
+        </section>
+        <section className="overflow-hidden rounded-2xl border border-border bg-card sm:rounded-3xl">
+          <div className="flex flex-col gap-2 border-b border-border/70 p-5 sm:flex-row sm:items-end sm:justify-between sm:p-6">
+            <div>
+              <p className="text-sm font-medium text-emerald-400">Latest activity</p>
+              <h2 className="mt-1 text-xl font-semibold">Recent invoice payments</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                The newest 10 completed invoices appear here automatically.
+              </p>
+            </div>
+            <div className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" /> {recentPaidInvoices.length} recent
+            </div>
+          </div>
+          {recentPaidInvoices.length ? (
+            <ol className="divide-y divide-border/70">
+              {recentPaidInvoices.map((invoice, index) => {
+                const clientName = workspaceNameById.get(invoice.workspace_id) ?? "Client";
+                return (
+                  <li key={invoice.id} className="grid gap-3 p-4 transition-colors hover:bg-emerald-500/[0.04] sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-6">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400">
+                      <ReceiptText className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p className="truncate font-semibold text-foreground">{clientName}</p>
+                        <span className="text-xs text-muted-foreground">#{index + 1}</span>
+                      </div>
+                      <p className="mt-0.5 truncate text-sm text-muted-foreground">
+                        {invoice.number ? `Invoice ${invoice.number}` : "Invoice"}
+                        {invoice.description ? ` · ${invoice.description}` : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-4 sm:block sm:text-right">
+                      <p className="font-semibold text-emerald-400">
+                        {money(invoice.amount_paid_cents || invoice.amount_cents || 0)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Paid {dateKey(invoice.paid_at!)}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <div className="p-8 text-center text-sm text-muted-foreground">
+              Completed invoice payments will appear here.
+            </div>
+          )}
         </section>
         <section className="rounded-2xl border border-border bg-card p-6">
           <h2 className="text-xl font-semibold">Import Bloom CSV</h2>
