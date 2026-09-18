@@ -12,6 +12,8 @@ export interface BusinessProfile {
   location: string;
   phone: string;
   logoUrl: string;
+  signerName: string;
+  signerTitle: string;
   /** Verified values required before a production invoice may be sent. */
   email: string | null;
   streetAddress: string | null;
@@ -26,6 +28,8 @@ export const businessProfile: BusinessProfile = {
   location: "Sarasota, FL",
   phone: "(941) 294-5727",
   logoUrl: logoAsset.url,
+  signerName: "Jesse Hayes",
+  signerTitle: "Sales Director",
   // Verified directly by the owner on September 18, 2026.
   email: "jessehayes@dwmsrq.com",
   streetAddress: "290 Via Anina Dr, Sarasota, FL 34243",
@@ -58,6 +62,8 @@ export const businessContractValues: Readonly<Record<string, string>> = {
   dwm_phone: businessProfile.phone,
   dwm_website: businessProfile.website,
   dwm_location: businessProfile.location,
+  dwm_signer_name: businessProfile.signerName,
+  dwm_signer_title: businessProfile.signerTitle,
 };
 
 /** Fields a valid production invoice still needs from the owner. */
