@@ -45,7 +45,7 @@ function contractHtml(input: { title: string; body: string; clientName: string }
 <h1>${escapeHtml(input.title)}</h1>
 <div class="meta">${escapeHtml(businessProfile.name)} · Prepared for ${escapeHtml(input.clientName)}</div>
 <div class="body">${escapeHtml(input.body)}</div>
-<div class="sign"><p>Client signature: {{s1:signature}}</p><p>Date: {{s1:date}}</p></div>
+<div class="sign"><p>Client signature: {{signature:1:y}}</p><p>Date: {{date:1:y}}</p></div>
 <footer>${escapeHtml(businessFooterLine)}</footer>
 </body></html>`;
 }
