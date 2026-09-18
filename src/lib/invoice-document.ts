@@ -17,6 +17,8 @@ export interface InvoiceDocument {
   subtotalCents?: number | null;
   discountType?: string | null;
   discountValue?: number | null;
+  serviceFeePercent?: number | null;
+  serviceFeeCents?: number | null;
   amountPaidCents: number;
   status: string;
   issuedAt: string;
@@ -63,10 +65,12 @@ export function invoiceTotalsFor(invoice: InvoiceDocument) {
   const subtotal =
     invoice.subtotalCents ?? (invoice.lineItems?.length ? lineSubtotal : invoice.amountCents);
   const total = invoice.amountCents ?? subtotal;
-  const discount = subtotal == null || total == null ? 0 : Math.max(0, subtotal - total);
+  const serviceFee = Math.max(0, invoice.serviceFeeCents ?? 0);
+  const discount =
+    subtotal == null || total == null ? 0 : Math.max(0, subtotal - (total - serviceFee));
   const paid = invoice.amountPaidCents ?? 0;
   const balance = total == null ? null : Math.max(0, total - paid);
-  return { subtotal, discount, total, paid, balance };
+  return { subtotal, discount, serviceFee, total, paid, balance };
 }
 
 const planLabels: Record<string, string> = {
@@ -86,7 +90,7 @@ export function invoiceDocumentHtml(
   options: { portalUrl?: string | null; profile?: BusinessProfile } = {},
 ): string {
   const profile = options.profile ?? businessProfile;
-  const { subtotal, discount, total, paid, balance } = invoiceTotalsFor(invoice);
+  const { subtotal, discount, serviceFee, total, paid, balance } = invoiceTotalsFor(invoice);
   const nextPayment = nextInvoicePaymentCents({
     amountCents: total,
     amountPaidCents: paid,
@@ -122,6 +126,14 @@ export function invoiceDocumentHtml(
               ? `Discount (${(invoice.discountValue / 100).toFixed(2).replace(/\.00$/, "")}%)`
               : "Discount",
             `−${formatMoney(discount, invoice.currency)}`,
+          ],
+        ]
+      : []),
+    ...(serviceFee > 0
+      ? [
+          [
+            `Service fee (${((invoice.serviceFeePercent ?? 0) / 100).toFixed(2).replace(/\.00$/, "")}%)`,
+            formatMoney(serviceFee, invoice.currency),
           ],
         ]
       : []),

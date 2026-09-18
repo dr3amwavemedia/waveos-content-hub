@@ -42,6 +42,7 @@ import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/us
 import { UpcomingShootPanel } from "@/components/app/upcoming-shoot";
 import { PortalReturnHint } from "@/components/app/portal-return-hint";
 import { nextInvoicePaymentCents, nextInvoicePaymentLabel } from "@/lib/invoice-payment-schedule";
+import { serviceFeePercentLabel } from "@/lib/invoice-service-fee";
 import { AuthorizeAutopayButton } from "@/components/app/authorize-autopay-button";
 
 export type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
@@ -949,6 +950,12 @@ export function InvoiceCard({
     checkoutPaymentType: invoice.checkout_payment_type,
     checkoutPaymentCents: invoice.checkout_payment_cents,
   });
+  const serviceFeeCents = Math.max(0, invoice.service_fee_cents ?? 0);
+  const discountCents = Math.max(
+    0,
+    (invoice.subtotal_cents ?? invoice.amount_cents ?? 0) -
+      ((invoice.amount_cents ?? 0) - serviceFeeCents),
+  );
 
   return (
     <div className="surface-card space-y-5 p-5 sm:p-6">
@@ -1029,17 +1036,23 @@ export function InvoiceCard({
           </strong>
         </div>
       )}
-      {(invoice.subtotal_cents ?? invoice.amount_cents ?? 0) > (invoice.amount_cents ?? 0) && (
+      {discountCents > 0 && (
         <p className="text-sm text-emerald-400">
-          Discount applied:{" "}
-          {formatMoney(
-            (invoice.subtotal_cents ?? 0) - (invoice.amount_cents ?? 0),
-            invoice.currency,
-          )}
+          Discount applied: {formatMoney(discountCents, invoice.currency)}
           {invoice.discount_type === "percentage" && invoice.discount_value != null
             ? ` (${(invoice.discount_value / 100).toFixed(2).replace(/\.00$/, "")}%)`
             : ""}
         </p>
+      )}
+      {serviceFeeCents > 0 && (
+        <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm">
+          <span className="text-muted-foreground">
+            Service fee ({serviceFeePercentLabel(invoice.service_fee_percent)}%)
+          </span>
+          <strong className="text-foreground">
+            {formatMoney(serviceFeeCents, invoice.currency)}
+          </strong>
+        </div>
       )}
       {lineItems.length > 0 && (
         <div className="space-y-2 rounded-lg border border-border/60 p-3 text-sm">
