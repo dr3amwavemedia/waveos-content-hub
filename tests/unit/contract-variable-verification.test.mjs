@@ -135,6 +135,8 @@ test("Dream Wave business details resolve from the verified profile only", () =>
   assert.equal(profileValue("website"), "https://dwmsrq.com");
   assert.equal(profileValue("location"), "Sarasota, FL");
   assert.equal(profileValue("phone"), "(941) 294-5727");
+  assert.equal(profileValue("signerName"), "Jesse Hayes");
+  assert.equal(profileValue("signerTitle"), "Sales Director");
   assert.match(profileSource, /logoUrl: logoAsset\.url/);
   // Owner-verified on 2026-09-18.
   assert.equal(profileValue("email"), "jessehayes@dwmsrq.com");

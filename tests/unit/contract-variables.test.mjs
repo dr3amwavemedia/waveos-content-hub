@@ -54,7 +54,7 @@ test("turns template-specific placeholders into required fill-in fields", () => 
 
 test("keeps Dream Wave business variables out of the client contract form", () => {
   const template =
-    "{{dwm_logo_url}} {{dwm_street_address}} {{dwm_email}} {{dwm_phone}} {{dwm_website}} {{client_legal_name}} {{project_date}}";
+    "{{dwm_logo_url}} {{dwm_street_address}} {{dwm_email}} {{dwm_phone}} {{dwm_website}} {{dwm_signer_name}} {{dwm_signer_title}} {{client_legal_name}} {{project_date}}";
   assert.deepEqual(contractFieldsForTemplate(template), [
     { key: "client_legal_name", label: "Client Legal Name", input: "text" },
     { key: "project_date", label: "Project date", input: "date" },
@@ -66,12 +66,15 @@ test("keeps Dream Wave business variables out of the client contract form", () =
     dwm_email: "jessehayes@dwmsrq.com",
     dwm_phone: "(941) 294-5727",
     dwm_website: "https://dwmsrq.com",
+    dwm_signer_name: "Jesse Hayes",
+    dwm_signer_title: "Sales Director",
     client_legal_name: "Sample Client LLC",
     project_date: "2026-10-04",
   });
   assert.deepEqual(result.missing, []);
   assert.deepEqual(result.unknown, []);
   assert.doesNotMatch(result.content, /{{dwm_/);
+  assert.match(result.content, /Jesse Hayes Sales Director/);
 });
 
 test("flags an unsupported Dream Wave variable instead of asking the client form for it", () => {
