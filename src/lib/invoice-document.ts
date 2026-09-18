@@ -13,6 +13,9 @@ export interface InvoiceDocument {
   description: string | null;
   currency: string;
   amountCents: number | null;
+  subtotalCents?: number | null;
+  discountType?: string | null;
+  discountValue?: number | null;
   amountPaidCents: number;
   status: string;
   issuedAt: string;
@@ -54,10 +57,13 @@ export function invoiceTotalsFor(invoice: InvoiceDocument) {
     (sum, item) => sum + Math.round(item.quantity * item.unitCents),
     0,
   );
-  const subtotal = invoice.amountCents ?? (invoice.lineItems?.length ? lineSubtotal : null);
+  const subtotal =
+    invoice.subtotalCents ?? (invoice.lineItems?.length ? lineSubtotal : invoice.amountCents);
+  const total = invoice.amountCents ?? subtotal;
+  const discount = subtotal == null || total == null ? 0 : Math.max(0, subtotal - total);
   const paid = invoice.amountPaidCents ?? 0;
-  const balance = subtotal == null ? null : Math.max(0, subtotal - paid);
-  return { subtotal, paid, balance };
+  const balance = total == null ? null : Math.max(0, total - paid);
+  return { subtotal, discount, total, paid, balance };
 }
 
 const planLabels: Record<string, string> = {
@@ -77,14 +83,14 @@ export function invoiceDocumentHtml(
   options: { portalUrl?: string | null; profile?: BusinessProfile } = {},
 ): string {
   const profile = options.profile ?? businessProfile;
-  const { subtotal, paid, balance } = invoiceTotalsFor(invoice);
+  const { subtotal, discount, total, paid, balance } = invoiceTotalsFor(invoice);
   const items = invoice.lineItems?.length
     ? invoice.lineItems
     : [
         {
           description: invoice.description ?? "Services",
           quantity: 1,
-          unitCents: invoice.amountCents ?? 0,
+          unitCents: invoice.subtotalCents ?? invoice.amountCents ?? 0,
         },
       ];
 
@@ -99,12 +105,23 @@ export function invoiceDocumentHtml(
 
   const summary = [
     ["Subtotal", formatMoney(subtotal, invoice.currency)],
+    ...(discount > 0
+      ? [
+          [
+            invoice.discountType === "percentage" && invoice.discountValue != null
+              ? `Discount (${(invoice.discountValue / 100).toFixed(2).replace(/\.00$/, "")}%)`
+              : "Discount",
+            `−${formatMoney(discount, invoice.currency)}`,
+          ],
+        ]
+      : []),
+    ["Total", formatMoney(total, invoice.currency)],
     ["Amount paid", formatMoney(paid, invoice.currency)],
     ["Balance due", formatMoney(balance, invoice.currency)],
   ]
     .map(
-      ([label, value], index) =>
-        `<tr class="${index === 2 ? "total" : ""}"><th>${esc(label)}</th><td class="num">${esc(value)}</td></tr>`,
+      ([label, value]) =>
+        `<tr class="${label === "Balance due" ? "total" : ""}"><th>${esc(label)}</th><td class="num">${esc(value)}</td></tr>`,
     )
     .join("");
 

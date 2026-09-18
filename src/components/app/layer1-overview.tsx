@@ -2,6 +2,11 @@ import { ExpandableSection } from "./expandable-section";
 import { PaymentProgress } from "./payment-progress";
 import { PayInvoiceButton } from "./pay-invoice-button";
 import { ContractSignButton } from "@/components/documents/contract-sign-button";
+import {
+  ClientContractCopyButton,
+  ClientInvoiceCopyButton,
+  SignedContractPdfButton,
+} from "@/components/documents/client-document-copy-buttons";
 
 import { useEffect, useMemo } from "react";
 import { Link } from "@tanstack/react-router";
@@ -433,7 +438,7 @@ export function Layer1Overview() {
         ) : (invoicesQ.data ?? []).length > 0 ? (
           <div className="space-y-3">
             {invoicesQ.data!.map((invoice) => (
-              <InvoiceCard key={invoice.id} invoice={invoice} />
+              <InvoiceCard key={invoice.id} invoice={invoice} clientName={projectName} />
             ))}
           </div>
         ) : (
@@ -760,6 +765,16 @@ export function ContractCard({ contract }: { contract: Contract }) {
           className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 disabled:opacity-60 sm:w-auto"
         />
       )}
+      {signed && (
+        <>
+          {contract.provider === "signwell" && <SignedContractPdfButton contractId={contract.id} />}
+          <ClientContractCopyButton
+            title={contract.title}
+            description={contract.description}
+            signedAt={contract.signed_at}
+          />
+        </>
+      )}
       {canOpen && !expired && contract.provider !== "signwell" && <a href={contract.hosted_url!} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110 sm:w-auto">
         {signed ? "View signed contract" : "Review & sign contract"}<ExternalLink className="h-4 w-4" />
       </a>}
@@ -769,7 +784,7 @@ export function ContractCard({ contract }: { contract: Contract }) {
   );
 }
 
-export function InvoiceCard({ invoice }: { invoice: Invoice }) {
+export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoice; clientName?: string }) {
   const lineItems = invoiceItemsFromJson(invoice.line_items);
   const amount = formatMoney(invoice.amount_cents, invoice.currency);
   const due = formatDate(invoice.due_at);
@@ -815,6 +830,14 @@ export function InvoiceCard({ invoice }: { invoice: Invoice }) {
       </div>
 
       <PaymentProgress invoice={invoice} />
+      {(invoice.subtotal_cents ?? invoice.amount_cents ?? 0) > (invoice.amount_cents ?? 0) && (
+        <p className="text-sm text-emerald-400">
+          Discount applied: {formatMoney((invoice.subtotal_cents ?? 0) - (invoice.amount_cents ?? 0), invoice.currency)}
+          {invoice.discount_type === "percentage" && invoice.discount_value != null
+            ? ` (${(invoice.discount_value / 100).toFixed(2).replace(/\.00$/, "")}%)`
+            : ""}
+        </p>
+      )}
       {lineItems.length > 0 && (
         <div className="space-y-2 rounded-lg border border-border/60 p-3 text-sm">
           <p className="font-medium text-foreground">Invoice items</p>
@@ -841,6 +864,7 @@ export function InvoiceCard({ invoice }: { invoice: Invoice }) {
       </dl>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <ClientInvoiceCopyButton invoice={invoice} clientName={clientName} />
         {!isPaid && invoice.published_at && (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0) > 0 && (
           <PayInvoiceButton
             invoiceId={invoice.id}
