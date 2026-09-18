@@ -249,12 +249,13 @@ export function matchInvoice(record: BloomRecord, invoices: InvoiceCandidate[]):
 export function invoiceUpdate(
   invoice: InvoiceCandidate,
   paidCents: number,
+  occurredAt: string,
 ): { amount_paid_cents: number; status?: "paid"; paid_at?: string } | null {
   if (invoice.status === "void" || invoice.status === "draft") return null;
   const already = invoice.amount_paid_cents ?? 0;
   const next = Math.min(invoice.amount_cents, already + paidCents);
   if (next <= already) return null;
   return next >= invoice.amount_cents
-    ? { amount_paid_cents: next, status: "paid", paid_at: new Date().toISOString() }
+    ? { amount_paid_cents: next, status: "paid", paid_at: occurredAt }
     : { amount_paid_cents: next };
 }
