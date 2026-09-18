@@ -15,6 +15,10 @@ import {
   storedDiscountDisplay,
   type InvoiceDiscountType,
 } from "@/lib/invoice-discount";
+import {
+  DEFAULT_SERVICE_FEE_BASIS_POINTS,
+  invoiceServiceFeeCents,
+} from "@/lib/invoice-service-fee";
 import { ContractExportTools } from "@/components/app/contract-export-tools";
 import { InvoiceExportTools } from "@/components/app/invoice-export-tools";
 import { InvoiceDocumentTools } from "@/components/app/invoice-document-tools";
@@ -109,6 +113,8 @@ type InvoiceListItem = Pick<
   | "subtotal_cents"
   | "discount_type"
   | "discount_value"
+  | "service_fee_percent"
+  | "service_fee_cents"
 >;
 type CrmAccountRow = Database["public"]["Tables"]["crm_accounts"]["Row"];
 type CrmContactRow = Pick<
@@ -2542,7 +2548,7 @@ function InvoicesTab({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
       const invoiceColumns =
-        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,checkout_payment_type,checkout_payment_cents";
+        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,service_fee_percent,service_fee_cents,checkout_payment_type,checkout_payment_cents";
       const { data, error } = await supabase
         .from("client_invoices")
         .select(`${invoiceColumns},line_items`)
@@ -2794,6 +2800,9 @@ function InvoiceForm({
   const [discountValue, setDiscountValue] = useState(
     storedDiscountDisplay(invoice?.discount_type, invoice?.discount_value),
   );
+  const [serviceFeeEnabled, setServiceFeeEnabled] = useState(
+    invoice ? invoice.service_fee_percent > 0 : true,
+  );
   const [paymentPlan, setPaymentPlan] = useState(invoice?.payment_plan ?? "one_time");
   const [checkoutPaymentAmount, setCheckoutPaymentAmount] = useState(
     invoice?.checkout_payment_cents == null
@@ -2856,7 +2865,8 @@ function InvoiceForm({
         type: discountType,
         value: Number(discountValue || 0),
       });
-      const cents = discount.totalCents;
+      const serviceFeeCents = serviceFeeEnabled ? invoiceServiceFeeCents(discount.totalCents) : 0;
+      const cents = discount.totalCents + serviceFeeCents;
       if (cents <= 0)
         throw new Error("The discount must leave an invoice total greater than zero.");
       let autopayChargeAt: string | null = null;
@@ -2902,6 +2912,8 @@ function InvoiceForm({
         subtotal_cents: discount.subtotalCents,
         discount_type: discount.discountType,
         discount_value: discount.discountValue,
+        service_fee_percent: serviceFeeEnabled ? DEFAULT_SERVICE_FEE_BASIS_POINTS : 0,
+        service_fee_cents: serviceFeeCents,
         line_items: items as never,
         amount_paid_cents: received ?? 0,
         payment_plan: paymentPlan,
@@ -2968,6 +2980,8 @@ function InvoiceForm({
           charge_at: autopayChargeAt!,
           timezone: "America/New_York",
           amount_cents: cents,
+          service_fee_percent: serviceFeeEnabled ? DEFAULT_SERVICE_FEE_BASIS_POINTS : 0,
+          service_fee_cents: serviceFeeCents,
           currency: currency.trim().toUpperCase(),
           description: description.trim() || invoiceNumber || "Dream Wave Media service",
           status: autopayQ.data?.stripe_payment_method_id ? "active" : "pending_authorization",
@@ -3013,7 +3027,10 @@ function InvoiceForm({
     type: discountType,
     value: Number(discountValue || 0),
   });
-  const effectiveAmount = (previewDiscount.totalCents / 100).toFixed(2);
+  const previewServiceFeeCents = serviceFeeEnabled
+    ? invoiceServiceFeeCents(previewDiscount.totalCents)
+    : 0;
+  const effectiveAmount = ((previewDiscount.totalCents + previewServiceFeeCents) / 100).toFixed(2);
   const checkoutPaymentType =
     paymentPlan === "deposit_balance"
       ? "deposit"
@@ -3136,12 +3153,35 @@ function InvoiceForm({
             )}
           </Field>
         )}
+        <label className="flex min-h-11 items-center gap-3 rounded-lg border border-border bg-surface/70 px-3 py-2 text-sm">
+          <input
+            type="checkbox"
+            checked={serviceFeeEnabled}
+            onChange={(event) => setServiceFeeEnabled(event.target.checked)}
+            className="h-4 w-4"
+          />
+          <span>
+            <strong className="block text-foreground">Add 2.9% service fee</strong>
+            <span className="text-xs text-muted-foreground">
+              On by default for new invoices. Uncheck to remove it.
+            </span>
+          </span>
+        </label>
         <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
           <p className="text-xs font-medium text-muted-foreground">Invoice total</p>
           <p className="mt-1 text-lg font-semibold text-foreground">
             {currency.toUpperCase()} {effectiveAmount}
           </p>
+          {serviceFeeEnabled && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Includes {currency.toUpperCase()} {(previewServiceFeeCents / 100).toFixed(2)} service
+              fee.
+            </p>
+          )}
         </div>
+        <p className="text-xs text-muted-foreground sm:col-span-3">
+          The service fee is part of the invoice price and applies regardless of payment method.
+        </p>
       </div>
       <CatalogItemPicker
         currency={currency}

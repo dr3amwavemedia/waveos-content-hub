@@ -676,6 +676,8 @@ export type Database = {
           provider_session_id: string | null
           published_at: string | null
           refund_flagged_at: string | null
+          service_fee_cents: number
+          service_fee_percent: number
           status: Database["public"]["Enums"]["invoice_status"]
           subtotal_cents: number | null
           updated_at: string
@@ -707,6 +709,8 @@ export type Database = {
           provider_session_id?: string | null
           published_at?: string | null
           refund_flagged_at?: string | null
+          service_fee_cents?: number
+          service_fee_percent?: number
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal_cents?: number | null
           updated_at?: string
@@ -738,6 +742,8 @@ export type Database = {
           provider_session_id?: string | null
           published_at?: string | null
           refund_flagged_at?: string | null
+          service_fee_cents?: number
+          service_fee_percent?: number
           status?: Database["public"]["Enums"]["invoice_status"]
           subtotal_cents?: number | null
           updated_at?: string
@@ -769,6 +775,8 @@ export type Database = {
           last_attempt_at: string | null
           last_error: string | null
           last_succeeded_at: string | null
+          service_fee_cents: number
+          service_fee_percent: number
           source_invoice_id: string
           status: string
           stripe_customer_id: string | null
@@ -794,6 +802,8 @@ export type Database = {
           last_attempt_at?: string | null
           last_error?: string | null
           last_succeeded_at?: string | null
+          service_fee_cents?: number
+          service_fee_percent?: number
           source_invoice_id: string
           status?: string
           stripe_customer_id?: string | null
@@ -819,6 +829,8 @@ export type Database = {
           last_attempt_at?: string | null
           last_error?: string | null
           last_succeeded_at?: string | null
+          service_fee_cents?: number
+          service_fee_percent?: number
           source_invoice_id?: string
           status?: string
           stripe_customer_id?: string | null

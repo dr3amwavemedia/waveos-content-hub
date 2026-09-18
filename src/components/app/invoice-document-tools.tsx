@@ -43,6 +43,8 @@ export function InvoiceDocumentTools({
           subtotalCents: invoice.subtotal_cents,
           discountType: invoice.discount_type,
           discountValue: invoice.discount_value,
+          serviceFeePercent: invoice.service_fee_percent,
+          serviceFeeCents: invoice.service_fee_cents,
           amountPaidCents: invoice.amount_paid_cents,
           status: invoice.status,
           issuedAt: invoice.issued_at,
