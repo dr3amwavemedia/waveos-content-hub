@@ -801,6 +801,7 @@ export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoi
   const nextPaymentCents = nextInvoicePaymentCents({
     amountCents: invoice.amount_cents,
     amountPaidCents: invoice.amount_paid_cents,
+    paymentPlan: invoice.payment_plan,
     checkoutPaymentType: invoice.checkout_payment_type,
     checkoutPaymentCents: invoice.checkout_payment_cents,
   });
@@ -884,6 +885,7 @@ export function InvoiceCard({ invoice, clientName = "Client" }: { invoice: Invoi
             label={nextInvoicePaymentLabel({
               amountCents: invoice.amount_cents,
               amountPaidCents: invoice.amount_paid_cents,
+              paymentPlan: invoice.payment_plan,
               checkoutPaymentType: invoice.checkout_payment_type,
               checkoutPaymentCents: invoice.checkout_payment_cents,
             })}

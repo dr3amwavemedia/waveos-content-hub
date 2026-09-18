@@ -90,7 +90,7 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
         const { data: invoice } = await supabaseAdmin
           .from("client_invoices")
           .select(
-            "id,workspace_id,number,amount_cents,amount_paid_cents,currency,status,provider_session_id,checkout_payment_type,checkout_payment_cents",
+            "id,workspace_id,number,amount_cents,amount_paid_cents,currency,status,provider_session_id,payment_plan,checkout_payment_type,checkout_payment_cents",
           )
           .eq("id", invoiceId)
           .maybeSingle();
@@ -126,6 +126,7 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
           const expectedDue = nextInvoicePaymentCents({
             amountCents: invoice.amount_cents,
             amountPaidCents: invoice.amount_paid_cents,
+            paymentPlan: invoice.payment_plan,
             checkoutPaymentType: invoice.checkout_payment_type,
             checkoutPaymentCents: invoice.checkout_payment_cents,
           });
