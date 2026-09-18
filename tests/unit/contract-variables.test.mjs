@@ -4,7 +4,9 @@ import test from "node:test";
 import {
   contractFieldsForTemplate,
   contractGuidancePrompts,
+  contractValuesFromClientProfile,
   contractValuesFromJson,
+  fillMissingContractValues,
   renderContract,
   todayLocalDate,
 } from "../../src/lib/contract-variables.ts";
@@ -79,4 +81,44 @@ test("flags an unsupported Dream Wave variable instead of asking the client form
   const result = renderContract("{{dwm_unverified_detail}}", {});
   assert.deepEqual(result.missing, []);
   assert.deepEqual(result.unknown, ["dwm_unverified_detail"]);
+});
+
+test("prefills matching contract fields from the selected client profile", () => {
+  const values = contractValuesFromClientProfile({
+    clientName: "Alex Rivera",
+    businessName: "Rivera Studio LLC",
+    businessEmail: "office@rivera.test",
+    businessPhone: "555-1000",
+    website: "https://rivera.test",
+    addressLine1: "123 Main St",
+    addressLine2: "Suite 4",
+    city: "Sarasota",
+    state: "FL",
+    postalCode: "34236",
+    country: "US",
+    contactFirstName: "Alex",
+    contactLastName: "Rivera",
+    contactTitle: "Owner",
+    contactEmail: "alex@rivera.test",
+    contactPhone: "555-2000",
+  });
+
+  assert.equal(values.client_legal_name, "Alex Rivera");
+  assert.equal(values.client_business_name, "Rivera Studio LLC");
+  assert.equal(values.client_email, "alex@rivera.test");
+  assert.equal(values.client_phone, "555-2000");
+  assert.equal(values.client_address, "123 Main St, Suite 4, Sarasota, FL 34236, US");
+  assert.equal(values.signer_name, "Alex Rivera");
+  assert.equal(values.signer_title, "Owner");
+  assert.equal(values.signer_email, "alex@rivera.test");
+});
+
+test("profile defaults fill blanks without replacing manual contract edits", () => {
+  assert.deepEqual(
+    fillMissingContractValues(
+      { client_name: "Manual contract name", client_email: "" },
+      { client_name: "Saved profile name", client_email: "saved@example.test" },
+    ),
+    { client_name: "Manual contract name", client_email: "saved@example.test" },
+  );
 });

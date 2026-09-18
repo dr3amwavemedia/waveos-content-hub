@@ -16,7 +16,9 @@ import { errorMessage } from "@/lib/error-message";
 import {
   contractFieldsForTemplate,
   contractGuidancePrompts,
+  contractValuesFromClientProfile,
   contractValuesFromJson,
+  fillMissingContractValues,
   renderContract,
   todayLocalDate,
   type ContractField,
@@ -102,6 +104,8 @@ export function ContractBuilder({
   );
   const [values, setValues] = useState<ContractValues>(() => {
     const initial = contractValuesFromJson(snapshot.values);
+    if (draft?.signer_name && !initial.signer_name) initial.signer_name = draft.signer_name;
+    if (draft?.signer_email && !initial.signer_email) initial.signer_email = draft.signer_email;
     if (!draft) initial.today_date = todayLocalDate();
     return initial;
   });
@@ -123,7 +127,9 @@ export function ContractBuilder({
           .single(),
         supabase
           .from("crm_accounts")
-          .select("id,business_name,email")
+          .select(
+            "id,business_name,email,phone,website,address_line1,address_line2,city,state,postal_code,country",
+          )
           .eq("linked_workspace_id", workspaceId)
           .order("created_at", { ascending: false })
           .limit(1)
@@ -150,7 +156,7 @@ export function ContractBuilder({
       const contact = account.data?.id
         ? await supabase
             .from("crm_contacts")
-            .select("first_name,last_name,email")
+            .select("first_name,last_name,job_title,email,phone")
             .eq("account_id", account.data.id)
             .eq("is_primary", true)
             .limit(1)
@@ -177,20 +183,31 @@ export function ContractBuilder({
         row.status !== "void" &&
         invoiceItemsFromJson(row.line_items).length > 0,
     );
-    setValues((current) => ({
-      ...current,
-      client_name:
-        current.client_name ||
+    const profileValues = contractValuesFromClientProfile({
+      clientName:
         workspace.client_name ||
         (contact ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") : "") ||
         project?.client_name ||
         workspace.name,
-      business_name:
-        current.business_name ||
-        workspace.business_name ||
-        account?.business_name ||
-        project?.business_name ||
-        "",
+      businessName:
+        workspace.business_name || account?.business_name || project?.business_name || "",
+      businessEmail: account?.email,
+      businessPhone: account?.phone,
+      website: account?.website,
+      addressLine1: account?.address_line1,
+      addressLine2: account?.address_line2,
+      city: account?.city,
+      state: account?.state,
+      postalCode: account?.postal_code,
+      country: account?.country,
+      contactFirstName: contact?.first_name,
+      contactLastName: contact?.last_name,
+      contactTitle: contact?.job_title,
+      contactEmail: contact?.email,
+      contactPhone: contact?.phone,
+    });
+    setValues((current) => ({
+      ...fillMissingContractValues(current, profileValues),
       project_name: current.project_name || project?.name || production?.title || "",
       project_date:
         current.project_date ||
@@ -236,15 +253,32 @@ export function ContractBuilder({
           row.status !== "void" &&
           invoiceItemsFromJson(row.line_items).length > 0,
       );
-    setValues((current) => ({
-      ...current,
-      client_name:
+    const profileValues = contractValuesFromClientProfile({
+      clientName:
         workspace.client_name ||
         (contact ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") : "") ||
         project?.client_name ||
         workspace.name,
-      business_name:
+      businessName:
         workspace.business_name || account?.business_name || project?.business_name || "",
+      businessEmail: account?.email,
+      businessPhone: account?.phone,
+      website: account?.website,
+      addressLine1: account?.address_line1,
+      addressLine2: account?.address_line2,
+      city: account?.city,
+      state: account?.state,
+      postalCode: account?.postal_code,
+      country: account?.country,
+      contactFirstName: contact?.first_name,
+      contactLastName: contact?.last_name,
+      contactTitle: contact?.job_title,
+      contactEmail: contact?.email,
+      contactPhone: contact?.phone,
+    });
+    setValues((current) => ({
+      ...current,
+      ...Object.fromEntries(Object.entries(profileValues).filter(([, value]) => value.trim())),
       project_name: project?.name || production?.title || "",
       project_date:
         project?.event_date ||
@@ -259,20 +293,15 @@ export function ContractBuilder({
     if (project) setSourceProjectId(project.id);
     if (invoice) setSourceInvoiceId(invoice.id);
     setSignerName(
-      (contact ? [contact.first_name, contact.last_name].filter(Boolean).join(" ") : "") ||
-        workspace.client_name ||
-        project?.client_name ||
-        workspace.name,
+      profileValues.signer_name || workspace.client_name || project?.client_name || workspace.name,
     );
-    if (contact?.email || account?.email) setSignerEmail(contact?.email || account?.email || "");
+    if (profileValues.signer_email) setSignerEmail(profileValues.signer_email);
   };
   const chooseTemplate = (template: TemplateRow) => {
     const body = (template.body ?? {}) as { title?: string; content?: string };
     setSelectedTemplate(template);
     setTitle(body.title ?? template.name);
     setTemplateText(body.content ?? "");
-    if (context.data) refreshFromClient();
-    else contextApplied.current = false;
   };
   const chooseProject = (id: string) => {
     setSourceProjectId(id);
@@ -461,7 +490,7 @@ export function ContractBuilder({
           ) : null}
           <div className="grid gap-4 md:grid-cols-2">
             {requiredFields
-              .filter(({ key }) => key !== "services")
+              .filter(({ key }) => !["services", "signer_name", "signer_email"].includes(key))
               .map(({ key, label, input }) => (
                 <label key={key} className="block text-xs font-medium">
                   {label}
@@ -523,7 +552,10 @@ export function ContractBuilder({
                 type="text"
                 autoComplete="name"
                 value={signerName}
-                onChange={(event) => setSignerName(event.target.value)}
+                onChange={(event) => {
+                  setSignerName(event.target.value);
+                  updateValue("signer_name", event.target.value);
+                }}
                 placeholder="Client's full name"
                 className={fieldCls}
               />
@@ -534,7 +566,10 @@ export function ContractBuilder({
                 type="email"
                 autoComplete="email"
                 value={signerEmail}
-                onChange={(event) => setSignerEmail(event.target.value)}
+                onChange={(event) => {
+                  setSignerEmail(event.target.value);
+                  updateValue("signer_email", event.target.value);
+                }}
                 placeholder="client@example.com"
                 className={fieldCls}
               />
