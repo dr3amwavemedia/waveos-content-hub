@@ -84,8 +84,7 @@ function CatalogPage() {
   });
 
   return (
-    <AppShell>
-      <div className="w-full space-y-8">
+    <div className="w-full space-y-8">
         <header className="border-b border-border pb-6">
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">Price list</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
@@ -233,8 +232,7 @@ function CatalogPage() {
           Source: FULL SERVICE BREAKDOWN PRICE SHEET 2026. Taxes, travel, add-ons, overtime and
           third-party costs are not included unless added separately.
         </p>
-      </div>
-    </AppShell>
+    </div>
   );
 }
 

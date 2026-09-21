@@ -66,6 +66,7 @@ import { sendInviteEmail, sendWorkspaceEmail, tryEmail } from "@/lib/transaction
 import { invitationContact } from "@/lib/invitation-contact";
 import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display";
 import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
+import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
