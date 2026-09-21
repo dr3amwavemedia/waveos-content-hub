@@ -104,7 +104,7 @@ function PaymentReturn() {
                   : view === "error"
                     ? "We could not load this invoice"
                     : view === "processing"
-                      ? "Payment not completed"
+                      ? "Payment still processing"
                       : "Confirming payment"}
         </h1>
 
@@ -123,7 +123,7 @@ function PaymentReturn() {
                         "Please open your invoices to check the current status.",
                       )
                     : view === "processing"
-                      ? "Stripe has not marked this payment successful, so the invoice remains unpaid. Return to your invoices to try again or choose another card."
+                      ? "Some payments take a little longer to clear. There is nothing else to do — your invoice updates automatically once it settles. Please do not pay again."
                       : "Checking the completed checkout directly with Stripe."}
         </p>
 

@@ -759,90 +759,6 @@ export type Database = {
           },
         ]
       }
-      invoice_autopay_schedules: {
-        Row: {
-          amount_cents: number
-          authorized_at: string | null
-          charge_at: string
-          created_at: string
-          created_by: string | null
-          currency: string
-          current_invoice_id: string | null
-          description: string | null
-          enabled: boolean
-          frequency: string
-          id: string
-          last_attempt_at: string | null
-          last_error: string | null
-          last_succeeded_at: string | null
-          service_fee_cents: number
-          service_fee_percent: number
-          source_invoice_id: string
-          status: string
-          stripe_customer_id: string | null
-          stripe_last_payment_intent_id: string | null
-          stripe_payment_method_id: string | null
-          stripe_setup_session_id: string | null
-          timezone: string
-          updated_at: string
-          workspace_id: string
-        }
-        Insert: {
-          amount_cents: number
-          authorized_at?: string | null
-          charge_at: string
-          created_at?: string
-          created_by?: string | null
-          currency?: string
-          current_invoice_id?: string | null
-          description?: string | null
-          enabled?: boolean
-          frequency?: string
-          id?: string
-          last_attempt_at?: string | null
-          last_error?: string | null
-          last_succeeded_at?: string | null
-          service_fee_cents?: number
-          service_fee_percent?: number
-          source_invoice_id: string
-          status?: string
-          stripe_customer_id?: string | null
-          stripe_last_payment_intent_id?: string | null
-          stripe_payment_method_id?: string | null
-          stripe_setup_session_id?: string | null
-          timezone?: string
-          updated_at?: string
-          workspace_id: string
-        }
-        Update: {
-          amount_cents?: number
-          authorized_at?: string | null
-          charge_at?: string
-          created_at?: string
-          created_by?: string | null
-          currency?: string
-          current_invoice_id?: string | null
-          description?: string | null
-          enabled?: boolean
-          frequency?: string
-          id?: string
-          last_attempt_at?: string | null
-          last_error?: string | null
-          last_succeeded_at?: string | null
-          service_fee_cents?: number
-          service_fee_percent?: number
-          source_invoice_id?: string
-          status?: string
-          stripe_customer_id?: string | null
-          stripe_last_payment_intent_id?: string | null
-          stripe_payment_method_id?: string | null
-          stripe_setup_session_id?: string | null
-          timezone?: string
-          updated_at?: string
-          workspace_id?: string
-        }
-        Relationships: []
-      }
       client_request_internal_notes: {
         Row: {
           body: string
@@ -1076,6 +992,72 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "content_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contract_signature_archive: {
+        Row: {
+          audit_evidence: Json
+          byte_size: number
+          completed_at: string
+          content_hash: string
+          contract_data: Json
+          contract_id: string
+          created_at: string
+          id: string
+          provider: string
+          provider_document_id: string
+          rendered_text: string | null
+          storage_path: string
+          template_version: number | null
+          workspace_id: string
+        }
+        Insert: {
+          audit_evidence?: Json
+          byte_size: number
+          completed_at: string
+          content_hash: string
+          contract_data?: Json
+          contract_id: string
+          created_at?: string
+          id?: string
+          provider: string
+          provider_document_id: string
+          rendered_text?: string | null
+          storage_path: string
+          template_version?: number | null
+          workspace_id: string
+        }
+        Update: {
+          audit_evidence?: Json
+          byte_size?: number
+          completed_at?: string
+          content_hash?: string
+          contract_data?: Json
+          contract_id?: string
+          created_at?: string
+          id?: string
+          provider?: string
+          provider_document_id?: string
+          rendered_text?: string | null
+          storage_path?: string
+          template_version?: number | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contract_signature_archive_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: false
+            referencedRelation: "client_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contract_signature_archive_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -1781,6 +1763,112 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "invites_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_autopay_schedules: {
+        Row: {
+          amount_cents: number
+          authorized_at: string | null
+          charge_at: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          current_invoice_id: string | null
+          description: string | null
+          enabled: boolean
+          frequency: string
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          last_succeeded_at: string | null
+          service_fee_cents: number
+          service_fee_percent: number
+          source_invoice_id: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_last_payment_intent_id: string | null
+          stripe_payment_method_id: string | null
+          stripe_setup_session_id: string | null
+          timezone: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_cents: number
+          authorized_at?: string | null
+          charge_at: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          current_invoice_id?: string | null
+          description?: string | null
+          enabled?: boolean
+          frequency?: string
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_succeeded_at?: string | null
+          service_fee_cents?: number
+          service_fee_percent?: number
+          source_invoice_id: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_last_payment_intent_id?: string | null
+          stripe_payment_method_id?: string | null
+          stripe_setup_session_id?: string | null
+          timezone?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount_cents?: number
+          authorized_at?: string | null
+          charge_at?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          current_invoice_id?: string | null
+          description?: string | null
+          enabled?: boolean
+          frequency?: string
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_succeeded_at?: string | null
+          service_fee_cents?: number
+          service_fee_percent?: number
+          source_invoice_id?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_last_payment_intent_id?: string | null
+          stripe_payment_method_id?: string | null
+          stripe_setup_session_id?: string | null
+          timezone?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_autopay_schedules_current_invoice_id_fkey"
+            columns: ["current_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "client_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_autopay_schedules_source_invoice_id_fkey"
+            columns: ["source_invoice_id"]
+            isOneToOne: true
+            referencedRelation: "client_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_autopay_schedules_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

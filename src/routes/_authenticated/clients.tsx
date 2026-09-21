@@ -66,6 +66,7 @@ import { sendInviteEmail, sendWorkspaceEmail, tryEmail } from "@/lib/transaction
 import { invitationContact } from "@/lib/invitation-contact";
 import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display";
 import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
+import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -2970,9 +2971,27 @@ function InvoiceForm({
       }
       if (!data?.id) throw new Error("The invoice changes were not saved. Please try again.");
       if (autopayEnabled) {
+        // Recurring retainers bill the full amount each month; a one-time
+        // automatic charge must only collect what this invoice still owes
+        // (deposit already paid, or the scheduled deposit/installment).
+        const autopayAmountCents =
+          autopayFrequency === "monthly"
+            ? cents
+            : nextInvoicePaymentCents({
+                amountCents: cents,
+                amountPaidCents: received ?? 0,
+                paymentPlan,
+                checkoutPaymentType,
+                checkoutPaymentCents: scheduledCents,
+              });
+        if (autopayAmountCents <= 0) {
+          throw new Error(
+            "There is nothing left to charge automatically on this invoice. Turn off automatic payments or adjust the amounts.",
+          );
+        }
         const { data: auth } = await supabase.auth.getUser();
         const authorizationMatches =
-          autopayQ.data?.amount_cents === cents &&
+          autopayQ.data?.amount_cents === autopayAmountCents &&
           autopayQ.data.currency.toUpperCase() === currency.trim().toUpperCase() &&
           autopayQ.data.frequency === autopayFrequency &&
           new Date(autopayQ.data.charge_at).getTime() === new Date(autopayChargeAt!).getTime();
@@ -2987,7 +3006,7 @@ function InvoiceForm({
           frequency: autopayFrequency,
           charge_at: autopayChargeAt!,
           timezone: "America/New_York",
-          amount_cents: cents,
+          amount_cents: autopayAmountCents,
           service_fee_percent: serviceFeeEnabled ? DEFAULT_SERVICE_FEE_BASIS_POINTS : 0,
           service_fee_cents: serviceFeeCents,
           currency: currency.trim().toUpperCase(),
