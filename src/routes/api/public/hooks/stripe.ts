@@ -8,6 +8,7 @@ import {
 } from "@/lib/stripe.server";
 import { applyStripeCheckoutPayment } from "@/lib/stripe-invoice-payment.server";
 import { nextMonthlyChargeAt } from "@/lib/date-time";
+import { claimWebhookEvent } from "@/lib/webhook-claim.server";
 
 /**
  * Stripe webhook receiver.
@@ -58,15 +59,14 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        const claim = await supabaseAdmin.rpc("claim_webhook_event", {
-          _source: "stripe",
-          _event_type: eventType,
-          _external_id: eventId,
-          _payload: event as never,
-          _processed_at: new Date().toISOString(),
+        const claim = await claimWebhookEvent(supabaseAdmin, {
+          source: "stripe",
+          eventType,
+          externalId: eventId,
+          payload: event,
         });
         if (claim.error) return new Response("event_store_failed", { status: 503 });
-        if (!claim.data) return new Response("duplicate_ignored", { status: 200 });
+        if (!claim.claimed) return new Response("duplicate_ignored", { status: 200 });
 
         const retryableFailure = async (message: string) => {
           await supabaseAdmin

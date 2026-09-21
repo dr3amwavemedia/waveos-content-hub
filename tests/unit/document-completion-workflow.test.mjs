@@ -60,8 +60,8 @@ test("webhooks trigger completion email delivery only after verified provider ev
   assert.match(recorder, /sendPaymentReceiptEmail/);
   assert.match(signwell, /eventType === "document_completed"/);
   assert.match(signwell, /sendSignedContractCopyEmail/);
-  assert.match(signwell, /rpc\("claim_webhook_event"/);
-  assert.match(signwell, /if \(!claim\.data\) return new Response\("duplicate_ignored"/);
+  assert.match(signwell, /claimWebhookEvent/);
+  assert.match(signwell, /if \(!claim\.claimed\) return new Response\("duplicate_ignored"/);
   assert.match(signwell, /contract_update_failed/);
   assert.match(signwell, /outcome\.reason !== "already_archived"/);
   assert.match(signwell, /return retryableFailure\("contract_archive_failed"\)/);

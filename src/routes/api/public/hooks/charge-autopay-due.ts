@@ -20,6 +20,18 @@ export const Route = createFileRoute("/api/public/hooks/charge-autopay-due")({
       POST: async ({ request }) => {
         if (!authorized(request)) return new Response("unauthorized", { status: 401 });
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const readiness = await supabaseAdmin.rpc("record_autopay_payment", {
+          _schedule_id: "00000000-0000-0000-0000-000000000000",
+          _invoice_id: "00000000-0000-0000-0000-000000000000",
+          _payment_id: "readiness-check",
+          _amount_cents: 1,
+          _currency: "USD",
+          _occurred_at: new Date().toISOString(),
+          _next_charge_at: null,
+        });
+        if (!readiness.error?.message.includes("autopay_schedule_missing")) {
+          return new Response("autopay_backend_not_ready", { status: 503 });
+        }
         const { data: schedules } = await supabaseAdmin
           .from("invoice_autopay_schedules")
           .select("*")

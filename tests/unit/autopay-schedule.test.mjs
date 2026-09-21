@@ -12,6 +12,7 @@ const adminForm = readFileSync("src/routes/_authenticated/clients.tsx", "utf8");
 const authorization = readFileSync("src/lib/autopay.functions.ts", "utf8");
 const chargeWorker = readFileSync("src/routes/api/public/hooks/charge-autopay-due.ts", "utf8");
 const stripeWebhook = readFileSync("src/routes/api/public/hooks/stripe.ts", "utf8");
+const webhookClaim = readFileSync("src/lib/webhook-claim.server.ts", "utf8");
 const integrityMigration = readFileSync(
   "supabase/migrations/20260921143911_secure_autopay_service_numbering.sql",
   "utf8",
@@ -70,7 +71,10 @@ test("server numbering and automatic payment settlement stay service-role only",
   assert.doesNotMatch(integrityMigration, /DELETE FROM public\.webhook_events/);
   assert.match(chargeWorker, /next_service_invoice_number/);
   assert.match(stripeWebhook, /record_autopay_payment/);
-  assert.match(stripeWebhook, /rpc\("claim_webhook_event"/);
+  assert.match(stripeWebhook, /claimWebhookEvent/);
+  assert.match(webhookClaim, /claim\.error\.code !== "PGRST202"/);
+  assert.match(webhookClaim, /from\("webhook_events"\)/);
+  assert.match(chargeWorker, /autopay_backend_not_ready/);
 });
 
 test("monthly charges clamp month ends and preserve the client's local time across DST", () => {
