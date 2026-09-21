@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createHmac, timingSafeEqual } from "crypto";
+import { claimWebhookEvent } from "@/lib/webhook-claim.server";
 
 /**
  * Ayrshare webhook receiver. Verifies HMAC signature (if AYRSHARE_WEBHOOK_SECRET is set),
@@ -39,15 +40,14 @@ export const Route = createFileRoute("/api/public/hooks/ayrshare")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const externalId = String(payload.id ?? payload.postId ?? "").trim() || null;
-        const claim = await supabaseAdmin.rpc("claim_webhook_event", {
-          _source: "ayrshare",
-          _event_type: String(payload.action ?? payload.type ?? "unknown"),
-          _external_id: externalId,
-          _payload: payload as never,
-          _processed_at: new Date().toISOString(),
+        const claim = await claimWebhookEvent(supabaseAdmin, {
+          source: "ayrshare",
+          eventType: String(payload.action ?? payload.type ?? "unknown"),
+          externalId,
+          payload,
         });
         if (claim.error) return new Response("event_store_failed", { status: 503 });
-        if (!claim.data) return new Response("duplicate_ignored", { status: 200 });
+        if (!claim.claimed) return new Response("duplicate_ignored", { status: 200 });
 
         // Best-effort: reconcile asynchronous platform completion (notably TikTok).
         const postId = payload.id ?? payload.postId;
