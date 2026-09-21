@@ -2998,7 +2998,7 @@ function InvoiceForm({
           frequency: autopayFrequency,
           charge_at: autopayChargeAt!,
           timezone: "America/New_York",
-          amount_cents: cents,
+          amount_cents: autopayAmountCents,
           service_fee_percent: serviceFeeEnabled ? DEFAULT_SERVICE_FEE_BASIS_POINTS : 0,
           service_fee_cents: serviceFeeCents,
           currency: currency.trim().toUpperCase(),
