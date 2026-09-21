@@ -3,7 +3,10 @@
   "private": true,
   "sideEffects": false,
   "overrides": {
-    "@tanstack/history": "1.162.4"
+    "@tanstack/history": "1.162.4",
+    "@lovable.dev/mcp-js": {
+      "esbuild": "^0.28.1"
+    }
   },
   "type": "module",
   "scripts": {

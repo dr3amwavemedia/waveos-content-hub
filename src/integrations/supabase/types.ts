@@ -3830,6 +3830,39 @@ export type Database = {
         }
         Returns: undefined
       }
+      claim_webhook_event: {
+        Args: {
+          _event_type: string
+          _external_id: string | null
+          _payload: Json
+          _processed_at: string
+          _source: string
+        }
+        Returns: boolean
+      }
+      next_service_invoice_number: {
+        Args: { _workspace_id: string }
+        Returns: string
+      }
+      record_autopay_payment: {
+        Args: {
+          _amount_cents: number
+          _currency: string
+          _invoice_id: string
+          _next_charge_at?: string | null
+          _occurred_at: string
+          _payment_id: string
+          _schedule_id: string
+        }
+        Returns: {
+          applied: boolean
+          balance_cents: number
+          invoice_currency: string
+          invoice_number: string
+          invoice_workspace_id: string
+          total_paid_cents: number
+        }[]
+      }
       set_staff_position: {
         Args: { _position: string; _target_user: string }
         Returns: undefined

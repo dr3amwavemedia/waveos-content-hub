@@ -60,6 +60,12 @@ test("webhooks trigger completion email delivery only after verified provider ev
   assert.match(recorder, /sendPaymentReceiptEmail/);
   assert.match(signwell, /eventType === "document_completed"/);
   assert.match(signwell, /sendSignedContractCopyEmail/);
+  assert.match(signwell, /rpc\("claim_webhook_event"/);
+  assert.match(signwell, /if \(!claim\.data\) return new Response\("duplicate_ignored"/);
+  assert.match(signwell, /contract_update_failed/);
+  assert.match(signwell, /outcome\.reason !== "already_archived"/);
+  assert.match(signwell, /return retryableFailure\("contract_archive_failed"\)/);
+  assert.match(signwell, /if \(!contract\) return retryableFailure\("contract_not_found"\)/);
 });
 
 test("Stripe return confirmation records deposits immediately and refreshes portal invoices", () => {
@@ -74,6 +80,13 @@ test("Stripe return confirmation records deposits immediately and refreshes port
   assert.match(paymentReturn, /Payment declined/);
   assert.match(paymentReturn, /invalidateQueries\(\{ queryKey: \["layer1", "invoices"\] \}\)/);
   assert.doesNotMatch(paymentReturn, /We're waiting for your bank/);
+});
+
+test("a duplicate Stripe ledger id cannot release delivery holds for the wrong invoice", () => {
+  const recorder = readFileSync("src/lib/stripe-invoice-payment.server.ts", "utf8");
+  assert.match(recorder, /existingPayment\?\.invoice_id === invoice\.id/);
+  assert.match(recorder, /existingPayment\.status === "posted"/);
+  assert.match(recorder, /paidNow > 0/);
 });
 
 test("portal provides authenticated record copies without relying on external hosted links", () => {
