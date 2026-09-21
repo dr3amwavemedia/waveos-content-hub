@@ -2990,6 +2990,14 @@ function InvoiceForm({
           );
         }
         const { data: auth } = await supabase.auth.getUser();
+        const authorizationMatches =
+          autopayQ.data?.amount_cents === autopayAmountCents &&
+          autopayQ.data.currency.toUpperCase() === currency.trim().toUpperCase() &&
+          autopayQ.data.frequency === autopayFrequency &&
+          new Date(autopayQ.data.charge_at).getTime() === new Date(autopayChargeAt!).getTime();
+        const authorizationChanged = Boolean(
+          autopayQ.data?.stripe_payment_method_id && !authorizationMatches,
+        );
         const schedule = {
           source_invoice_id: data.id,
           current_invoice_id: data.id,
@@ -3003,7 +3011,17 @@ function InvoiceForm({
           service_fee_cents: serviceFeeCents,
           currency: currency.trim().toUpperCase(),
           description: description.trim() || invoiceNumber || "Dream Wave Media service",
-          status: autopayQ.data?.stripe_payment_method_id ? "active" : "pending_authorization",
+          status:
+            autopayQ.data?.stripe_payment_method_id && !authorizationChanged
+              ? "active"
+              : "pending_authorization",
+          ...(authorizationChanged
+            ? {
+                stripe_payment_method_id: null,
+                stripe_setup_session_id: null,
+                authorized_at: null,
+              }
+            : {}),
           created_by: auth.user?.id ?? null,
         };
         const autoResult = await supabase
@@ -3013,7 +3031,13 @@ function InvoiceForm({
       } else if (invoice?.id) {
         const autoResult = await supabase
           .from("invoice_autopay_schedules")
-          .update({ enabled: false, status: "disabled" })
+          .update({
+            enabled: false,
+            status: "disabled",
+            stripe_payment_method_id: null,
+            stripe_setup_session_id: null,
+            authorized_at: null,
+          })
           .eq("source_invoice_id", invoice.id);
         if (autoResult.error) throw autoResult.error;
       }

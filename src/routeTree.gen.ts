@@ -9,107 +9,81 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as TermsRouteImport } from './routes/terms'
-import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as PrivacyRouteImport } from './routes/privacy'
-import { Route as McpRouteImport } from './routes/mcp'
-import { Route as AuthCallbackRouteImport } from './routes/auth-callback'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as VisionTokenRouteImport } from './routes/vision/$token'
-import { Route as StoryboardTokenRouteImport } from './routes/storyboard.$token'
-import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
-import { Route as PromoTokenRouteImport } from './routes/promo/$token'
-import { Route as ApiFrameioRouteImport } from './routes/api/frameio'
-import { Route as AuthenticatedWeddingContentRouteImport } from './routes/_authenticated/wedding-content'
-import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
-import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
-import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
-import { Route as AuthenticatedToolsRouteImport } from './routes/_authenticated/tools'
-import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
-import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
-import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
-import { Route as AuthenticatedPostsRouteImport } from './routes/_authenticated/posts'
-import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
-import { Route as AuthenticatedPaymentReturnRouteImport } from './routes/_authenticated/payment-return'
-import { Route as AuthenticatedOutlookRouteImport } from './routes/_authenticated/outlook'
-import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
-import { Route as AuthenticatedMyProjectsRouteImport } from './routes/_authenticated/my-projects'
-import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
-import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
-import { Route as AuthenticatedDeliveriesRouteImport } from './routes/_authenticated/deliveries'
-import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
-import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated/create'
-import { Route as AuthenticatedContractReturnRouteImport } from './routes/_authenticated/contract-return'
-import { Route as AuthenticatedContentRouteImport } from './routes/_authenticated/content'
-import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
-import { Route as AuthenticatedCatalogRouteImport } from './routes/_authenticated/catalog'
-import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
-import { Route as AuthenticatedBrandVoiceRouteImport } from './routes/_authenticated/brand-voice'
-import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
-import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
-import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthCallbackRouteImport } from './routes/auth-callback'
+import { Route as McpRouteImport } from './routes/mcp'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
-import { Route as ApiPublicVisionAssetRouteImport } from './routes/api/public/vision-asset'
-import { Route as ApiOutlookOauthRouteImport } from './routes/api/outlook/oauth'
-import { Route as ApiOutlookMailRouteImport } from './routes/api/outlook/mail'
-import { Route as ApiOutlookContactsRouteImport } from './routes/api/outlook/contacts'
-import { Route as ApiOutlookCallbackRouteImport } from './routes/api/outlook/callback'
-import { Route as ApiOutlookCalendarRouteImport } from './routes/api/outlook/calendar'
-import { Route as ApiFrameioMediaRouteImport } from './routes/api/frameio.media'
-import { Route as ApiFrameioCallbackRouteImport } from './routes/api/frameio.callback'
-import { Route as ApiExternalMediaProviderRouteImport } from './routes/api/external-media/$provider'
-import { Route as AuthenticatedVisionBoardBoardIdRouteImport } from './routes/_authenticated/vision-board.$boardId'
-import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
+import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
+import { Route as AuthenticatedBrandVoiceRouteImport } from './routes/_authenticated/brand-voice'
+import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedCatalogRouteImport } from './routes/_authenticated/catalog'
+import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
+import { Route as AuthenticatedContentRouteImport } from './routes/_authenticated/content'
+import { Route as AuthenticatedContractReturnRouteImport } from './routes/_authenticated/contract-return'
+import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated/create'
+import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
+import { Route as AuthenticatedDeliveriesRouteImport } from './routes/_authenticated/deliveries'
+import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
+import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
+import { Route as AuthenticatedMyProjectsRouteImport } from './routes/_authenticated/my-projects'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedOutlookRouteImport } from './routes/_authenticated/outlook'
+import { Route as AuthenticatedPaymentReturnRouteImport } from './routes/_authenticated/payment-return'
+import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
+import { Route as AuthenticatedPostsRouteImport } from './routes/_authenticated/posts'
+import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
+import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
+import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
+import { Route as AuthenticatedToolsRouteImport } from './routes/_authenticated/tools'
+import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
+import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
+import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
+import { Route as AuthenticatedWeddingContentRouteImport } from './routes/_authenticated/wedding-content'
+import { Route as ApiFrameioRouteImport } from './routes/api/frameio'
+import { Route as PromoTokenRouteImport } from './routes/promo/$token'
+import { Route as SocialConnectionsCallbackRouteImport } from './routes/social-connections.callback'
+import { Route as StoryboardTokenRouteImport } from './routes/storyboard.$token'
+import { Route as VisionTokenRouteImport } from './routes/vision/$token'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
-import { Route as ApiPublicHooksStripeRouteImport } from './routes/api/public/hooks/stripe'
-import { Route as ApiPublicHooksSignwellRouteImport } from './routes/api/public/hooks/signwell'
-import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
-import { Route as ApiPublicHooksChargeAutopayDueRouteImport } from './routes/api/public/hooks/charge-autopay-due'
-import { Route as ApiPublicHooksAyrshareRouteImport } from './routes/api/public/hooks/ayrshare'
-import { Route as ApiPublicExternalMediaAssetIdRouteImport } from './routes/api/public/external-media/$assetId'
-import { Route as ApiExternalMediaProviderFilesRouteImport } from './routes/api/external-media/$provider.files'
+import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
+import { Route as AuthenticatedVisionBoardBoardIdRouteImport } from './routes/_authenticated/vision-board.$boardId'
+import { Route as ApiExternalMediaProviderRouteImport } from './routes/api/external-media/$provider'
+import { Route as ApiFrameioCallbackRouteImport } from './routes/api/frameio.callback'
+import { Route as ApiFrameioMediaRouteImport } from './routes/api/frameio.media'
+import { Route as ApiOutlookCalendarRouteImport } from './routes/api/outlook/calendar'
+import { Route as ApiOutlookCallbackRouteImport } from './routes/api/outlook/callback'
+import { Route as ApiOutlookContactsRouteImport } from './routes/api/outlook/contacts'
+import { Route as ApiOutlookMailRouteImport } from './routes/api/outlook/mail'
+import { Route as ApiOutlookOauthRouteImport } from './routes/api/outlook/oauth'
+import { Route as ApiPublicVisionAssetRouteImport } from './routes/api/public/vision-asset'
 import { Route as ApiExternalMediaProviderCallbackRouteImport } from './routes/api/external-media/$provider.callback'
+import { Route as ApiExternalMediaProviderFilesRouteImport } from './routes/api/external-media/$provider.files'
+import { Route as ApiPublicExternalMediaAssetIdRouteImport } from './routes/api/public/external-media/$assetId'
+import { Route as ApiPublicHooksAyrshareRouteImport } from './routes/api/public/hooks/ayrshare'
+import { Route as ApiPublicHooksChargeAutopayDueRouteImport } from './routes/api/public/hooks/charge-autopay-due'
+import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
+import { Route as ApiPublicHooksSignwellRouteImport } from './routes/api/public/hooks/signwell'
+import { Route as ApiPublicHooksStripeRouteImport } from './routes/api/public/hooks/stripe'
 
-const TermsRoute = TermsRouteImport.update({
-  id: '/terms',
-  path: '/terms',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
-  id: '/sitemap.xml',
-  path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PrivacyRoute = PrivacyRouteImport.update({
-  id: '/privacy',
-  path: '/privacy',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const McpRoute = McpRouteImport.update({
-  id: '/mcp',
-  path: '/mcp',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthCallbackRoute = AuthCallbackRouteImport.update({
-  id: '/auth-callback',
-  path: '/auth-callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthRoute = AuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AcceptInviteRoute = AcceptInviteRouteImport.update({
@@ -117,150 +91,91 @@ const AcceptInviteRoute = AcceptInviteRouteImport.update({
   path: '/accept-invite',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth-callback',
+  path: '/auth-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VisionTokenRoute = VisionTokenRouteImport.update({
-  id: '/vision/$token',
-  path: '/vision/$token',
+const McpRoute = McpRouteImport.update({
+  id: '/mcp',
+  path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
-const StoryboardTokenRoute = StoryboardTokenRouteImport.update({
-  id: '/storyboard/$token',
-  path: '/storyboard/$token',
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SocialConnectionsCallbackRoute =
-  SocialConnectionsCallbackRouteImport.update({
-    id: '/social-connections/callback',
-    path: '/social-connections/callback',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Char91DotmcpChar93ListToolsRoute =
+  Char91DotmcpChar93ListToolsRouteImport.update({
+    id: '/.mcp/list-tools',
+    path: '/.mcp/list-tools',
     getParentRoute: () => rootRouteImport,
   } as any)
-const PromoTokenRoute = PromoTokenRouteImport.update({
-  id: '/promo/$token',
-  path: '/promo/$token',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiFrameioRoute = ApiFrameioRouteImport.update({
-  id: '/api/frameio',
-  path: '/api/frameio',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedWeddingContentRoute =
-  AuthenticatedWeddingContentRouteImport.update({
-    id: '/wedding-content',
-    path: '/wedding-content',
-    getParentRoute: () => AuthenticatedRouteRoute,
+const Char91DotwellKnownChar93OauthProtectedResourceRoute =
+  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
+    id: '/.well-known/oauth-protected-resource',
+    path: '/.well-known/oauth-protected-resource',
+    getParentRoute: () => rootRouteImport,
   } as any)
-const AuthenticatedVisionStudioRoute =
-  AuthenticatedVisionStudioRouteImport.update({
-    id: '/vision-studio',
-    path: '/vision-studio',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedVisionBoardRoute =
-  AuthenticatedVisionBoardRouteImport.update({
-    id: '/vision-board',
-    path: '/vision-board',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedVideographerRoute =
-  AuthenticatedVideographerRouteImport.update({
-    id: '/videographer',
-    path: '/videographer',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedToolsRoute = AuthenticatedToolsRouteImport.update({
-  id: '/tools',
-  path: '/tools',
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
-  id: '/templates',
-  path: '/templates',
+const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedStaffEmailRoute = AuthenticatedStaffEmailRouteImport.update({
-  id: '/staff-email',
-  path: '/staff-email',
+const AuthenticatedApprovalsRoute = AuthenticatedApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedSocialAccountsRoute =
-  AuthenticatedSocialAccountsRouteImport.update({
-    id: '/social-accounts',
-    path: '/social-accounts',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const AuthenticatedBrandVoiceRoute = AuthenticatedBrandVoiceRouteImport.update({
+  id: '/brand-voice',
+  path: '/brand-voice',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
+const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
+  id: '/calendar',
+  path: '/calendar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedPostsRoute = AuthenticatedPostsRouteImport.update({
-  id: '/posts',
-  path: '/posts',
+const AuthenticatedCatalogRoute = AuthenticatedCatalogRouteImport.update({
+  id: '/catalog',
+  path: '/catalog',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
-  id: '/payments',
-  path: '/payments',
+const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
+  id: '/clients',
+  path: '/clients',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedPaymentReturnRoute =
-  AuthenticatedPaymentReturnRouteImport.update({
-    id: '/payment-return',
-    path: '/payment-return',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedOutlookRoute = AuthenticatedOutlookRouteImport.update({
-  id: '/outlook',
-  path: '/outlook',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
-  id: '/onboarding',
-  path: '/onboarding',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedMyProjectsRoute = AuthenticatedMyProjectsRouteImport.update({
-  id: '/my-projects',
-  path: '/my-projects',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
-  id: '/home',
-  path: '/home',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedFeedbackRoute = AuthenticatedFeedbackRouteImport.update({
-  id: '/feedback',
-  path: '/feedback',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedDeliveriesRoute = AuthenticatedDeliveriesRouteImport.update({
-  id: '/deliveries',
-  path: '/deliveries',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedCrmRoute = AuthenticatedCrmRouteImport.update({
-  id: '/crm',
-  path: '/crm',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedCreateRoute = AuthenticatedCreateRouteImport.update({
-  id: '/create',
-  path: '/create',
+const AuthenticatedContentRoute = AuthenticatedContentRouteImport.update({
+  id: '/content',
+  path: '/content',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedContractReturnRoute =
@@ -269,102 +184,152 @@ const AuthenticatedContractReturnRoute =
     path: '/contract-return',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedContentRoute = AuthenticatedContentRouteImport.update({
-  id: '/content',
-  path: '/content',
+const AuthenticatedCreateRoute = AuthenticatedCreateRouteImport.update({
+  id: '/create',
+  path: '/create',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
-  id: '/clients',
-  path: '/clients',
+const AuthenticatedCrmRoute = AuthenticatedCrmRouteImport.update({
+  id: '/crm',
+  path: '/crm',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedCatalogRoute = AuthenticatedCatalogRouteImport.update({
-  id: '/catalog',
-  path: '/catalog',
+const AuthenticatedDeliveriesRoute = AuthenticatedDeliveriesRouteImport.update({
+  id: '/deliveries',
+  path: '/deliveries',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
-  id: '/calendar',
-  path: '/calendar',
+const AuthenticatedFeedbackRoute = AuthenticatedFeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedBrandVoiceRoute = AuthenticatedBrandVoiceRouteImport.update({
-  id: '/brand-voice',
-  path: '/brand-voice',
+const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
+  id: '/home',
+  path: '/home',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedApprovalsRoute = AuthenticatedApprovalsRouteImport.update({
-  id: '/approvals',
-  path: '/approvals',
+const AuthenticatedMyProjectsRoute = AuthenticatedMyProjectsRouteImport.update({
+  id: '/my-projects',
+  path: '/my-projects',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
-  id: '/analytics',
-  path: '/analytics',
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
+const AuthenticatedOutlookRoute = AuthenticatedOutlookRouteImport.update({
+  id: '/outlook',
+  path: '/outlook',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const Char91DotwellKnownChar93OauthProtectedResourceRoute =
-  Char91DotwellKnownChar93OauthProtectedResourceRouteImport.update({
-    id: '/.well-known/oauth-protected-resource',
-    path: '/.well-known/oauth-protected-resource',
+const AuthenticatedPaymentReturnRoute =
+  AuthenticatedPaymentReturnRouteImport.update({
+    id: '/payment-return',
+    path: '/payment-return',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedPaymentsRoute = AuthenticatedPaymentsRouteImport.update({
+  id: '/payments',
+  path: '/payments',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPostsRoute = AuthenticatedPostsRouteImport.update({
+  id: '/posts',
+  path: '/posts',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSocialAccountsRoute =
+  AuthenticatedSocialAccountsRouteImport.update({
+    id: '/social-accounts',
+    path: '/social-accounts',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedStaffEmailRoute = AuthenticatedStaffEmailRouteImport.update({
+  id: '/staff-email',
+  path: '/staff-email',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
+  id: '/templates',
+  path: '/templates',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedToolsRoute = AuthenticatedToolsRouteImport.update({
+  id: '/tools',
+  path: '/tools',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedVideographerRoute =
+  AuthenticatedVideographerRouteImport.update({
+    id: '/videographer',
+    path: '/videographer',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVisionBoardRoute =
+  AuthenticatedVisionBoardRouteImport.update({
+    id: '/vision-board',
+    path: '/vision-board',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedVisionStudioRoute =
+  AuthenticatedVisionStudioRouteImport.update({
+    id: '/vision-studio',
+    path: '/vision-studio',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedWeddingContentRoute =
+  AuthenticatedWeddingContentRouteImport.update({
+    id: '/wedding-content',
+    path: '/wedding-content',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiFrameioRoute = ApiFrameioRouteImport.update({
+  id: '/api/frameio',
+  path: '/api/frameio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PromoTokenRoute = PromoTokenRouteImport.update({
+  id: '/promo/$token',
+  path: '/promo/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SocialConnectionsCallbackRoute =
+  SocialConnectionsCallbackRouteImport.update({
+    id: '/social-connections/callback',
+    path: '/social-connections/callback',
     getParentRoute: () => rootRouteImport,
   } as any)
-const Char91DotmcpChar93ListToolsRoute =
-  Char91DotmcpChar93ListToolsRouteImport.update({
-    id: '/.mcp/list-tools',
-    path: '/.mcp/list-tools',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicVisionAssetRoute = ApiPublicVisionAssetRouteImport.update({
-  id: '/api/public/vision-asset',
-  path: '/api/public/vision-asset',
+const StoryboardTokenRoute = StoryboardTokenRouteImport.update({
+  id: '/storyboard/$token',
+  path: '/storyboard/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOutlookOauthRoute = ApiOutlookOauthRouteImport.update({
-  id: '/api/outlook/oauth',
-  path: '/api/outlook/oauth',
+const VisionTokenRoute = VisionTokenRouteImport.update({
+  id: '/vision/$token',
+  path: '/vision/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOutlookMailRoute = ApiOutlookMailRouteImport.update({
-  id: '/api/outlook/mail',
-  path: '/api/outlook/mail',
+const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
+  id: '/.lovable/oauth/consent',
+  path: '/.lovable/oauth/consent',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiOutlookContactsRoute = ApiOutlookContactsRouteImport.update({
-  id: '/api/outlook/contacts',
-  path: '/api/outlook/contacts',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOutlookCallbackRoute = ApiOutlookCallbackRouteImport.update({
-  id: '/api/outlook/callback',
-  path: '/api/outlook/callback',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiOutlookCalendarRoute = ApiOutlookCalendarRouteImport.update({
-  id: '/api/outlook/calendar',
-  path: '/api/outlook/calendar',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiFrameioMediaRoute = ApiFrameioMediaRouteImport.update({
-  id: '/media',
-  path: '/media',
-  getParentRoute: () => ApiFrameioRoute,
-} as any)
-const ApiFrameioCallbackRoute = ApiFrameioCallbackRouteImport.update({
-  id: '/callback',
-  path: '/callback',
-  getParentRoute: () => ApiFrameioRoute,
-} as any)
-const ApiExternalMediaProviderRoute =
-  ApiExternalMediaProviderRouteImport.update({
-    id: '/api/external-media/$provider',
-    path: '/api/external-media/$provider',
+const Char91DotmcpChar93InvokeToolToolRoute =
+  Char91DotmcpChar93InvokeToolToolRouteImport.update({
+    id: '/.mcp/invoke-tool/$tool',
+    path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
 const AuthenticatedVisionBoardBoardIdRoute =
@@ -373,49 +338,57 @@ const AuthenticatedVisionBoardBoardIdRoute =
     path: '/$boardId',
     getParentRoute: () => AuthenticatedVisionBoardRoute,
   } as any)
-const Char91DotmcpChar93InvokeToolToolRoute =
-  Char91DotmcpChar93InvokeToolToolRouteImport.update({
-    id: '/.mcp/invoke-tool/$tool',
-    path: '/.mcp/invoke-tool/$tool',
+const ApiExternalMediaProviderRoute =
+  ApiExternalMediaProviderRouteImport.update({
+    id: '/api/external-media/$provider',
+    path: '/api/external-media/$provider',
     getParentRoute: () => rootRouteImport,
   } as any)
-const DotlovableOauthConsentRoute = DotlovableOauthConsentRouteImport.update({
-  id: '/.lovable/oauth/consent',
-  path: '/.lovable/oauth/consent',
+const ApiFrameioCallbackRoute = ApiFrameioCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => ApiFrameioRoute,
+} as any)
+const ApiFrameioMediaRoute = ApiFrameioMediaRouteImport.update({
+  id: '/media',
+  path: '/media',
+  getParentRoute: () => ApiFrameioRoute,
+} as any)
+const ApiOutlookCalendarRoute = ApiOutlookCalendarRouteImport.update({
+  id: '/api/outlook/calendar',
+  path: '/api/outlook/calendar',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicHooksStripeRoute = ApiPublicHooksStripeRouteImport.update({
-  id: '/api/public/hooks/stripe',
-  path: '/api/public/hooks/stripe',
+const ApiOutlookCallbackRoute = ApiOutlookCallbackRouteImport.update({
+  id: '/api/outlook/callback',
+  path: '/api/outlook/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicHooksSignwellRoute = ApiPublicHooksSignwellRouteImport.update({
-  id: '/api/public/hooks/signwell',
-  path: '/api/public/hooks/signwell',
+const ApiOutlookContactsRoute = ApiOutlookContactsRouteImport.update({
+  id: '/api/outlook/contacts',
+  path: '/api/outlook/contacts',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicHooksPublishDueRoute =
-  ApiPublicHooksPublishDueRouteImport.update({
-    id: '/api/public/hooks/publish-due',
-    path: '/api/public/hooks/publish-due',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksChargeAutopayDueRoute =
-  ApiPublicHooksChargeAutopayDueRouteImport.update({
-    id: '/api/public/hooks/charge-autopay-due',
-    path: '/api/public/hooks/charge-autopay-due',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicHooksAyrshareRoute = ApiPublicHooksAyrshareRouteImport.update({
-  id: '/api/public/hooks/ayrshare',
-  path: '/api/public/hooks/ayrshare',
+const ApiOutlookMailRoute = ApiOutlookMailRouteImport.update({
+  id: '/api/outlook/mail',
+  path: '/api/outlook/mail',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiPublicExternalMediaAssetIdRoute =
-  ApiPublicExternalMediaAssetIdRouteImport.update({
-    id: '/api/public/external-media/$assetId',
-    path: '/api/public/external-media/$assetId',
-    getParentRoute: () => rootRouteImport,
+const ApiOutlookOauthRoute = ApiOutlookOauthRouteImport.update({
+  id: '/api/outlook/oauth',
+  path: '/api/outlook/oauth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicVisionAssetRoute = ApiPublicVisionAssetRouteImport.update({
+  id: '/api/public/vision-asset',
+  path: '/api/public/vision-asset',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiExternalMediaProviderCallbackRoute =
+  ApiExternalMediaProviderCallbackRouteImport.update({
+    id: '/callback',
+    path: '/callback',
+    getParentRoute: () => ApiExternalMediaProviderRoute,
   } as any)
 const ApiExternalMediaProviderFilesRoute =
   ApiExternalMediaProviderFilesRouteImport.update({
@@ -423,12 +396,39 @@ const ApiExternalMediaProviderFilesRoute =
     path: '/files',
     getParentRoute: () => ApiExternalMediaProviderRoute,
   } as any)
-const ApiExternalMediaProviderCallbackRoute =
-  ApiExternalMediaProviderCallbackRouteImport.update({
-    id: '/callback',
-    path: '/callback',
-    getParentRoute: () => ApiExternalMediaProviderRoute,
+const ApiPublicExternalMediaAssetIdRoute =
+  ApiPublicExternalMediaAssetIdRouteImport.update({
+    id: '/api/public/external-media/$assetId',
+    path: '/api/public/external-media/$assetId',
+    getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksAyrshareRoute = ApiPublicHooksAyrshareRouteImport.update({
+  id: '/api/public/hooks/ayrshare',
+  path: '/api/public/hooks/ayrshare',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksChargeAutopayDueRoute =
+  ApiPublicHooksChargeAutopayDueRouteImport.update({
+    id: '/api/public/hooks/charge-autopay-due',
+    path: '/api/public/hooks/charge-autopay-due',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksPublishDueRoute =
+  ApiPublicHooksPublishDueRouteImport.update({
+    id: '/api/public/hooks/publish-due',
+    path: '/api/public/hooks/publish-due',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiPublicHooksSignwellRoute = ApiPublicHooksSignwellRouteImport.update({
+  id: '/api/public/hooks/signwell',
+  path: '/api/public/hooks/signwell',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicHooksStripeRoute = ApiPublicHooksStripeRouteImport.update({
+  id: '/api/public/hooks/stripe',
+  path: '/api/public/hooks/stripe',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -881,60 +881,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/terms': {
-      id: '/terms'
-      path: '/terms'
-      fullPath: '/terms'
-      preLoaderRoute: typeof TermsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/sitemap.xml': {
-      id: '/sitemap.xml'
-      path: '/sitemap.xml'
-      fullPath: '/sitemap.xml'
-      preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/privacy': {
-      id: '/privacy'
-      path: '/privacy'
-      fullPath: '/privacy'
-      preLoaderRoute: typeof PrivacyRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/mcp': {
-      id: '/mcp'
-      path: '/mcp'
-      fullPath: '/mcp'
-      preLoaderRoute: typeof McpRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth-callback': {
-      id: '/auth-callback'
-      path: '/auth-callback'
-      fullPath: '/auth-callback'
-      preLoaderRoute: typeof AuthCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/accept-invite': {
-      id: '/accept-invite'
-      path: '/accept-invite'
-      fullPath: '/accept-invite'
-      preLoaderRoute: typeof AcceptInviteRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -944,263 +895,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/accept-invite': {
+      id: '/accept-invite'
+      path: '/accept-invite'
+      fullPath: '/accept-invite'
+      preLoaderRoute: typeof AcceptInviteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/vision/$token': {
-      id: '/vision/$token'
-      path: '/vision/$token'
-      fullPath: '/vision/$token'
-      preLoaderRoute: typeof VisionTokenRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/storyboard/$token': {
-      id: '/storyboard/$token'
-      path: '/storyboard/$token'
-      fullPath: '/storyboard/$token'
-      preLoaderRoute: typeof StoryboardTokenRouteImport
+    '/auth-callback': {
+      id: '/auth-callback'
+      path: '/auth-callback'
+      fullPath: '/auth-callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/social-connections/callback': {
-      id: '/social-connections/callback'
-      path: '/social-connections/callback'
-      fullPath: '/social-connections/callback'
-      preLoaderRoute: typeof SocialConnectionsCallbackRouteImport
+    '/mcp': {
+      id: '/mcp'
+      path: '/mcp'
+      fullPath: '/mcp'
+      preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/promo/$token': {
-      id: '/promo/$token'
-      path: '/promo/$token'
-      fullPath: '/promo/$token'
-      preLoaderRoute: typeof PromoTokenRouteImport
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/frameio': {
-      id: '/api/frameio'
-      path: '/api/frameio'
-      fullPath: '/api/frameio'
-      preLoaderRoute: typeof ApiFrameioRouteImport
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/wedding-content': {
-      id: '/_authenticated/wedding-content'
-      path: '/wedding-content'
-      fullPath: '/wedding-content'
-      preLoaderRoute: typeof AuthenticatedWeddingContentRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/vision-studio': {
-      id: '/_authenticated/vision-studio'
-      path: '/vision-studio'
-      fullPath: '/vision-studio'
-      preLoaderRoute: typeof AuthenticatedVisionStudioRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/vision-board': {
-      id: '/_authenticated/vision-board'
-      path: '/vision-board'
-      fullPath: '/vision-board'
-      preLoaderRoute: typeof AuthenticatedVisionBoardRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/videographer': {
-      id: '/_authenticated/videographer'
-      path: '/videographer'
-      fullPath: '/videographer'
-      preLoaderRoute: typeof AuthenticatedVideographerRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/tools': {
-      id: '/_authenticated/tools'
-      path: '/tools'
-      fullPath: '/tools'
-      preLoaderRoute: typeof AuthenticatedToolsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/templates': {
-      id: '/_authenticated/templates'
-      path: '/templates'
-      fullPath: '/templates'
-      preLoaderRoute: typeof AuthenticatedTemplatesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/staff-email': {
-      id: '/_authenticated/staff-email'
-      path: '/staff-email'
-      fullPath: '/staff-email'
-      preLoaderRoute: typeof AuthenticatedStaffEmailRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/social-accounts': {
-      id: '/_authenticated/social-accounts'
-      path: '/social-accounts'
-      fullPath: '/social-accounts'
-      preLoaderRoute: typeof AuthenticatedSocialAccountsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/projects': {
-      id: '/_authenticated/projects'
-      path: '/projects'
-      fullPath: '/projects'
-      preLoaderRoute: typeof AuthenticatedProjectsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/posts': {
-      id: '/_authenticated/posts'
-      path: '/posts'
-      fullPath: '/posts'
-      preLoaderRoute: typeof AuthenticatedPostsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/payments': {
-      id: '/_authenticated/payments'
-      path: '/payments'
-      fullPath: '/payments'
-      preLoaderRoute: typeof AuthenticatedPaymentsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/payment-return': {
-      id: '/_authenticated/payment-return'
-      path: '/payment-return'
-      fullPath: '/payment-return'
-      preLoaderRoute: typeof AuthenticatedPaymentReturnRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/outlook': {
-      id: '/_authenticated/outlook'
-      path: '/outlook'
-      fullPath: '/outlook'
-      preLoaderRoute: typeof AuthenticatedOutlookRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/onboarding': {
-      id: '/_authenticated/onboarding'
-      path: '/onboarding'
-      fullPath: '/onboarding'
-      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/my-projects': {
-      id: '/_authenticated/my-projects'
-      path: '/my-projects'
-      fullPath: '/my-projects'
-      preLoaderRoute: typeof AuthenticatedMyProjectsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/home': {
-      id: '/_authenticated/home'
-      path: '/home'
-      fullPath: '/home'
-      preLoaderRoute: typeof AuthenticatedHomeRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/feedback': {
-      id: '/_authenticated/feedback'
-      path: '/feedback'
-      fullPath: '/feedback'
-      preLoaderRoute: typeof AuthenticatedFeedbackRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/deliveries': {
-      id: '/_authenticated/deliveries'
-      path: '/deliveries'
-      fullPath: '/deliveries'
-      preLoaderRoute: typeof AuthenticatedDeliveriesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/crm': {
-      id: '/_authenticated/crm'
-      path: '/crm'
-      fullPath: '/crm'
-      preLoaderRoute: typeof AuthenticatedCrmRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/create': {
-      id: '/_authenticated/create'
-      path: '/create'
-      fullPath: '/create'
-      preLoaderRoute: typeof AuthenticatedCreateRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/contract-return': {
-      id: '/_authenticated/contract-return'
-      path: '/contract-return'
-      fullPath: '/contract-return'
-      preLoaderRoute: typeof AuthenticatedContractReturnRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/content': {
-      id: '/_authenticated/content'
-      path: '/content'
-      fullPath: '/content'
-      preLoaderRoute: typeof AuthenticatedContentRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/clients': {
-      id: '/_authenticated/clients'
-      path: '/clients'
-      fullPath: '/clients'
-      preLoaderRoute: typeof AuthenticatedClientsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/catalog': {
-      id: '/_authenticated/catalog'
-      path: '/catalog'
-      fullPath: '/catalog'
-      preLoaderRoute: typeof AuthenticatedCatalogRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/calendar': {
-      id: '/_authenticated/calendar'
-      path: '/calendar'
-      fullPath: '/calendar'
-      preLoaderRoute: typeof AuthenticatedCalendarRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/brand-voice': {
-      id: '/_authenticated/brand-voice'
-      path: '/brand-voice'
-      fullPath: '/brand-voice'
-      preLoaderRoute: typeof AuthenticatedBrandVoiceRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/approvals': {
-      id: '/_authenticated/approvals'
-      path: '/approvals'
-      fullPath: '/approvals'
-      preLoaderRoute: typeof AuthenticatedApprovalsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/analytics': {
-      id: '/_authenticated/analytics'
-      path: '/analytics'
-      fullPath: '/analytics'
-      preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/admin': {
-      id: '/_authenticated/admin'
-      path: '/admin'
-      fullPath: '/admin'
-      preLoaderRoute: typeof AuthenticatedAdminRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/.well-known/oauth-protected-resource': {
-      id: '/.well-known/oauth-protected-resource'
-      path: '/.well-known/oauth-protected-resource'
-      fullPath: '/.well-known/oauth-protected-resource'
-      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.mcp/list-tools': {
@@ -1210,81 +958,256 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/vision-asset': {
-      id: '/api/public/vision-asset'
-      path: '/api/public/vision-asset'
-      fullPath: '/api/public/vision-asset'
-      preLoaderRoute: typeof ApiPublicVisionAssetRouteImport
+    '/.well-known/oauth-protected-resource': {
+      id: '/.well-known/oauth-protected-resource'
+      path: '/.well-known/oauth-protected-resource'
+      fullPath: '/.well-known/oauth-protected-resource'
+      preLoaderRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/outlook/oauth': {
-      id: '/api/outlook/oauth'
-      path: '/api/outlook/oauth'
-      fullPath: '/api/outlook/oauth'
-      preLoaderRoute: typeof ApiOutlookOauthRouteImport
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/analytics': {
+      id: '/_authenticated/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/approvals': {
+      id: '/_authenticated/approvals'
+      path: '/approvals'
+      fullPath: '/approvals'
+      preLoaderRoute: typeof AuthenticatedApprovalsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/brand-voice': {
+      id: '/_authenticated/brand-voice'
+      path: '/brand-voice'
+      fullPath: '/brand-voice'
+      preLoaderRoute: typeof AuthenticatedBrandVoiceRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/calendar': {
+      id: '/_authenticated/calendar'
+      path: '/calendar'
+      fullPath: '/calendar'
+      preLoaderRoute: typeof AuthenticatedCalendarRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/catalog': {
+      id: '/_authenticated/catalog'
+      path: '/catalog'
+      fullPath: '/catalog'
+      preLoaderRoute: typeof AuthenticatedCatalogRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/clients': {
+      id: '/_authenticated/clients'
+      path: '/clients'
+      fullPath: '/clients'
+      preLoaderRoute: typeof AuthenticatedClientsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/content': {
+      id: '/_authenticated/content'
+      path: '/content'
+      fullPath: '/content'
+      preLoaderRoute: typeof AuthenticatedContentRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/contract-return': {
+      id: '/_authenticated/contract-return'
+      path: '/contract-return'
+      fullPath: '/contract-return'
+      preLoaderRoute: typeof AuthenticatedContractReturnRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/create': {
+      id: '/_authenticated/create'
+      path: '/create'
+      fullPath: '/create'
+      preLoaderRoute: typeof AuthenticatedCreateRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/crm': {
+      id: '/_authenticated/crm'
+      path: '/crm'
+      fullPath: '/crm'
+      preLoaderRoute: typeof AuthenticatedCrmRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/deliveries': {
+      id: '/_authenticated/deliveries'
+      path: '/deliveries'
+      fullPath: '/deliveries'
+      preLoaderRoute: typeof AuthenticatedDeliveriesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/feedback': {
+      id: '/_authenticated/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof AuthenticatedFeedbackRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/home': {
+      id: '/_authenticated/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof AuthenticatedHomeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/my-projects': {
+      id: '/_authenticated/my-projects'
+      path: '/my-projects'
+      fullPath: '/my-projects'
+      preLoaderRoute: typeof AuthenticatedMyProjectsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/outlook': {
+      id: '/_authenticated/outlook'
+      path: '/outlook'
+      fullPath: '/outlook'
+      preLoaderRoute: typeof AuthenticatedOutlookRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/payment-return': {
+      id: '/_authenticated/payment-return'
+      path: '/payment-return'
+      fullPath: '/payment-return'
+      preLoaderRoute: typeof AuthenticatedPaymentReturnRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/payments': {
+      id: '/_authenticated/payments'
+      path: '/payments'
+      fullPath: '/payments'
+      preLoaderRoute: typeof AuthenticatedPaymentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/posts': {
+      id: '/_authenticated/posts'
+      path: '/posts'
+      fullPath: '/posts'
+      preLoaderRoute: typeof AuthenticatedPostsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/projects': {
+      id: '/_authenticated/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof AuthenticatedProjectsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/social-accounts': {
+      id: '/_authenticated/social-accounts'
+      path: '/social-accounts'
+      fullPath: '/social-accounts'
+      preLoaderRoute: typeof AuthenticatedSocialAccountsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/staff-email': {
+      id: '/_authenticated/staff-email'
+      path: '/staff-email'
+      fullPath: '/staff-email'
+      preLoaderRoute: typeof AuthenticatedStaffEmailRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/templates': {
+      id: '/_authenticated/templates'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof AuthenticatedTemplatesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/tools': {
+      id: '/_authenticated/tools'
+      path: '/tools'
+      fullPath: '/tools'
+      preLoaderRoute: typeof AuthenticatedToolsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/videographer': {
+      id: '/_authenticated/videographer'
+      path: '/videographer'
+      fullPath: '/videographer'
+      preLoaderRoute: typeof AuthenticatedVideographerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/vision-board': {
+      id: '/_authenticated/vision-board'
+      path: '/vision-board'
+      fullPath: '/vision-board'
+      preLoaderRoute: typeof AuthenticatedVisionBoardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/vision-studio': {
+      id: '/_authenticated/vision-studio'
+      path: '/vision-studio'
+      fullPath: '/vision-studio'
+      preLoaderRoute: typeof AuthenticatedVisionStudioRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/wedding-content': {
+      id: '/_authenticated/wedding-content'
+      path: '/wedding-content'
+      fullPath: '/wedding-content'
+      preLoaderRoute: typeof AuthenticatedWeddingContentRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/frameio': {
+      id: '/api/frameio'
+      path: '/api/frameio'
+      fullPath: '/api/frameio'
+      preLoaderRoute: typeof ApiFrameioRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/outlook/mail': {
-      id: '/api/outlook/mail'
-      path: '/api/outlook/mail'
-      fullPath: '/api/outlook/mail'
-      preLoaderRoute: typeof ApiOutlookMailRouteImport
+    '/promo/$token': {
+      id: '/promo/$token'
+      path: '/promo/$token'
+      fullPath: '/promo/$token'
+      preLoaderRoute: typeof PromoTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/outlook/contacts': {
-      id: '/api/outlook/contacts'
-      path: '/api/outlook/contacts'
-      fullPath: '/api/outlook/contacts'
-      preLoaderRoute: typeof ApiOutlookContactsRouteImport
+    '/social-connections/callback': {
+      id: '/social-connections/callback'
+      path: '/social-connections/callback'
+      fullPath: '/social-connections/callback'
+      preLoaderRoute: typeof SocialConnectionsCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/outlook/callback': {
-      id: '/api/outlook/callback'
-      path: '/api/outlook/callback'
-      fullPath: '/api/outlook/callback'
-      preLoaderRoute: typeof ApiOutlookCallbackRouteImport
+    '/storyboard/$token': {
+      id: '/storyboard/$token'
+      path: '/storyboard/$token'
+      fullPath: '/storyboard/$token'
+      preLoaderRoute: typeof StoryboardTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/outlook/calendar': {
-      id: '/api/outlook/calendar'
-      path: '/api/outlook/calendar'
-      fullPath: '/api/outlook/calendar'
-      preLoaderRoute: typeof ApiOutlookCalendarRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/frameio/media': {
-      id: '/api/frameio/media'
-      path: '/media'
-      fullPath: '/api/frameio/media'
-      preLoaderRoute: typeof ApiFrameioMediaRouteImport
-      parentRoute: typeof ApiFrameioRoute
-    }
-    '/api/frameio/callback': {
-      id: '/api/frameio/callback'
-      path: '/callback'
-      fullPath: '/api/frameio/callback'
-      preLoaderRoute: typeof ApiFrameioCallbackRouteImport
-      parentRoute: typeof ApiFrameioRoute
-    }
-    '/api/external-media/$provider': {
-      id: '/api/external-media/$provider'
-      path: '/api/external-media/$provider'
-      fullPath: '/api/external-media/$provider'
-      preLoaderRoute: typeof ApiExternalMediaProviderRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/_authenticated/vision-board/$boardId': {
-      id: '/_authenticated/vision-board/$boardId'
-      path: '/$boardId'
-      fullPath: '/vision-board/$boardId'
-      preLoaderRoute: typeof AuthenticatedVisionBoardBoardIdRouteImport
-      parentRoute: typeof AuthenticatedVisionBoardRoute
-    }
-    '/.mcp/invoke-tool/$tool': {
-      id: '/.mcp/invoke-tool/$tool'
-      path: '/.mcp/invoke-tool/$tool'
-      fullPath: '/.mcp/invoke-tool/$tool'
-      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
+    '/vision/$token': {
+      id: '/vision/$token'
+      path: '/vision/$token'
+      fullPath: '/vision/$token'
+      preLoaderRoute: typeof VisionTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/.lovable/oauth/consent': {
@@ -1294,32 +1217,102 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DotlovableOauthConsentRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/stripe': {
-      id: '/api/public/hooks/stripe'
-      path: '/api/public/hooks/stripe'
-      fullPath: '/api/public/hooks/stripe'
-      preLoaderRoute: typeof ApiPublicHooksStripeRouteImport
+    '/.mcp/invoke-tool/$tool': {
+      id: '/.mcp/invoke-tool/$tool'
+      path: '/.mcp/invoke-tool/$tool'
+      fullPath: '/.mcp/invoke-tool/$tool'
+      preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/signwell': {
-      id: '/api/public/hooks/signwell'
-      path: '/api/public/hooks/signwell'
-      fullPath: '/api/public/hooks/signwell'
-      preLoaderRoute: typeof ApiPublicHooksSignwellRouteImport
+    '/_authenticated/vision-board/$boardId': {
+      id: '/_authenticated/vision-board/$boardId'
+      path: '/$boardId'
+      fullPath: '/vision-board/$boardId'
+      preLoaderRoute: typeof AuthenticatedVisionBoardBoardIdRouteImport
+      parentRoute: typeof AuthenticatedVisionBoardRoute
+    }
+    '/api/external-media/$provider': {
+      id: '/api/external-media/$provider'
+      path: '/api/external-media/$provider'
+      fullPath: '/api/external-media/$provider'
+      preLoaderRoute: typeof ApiExternalMediaProviderRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/publish-due': {
-      id: '/api/public/hooks/publish-due'
-      path: '/api/public/hooks/publish-due'
-      fullPath: '/api/public/hooks/publish-due'
-      preLoaderRoute: typeof ApiPublicHooksPublishDueRouteImport
+    '/api/frameio/callback': {
+      id: '/api/frameio/callback'
+      path: '/callback'
+      fullPath: '/api/frameio/callback'
+      preLoaderRoute: typeof ApiFrameioCallbackRouteImport
+      parentRoute: typeof ApiFrameioRoute
+    }
+    '/api/frameio/media': {
+      id: '/api/frameio/media'
+      path: '/media'
+      fullPath: '/api/frameio/media'
+      preLoaderRoute: typeof ApiFrameioMediaRouteImport
+      parentRoute: typeof ApiFrameioRoute
+    }
+    '/api/outlook/calendar': {
+      id: '/api/outlook/calendar'
+      path: '/api/outlook/calendar'
+      fullPath: '/api/outlook/calendar'
+      preLoaderRoute: typeof ApiOutlookCalendarRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/hooks/charge-autopay-due': {
-      id: '/api/public/hooks/charge-autopay-due'
-      path: '/api/public/hooks/charge-autopay-due'
-      fullPath: '/api/public/hooks/charge-autopay-due'
-      preLoaderRoute: typeof ApiPublicHooksChargeAutopayDueRouteImport
+    '/api/outlook/callback': {
+      id: '/api/outlook/callback'
+      path: '/api/outlook/callback'
+      fullPath: '/api/outlook/callback'
+      preLoaderRoute: typeof ApiOutlookCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/outlook/contacts': {
+      id: '/api/outlook/contacts'
+      path: '/api/outlook/contacts'
+      fullPath: '/api/outlook/contacts'
+      preLoaderRoute: typeof ApiOutlookContactsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/outlook/mail': {
+      id: '/api/outlook/mail'
+      path: '/api/outlook/mail'
+      fullPath: '/api/outlook/mail'
+      preLoaderRoute: typeof ApiOutlookMailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/outlook/oauth': {
+      id: '/api/outlook/oauth'
+      path: '/api/outlook/oauth'
+      fullPath: '/api/outlook/oauth'
+      preLoaderRoute: typeof ApiOutlookOauthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/vision-asset': {
+      id: '/api/public/vision-asset'
+      path: '/api/public/vision-asset'
+      fullPath: '/api/public/vision-asset'
+      preLoaderRoute: typeof ApiPublicVisionAssetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/external-media/$provider/callback': {
+      id: '/api/external-media/$provider/callback'
+      path: '/callback'
+      fullPath: '/api/external-media/$provider/callback'
+      preLoaderRoute: typeof ApiExternalMediaProviderCallbackRouteImport
+      parentRoute: typeof ApiExternalMediaProviderRoute
+    }
+    '/api/external-media/$provider/files': {
+      id: '/api/external-media/$provider/files'
+      path: '/files'
+      fullPath: '/api/external-media/$provider/files'
+      preLoaderRoute: typeof ApiExternalMediaProviderFilesRouteImport
+      parentRoute: typeof ApiExternalMediaProviderRoute
+    }
+    '/api/public/external-media/$assetId': {
+      id: '/api/public/external-media/$assetId'
+      path: '/api/public/external-media/$assetId'
+      fullPath: '/api/public/external-media/$assetId'
+      preLoaderRoute: typeof ApiPublicExternalMediaAssetIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/ayrshare': {
@@ -1329,26 +1322,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksAyrshareRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/external-media/$assetId': {
-      id: '/api/public/external-media/$assetId'
-      path: '/api/public/external-media/$assetId'
-      fullPath: '/api/public/external-media/$assetId'
-      preLoaderRoute: typeof ApiPublicExternalMediaAssetIdRouteImport
+    '/api/public/hooks/charge-autopay-due': {
+      id: '/api/public/hooks/charge-autopay-due'
+      path: '/api/public/hooks/charge-autopay-due'
+      fullPath: '/api/public/hooks/charge-autopay-due'
+      preLoaderRoute: typeof ApiPublicHooksChargeAutopayDueRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/external-media/$provider/files': {
-      id: '/api/external-media/$provider/files'
-      path: '/files'
-      fullPath: '/api/external-media/$provider/files'
-      preLoaderRoute: typeof ApiExternalMediaProviderFilesRouteImport
-      parentRoute: typeof ApiExternalMediaProviderRoute
+    '/api/public/hooks/publish-due': {
+      id: '/api/public/hooks/publish-due'
+      path: '/api/public/hooks/publish-due'
+      fullPath: '/api/public/hooks/publish-due'
+      preLoaderRoute: typeof ApiPublicHooksPublishDueRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/api/external-media/$provider/callback': {
-      id: '/api/external-media/$provider/callback'
-      path: '/callback'
-      fullPath: '/api/external-media/$provider/callback'
-      preLoaderRoute: typeof ApiExternalMediaProviderCallbackRouteImport
-      parentRoute: typeof ApiExternalMediaProviderRoute
+    '/api/public/hooks/signwell': {
+      id: '/api/public/hooks/signwell'
+      path: '/api/public/hooks/signwell'
+      fullPath: '/api/public/hooks/signwell'
+      preLoaderRoute: typeof ApiPublicHooksSignwellRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/hooks/stripe': {
+      id: '/api/public/hooks/stripe'
+      path: '/api/public/hooks/stripe'
+      fullPath: '/api/public/hooks/stripe'
+      preLoaderRoute: typeof ApiPublicHooksStripeRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }

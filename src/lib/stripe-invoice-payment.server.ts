@@ -80,6 +80,12 @@ export async function applyStripeCheckoutPayment(
   });
 
   if (ledger.error?.code === "23505") {
+    const { data: existingPayment } = await supabaseAdmin
+      .from("payment_ledger")
+      .select("invoice_id,status")
+      .eq("source", "stripe")
+      .eq("external_id", paymentId)
+      .maybeSingle();
     const { data: current } = await supabaseAdmin
       .from("client_invoices")
       .select("amount_cents,amount_paid_cents,status")
@@ -89,7 +95,13 @@ export async function applyStripeCheckoutPayment(
     const settled =
       current?.status === "paid" ||
       ((current?.amount_cents ?? total) > 0 && paidNow >= (current?.amount_cents ?? total));
-    await releaseHolds(supabaseAdmin, invoice.workspace_id, settled);
+    if (
+      existingPayment?.invoice_id === invoice.id &&
+      existingPayment.status === "posted" &&
+      paidNow > 0
+    ) {
+      await releaseHolds(supabaseAdmin, invoice.workspace_id, settled);
+    }
     return { kind: "duplicate", paidNow, settled };
   }
   if (ledger.error) throw ledger.error;

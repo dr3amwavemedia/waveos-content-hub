@@ -68,21 +68,24 @@ export const Route = createFileRoute("/api/public/hooks/signwell")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        const { data: seen } = await supabaseAdmin
-          .from("webhook_events")
-          .select("id")
-          .eq("source", "signwell")
-          .eq("external_id", eventId)
-          .maybeSingle();
-        if (seen) return new Response("duplicate_ignored", { status: 200 });
-
-        await supabaseAdmin.from("webhook_events").insert({
-          source: "signwell",
-          event_type: eventType,
-          external_id: eventId,
-          payload: event as never,
-          processed_at: new Date().toISOString(),
+        const claim = await supabaseAdmin.rpc("claim_webhook_event", {
+          _source: "signwell",
+          _event_type: eventType,
+          _external_id: eventId,
+          _payload: event as never,
+          _processed_at: new Date().toISOString(),
         });
+        if (claim.error) return new Response("event_store_failed", { status: 503 });
+        if (!claim.data) return new Response("duplicate_ignored", { status: 200 });
+
+        const retryableFailure = async (message: string) => {
+          await supabaseAdmin
+            .from("webhook_events")
+            .delete()
+            .eq("source", "signwell")
+            .eq("external_id", eventId);
+          return new Response(message, { status: 503 });
+        };
 
         const status =
           eventType === "document_completed"
@@ -112,15 +115,24 @@ export const Route = createFileRoute("/api/public/hooks/signwell")({
           .select(
             "id,workspace_id,title,description,signer_email,contract_data,source_template_version,provider_document_id",
           );
-        const { data: contract } = metadata.contract_id
+        const contractResult = metadata.contract_id
           ? await locate.eq("id", metadata.contract_id).maybeSingle()
           : documentId
             ? await locate.eq("provider_document_id", documentId).maybeSingle()
-            : { data: null };
+            : { data: null, error: null };
+        if (contractResult.error) return retryableFailure("contract_lookup_failed");
+        const contract = contractResult.data;
 
-        if (!contract) return new Response("ok", { status: 200 });
+        if (!contract) return retryableFailure("contract_not_found");
 
-        await supabaseAdmin.from("client_contracts").update(patch).eq("id", contract.id);
+        const updated = await supabaseAdmin
+          .from("client_contracts")
+          .update(patch)
+          .eq("id", contract.id)
+          .select("id");
+        if (updated.error || !updated.data?.length) {
+          return retryableFailure("contract_update_failed");
+        }
 
         // Only a verified completion produces the private signed archive.
         if (status === "signed") {
@@ -150,12 +162,16 @@ export const Route = createFileRoute("/api/public/hooks/signwell")({
                     : [],
                 },
               });
-              // Reason codes only — never document contents or links.
-              if (!outcome.archived) {
-                console.error("[signwell webhook] archive skipped:", outcome.reason);
+              // A completed PDF can take a few seconds to become available.
+              // Release the event claim and ask SignWell to retry transient
+              // archive failures instead of permanently losing the signed copy.
+              if (!outcome.archived && outcome.reason !== "already_archived") {
+                console.error("[signwell webhook] archive retry required:", outcome.reason);
+                return retryableFailure("contract_archive_failed");
               }
             } catch {
               console.error("[signwell webhook] archive failed for contract", contract.id);
+              return retryableFailure("contract_archive_failed");
             }
           }
           try {

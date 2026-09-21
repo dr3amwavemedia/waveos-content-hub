@@ -239,8 +239,12 @@ function AdminPage() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["admin", "staff"] });
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["admin", "staff"] }),
+        qc.invalidateQueries({ queryKey: ["waveos", "current-user"] }),
+        qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] }),
+      ]);
       toast.success("Staff position updated.");
     },
     onError: (e: unknown) =>
@@ -257,10 +261,13 @@ function AdminPage() {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       setEditingStaff(null);
-      qc.invalidateQueries({ queryKey: ["admin", "staff"] });
-      qc.invalidateQueries({ queryKey: ["crm", "staff"] });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["admin", "staff"] }),
+        qc.invalidateQueries({ queryKey: ["crm", "staff"] }),
+        qc.invalidateQueries({ queryKey: ["waveos", "current-user"] }),
+      ]);
       toast.success("Staff information updated.");
     },
     onError: (e: unknown) =>

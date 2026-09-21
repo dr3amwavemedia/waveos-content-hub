@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import { nextMonthlyChargeAt } from "../../src/lib/date-time.ts";
+
 const migration = readFileSync(
   "supabase/migrations/20260918193000_invoice_autopay_schedules.sql",
   "utf8",
@@ -10,6 +12,10 @@ const adminForm = readFileSync("src/routes/_authenticated/clients.tsx", "utf8");
 const authorization = readFileSync("src/lib/autopay.functions.ts", "utf8");
 const chargeWorker = readFileSync("src/routes/api/public/hooks/charge-autopay-due.ts", "utf8");
 const stripeWebhook = readFileSync("src/routes/api/public/hooks/stripe.ts", "utf8");
+const integrityMigration = readFileSync(
+  "supabase/migrations/20260921143911_secure_autopay_service_numbering.sql",
+  "utf8",
+);
 
 test("autopay schedules are workspace-scoped and protected by RLS", () => {
   assert.match(migration, /create table if not exists public\.invoice_autopay_schedules/);
@@ -49,4 +55,39 @@ test("Stripe webhooks activate authorizations and settle or pause schedules", ()
   assert.match(stripeWebhook, /payment_intent\.succeeded/);
   assert.match(stripeWebhook, /payment_intent\.payment_failed/);
   assert.match(stripeWebhook, /sendPaymentReceiptEmail/);
+});
+
+test("server numbering and automatic payment settlement stay service-role only", () => {
+  assert.match(integrityMigration, /next_service_invoice_number/);
+  assert.match(integrityMigration, /record_autopay_payment/);
+  assert.match(
+    integrityMigration,
+    /REVOKE ALL ON FUNCTION public\.record_autopay_payment\([\s\S]*FROM PUBLIC, anon, authenticated/,
+  );
+  assert.match(integrityMigration, /current_setting\('request\.jwt\.claim\.role'/);
+  assert.match(integrityMigration, /claim_webhook_event/);
+  assert.match(integrityMigration, /pg_advisory_xact_lock/);
+  assert.doesNotMatch(integrityMigration, /DELETE FROM public\.webhook_events/);
+  assert.match(chargeWorker, /next_service_invoice_number/);
+  assert.match(stripeWebhook, /record_autopay_payment/);
+  assert.match(stripeWebhook, /rpc\("claim_webhook_event"/);
+});
+
+test("monthly charges clamp month ends and preserve the client's local time across DST", () => {
+  assert.equal(
+    nextMonthlyChargeAt("2026-01-31T15:00:00.000Z", "America/New_York"),
+    "2026-02-28T15:00:00.000Z",
+  );
+  assert.equal(
+    nextMonthlyChargeAt("2026-02-28T15:00:00.000Z", "America/New_York"),
+    "2026-03-28T14:00:00.000Z",
+  );
+});
+
+test("editing or disabling autopay requires fresh client card authorization", () => {
+  assert.match(adminForm, /authorizationChanged/);
+  assert.match(adminForm, /stripe_payment_method_id: null/);
+  assert.match(adminForm, /authorized_at: null/);
+  assert.match(chargeWorker, /card_authorization_missing/);
+  assert.match(chargeWorker, /invoice_balance_changed/);
 });
