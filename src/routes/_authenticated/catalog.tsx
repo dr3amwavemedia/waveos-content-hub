@@ -5,7 +5,6 @@ import { Loader2, Pencil, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
-import { AppShell } from "@/components/app/app-shell";
 import { errorMessage } from "@/lib/error-message";
 import { moneyInputToCents } from "@/lib/invoice-items";
 import { formatCents, pricingBadges, priceSummary } from "@/lib/catalog";

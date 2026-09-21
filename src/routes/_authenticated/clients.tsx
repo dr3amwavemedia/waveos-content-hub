@@ -2970,6 +2970,24 @@ function InvoiceForm({
       }
       if (!data?.id) throw new Error("The invoice changes were not saved. Please try again.");
       if (autopayEnabled) {
+        // Recurring retainers bill the full amount each month; a one-time
+        // automatic charge must only collect what this invoice still owes
+        // (deposit already paid, or the scheduled deposit/installment).
+        const autopayAmountCents =
+          autopayFrequency === "monthly"
+            ? cents
+            : nextInvoicePaymentCents({
+                amountCents: cents,
+                amountPaidCents: received ?? 0,
+                paymentPlan,
+                checkoutPaymentType,
+                checkoutPaymentCents: scheduledCents,
+              });
+        if (autopayAmountCents <= 0) {
+          throw new Error(
+            "There is nothing left to charge automatically on this invoice. Turn off automatic payments or adjust the amounts.",
+          );
+        }
         const { data: auth } = await supabase.auth.getUser();
         const schedule = {
           source_invoice_id: data.id,
