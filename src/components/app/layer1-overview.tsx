@@ -46,6 +46,11 @@ import { serviceFeePercentLabel } from "@/lib/invoice-service-fee";
 import { AuthorizeAutopayButton } from "@/components/app/authorize-autopay-button";
 
 export type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
+/** One recorded transaction against an invoice (card payment, automatic charge, import or refund). */
+export type PaymentEntry = Pick<
+  Database["public"]["Tables"]["payment_ledger"]["Row"],
+  "id" | "invoice_id" | "kind" | "amount_cents" | "currency" | "occurred_at" | "source"
+>;
 type AutopaySchedule = Pick<
   Database["public"]["Tables"]["invoice_autopay_schedules"]["Row"],
   | "id"
@@ -239,6 +244,22 @@ export function Layer1Overview() {
         .eq("enabled", true);
       if (error) throw error;
       return (data ?? []) as AutopaySchedule[];
+    },
+  });
+
+  const paymentsQ = useQuery({
+    queryKey: ["layer1", "payments", wsId],
+    enabled: !!wsId,
+    staleTime: 15_000,
+    queryFn: async (): Promise<PaymentEntry[]> => {
+      const { data, error } = await supabase
+        .from("payment_ledger")
+        .select("id,invoice_id,kind,amount_cents,currency,occurred_at,source")
+        .eq("workspace_id", wsId!)
+        .eq("status", "posted")
+        .order("occurred_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
@@ -540,6 +561,9 @@ export function Layer1Overview() {
                       : schedule.source_invoice_id === invoice.id,
                   ) ?? null
                 }
+                payments={(paymentsQ.data ?? []).filter(
+                  (entry) => entry.invoice_id === invoice.id,
+                )}
               />
             ))}
           </div>
@@ -923,11 +947,16 @@ export function InvoiceCard({
   invoice,
   clientName = "Client",
   autopay = null,
+  payments = [],
 }: {
   invoice: Invoice;
   clientName?: string;
   autopay?: AutopaySchedule | null;
+  payments?: PaymentEntry[];
 }) {
+  const paymentHistory = [...payments].sort(
+    (a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime(),
+  );
   const lineItems = invoiceItemsFromJson(invoice.line_items);
   const amount = formatMoney(invoice.amount_cents, invoice.currency);
   const due = formatDate(invoice.due_at);
@@ -993,6 +1022,33 @@ export function InvoiceCard({
       </div>
 
       <PaymentProgress invoice={invoice} />
+      {paymentHistory.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-border/70 bg-muted/30 p-4">
+          <p className="text-sm font-semibold text-foreground">Payment history</p>
+          <ul className="space-y-1.5">
+            {paymentHistory.map((entry) => (
+              <li
+                key={entry.id}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+              >
+                <span className="text-muted-foreground">
+                  {entry.kind === "refund" ? "Refund" : "Payment received"} ·{" "}
+                  {formatDate(entry.occurred_at)}
+                </span>
+                <span
+                  className={
+                    "font-medium " +
+                    (entry.kind === "refund" ? "text-destructive" : "text-foreground")
+                  }
+                >
+                  {entry.kind === "refund" ? "−" : ""}
+                  {formatMoney(entry.amount_cents, entry.currency)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {autopay && (
         <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
