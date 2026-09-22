@@ -27,7 +27,7 @@ export const Route = createFileRoute("/api/public/hooks/charge-autopay-due")({
           _amount_cents: 1,
           _currency: "USD",
           _occurred_at: new Date().toISOString(),
-          _next_charge_at: null,
+          _next_charge_at: undefined,
         });
         if (!readiness.error?.message.includes("autopay_schedule_missing")) {
           return new Response("autopay_backend_not_ready", { status: 503 });

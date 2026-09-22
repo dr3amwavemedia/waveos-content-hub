@@ -17,7 +17,8 @@ export async function claimWebhookEvent(supabaseAdmin: AdminClient, event: Webho
   const claim = await supabaseAdmin.rpc("claim_webhook_event", {
     _source: event.source,
     _event_type: event.eventType,
-    _external_id: event.externalId,
+    // The SQL argument accepts NULL; the generated types omit that nullability.
+    _external_id: event.externalId as unknown as string,
     _payload: event.payload as never,
     _processed_at: processedAt,
   });
