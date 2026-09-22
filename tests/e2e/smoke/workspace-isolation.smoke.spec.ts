@@ -31,6 +31,8 @@ test.describe("smoke: workspace isolation", () => {
     page,
     baseURL,
   }, testInfo) => {
+    // Walks five surfaces in one pass; needs more than the default budget.
+    testInfo.setTimeout(120_000);
     const session = await startSmokeSession(context, page, baseURL!);
     skipWithoutSession(session, testInfo);
 
