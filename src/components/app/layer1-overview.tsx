@@ -947,11 +947,16 @@ export function InvoiceCard({
   invoice,
   clientName = "Client",
   autopay = null,
+  payments = [],
 }: {
   invoice: Invoice;
   clientName?: string;
   autopay?: AutopaySchedule | null;
+  payments?: PaymentEntry[];
 }) {
+  const paymentHistory = [...payments].sort(
+    (a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime(),
+  );
   const lineItems = invoiceItemsFromJson(invoice.line_items);
   const amount = formatMoney(invoice.amount_cents, invoice.currency);
   const due = formatDate(invoice.due_at);
