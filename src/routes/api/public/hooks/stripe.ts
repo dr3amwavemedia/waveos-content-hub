@@ -154,7 +154,7 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
             _next_charge_at:
               schedule.frequency === "monthly"
                 ? nextMonthlyChargeAt(schedule.charge_at, schedule.timezone)
-                : null,
+                : undefined,
           });
           if (recorded.error || !recorded.data?.[0]) {
             return retryableFailure("autopay_payment_record_failed");
