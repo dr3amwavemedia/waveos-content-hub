@@ -16,7 +16,8 @@
     "check": "npm run typecheck && npm run build",
     "test:e2e": "playwright test",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:smoke": "playwright test tests/e2e/smoke"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
