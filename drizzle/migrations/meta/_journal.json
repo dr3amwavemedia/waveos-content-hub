@@ -64,6 +64,13 @@
       "when": 1790042011756,
       "tag": "0008_lock_sensitive_tables_service_role_only",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790085715524,
+      "tag": "0009_payment_ledger_client_and_staff_read",
+      "breakpoints": true
     }
   ]
 }
