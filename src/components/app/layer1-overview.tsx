@@ -561,6 +561,9 @@ export function Layer1Overview() {
                       : schedule.source_invoice_id === invoice.id,
                   ) ?? null
                 }
+                payments={(paymentsQ.data ?? []).filter(
+                  (entry) => entry.invoice_id === invoice.id,
+                )}
               />
             ))}
           </div>
