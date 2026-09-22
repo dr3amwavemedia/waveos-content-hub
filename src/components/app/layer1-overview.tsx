@@ -1022,6 +1022,33 @@ export function InvoiceCard({
       </div>
 
       <PaymentProgress invoice={invoice} />
+      {paymentHistory.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-border/70 bg-muted/30 p-4">
+          <p className="text-sm font-semibold text-foreground">Payment history</p>
+          <ul className="space-y-1.5">
+            {paymentHistory.map((entry) => (
+              <li
+                key={entry.id}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+              >
+                <span className="text-muted-foreground">
+                  {entry.kind === "refund" ? "Refund" : "Payment received"} ·{" "}
+                  {formatDate(entry.occurred_at)}
+                </span>
+                <span
+                  className={
+                    "font-medium " +
+                    (entry.kind === "refund" ? "text-destructive" : "text-foreground")
+                  }
+                >
+                  {entry.kind === "refund" ? "−" : ""}
+                  {formatMoney(entry.amount_cents, entry.currency)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {autopay && (
         <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
