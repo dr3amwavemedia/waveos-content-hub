@@ -3549,6 +3549,16 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
+      claim_webhook_event: {
+        Args: {
+          _event_type: string
+          _external_id: string
+          _payload: Json
+          _processed_at: string
+          _source: string
+        }
+        Returns: boolean
+      }
       create_brand_workspace: {
         Args: {
           _business_name?: string
@@ -3818,6 +3828,10 @@ export type Database = {
         Returns: undefined
       }
       next_invoice_number: { Args: { _workspace_id: string }; Returns: string }
+      next_service_invoice_number: {
+        Args: { _workspace_id: string }
+        Returns: string
+      }
       notify_delivery_revisions_updated: {
         Args: { _delivery_id: string }
         Returns: number
@@ -3891,6 +3905,25 @@ export type Database = {
         Args: { _item_id: string; _status: string }
         Returns: undefined
       }
+      record_autopay_payment: {
+        Args: {
+          _amount_cents: number
+          _currency: string
+          _invoice_id: string
+          _next_charge_at?: string
+          _occurred_at: string
+          _payment_id: string
+          _schedule_id: string
+        }
+        Returns: {
+          applied: boolean
+          balance_cents: number
+          invoice_currency: string
+          invoice_number: string
+          invoice_workspace_id: string
+          total_paid_cents: number
+        }[]
+      }
       record_promo_event: {
         Args: { _event: string; _token: string }
         Returns: undefined
@@ -3917,39 +3950,6 @@ export type Database = {
           _target_user: string
         }
         Returns: undefined
-      }
-      claim_webhook_event: {
-        Args: {
-          _event_type: string
-          _external_id: string | null
-          _payload: Json
-          _processed_at: string
-          _source: string
-        }
-        Returns: boolean
-      }
-      next_service_invoice_number: {
-        Args: { _workspace_id: string }
-        Returns: string
-      }
-      record_autopay_payment: {
-        Args: {
-          _amount_cents: number
-          _currency: string
-          _invoice_id: string
-          _next_charge_at?: string | null
-          _occurred_at: string
-          _payment_id: string
-          _schedule_id: string
-        }
-        Returns: {
-          applied: boolean
-          balance_cents: number
-          invoice_currency: string
-          invoice_number: string
-          invoice_workspace_id: string
-          total_paid_cents: number
-        }[]
       }
       set_staff_position: {
         Args: { _position: string; _target_user: string }
