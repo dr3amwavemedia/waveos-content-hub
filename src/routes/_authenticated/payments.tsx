@@ -176,6 +176,11 @@ function PaymentsPage() {
         { event: "*", schema: "public", table: "client_invoices" },
         () => void reload(),
       )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "payment_ledger" },
+        () => void reload(),
+      )
       .subscribe();
     return () => {
       void supabase.removeChannel(channel);
@@ -227,10 +232,15 @@ function PaymentsPage() {
       workspace.client_name || workspace.business_name || workspace.name,
     ]),
   );
-  const recentPaidInvoices = salesInvoices
-    .filter((invoice) => invoice.status === "paid" && invoice.paid_at)
-    .sort((a, b) => new Date(b.paid_at!).getTime() - new Date(a.paid_at!).getTime())
-    .slice(0, 10);
+  const invoiceById = new Map(salesInvoices.map((invoice) => [invoice.id, invoice]));
+  /** Every recorded transaction: card payments, automatic charges, imports and refunds. */
+  const recentTransactions = entries
+    .filter(
+      (entry) =>
+        entry.status === "posted" && (entry.kind === "payment" || entry.kind === "refund"),
+    )
+    .sort((a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime())
+    .slice(0, 15);
 
   const chartData = useMemo(() => {
     const grouped = new Map<string, { collected: number; refunds: number; expected: number }>();
