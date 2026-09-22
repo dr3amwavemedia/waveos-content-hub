@@ -46,6 +46,11 @@ import { serviceFeePercentLabel } from "@/lib/invoice-service-fee";
 import { AuthorizeAutopayButton } from "@/components/app/authorize-autopay-button";
 
 export type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
+/** One recorded transaction against an invoice (card payment, automatic charge, import or refund). */
+export type PaymentEntry = Pick<
+  Database["public"]["Tables"]["payment_ledger"]["Row"],
+  "id" | "invoice_id" | "kind" | "amount_cents" | "currency" | "occurred_at" | "source"
+>;
 type AutopaySchedule = Pick<
   Database["public"]["Tables"]["invoice_autopay_schedules"]["Row"],
   | "id"
@@ -239,6 +244,22 @@ export function Layer1Overview() {
         .eq("enabled", true);
       if (error) throw error;
       return (data ?? []) as AutopaySchedule[];
+    },
+  });
+
+  const paymentsQ = useQuery({
+    queryKey: ["layer1", "payments", wsId],
+    enabled: !!wsId,
+    staleTime: 15_000,
+    queryFn: async (): Promise<PaymentEntry[]> => {
+      const { data, error } = await supabase
+        .from("payment_ledger")
+        .select("id,invoice_id,kind,amount_cents,currency,occurred_at,source")
+        .eq("workspace_id", wsId!)
+        .eq("status", "posted")
+        .order("occurred_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
     },
   });
 
