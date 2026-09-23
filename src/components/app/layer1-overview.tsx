@@ -1150,6 +1150,18 @@ export function InvoiceCard({
                 checkoutPaymentType: invoice.checkout_payment_type,
                 checkoutPaymentCents: invoice.checkout_payment_cents,
               })}
+              minimumCents={nextInvoicePaymentCents({
+                amountCents: invoice.amount_cents,
+                amountPaidCents: invoice.amount_paid_cents,
+                paymentPlan: invoice.payment_plan,
+                checkoutPaymentType: invoice.checkout_payment_type,
+                checkoutPaymentCents: invoice.checkout_payment_cents,
+              })}
+              remainingCents={Math.max(
+                0,
+                (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0),
+              )}
+              currency={invoice.currency}
             />
           )}
         {canOpen && (
