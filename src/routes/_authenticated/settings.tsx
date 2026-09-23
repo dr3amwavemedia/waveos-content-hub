@@ -38,6 +38,7 @@ import {
 import { TeamSettings } from "@/components/app/team-settings";
 import { EmailAutomationSettings } from "@/components/app/email-automation-settings";
 import { openWorkspaceTour } from "@/components/app/workspace-tour";
+import { ClientDocumentRecords } from "@/components/app/client-document-records";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -132,6 +133,10 @@ function SettingsPage() {
         </div>
       </div>
 
+      {!user?.isStaff && activeWorkspace && (
+        <ClientDocumentRecords workspaceId={activeWorkspace.id} clientName={activeWorkspace.name} />
+      )}
+
       {canManageApproval && (
         <div className="surface-card flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-4">
@@ -200,26 +205,28 @@ function SettingsPage() {
         </section>
       )}
 
-      <section className="surface-card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
-        <div className="flex items-start gap-4">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
-            <BookOpen className="h-5 w-5" />
+      {!user?.isStaff && (
+        <section className="surface-card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+              <BookOpen className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Workspace guide</h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                Reopen the introduction to your available pages and tools.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-semibold text-foreground">Workspace guide</h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Reopen the introduction to your available pages and tools.
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={openWorkspaceTour}
-          className="min-h-11 w-full rounded-xl border border-primary/40 bg-primary/10 px-4 text-sm font-semibold text-primary transition hover:bg-primary/15 sm:w-auto"
-        >
-          Open guide
-        </button>
-      </section>
+          <button
+            type="button"
+            onClick={openWorkspaceTour}
+            className="min-h-11 w-full rounded-xl border border-primary/40 bg-primary/10 px-4 text-sm font-semibold text-primary transition hover:bg-primary/15 sm:w-auto"
+          >
+            Open guide
+          </button>
+        </section>
+      )}
 
       <div className="surface-card flex items-start gap-4 p-6">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">

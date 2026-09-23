@@ -22,7 +22,10 @@ import { applyStripeCheckoutPayment } from "@/lib/stripe-invoice-payment.server"
  */
 export const createInvoiceCheckout = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { invoiceId: string; paymentAmountCents?: number }) => d)
+  .validator(
+    (d: { invoiceId: string; paymentChoice?: "scheduled" | "full"; paymentAmountCents?: number }) =>
+      d,
+  )
   .handler(async ({ data, context }) => {
     const { supabase } = context;
 
@@ -52,9 +55,14 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
       checkoutPaymentType: invoice.checkout_payment_type,
       checkoutPaymentCents: invoice.checkout_payment_cents,
     };
-    const minimumDue = nextInvoicePaymentCents(paymentSchedule);
-    if (minimumDue <= 0) throw new Error("This invoice has no scheduled payment due.");
-    const requestedAmount = data.paymentAmountCents;
+    const scheduledDue = nextInvoicePaymentCents(paymentSchedule);
+    if (scheduledDue <= 0) throw new Error("This invoice has no scheduled payment due.");
+    const requestedAmount =
+      data.paymentChoice === "full"
+        ? balance
+        : data.paymentChoice === "scheduled"
+          ? scheduledDue
+          : data.paymentAmountCents;
     if (
       requestedAmount !== undefined &&
       (!Number.isSafeInteger(requestedAmount) || requestedAmount <= 0)
@@ -63,23 +71,31 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
     }
     // The browser may suggest an amount, but the server always enforces the
     // invoice's current balance and the admin-defined minimum/deposit.
-    const dueNow = requestedAmount ?? minimumDue;
-    if (dueNow < minimumDue) {
-      throw new Error(`The minimum payment due is ${new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency: invoice.currency ?? "USD",
-      }).format(minimumDue / 100)}.`);
+    const dueNow = requestedAmount ?? scheduledDue;
+    if (dueNow < scheduledDue) {
+      throw new Error(
+        `The minimum payment due is ${new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: invoice.currency ?? "USD",
+        }).format(scheduledDue / 100)}.`,
+      );
     }
     if (dueNow > balance) {
       throw new Error("Payment cannot be greater than the remaining balance.");
     }
-    const paymentType = effectiveCheckoutPaymentType(paymentSchedule);
-    const paymentLabel = nextInvoicePaymentLabel(paymentSchedule).replace(/^Pay /, "");
+    const paymentType =
+      dueNow === balance ? "remaining" : effectiveCheckoutPaymentType(paymentSchedule);
+    const paymentLabel =
+      dueNow === balance
+        ? "full balance"
+        : nextInvoicePaymentLabel(paymentSchedule).replace(/^Pay /, "");
     const checkoutItemLabel =
       dueNow === balance
         ? "Remaining balance"
-        : dueNow === minimumDue
-          ? (paymentLabel === "now" ? "Invoice payment" : paymentLabel)
+        : dueNow === scheduledDue
+          ? paymentLabel === "now"
+            ? "Invoice payment"
+            : paymentLabel
           : "Partial payment";
     const invoiceLabel = invoice.number ?? "Invoice";
     const remainingAfterPayment = Math.max(0, balance - dueNow);

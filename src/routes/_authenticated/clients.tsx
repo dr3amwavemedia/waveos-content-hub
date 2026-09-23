@@ -611,6 +611,7 @@ function WorkspaceDrawer({
 }) {
   const [tab, setTab] = useState<DrawerTab>("info");
   const impersonate = useImpersonateClient();
+  const mobileTabs: DrawerTab[] = ["info", "contracts", "invoices", "invites"];
 
   function exportSummary() {
     const rows = [
@@ -703,6 +704,7 @@ function WorkspaceDrawer({
             onClick={() => setTab(t)}
             className={cn(
               "min-h-11 border-b-2 px-3 py-2 text-xs font-medium capitalize transition-colors",
+              !mobileTabs.includes(t) && "hidden sm:block",
               tab === t
                 ? "border-primary text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground",
@@ -2597,13 +2599,19 @@ function InvoicesTab({
   return (
     <div className="space-y-3">
       {q.isSuccess && (
-        <InvoiceDocumentTools
-          key={`doc-${workspaceId}`}
-          invoices={q.data ?? []}
-          clientName={clientName ?? null}
-        />
+        <div className="hidden sm:block">
+          <InvoiceDocumentTools
+            key={`doc-${workspaceId}`}
+            invoices={q.data ?? []}
+            clientName={clientName ?? null}
+          />
+        </div>
       )}
-      {q.isSuccess && <InvoiceExportTools key={workspaceId} invoices={q.data ?? []} />}
+      {q.isSuccess && (
+        <div className="hidden sm:block">
+          <InvoiceExportTools key={workspaceId} invoices={q.data ?? []} />
+        </div>
+      )}
       <div className="flex justify-end">
         <button
           onClick={() => {
@@ -2718,7 +2726,7 @@ function InvoicesTab({
                     setEditingInvoice(i);
                     setShowForm(true);
                   }}
-                  className="rounded-md p-1.5 text-primary hover:bg-primary/15"
+                  className="flex h-11 w-11 items-center justify-center rounded-lg text-primary hover:bg-primary/15 sm:h-9 sm:w-9"
                   aria-label={`Edit ${i.number || "invoice"}`}
                   title="Edit invoice"
                 >
@@ -2727,7 +2735,8 @@ function InvoicesTab({
 
                 <button
                   onClick={() => confirm("Remove this invoice?") && del.mutate(i.id)}
-                  className="rounded-md p-1.5 text-destructive hover:bg-destructive/15"
+                  className="flex h-11 w-11 items-center justify-center rounded-lg text-destructive hover:bg-destructive/15 sm:h-9 sm:w-9"
+                  aria-label={`Remove ${i.number || "invoice"}`}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -3339,30 +3348,55 @@ function InvoiceForm({
           </p>
         </div>
       )}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Payment arrangement">
-          <select
-            value={paymentPlan}
-            onChange={(e) => {
-              const nextPlan = e.target.value;
-              setPaymentPlan(nextPlan);
-              if (nextPlan === "deposit_balance" && !checkoutPaymentAmount) {
-                setCheckoutPaymentAmount((Number(effectiveAmount || 0) / 2).toFixed(2));
-              } else if (nextPlan === "one_time" || nextPlan === "monthly_retainer") {
-                setCheckoutPaymentAmount("");
-              }
-            }}
-            className={inputCls}
-          >
-            <option value="one_time">Full remaining balance</option>
-            <option value="deposit_balance">Deposit first, then remaining balance</option>
-            <option value="installments">Fixed payment installments</option>
-            <option value="monthly_retainer">Monthly retainer / subscription</option>
-          </select>
+      <div className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Client payment options</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            This selection controls the amount and wording shown in Stripe Checkout.
+            Pay in full is always available. Turn on one scheduled-payment option if you want to
+            offer the client more flexibility.
           </p>
-        </Field>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="flex min-h-24 flex-col justify-between rounded-xl border border-emerald-400/30 bg-emerald-500/5 p-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Pay in full</p>
+              <p className="mt-1 text-xs text-muted-foreground">Full remaining balance</p>
+            </div>
+            <span className="mt-3 w-fit rounded-full bg-emerald-500/15 px-2 py-1 text-[11px] font-semibold uppercase text-emerald-400">
+              Always on
+            </span>
+          </div>
+          <PaymentOptionSwitch
+            label="Deposit"
+            description="Collect a deposit, then the balance."
+            enabled={paymentPlan === "deposit_balance"}
+            onToggle={() => {
+              const enabled = paymentPlan !== "deposit_balance";
+              setPaymentPlan(enabled ? "deposit_balance" : "one_time");
+              setCheckoutPaymentAmount(
+                enabled
+                  ? checkoutPaymentAmount || (Number(effectiveAmount || 0) / 2).toFixed(2)
+                  : "",
+              );
+            }}
+          />
+          <PaymentOptionSwitch
+            label="Installment payments"
+            description="Offer a fixed amount per payment."
+            enabled={paymentPlan === "installments"}
+            onToggle={() => {
+              const enabled = paymentPlan !== "installments";
+              setPaymentPlan(enabled ? "installments" : "one_time");
+              setCheckoutPaymentAmount(
+                enabled
+                  ? checkoutPaymentAmount || (Number(effectiveAmount || 0) / 2).toFixed(2)
+                  : "",
+              );
+            }}
+          />
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Total received so far">
           <input
             type="number"
@@ -3454,15 +3488,28 @@ function InvoiceForm({
         />
       </Field>
       <div className="space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
-        <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-foreground">
-          <input
-            type="checkbox"
-            checked={autopayEnabled}
-            onChange={(event) => setAutopayEnabled(event.target.checked)}
-            className="h-4 w-4"
-          />
-          Enable automatic card charges
-        </label>
+        <div className="flex min-h-12 items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Automatic payments</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The client must authorize their card before a scheduled charge.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={autopayEnabled}
+            onClick={() => setAutopayEnabled((enabled) => !enabled)}
+            className={cn(
+              "inline-flex min-h-11 min-w-20 items-center justify-center rounded-full border px-3 text-xs font-semibold uppercase transition",
+              autopayEnabled
+                ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300"
+                : "border-border bg-background text-muted-foreground",
+            )}
+          >
+            {autopayEnabled ? "On" : "Off"}
+          </button>
+        </div>
         {autopayEnabled && (
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Automatic charge type">
@@ -4522,6 +4569,46 @@ function InviteLinkModal({
 
 const inputCls =
   "w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40";
+
+function PaymentOptionSwitch({
+  label,
+  description,
+  enabled,
+  onToggle,
+}: {
+  label: string;
+  description: string;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-24 flex-col justify-between rounded-xl border p-3 transition-colors",
+        enabled ? "border-primary/50 bg-primary/10" : "border-border bg-background",
+      )}
+    >
+      <div>
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        onClick={onToggle}
+        className={cn(
+          "mt-3 min-h-11 w-full rounded-full border px-3 text-xs font-semibold uppercase transition",
+          enabled
+            ? "border-primary/50 bg-primary/15 text-primary"
+            : "border-border text-muted-foreground",
+        )}
+      >
+        {enabled ? "On" : "Off"}
+      </button>
+    </div>
+  );
+}
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (

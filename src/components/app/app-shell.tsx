@@ -157,13 +157,14 @@ const LAYER1_MOBILE_NAV: NavItem[] = [
   { to: "/settings", label: "More", icon: Menu },
 ];
 
-const WEDDING_ALLOWED_PATHS = ["/home", "/wedding-content"];
+const WEDDING_ALLOWED_PATHS = ["/home", "/wedding-content", "/settings"];
 
 const WEDDING_NAV: NavItem[] = [
   { to: "/home", label: "Wedding Overview", icon: Heart },
   { to: "/wedding-content", label: "Deliveries", icon: Images },
   { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
   { to: "/home", hash: "wedding-invoices", label: "Payments", icon: FileText },
+  { to: "/settings", label: "Records & Settings", icon: Settings },
   { to: "/home", hash: "wedding-contact", label: "Contact Dream Wave", icon: MessageSquare },
 ];
 
@@ -172,7 +173,7 @@ const WEDDING_MOBILE_NAV: NavItem[] = [
   { to: "/wedding-content", label: "Deliveries", icon: Images },
   { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
   { to: "/home", hash: "wedding-invoices", label: "Payments", icon: FileText },
-  { to: "/home", hash: "wedding-contact", label: "More", icon: Menu },
+  { to: "/settings", label: "More", icon: Menu },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -271,6 +272,9 @@ function Shell({ children }: { children: ReactNode }) {
             : filterByFeature(MOBILE_NAV);
   const mobilePrimaryNav = mobileNav.filter((item) => item.label !== "More").slice(0, 4);
   const nav = [...clientNav, ...staffNav];
+  // Phone navigation is intentionally task-focused. Template and catalog
+  // maintenance remain available on the full desktop workspace.
+  const mobileDrawerNav = nav.filter((item) => item.to !== "/templates" && item.to !== "/catalog");
 
   return (
     <div
@@ -337,7 +341,7 @@ function Shell({ children }: { children: ReactNode }) {
               className="mt-2 min-h-0 flex-1 overflow-y-auto"
               onClick={() => setMobileOpen(false)}
             >
-              <NavGroup items={nav} className="mt-2" />
+              <NavGroup items={mobileDrawerNav} className="mt-2" />
             </div>
             <UserFooter />
           </div>
@@ -356,9 +360,10 @@ function Shell({ children }: { children: ReactNode }) {
             useWideCanvas ? "max-w-none lg:px-8 xl:px-10" : "max-w-7xl lg:px-10",
           )}
         >
-          {user && activeWorkspace && !permsLoading && (
+          {user && activeWorkspace && !permsLoading && !isStaff && (
             <WorkspaceTour
               key={`${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
+              userId={user.userId}
               storageKey={`waveos.tour.v1:${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
               audience={isStaff ? "your team" : isWeddingClient ? "your wedding" : "your projects"}
               destinations={[

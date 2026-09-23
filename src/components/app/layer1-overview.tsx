@@ -343,6 +343,13 @@ export function Layer1Overview() {
     return items[0] ?? null;
   }, [deliveriesQ.data]);
 
+  const activeContracts = (contractsQ.data ?? []).filter((contract) =>
+    ["sent", "viewed"].includes(contract.status),
+  );
+  const activeInvoices = (invoicesQ.data ?? []).filter(
+    (invoice) => invoice.status !== "paid" && invoice.status !== "void",
+  );
+
   const projectName = brandQ.data?.business_name?.trim() || activeWorkspace?.name || "Your project";
 
   const statusLabel = wsMetaQ.data?.account_status
@@ -383,8 +390,8 @@ export function Layer1Overview() {
 
       <nav aria-label="Your workspace tools" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
-          { id: "invoices", label: "Invoices", count: invoicesQ.data?.length },
-          { id: "contracts", label: "Contracts", count: contractsQ.data?.length },
+          { id: "invoices", label: "Invoices", count: activeInvoices.length },
+          { id: "contracts", label: "Contracts", count: activeContracts.length },
         ].map((item) => (
           <a
             key={item.id}
@@ -505,9 +512,9 @@ export function Layer1Overview() {
       >
         <div className="flex flex-wrap items-end justify-between gap-2">
           <h2 className="text-lg font-semibold text-foreground">Contracts & Agreements</h2>
-          {(contractsQ.data?.length ?? 0) > 1 && (
+          {activeContracts.length > 1 && (
             <span className="text-xs text-muted-foreground">
-              {contractsQ.data!.length} contracts
+              {activeContracts.length} contracts
             </span>
           )}
         </div>
@@ -517,14 +524,17 @@ export function Layer1Overview() {
           <div className="surface-card p-5 text-sm text-destructive">
             Contracts could not be loaded. Refresh the page to try again.
           </div>
-        ) : (contractsQ.data ?? []).length > 0 ? (
+        ) : activeContracts.length > 0 ? (
           <div className="space-y-3">
-            {contractsQ.data?.map((contract) => (
+            {activeContracts.map((contract) => (
               <ContractCard key={contract.id} contract={contract} />
             ))}
           </div>
         ) : (
-          <PolishedEmpty icon={FileText} body="You currently have no contracts requiring action." />
+          <PolishedEmpty
+            icon={FileText}
+            body="No contracts need your attention. Completed agreements are saved in Settings."
+          />
         )}
       </ExpandableSection>
 
@@ -535,9 +545,9 @@ export function Layer1Overview() {
         className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4"
       >
         <div className="flex flex-wrap items-end justify-between gap-2">
-          {(invoicesQ.data?.length ?? 0) > 1 && (
+          {activeInvoices.length > 1 && (
             <span className="text-xs text-muted-foreground">
-              {invoicesQ.data!.length} invoices · newest first
+              {activeInvoices.length} open invoices · newest first
             </span>
           )}
         </div>
@@ -547,9 +557,9 @@ export function Layer1Overview() {
           <div className="surface-card p-5 text-sm text-destructive">
             Invoices could not be loaded. Refresh the page to try again.
           </div>
-        ) : (invoicesQ.data ?? []).length > 0 ? (
+        ) : activeInvoices.length > 0 ? (
           <div className="space-y-3">
-            {invoicesQ.data!.map((invoice) => (
+            {activeInvoices.map((invoice) => (
               <InvoiceCard
                 key={invoice.id}
                 invoice={invoice}
@@ -561,14 +571,15 @@ export function Layer1Overview() {
                       : schedule.source_invoice_id === invoice.id,
                   ) ?? null
                 }
-                payments={(paymentsQ.data ?? []).filter(
-                  (entry) => entry.invoice_id === invoice.id,
-                )}
+                payments={(paymentsQ.data ?? []).filter((entry) => entry.invoice_id === invoice.id)}
               />
             ))}
           </div>
         ) : (
-          <PolishedEmpty icon={FileText} body="You currently have no invoices requiring action." />
+          <PolishedEmpty
+            icon={FileText}
+            body="No payments need your attention. Paid invoices and receipts are saved in Settings."
+          />
         )}
       </ExpandableSection>
 
@@ -1143,20 +1154,14 @@ export function InvoiceCard({
           (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0) > 0 && (
             <PayInvoiceButton
               invoiceId={invoice.id}
-              label={nextInvoicePaymentLabel({
+              scheduledLabel={nextInvoicePaymentLabel({
                 amountCents: invoice.amount_cents,
                 amountPaidCents: invoice.amount_paid_cents,
                 paymentPlan: invoice.payment_plan,
                 checkoutPaymentType: invoice.checkout_payment_type,
                 checkoutPaymentCents: invoice.checkout_payment_cents,
               })}
-              minimumCents={nextInvoicePaymentCents({
-                amountCents: invoice.amount_cents,
-                amountPaidCents: invoice.amount_paid_cents,
-                paymentPlan: invoice.payment_plan,
-                checkoutPaymentType: invoice.checkout_payment_type,
-                checkoutPaymentCents: invoice.checkout_payment_cents,
-              })}
+              scheduledCents={nextPaymentCents}
               remainingCents={Math.max(
                 0,
                 (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0),
