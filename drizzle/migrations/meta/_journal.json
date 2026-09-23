@@ -71,6 +71,13 @@
       "when": 1790085715524,
       "tag": "0009_payment_ledger_client_and_staff_read",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790185163339,
+      "tag": "0010_autopay_allow_partial_scheduled_charge",
+      "breakpoints": true
     }
   ]
 }
