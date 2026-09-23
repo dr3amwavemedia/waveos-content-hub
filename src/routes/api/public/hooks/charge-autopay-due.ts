@@ -108,7 +108,7 @@ export const Route = createFileRoute("/api/public/hooks/charge-autopay-due")({
               (target.data.amount_cents ?? 0) - (target.data.amount_paid_cents ?? 0),
             );
             if (
-              remaining !== schedule.amount_cents ||
+              schedule.amount_cents > remaining ||
               target.data.currency.toUpperCase() !== schedule.currency.toUpperCase()
             ) {
               throw new Error("invoice_balance_changed");
