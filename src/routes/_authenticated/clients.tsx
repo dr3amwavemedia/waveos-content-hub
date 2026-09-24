@@ -3356,7 +3356,7 @@ function InvoiceForm({
             offer the client more flexibility.
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex min-h-24 flex-col justify-between rounded-xl border border-emerald-400/30 bg-emerald-500/5 p-3">
             <div>
               <p className="text-sm font-semibold text-foreground">Pay in full</p>
@@ -3392,6 +3392,16 @@ function InvoiceForm({
                   ? checkoutPaymentAmount || (Number(effectiveAmount || 0) / 2).toFixed(2)
                   : "",
               );
+            }}
+          />
+          <PaymentOptionSwitch
+            label="Monthly retainer"
+            description="Bill a set amount for a specific month."
+            enabled={paymentPlan === "monthly_retainer"}
+            onToggle={() => {
+              const enabled = paymentPlan !== "monthly_retainer";
+              setPaymentPlan(enabled ? "monthly_retainer" : "one_time");
+              if (enabled) setCheckoutPaymentAmount("");
             }}
           />
         </div>
