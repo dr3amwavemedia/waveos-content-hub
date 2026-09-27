@@ -111,7 +111,9 @@ export function featureVisibility(
   feature: FeatureKey,
 ): "enabled" | "preview" | "hidden" {
   if (hasFeature(access, feature)) return "enabled";
-  // Layer 2 (growth_90) sees premium modules as previews to demonstrate value.
+  // Social tools are never previewed to clients without access (owner decision).
+  if (SOCIAL_FEATURES.has(feature)) return "hidden";
+  // Layer 2 (growth_90) sees other premium modules as previews to demonstrate value.
   if (access.tier === "growth_90") return "preview";
   return "hidden";
 }
