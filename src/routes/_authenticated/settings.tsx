@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
+  AlertCircle,
   CheckCircle2,
   BookOpen,
   Cloud,
@@ -209,20 +210,20 @@ function SettingsPage() {
         <section className="surface-card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div className="flex items-start gap-4">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
-            <BookOpen className="h-5 w-5" />
+              <BookOpen className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Workspace guide</h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                Reopen the introduction to your available pages and tools.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-semibold text-foreground">Workspace guide</h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Reopen the introduction to your available pages and tools.
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={openWorkspaceTour}
-          className="min-h-11 w-full rounded-xl border border-primary/40 bg-primary/10 px-4 text-sm font-semibold text-primary transition hover:bg-primary/15 sm:w-auto"
-        >
+          <button
+            type="button"
+            onClick={openWorkspaceTour}
+            className="min-h-11 w-full rounded-xl border border-primary/40 bg-primary/10 px-4 text-sm font-semibold text-primary transition hover:bg-primary/15 sm:w-auto"
+          >
             Open guide
           </button>
         </section>
@@ -246,10 +247,47 @@ function SettingsPage() {
 
 function FrameioServiceConnectionCard() {
   const qc = useQueryClient();
+  const [callbackMessage, setCallbackMessage] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
   const status = useQuery({
     queryKey: ["frameio-service-status"],
     queryFn: getFrameioServiceStatus,
   });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const error = url.searchParams.get("frameio_error");
+    const connected = url.searchParams.get("frameio_connected") === "true";
+    if (!error && !connected) return;
+
+    if (connected) {
+      setCallbackMessage({
+        tone: "success",
+        text: "Frame.io connected successfully. You can now sync the client Share again.",
+      });
+      void qc.invalidateQueries({ queryKey: ["frameio-service-status"] });
+    } else {
+      const messages: Record<string, string> = {
+        invalid_state:
+          "The Frame.io sign-in expired or was cancelled. Select Connect Frame.io and finish the Adobe sign-in without closing the window.",
+        token_exchange:
+          "Adobe returned to WaveOS, but the authorization could not be completed. Check the Frame.io OAuth client secret and redirect URL in Adobe Developer Console.",
+        profile:
+          "Adobe signed in, but WaveOS could not access the Frame.io V4 profile. Sign in with the same Adobe ID used by your Frame.io V4 account and confirm the Frame.io API is added to the Adobe project.",
+        connection_save:
+          "Adobe authorized Frame.io, but WaveOS could not securely save the connection. The server connection settings need attention.",
+      };
+      setCallbackMessage({
+        tone: "error",
+        text: messages[error ?? ""] ?? "Frame.io could not be connected. Please try again.",
+      });
+    }
+
+    url.searchParams.delete("frameio_error");
+    url.searchParams.delete("frameio_connected");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [qc]);
   const connect = useMutation({
     mutationFn: startFrameioServiceConnection,
     onSuccess: ({ url }) => window.location.assign(url),
@@ -267,60 +305,79 @@ function FrameioServiceConnectionCard() {
   });
   const connected = status.data?.connected === true;
   return (
-    <section className="surface-card flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-start gap-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
-          <Cloud className="h-5 w-5" />
-        </div>
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold text-foreground">Dream Wave Frame.io</h2>
-            {connected && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
-          </div>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            One protected company connection powers the curated Shares assigned to client
-            workspaces.
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {status.isLoading
-              ? "Checking connection…"
-              : connected
-                ? status.data?.email || "Connected"
-                : status.data?.configured === false
-                  ? "Developer credentials needed"
-                  : "Not connected"}
-          </p>
-        </div>
-      </div>
-      {connected ? (
-        <button
-          type="button"
-          onClick={() => disconnect.mutate()}
-          disabled={disconnect.isPending}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
+    <section className="surface-card flex flex-col gap-4 p-6">
+      {callbackMessage && (
+        <div
+          role={callbackMessage.tone === "error" ? "alert" : "status"}
+          className={`flex items-start gap-3 rounded-xl border px-4 py-3 text-sm ${
+            callbackMessage.tone === "error"
+              ? "border-red-500/30 bg-red-500/10 text-red-200"
+              : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+          }`}
         >
-          {disconnect.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+          {callbackMessage.tone === "error" ? (
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           ) : (
-            <Unplug className="h-4 w-4" />
-          )}{" "}
-          Disconnect
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={() => connect.mutate()}
-          disabled={status.isLoading || status.data?.configured === false || connect.isPending}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-        >
-          {connect.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <ExternalLink className="h-4 w-4" />
-          )}{" "}
-          Connect Frame.io
-        </button>
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          )}
+          <span>{callbackMessage.text}</span>
+        </div>
       )}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+            <Cloud className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-semibold text-foreground">Dream Wave Frame.io</h2>
+              {connected && <CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+            </div>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              One protected company connection powers the curated Shares assigned to client
+              workspaces.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {status.isLoading
+                ? "Checking connection…"
+                : connected
+                  ? status.data?.email || "Connected"
+                  : status.data?.configured === false
+                    ? "Developer credentials needed"
+                    : "Not connected"}
+            </p>
+          </div>
+        </div>
+        {connected ? (
+          <button
+            type="button"
+            onClick={() => disconnect.mutate()}
+            disabled={disconnect.isPending}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            {disconnect.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Unplug className="h-4 w-4" />
+            )}{" "}
+            Disconnect
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => connect.mutate()}
+            disabled={status.isLoading || status.data?.configured === false || connect.isPending}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {connect.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <ExternalLink className="h-4 w-4" />
+            )}{" "}
+            Connect Frame.io
+          </button>
+        )}
+      </div>
     </section>
   );
 }
