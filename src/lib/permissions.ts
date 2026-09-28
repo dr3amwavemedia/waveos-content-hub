@@ -106,6 +106,11 @@ export function hasFeature(access: WorkspaceAccess, feature: FeatureKey): boolea
 // A feature can be shown in "preview / locked" mode to a client. Preview is used
 // when the module should visually appear (Layer 2 sees the full product) but the
 // user cannot actually operate it. Fully hidden = never in navigation.
+const SOCIAL_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
+  "can_connect_socials",
+  "can_schedule_content",
+  "can_publish_content",
+]);
 export function featureVisibility(
   access: WorkspaceAccess,
   feature: FeatureKey,
