@@ -26,6 +26,7 @@ import {
   Settings2,
   Sparkles,
   Twitter,
+  Unplug,
   Wrench,
   XCircle,
   Youtube,
@@ -47,6 +48,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   createZernioConnectUrl,
+  disconnectZernioAccount,
   ensureZernioProfile,
   getZernioWorkspaceStatus,
   refreshZernioConnections,
@@ -770,7 +772,8 @@ function AccountsView({
   const ensureProfile = useServerFn(ensureZernioProfile);
   const refreshConnections = useServerFn(refreshZernioConnections);
   const getConnectUrl = useServerFn(createZernioConnectUrl);
-  const [busy, setBusy] = useState<"profile" | "refresh" | SocialPlatform | null>(null);
+  const disconnectAccount = useServerFn(disconnectZernioAccount);
+  const [busy, setBusy] = useState<string | null>(null);
   const status = useQuery({
     queryKey: ["zernio-status", workspaceId],
     queryFn: () => getStatus({ data: { workspaceId } }),
@@ -819,7 +822,7 @@ function AccountsView({
   };
 
   const connect = async (platform: SocialPlatform) => {
-    setBusy(platform);
+    setBusy(`connect:${platform}`);
     try {
       const result = await getConnectUrl({ data: { workspaceId, platform } });
       if (result.alreadyConnected || !result.url) {
@@ -831,6 +834,25 @@ function AccountsView({
       if (!popup) window.location.assign(result.url);
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : "Could not start the connection.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const disconnect = async (platform: SocialPlatform) => {
+    if (
+      !window.confirm(
+        `Disconnect ${PLATFORM_LABEL[platform]} from this workspace? WaveOS will no longer be able to publish to that account until it is connected again.`,
+      )
+    )
+      return;
+    setBusy(`disconnect:${platform}`);
+    try {
+      await disconnectAccount({ data: { workspaceId, platform } });
+      await queryClient.invalidateQueries({ queryKey: ["social-connections", workspaceId] });
+      toast.success(`${PLATFORM_LABEL[platform]} disconnected.`);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Could not disconnect the account.");
     } finally {
       setBusy(null);
     }
@@ -918,8 +940,10 @@ function AccountsView({
               key={account.platform}
               account={account}
               canConnect={Boolean(status.data?.configured && status.data.hasProfile)}
-              busy={busy === account.platform}
+              busy={busy === `connect:${account.platform}`}
+              disconnecting={busy === `disconnect:${account.platform}`}
               onConnect={() => void connect(account.platform)}
+              onDisconnect={() => void disconnect(account.platform)}
             />
           ))}
         </div>
@@ -959,12 +983,16 @@ function AccountCard({
   account,
   canConnect,
   busy,
+  disconnecting,
   onConnect,
+  onDisconnect,
 }: {
   account: AccountRow;
   canConnect: boolean;
   busy: boolean;
+  disconnecting: boolean;
   onConnect: () => void;
+  onDisconnect: () => void;
 }) {
   const Icon = PLATFORM_ICON[account.platform] ?? Globe;
   const state = ACCOUNT_STATE[account.state];
@@ -999,15 +1027,34 @@ function AccountCard({
           </span>
         )}
       </div>
-      <button
-        type="button"
-        onClick={onConnect}
-        disabled={!canConnect || busy}
-        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-background/35 px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/35 disabled:cursor-not-allowed disabled:opacity-45"
-      >
-        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-        {account.state === "connected" ? "Reconnect" : "Connect"} {PLATFORM_LABEL[account.platform]}
-      </button>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          onClick={onConnect}
+          disabled={!canConnect || busy || disconnecting}
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-background/35 px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/35 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+          {account.state === "connected" ? "Reconnect" : "Connect"}{" "}
+          {PLATFORM_LABEL[account.platform]}
+        </button>
+        {account.state === "connected" && (
+          <button
+            type="button"
+            onClick={onDisconnect}
+            disabled={busy || disconnecting}
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-400/25 bg-rose-400/[0.07] px-3 py-2 text-xs font-semibold text-rose-300 hover:border-rose-400/45 disabled:cursor-not-allowed disabled:opacity-45"
+            aria-label={`Disconnect ${PLATFORM_LABEL[account.platform]}`}
+          >
+            {disconnecting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Unplug className="h-3.5 w-3.5" />
+            )}
+            Disconnect
+          </button>
+        )}
+      </div>
     </article>
   );
 }

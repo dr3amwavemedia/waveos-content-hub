@@ -118,6 +118,52 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
     };
   });
 
+export const disconnectZernioAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { workspaceId: string; platform: SocialPlatform }) => data)
+  .handler(async ({ data, context }) => {
+    const { requireSocialWorkspaceAccess, zernioRequest } = await import("./zernio.server");
+    await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const result = await supabaseAdmin
+      .from("social_connections")
+      .select("provider_account_id")
+      .eq("workspace_id", data.workspaceId)
+      .eq("platform", data.platform)
+      .eq("provider", "zernio")
+      .maybeSingle();
+    if (result.error) throw result.error;
+    const connection = result.data as { provider_account_id: string | null } | null;
+    if (!connection?.provider_account_id) throw new Error("This social account is not connected.");
+
+    try {
+      await zernioRequest(`/accounts/${encodeURIComponent(connection.provider_account_id)}`, {
+        method: "DELETE",
+      });
+    } catch (reason) {
+      const error = reason as Error & { status?: number };
+      if (error.status !== 404) throw error;
+    }
+
+    const update = await supabaseAdmin
+      .from("social_connections")
+      .update({
+        connected: false,
+        connection_state: "not_connected",
+        provider_account_id: null,
+        display_name: null,
+        username: null,
+        avatar_url: null,
+        raw: {},
+        last_synced_at: new Date().toISOString(),
+      } as never)
+      .eq("workspace_id", data.workspaceId)
+      .eq("platform", data.platform)
+      .eq("provider", "zernio");
+    if (update.error) throw update.error;
+    return { disconnected: true };
+  });
+
 export const refreshZernioConnections = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { workspaceId: string }) => data)
