@@ -1684,7 +1684,7 @@ function GoogleDrivePicker({
         .setIncludeFolders(true)
         .setSelectFolderEnabled(false)
         .setEnableDrives(false)
-        .setMode(googleApi.picker.DocsViewMode.LIST)
+        .setMode(googleApi.picker.DocsViewMode.GRID)
         .setMimeTypes("image/jpeg,image/png,video/mp4,video/quicktime");
       const picker = new googleApi.picker.PickerBuilder()
         .enableFeature(googleApi.picker.Feature.MULTISELECT_ENABLED)
@@ -1824,7 +1824,7 @@ type GooglePickerGlobal = {
     };
     PickerBuilder: new () => GooglePickerBuilder;
     ViewId: { DOCS: string };
-    DocsViewMode: { LIST: string };
+    DocsViewMode: { GRID: string; LIST: string };
     Feature: { MULTISELECT_ENABLED: string };
     Action: { PICKED: string };
   };
