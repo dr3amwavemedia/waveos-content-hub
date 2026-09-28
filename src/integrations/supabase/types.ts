@@ -1,4 +1,10 @@
-export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
@@ -138,50 +144,6 @@ export type Database = {
           },
         ]
       }
-      zernio_profiles: {
-        Row: {
-          created_at: string
-          id: string
-          last_error: string | null
-          last_synced_at: string | null
-          profile_id: string
-          profile_name: string
-          updated_at: string
-          verified_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          last_error?: string | null
-          last_synced_at?: string | null
-          profile_id: string
-          profile_name: string
-          updated_at?: string
-          verified_at?: string | null
-          workspace_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          last_error?: string | null
-          last_synced_at?: string | null
-          profile_id?: string
-          profile_name?: string
-          updated_at?: string
-          verified_at?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "zernio_profiles_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: true
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       brand_profiles: {
         Row: {
           brand_summary: string | null
@@ -260,6 +222,85 @@ export type Database = {
             foreignKeyName: "brand_profiles_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_categories: {
+        Row: {
+          category_key: string
+          color: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          category_key: string
+          color: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          category_key?: string
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_categories_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_color_preferences: {
+        Row: {
+          category_key: string
+          color: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          category_key: string
+          color: string
+          updated_at?: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          category_key?: string
+          color?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_color_preferences_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -2938,6 +2979,84 @@ export type Database = {
           },
         ]
       }
+      social_strategy_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          details: string | null
+          end_date: string | null
+          id: string
+          item_kind: string
+          links: string[]
+          media_asset_ids: string[]
+          owner_id: string | null
+          platforms: string[]
+          priority: string
+          related_content_item_id: string | null
+          start_date: string
+          status: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          details?: string | null
+          end_date?: string | null
+          id?: string
+          item_kind?: string
+          links?: string[]
+          media_asset_ids?: string[]
+          owner_id?: string | null
+          platforms?: string[]
+          priority?: string
+          related_content_item_id?: string | null
+          start_date: string
+          status?: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          details?: string | null
+          end_date?: string | null
+          id?: string
+          item_kind?: string
+          links?: string[]
+          media_asset_ids?: string[]
+          owner_id?: string | null
+          platforms?: string[]
+          priority?: string
+          related_content_item_id?: string | null
+          start_date?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_strategy_items_related_content_item_id_fkey"
+            columns: ["related_content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_strategy_items_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactional_email_log: {
         Row: {
           created_at: string
@@ -3471,6 +3590,50 @@ export type Database = {
         }
         Relationships: []
       }
+      zernio_profiles: {
+        Row: {
+          created_at: string
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          profile_id: string
+          profile_name: string
+          updated_at: string
+          verified_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          profile_id: string
+          profile_name: string
+          updated_at?: string
+          verified_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          profile_id?: string
+          profile_name?: string
+          updated_at?: string
+          verified_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zernio_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       invites_admin: {
@@ -3489,7 +3652,9 @@ export type Database = {
           staff_type: Database["public"]["Enums"]["staff_type"] | null
           status: Database["public"]["Enums"]["invite_status"] | null
           workspace_id: string | null
-          workspace_role: Database["public"]["Enums"]["workspace_member_role"] | null
+          workspace_role:
+            | Database["public"]["Enums"]["workspace_member_role"]
+            | null
         }
         Insert: {
           accepted_at?: string | null
@@ -3506,7 +3671,9 @@ export type Database = {
           staff_type?: Database["public"]["Enums"]["staff_type"] | null
           status?: Database["public"]["Enums"]["invite_status"] | null
           workspace_id?: string | null
-          workspace_role?: Database["public"]["Enums"]["workspace_member_role"] | null
+          workspace_role?:
+            | Database["public"]["Enums"]["workspace_member_role"]
+            | null
         }
         Update: {
           accepted_at?: string | null
@@ -3523,7 +3690,9 @@ export type Database = {
           staff_type?: Database["public"]["Enums"]["staff_type"] | null
           status?: Database["public"]["Enums"]["invite_status"] | null
           workspace_id?: string | null
-          workspace_role?: Database["public"]["Enums"]["workspace_member_role"] | null
+          workspace_role?:
+            | Database["public"]["Enums"]["workspace_member_role"]
+            | null
         }
         Relationships: [
           {
@@ -4028,7 +4197,12 @@ export type Database = {
       }
     }
     Enums: {
-      account_status: "pending" | "active" | "suspended" | "expired" | "archived"
+      account_status:
+        | "pending"
+        | "active"
+        | "suspended"
+        | "expired"
+        | "archived"
       agreement_term: "one_time" | "90_day" | "6_month" | "12_month"
       app_role:
         | "dream_wave_owner"
@@ -4036,9 +4210,17 @@ export type Database = {
         | "client_owner"
         | "client_approver"
         | "client_viewer"
-      approval_decision: "pending" | "approved" | "changes_requested" | "rejected"
+      approval_decision:
+        | "pending"
+        | "approved"
+        | "changes_requested"
+        | "rejected"
       client_access_tier:
-        "project_client" | "growth_90" | "retainer_full" | "social_management" | "wedding_client"
+        | "project_client"
+        | "growth_90"
+        | "retainer_full"
+        | "social_management"
+        | "wedding_client"
       content_status:
         | "draft"
         | "in_review"
@@ -4062,10 +4244,29 @@ export type Database = {
       crm_priority: "low" | "normal" | "high" | "urgent"
       crm_sync_status: "not_connected" | "pending" | "synced" | "failed"
       crm_task_status: "open" | "in_progress" | "completed" | "cancelled"
-      delivery_kind: "photos" | "videos" | "reels" | "graphics" | "documents" | "link" | "other"
+      delivery_kind:
+        | "photos"
+        | "videos"
+        | "reels"
+        | "graphics"
+        | "documents"
+        | "link"
+        | "other"
       invite_status: "pending" | "accepted" | "expired" | "revoked"
-      invoice_status: "draft" | "sent" | "paid" | "overdue" | "void" | "deposit" | "unpaid"
-      media_publishing_status: "none" | "preparing" | "ready" | "expired" | "failed"
+      invoice_status:
+        | "draft"
+        | "sent"
+        | "paid"
+        | "overdue"
+        | "void"
+        | "deposit"
+        | "unpaid"
+      media_publishing_status:
+        | "none"
+        | "preparing"
+        | "ready"
+        | "expired"
+        | "failed"
       notification_kind:
         | "invite_accepted"
         | "content_submitted"
@@ -4078,7 +4279,13 @@ export type Database = {
         | "account_connected"
         | "account_disconnected"
         | "generic"
-      publish_status: "queued" | "sending" | "success" | "partial" | "failed" | "skipped"
+      publish_status:
+        | "queued"
+        | "sending"
+        | "success"
+        | "partial"
+        | "failed"
+        | "skipped"
       social_platform:
         | "instagram"
         | "facebook"
@@ -4093,7 +4300,12 @@ export type Database = {
         | "snapchat"
       staff_type: "sales" | "media_manager"
       vision_deck_status: "draft" | "ready" | "archived"
-      workspace_member_role: "owner" | "approver" | "viewer" | "admin" | "editor"
+      workspace_member_role:
+        | "owner"
+        | "approver"
+        | "viewer"
+        | "admin"
+        | "editor"
       workspace_status: "onboarding" | "active" | "paused" | "archived"
     }
     CompositeTypes: {
@@ -4125,8 +4337,10 @@ export type Tables<
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] & DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -4135,7 +4349,8 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -4159,7 +4374,8 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema["Tables"] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -4183,7 +4399,8 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    keyof DefaultSchema["Enums"] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -4199,7 +4416,8 @@ export type Enums<
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    keyof DefaultSchema["CompositeTypes"] | { schema: keyof DatabaseWithoutInternals },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
@@ -4225,7 +4443,12 @@ export const Constants = {
         "client_approver",
         "client_viewer",
       ],
-      approval_decision: ["pending", "approved", "changes_requested", "rejected"],
+      approval_decision: [
+        "pending",
+        "approved",
+        "changes_requested",
+        "rejected",
+      ],
       client_access_tier: [
         "project_client",
         "growth_90",
@@ -4258,10 +4481,32 @@ export const Constants = {
       crm_priority: ["low", "normal", "high", "urgent"],
       crm_sync_status: ["not_connected", "pending", "synced", "failed"],
       crm_task_status: ["open", "in_progress", "completed", "cancelled"],
-      delivery_kind: ["photos", "videos", "reels", "graphics", "documents", "link", "other"],
+      delivery_kind: [
+        "photos",
+        "videos",
+        "reels",
+        "graphics",
+        "documents",
+        "link",
+        "other",
+      ],
       invite_status: ["pending", "accepted", "expired", "revoked"],
-      invoice_status: ["draft", "sent", "paid", "overdue", "void", "deposit", "unpaid"],
-      media_publishing_status: ["none", "preparing", "ready", "expired", "failed"],
+      invoice_status: [
+        "draft",
+        "sent",
+        "paid",
+        "overdue",
+        "void",
+        "deposit",
+        "unpaid",
+      ],
+      media_publishing_status: [
+        "none",
+        "preparing",
+        "ready",
+        "expired",
+        "failed",
+      ],
       notification_kind: [
         "invite_accepted",
         "content_submitted",
@@ -4275,7 +4520,14 @@ export const Constants = {
         "account_disconnected",
         "generic",
       ],
-      publish_status: ["queued", "sending", "success", "partial", "failed", "skipped"],
+      publish_status: [
+        "queued",
+        "sending",
+        "success",
+        "partial",
+        "failed",
+        "skipped",
+      ],
       social_platform: [
         "instagram",
         "facebook",
