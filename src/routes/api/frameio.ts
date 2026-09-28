@@ -47,6 +47,7 @@ export const Route = createFileRoute("/api/frameio")({
           redirect_uri: frameioRedirectUri(),
           scope: "offline_access,openid,email,profile,additional_info.roles",
           response_type: "code",
+          prompt: "login",
           state,
         }).toString();
         return json({ url: authorize.toString() });
