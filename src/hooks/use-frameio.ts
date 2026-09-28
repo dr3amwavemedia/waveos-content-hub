@@ -17,7 +17,9 @@ async function frameioRequest<T>(body: Record<string, unknown>, path = "/api/fra
 }
 
 export const getFrameioServiceStatus = () =>
-  frameioRequest<{ configured: boolean; connected: boolean; email: string | null }>({ action: "status" });
+  frameioRequest<{ configured: boolean; connected: boolean; email: string | null }>({
+    action: "status",
+  });
 
 export const startFrameioServiceConnection = () =>
   frameioRequest<{ url: string }>({ action: "connect" });
@@ -32,27 +34,39 @@ export type FrameioProviderFile = {
   sizeBytes: number;
   thumbnailUrl: string | null;
   viewUrl: string | null;
+  width: number | null;
+  height: number | null;
+  durationSeconds: number | null;
 };
 
 export const getFrameioWorkspaceStatus = (workspaceId: string) =>
-  frameioRequest<{ configured: boolean; connected: boolean; label?: string }>({
-    action: "status",
-    workspaceId,
-  }, "/api/frameio/media");
+  frameioRequest<{ configured: boolean; connected: boolean; label?: string }>(
+    {
+      action: "status",
+      workspaceId,
+    },
+    "/api/frameio/media",
+  );
 
 export const syncFrameioWorkspaceShare = (workspaceId: string) =>
   frameioRequest<{ ready: true }>({ action: "sync", workspaceId }, "/api/frameio/media");
 
 export const listFrameioWorkspaceMedia = (workspaceId: string, query: string) =>
-  frameioRequest<{ files: FrameioProviderFile[]; label: string }>({
-    action: "list",
-    workspaceId,
-    query,
-  }, "/api/frameio/media");
+  frameioRequest<{ files: FrameioProviderFile[]; label: string }>(
+    {
+      action: "list",
+      workspaceId,
+      query,
+    },
+    "/api/frameio/media",
+  );
 
 export const importFrameioWorkspaceMedia = (workspaceId: string, fileIds: string[]) =>
-  frameioRequest<{ imported: { id: string; name: string }[] }>({
-    action: "import",
-    workspaceId,
-    fileIds,
-  }, "/api/frameio/media");
+  frameioRequest<{ imported: { id: string; name: string }[] }>(
+    {
+      action: "import",
+      workspaceId,
+      fileIds,
+    },
+    "/api/frameio/media",
+  );

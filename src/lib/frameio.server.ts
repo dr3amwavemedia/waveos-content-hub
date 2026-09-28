@@ -1,7 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/integrations/supabase/types";
-import { decryptExternalToken, encryptExternalToken, externalMediaEnv } from "@/lib/external-media.server";
+import {
+  decryptExternalToken,
+  encryptExternalToken,
+  externalMediaEnv,
+} from "@/lib/external-media.server";
 
 export const frameioEnv = (name: "FRAMEIO_CLIENT_ID" | "FRAMEIO_CLIENT_SECRET") =>
   externalMediaEnv(name);
@@ -27,10 +31,7 @@ export async function requireDreamWaveOwner(request: Request) {
   });
   const { data: auth } = await db.auth.getUser(token);
   if (!auth.user) return null;
-  const { data: roles } = await db
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", auth.user.id);
+  const { data: roles } = await db.from("user_roles").select("role").eq("user_id", auth.user.id);
   if (!(roles ?? []).some((row) => row.role === "dream_wave_owner")) return null;
   return { user: auth.user, token };
 }
@@ -149,6 +150,9 @@ export type FrameioFile = {
   sizeBytes: number;
   thumbnailUrl: string | null;
   viewUrl: string | null;
+  width: number | null;
+  height: number | null;
+  durationSeconds: number | null;
 };
 
 export async function listFrameioShareFiles(accountId: string, shareId: string) {
@@ -158,20 +162,46 @@ export async function listFrameioShareFiles(accountId: string, shareId: string) 
   );
   return (result.data ?? [])
     .map((entry): FrameioFile | null => {
-      const links = (entry.media_links ?? {}) as Record<string, Record<string, unknown> | undefined>;
+      const links = (entry.media_links ?? {}) as Record<
+        string,
+        Record<string, unknown> | undefined
+      >;
       const mediaType = String(entry.media_type ?? "application/octet-stream");
-      if (!/^(image|video)\//.test(mediaType) || entry.type !== "file") return null;
+      if (
+        !["image/jpeg", "image/png", "video/mp4", "video/quicktime"].includes(
+          mediaType.toLowerCase(),
+        ) ||
+        entry.type !== "file"
+      )
+        return null;
+      const metadata =
+        entry.metadata && typeof entry.metadata === "object"
+          ? (entry.metadata as Record<string, unknown>)
+          : {};
       return {
         id: String(entry.id ?? ""),
         name: String(entry.name ?? "Untitled"),
         mediaType,
         sizeBytes: Number(entry.file_size ?? 0),
-        thumbnailUrl:
-          typeof links.thumbnail?.url === "string" ? links.thumbnail.url : null,
+        thumbnailUrl: typeof links.thumbnail?.url === "string" ? links.thumbnail.url : null,
         viewUrl: typeof entry.view_url === "string" ? entry.view_url : null,
+        width: positiveFrameioNumber(entry.width ?? metadata.width),
+        height: positiveFrameioNumber(entry.height ?? metadata.height),
+        durationSeconds: frameioDurationSeconds(entry.duration ?? metadata.duration),
       };
     })
     .filter((file): file is FrameioFile => Boolean(file?.id));
+}
+
+function positiveFrameioNumber(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function frameioDurationSeconds(value: unknown) {
+  const duration = positiveFrameioNumber(value);
+  if (duration === null) return null;
+  return duration > 10_000 ? duration / 1000 : duration;
 }
 
 export async function frameioFileOriginalUrl(accountId: string, fileId: string) {

@@ -10,6 +10,18 @@ export type ExternalProviderFile = {
   thumbnailUrl: string | null;
   webUrl: string | null;
   parentId: string | null;
+  path: string | null;
+  modifiedAt: string | null;
+  width: number | null;
+  height: number | null;
+  durationSeconds: number | null;
+};
+
+export type ExternalProviderFolder = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  path: string | null;
 };
 
 async function providerRequest<T>(
@@ -53,12 +65,18 @@ export function listExternalMedia(
   provider: ExternalMediaProvider,
   workspaceId: string,
   query: string,
+  folderId?: string | null,
 ) {
-  return providerRequest<{ files: ExternalProviderFile[] }>(provider, "/files", {
-    action: "list",
-    workspaceId,
-    query,
-  });
+  return providerRequest<{ files: ExternalProviderFile[]; folders: ExternalProviderFolder[] }>(
+    provider,
+    "/files",
+    {
+      action: "list",
+      workspaceId,
+      query,
+      folderId: folderId ?? null,
+    },
+  );
 }
 
 export function getGooglePickerToken(workspaceId: string) {

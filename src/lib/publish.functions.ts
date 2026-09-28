@@ -1,266 +1,35 @@
 import { createServerFn } from "@tanstack/react-start";
+
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { parseAyrsharePostResponse } from "@/lib/ayrshare-response";
 
 export const refreshPublishAttemptDetails = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { attemptId: string }) => d)
+  .validator((data: { attemptId: string }) => data)
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
-    const apiKey = process.env.AYRSHARE_API_KEY;
-    if (!apiKey) throw new Error("Ayrshare not configured");
-
-    const { data: attempt, error } = await supabase
+    const { data: attempt, error } = await context.supabase
       .from("publish_attempts")
-      .select("id,workspace_id,content_item_id,platform,ayrshare_post_id")
+      .select("id")
       .eq("id", data.attemptId)
       .maybeSingle();
     if (error) throw error;
     if (!attempt) throw new Error("Publishing attempt not found.");
-    if (!attempt.ayrshare_post_id) {
-      throw new Error("Ayrshare did not return a reference ID for this attempt. Retry the post to create a traceable attempt.");
-    }
-
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: profile } = await supabaseAdmin
-      .from("ayrshare_profiles")
-      .select("profile_key")
-      .eq("workspace_id", attempt.workspace_id)
-      .maybeSingle();
-    if (!profile) throw new Error("Ayrshare profile missing for this workspace.");
-
-    const response = await fetch(
-      `https://api.ayrshare.com/api/history/${encodeURIComponent(attempt.ayrshare_post_id)}`,
-      {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Profile-Key": profile.profile_key,
-        },
-      },
-    );
-    const text = await response.text();
-    let json: Record<string, unknown> = {};
-    try {
-      json = JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      json = { message: text || `Ayrshare history returned HTTP ${response.status}.` };
-    }
-    const result = parseAyrsharePostResponse(json, attempt.platform, response.status);
-    const historyStatus = String(json.status ?? "").toLowerCase();
-    const nextAttemptStatus = result.accepted
-      ? result.pending || historyStatus === "pending"
-        ? "sending"
-        : "success"
-      : "failed";
-
-    const { error: updateError } = await supabaseAdmin
-      .from("publish_attempts")
-      .update({
-        status: nextAttemptStatus,
-        response_snapshot: json as never,
-        error_code: nextAttemptStatus === "failed" ? result.errorCode : null,
-        error_message: nextAttemptStatus === "failed" ? result.errorMessage : null,
-        post_url: result.postUrl,
-        completed_at: nextAttemptStatus === "sending" ? null : new Date().toISOString(),
-      })
-      .eq("id", attempt.id);
-    if (updateError) throw updateError;
-
-    const { data: allAttempts } = await supabaseAdmin
-      .from("publish_attempts")
-      .select("status")
-      .eq("content_item_id", attempt.content_item_id);
-    const statuses = (allAttempts ?? []).map((entry) => entry.status);
-    const itemStatus = statuses.some((status) => status === "failed")
-      ? "failed"
-      : statuses.some((status) => status === "sending")
-        ? "publishing"
-        : statuses.length > 0 && statuses.every((status) => status === "success")
-          ? "published"
-          : undefined;
-    if (itemStatus) {
-      await supabaseAdmin.from("content_items").update({ status: itemStatus }).eq("id", attempt.content_item_id);
-    }
-
-    return {
-      status: nextAttemptStatus,
-      errorCode: result.errorCode,
-      errorMessage: result.errorMessage,
-      postUrl: result.postUrl,
-      providerReference: attempt.ayrshare_post_id,
-    };
+    const { refreshZernioPublishAttempt } = await import("./zernio-publish.server");
+    return refreshZernioPublishAttempt(data.attemptId);
   });
 
-/**
- * Attempt to publish a content_item to all its enabled platforms via Ayrshare.
- * Records a publish_attempt per platform with idempotency key = content_id:platform.
- * Marks item as `publishing` while attempting; success/partial/failed after.
- */
 export const publishContentItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((d: { contentId: string }) => d)
+  .validator((data: { contentId: string }) => data)
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const apiKey = process.env.AYRSHARE_API_KEY;
-    if (!apiKey) throw new Error("Ayrshare not configured");
-
-    const { data: item, error } = await supabase
+    const { data: item, error } = await context.supabase
       .from("content_items")
-      .select("*")
+      .select("id,workspace_id")
       .eq("id", data.contentId)
       .maybeSingle();
     if (error) throw error;
-    if (!item) throw new Error("not_found");
-    if (item.status !== "approved" && item.status !== "scheduled") {
-      throw new Error("Item must be approved before publishing.");
-    }
-
-    const { data: variants, error: ve } = await supabase
-      .from("post_variants")
-      .select("*")
-      .eq("content_item_id", data.contentId)
-      .eq("enabled", true);
-    if (ve) throw ve;
-    if (!variants?.length) throw new Error("No platforms selected");
-
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: prof } = await supabaseAdmin
-      .from("ayrshare_profiles")
-      .select("profile_key")
-      .eq("workspace_id", item.workspace_id)
-      .maybeSingle();
-    if (!prof) throw new Error("Ayrshare profile missing for this workspace.");
-
-    // Long-lived signed URLs for media
-    let mediaUrls: string[] = [];
-    let isVideo = false;
-    if (item.media_asset_ids?.length) {
-      const { data: assets } = await supabaseAdmin
-        .from("media_assets")
-        .select("id,workspace_id,name,storage_path,mime_type,size_bytes,source_provider,external_file_id,source_web_url")
-        .in("id", item.media_asset_ids);
-      isVideo = assets?.length === 1 && assets[0]?.mime_type?.startsWith("video/") === true;
-      const { resolveMediaAssetUrl } = await import("@/lib/external-media.server");
-      mediaUrls = await Promise.all((assets ?? []).map((asset) => resolveMediaAssetUrl(asset)));
-    }
-
-    await supabase.from("content_items").update({ status: "publishing" }).eq("id", data.contentId);
-
-    let successCount = 0;
-    let failCount = 0;
-    let pendingCount = 0;
-
-    for (const v of variants) {
-      const idempotencyKey = `${data.contentId}:${v.platform}`;
-      // Skip if already succeeded
-      const { data: existing } = await supabaseAdmin
-        .from("publish_attempts")
-        .select("id,status")
-        .eq("idempotency_key", idempotencyKey)
-        .eq("platform", v.platform)
-        .maybeSingle();
-      if (existing?.status === "success") {
-        successCount++;
-        continue;
-      }
-
-      const body = {
-        post: v.caption || item.primary_caption || "",
-        platforms: [v.platform],
-        mediaUrls,
-        ...(isVideo ? { isVideo: true } : {}),
-      };
-
-      const { data: attempt } = await supabaseAdmin
-        .from("publish_attempts")
-        .upsert(
-          {
-            content_item_id: data.contentId,
-            workspace_id: item.workspace_id,
-            platform: v.platform,
-            status: "sending",
-            idempotency_key: idempotencyKey,
-            request_snapshot: body as never,
-            attempted_at: new Date().toISOString(),
-          },
-          { onConflict: "idempotency_key,platform" },
-        )
-        .select("id")
-        .single();
-
-      try {
-        const res = await fetch("https://api.ayrshare.com/api/post", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "Profile-Key": prof.profile_key,
-          },
-          body: JSON.stringify(body),
-        });
-        const json = (await res.json()) as Record<string, unknown>;
-        const result = parseAyrsharePostResponse(json, v.platform, res.status);
-        if (!result.accepted) {
-          await supabaseAdmin
-            .from("publish_attempts")
-            .update({
-              status: "failed",
-              ayrshare_post_id: result.ayrshareId,
-              error_code: result.errorCode,
-              error_message: result.errorMessage,
-              response_snapshot: json as never,
-              completed_at: new Date().toISOString(),
-            })
-            .eq("id", attempt!.id);
-          failCount++;
-          continue;
-        }
-
-        await supabaseAdmin
-          .from("publish_attempts")
-          .update({
-            status: result.pending ? "sending" : "success",
-            ayrshare_post_id: result.ayrshareId,
-            post_url: result.postUrl,
-            response_snapshot: json as never,
-            completed_at: result.pending ? null : new Date().toISOString(),
-          })
-          .eq("id", attempt!.id);
-        if (result.pending) pendingCount++;
-        else successCount++;
-      } catch (e) {
-        await supabaseAdmin
-          .from("publish_attempts")
-          .update({
-            status: "failed",
-            error_message: (e as Error).message,
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", attempt!.id);
-        failCount++;
-      }
-    }
-
-    // A partial result must remain recoverable. Successful attempts are kept
-    // and skipped by idempotency on retry; failed networks can be retried.
-    const nextStatus = failCount > 0 ? "failed" : pendingCount > 0 ? "publishing" : "published";
-
-    await supabase
-      .from("content_items")
-      .update({
-        status: nextStatus,
-        published_at: successCount > 0 ? new Date().toISOString() : null,
-      })
-      .eq("id", data.contentId);
-
-    await supabaseAdmin.from("activity_logs").insert({
-      workspace_id: item.workspace_id,
-      actor_user_id: userId,
-      action: "content_published",
-      entity_type: "content_item",
-      entity_id: data.contentId,
-      safe_metadata: { success: successCount, failed: failCount } as never,
-    });
-
-    return { success: successCount, failed: failCount, pending: pendingCount };
+    if (!item) throw new Error("Post not found.");
+    const { requireSocialWorkspaceAccess } = await import("./zernio.server");
+    await requireSocialWorkspaceAccess(context.supabase, context.userId, item.workspace_id);
+    const { publishContentItemWithZernio } = await import("./zernio-publish.server");
+    return publishContentItemWithZernio(data.contentId, context.userId);
   });

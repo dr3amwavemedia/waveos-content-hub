@@ -177,7 +177,11 @@ function AdminPage() {
       setEmail("");
       setInviteLink(link);
       qc.invalidateQueries({ queryKey: ["admin", "staff-invites"] });
-      toast.success(delivery.sent ? "Staff invitation emailed." : "Staff invitation created. Copy the link to send it manually.");
+      toast.success(
+        delivery.sent
+          ? "Staff invitation emailed."
+          : "Staff invitation created. Copy the link to send it manually.",
+      );
     },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Could not create staff invitation."),
@@ -199,7 +203,11 @@ function AdminPage() {
     onSuccess: ({ link, delivery }) => {
       setInviteLink(link);
       qc.invalidateQueries({ queryKey: ["admin", "staff-invites"] });
-      toast.success(delivery.sent ? "Staff invitation refreshed and emailed." : "Staff invitation refreshed. Copy the link to send it manually.");
+      toast.success(
+        delivery.sent
+          ? "Staff invitation refreshed and emailed."
+          : "Staff invitation refreshed. Copy the link to send it manually.",
+      );
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not resend."),
   });
@@ -410,18 +418,30 @@ function AdminPage() {
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading sign-ins…
           </div>
         ) : loginActivityQ.isError ? (
-          <div className="px-5 py-5 text-sm text-muted-foreground">Login activity could not be loaded.</div>
+          <div className="px-5 py-5 text-sm text-muted-foreground">
+            Login activity could not be loaded.
+          </div>
         ) : !(loginActivityQ.data ?? []).length ? (
-          <div className="px-5 py-5 text-sm text-muted-foreground">No new login sessions recorded yet.</div>
+          <div className="px-5 py-5 text-sm text-muted-foreground">
+            No new login sessions recorded yet.
+          </div>
         ) : (
           <ul className="max-h-[24rem] divide-y divide-border/60 overflow-y-auto">
             {loginActivityQ.data!.map((entry) => (
-              <li key={entry.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5">
+              <li
+                key={entry.id}
+                className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-5"
+              >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-foreground">{entry.user_email}</p>
-                  <p className="text-xs capitalize text-muted-foreground">{entry.device_category} sign-in</p>
+                  <p className="text-xs capitalize text-muted-foreground">
+                    {entry.device_category} sign-in
+                  </p>
                 </div>
-                <time className="shrink-0 text-xs text-muted-foreground" dateTime={entry.occurred_at}>
+                <time
+                  className="shrink-0 text-xs text-muted-foreground"
+                  dateTime={entry.occurred_at}
+                >
                   {new Date(entry.occurred_at).toLocaleString()}
                 </time>
               </li>
@@ -615,7 +635,7 @@ function AdminPage() {
                         <option value="admin">Admin</option>
                         <option value="sales">Sales</option>
                         <option value="media_manager">Social Manager</option>
-            <option value="crew">Crew — Production only</option>
+                        <option value="crew">Crew — Production only</option>
                       </select>
                       {s.email && (
                         <button
@@ -691,6 +711,8 @@ function AdminPage() {
           </div>
         ) : (
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <StatusRow label="Zernio API key" ok={!!statusQ.data?.zernio.api_key} />
+            <StatusRow label="Zernio webhook secret" ok={!!statusQ.data?.zernio.webhook_secret} />
             <StatusRow label="Ayrshare API key" ok={!!statusQ.data?.ayrshare.api_key} />
             <StatusRow label="Ayrshare white-label domain" ok={!!statusQ.data?.ayrshare.domain} />
             <StatusRow

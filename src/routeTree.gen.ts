@@ -75,6 +75,7 @@ import { Route as ApiPublicHooksChargeAutopayDueRouteImport } from './routes/api
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 import { Route as ApiPublicHooksSignwellRouteImport } from './routes/api/public/hooks/signwell'
 import { Route as ApiPublicHooksStripeRouteImport } from './routes/api/public/hooks/stripe'
+import { Route as ApiPublicHooksZernioRouteImport } from './routes/api/public/hooks/zernio'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -421,6 +422,11 @@ const ApiPublicHooksStripeRoute = ApiPublicHooksStripeRouteImport.update({
   path: '/api/public/hooks/stripe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksZernioRoute = ApiPublicHooksZernioRouteImport.update({
+  id: '/api/public/hooks/zernio',
+  path: '/api/public/hooks/zernio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -488,6 +494,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
+  '/api/public/hooks/zernio': typeof ApiPublicHooksZernioRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -555,6 +562,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
+  '/api/public/hooks/zernio': typeof ApiPublicHooksZernioRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -624,6 +632,7 @@ export interface FileRoutesById {
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
+  '/api/public/hooks/zernio': typeof ApiPublicHooksZernioRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -693,6 +702,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/signwell'
     | '/api/public/hooks/stripe'
+    | '/api/public/hooks/zernio'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -760,6 +770,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/signwell'
     | '/api/public/hooks/stripe'
+    | '/api/public/hooks/zernio'
   id:
     | '__root__'
     | '/'
@@ -828,6 +839,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/signwell'
     | '/api/public/hooks/stripe'
+    | '/api/public/hooks/zernio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -861,6 +873,7 @@ export interface RootRouteChildren {
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
   ApiPublicHooksSignwellRoute: typeof ApiPublicHooksSignwellRoute
   ApiPublicHooksStripeRoute: typeof ApiPublicHooksStripeRoute
+  ApiPublicHooksZernioRoute: typeof ApiPublicHooksZernioRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1327,6 +1340,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksStripeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/zernio': {
+      id: '/api/public/hooks/zernio'
+      path: '/api/public/hooks/zernio'
+      fullPath: '/api/public/hooks/zernio'
+      preLoaderRoute: typeof ApiPublicHooksZernioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1478,6 +1498,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
   ApiPublicHooksSignwellRoute: ApiPublicHooksSignwellRoute,
   ApiPublicHooksStripeRoute: ApiPublicHooksStripeRoute,
+  ApiPublicHooksZernioRoute: ApiPublicHooksZernioRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

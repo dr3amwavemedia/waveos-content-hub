@@ -30,10 +30,15 @@ export const Route = createFileRoute("/api/frameio/media")({
         if (!source) return json({ configured: true, connected: false, files: [] });
 
         if (body.action === "status")
-          return json({ configured: true, connected: source.sync_status === "ready", label: source.label });
+          return json({
+            configured: true,
+            connected: source.sync_status === "ready",
+            label: source.label,
+          });
 
         if (body.action === "sync") {
-          const { requireDreamWaveOwner, resolveFrameioShare } = await import("@/lib/frameio.server");
+          const { requireDreamWaveOwner, resolveFrameioShare } =
+            await import("@/lib/frameio.server");
           const owner = await requireDreamWaveOwner(request);
           if (!owner) return json({ error: "owner_required" }, 403);
           try {
@@ -68,12 +73,19 @@ export const Route = createFileRoute("/api/frameio/media")({
           }
         }
 
-        if (!source.frameio_account_id || !source.frameio_share_id || source.sync_status !== "ready")
+        if (
+          !source.frameio_account_id ||
+          !source.frameio_share_id ||
+          source.sync_status !== "ready"
+        )
           return json({ error: "frameio_share_not_ready" }, 409);
         const { listFrameioShareFiles } = await import("@/lib/frameio.server");
         let allFiles;
         try {
-          allFiles = await listFrameioShareFiles(source.frameio_account_id, source.frameio_share_id);
+          allFiles = await listFrameioShareFiles(
+            source.frameio_account_id,
+            source.frameio_share_id,
+          );
         } catch (error) {
           const code = error instanceof Error ? error.message : "frameio_request_failed";
           if (code === "frameio_reconnect_required" || code === "frameio_not_connected") {
@@ -82,21 +94,29 @@ export const Route = createFileRoute("/api/frameio/media")({
               .update({ sync_status: "error", sync_error: code } as never)
               .eq("workspace_id", workspaceId);
             return json(
-              { error: "Frame.io needs to be reconnected. Ask a Dream Wave owner to reconnect Frame.io in Settings." },
+              {
+                error:
+                  "Frame.io needs to be reconnected. Ask a Dream Wave owner to reconnect Frame.io in Settings.",
+              },
               409,
             );
           }
           return json({ error: "Frame.io could not be reached. Try again in a moment." }, 502);
         }
         const query = typeof body.query === "string" ? body.query.trim().toLowerCase() : "";
-        const files = query ? allFiles.filter((file) => file.name.toLowerCase().includes(query)) : allFiles;
+        const files = query
+          ? allFiles.filter((file) => file.name.toLowerCase().includes(query))
+          : allFiles;
 
         if (body.action === "list") return json({ files, label: source.label });
         if (body.action !== "import") return json({ error: "invalid_action" }, 400);
-        const ids = Array.isArray(body.fileIds) ? body.fileIds.filter((id): id is string => typeof id === "string") : [];
+        const ids = Array.isArray(body.fileIds)
+          ? body.fileIds.filter((id): id is string => typeof id === "string")
+          : [];
         if (!ids.length || ids.length > 20) return json({ error: "invalid_files" }, 400);
         const selected = files.filter((file) => ids.includes(file.id));
-        if (selected.length !== new Set(ids).size) return json({ error: "file_not_in_assigned_share" }, 403);
+        if (selected.length !== new Set(ids).size)
+          return json({ error: "file_not_in_assigned_share" }, 403);
         const imported: Array<{ id: string; name: string }> = [];
         for (const file of selected) {
           const row = {
@@ -112,7 +132,13 @@ export const Route = createFileRoute("/api/frameio/media")({
             external_parent_id: source.frameio_share_id,
             source_web_url: file.viewUrl,
             thumbnail_url: file.thumbnailUrl,
-            source_metadata: { frameio_account_id: source.frameio_account_id, imported_at: new Date().toISOString() },
+            width: file.width,
+            height: file.height,
+            duration_seconds: file.durationSeconds,
+            source_metadata: {
+              frameio_account_id: source.frameio_account_id,
+              imported_at: new Date().toISOString(),
+            },
           };
           const existing = await supabaseAdmin
             .from("media_assets")
@@ -122,8 +148,17 @@ export const Route = createFileRoute("/api/frameio/media")({
             .eq("external_file_id", file.id)
             .maybeSingle();
           const saved = existing.data?.id
-            ? await supabaseAdmin.from("media_assets").update(row as never).eq("id", existing.data.id).select("id,name").single()
-            : await supabaseAdmin.from("media_assets").insert(row as never).select("id,name").single();
+            ? await supabaseAdmin
+                .from("media_assets")
+                .update(row as never)
+                .eq("id", existing.data.id)
+                .select("id,name")
+                .single()
+            : await supabaseAdmin
+                .from("media_assets")
+                .insert(row as never)
+                .select("id,name")
+                .single();
           if (saved.error) return json({ error: saved.error.message }, 500);
           imported.push(saved.data as { id: string; name: string });
         }
