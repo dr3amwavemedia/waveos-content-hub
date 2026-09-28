@@ -42,6 +42,7 @@ import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedPostsRouteImport } from './routes/_authenticated/posts'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSocialRouteImport } from './routes/_authenticated/social'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
@@ -240,6 +241,11 @@ const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSocialRoute = AuthenticatedSocialRouteImport.update({
+  id: '/social',
+  path: '/social',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSocialAccountsRoute =
@@ -449,6 +455,7 @@ export interface FileRoutesByFullPath {
   '/posts': typeof AuthenticatedPostsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/social': typeof AuthenticatedSocialRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/templates': typeof AuthenticatedTemplatesRoute
@@ -515,6 +522,7 @@ export interface FileRoutesByTo {
   '/posts': typeof AuthenticatedPostsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/social': typeof AuthenticatedSocialRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/templates': typeof AuthenticatedTemplatesRoute
@@ -583,6 +591,7 @@ export interface FileRoutesById {
   '/_authenticated/posts': typeof AuthenticatedPostsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/social': typeof AuthenticatedSocialRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
@@ -651,6 +660,7 @@ export interface FileRouteTypes {
     | '/posts'
     | '/projects'
     | '/settings'
+    | '/social'
     | '/social-accounts'
     | '/staff-email'
     | '/templates'
@@ -717,6 +727,7 @@ export interface FileRouteTypes {
     | '/posts'
     | '/projects'
     | '/settings'
+    | '/social'
     | '/social-accounts'
     | '/staff-email'
     | '/templates'
@@ -784,6 +795,7 @@ export interface FileRouteTypes {
     | '/_authenticated/posts'
     | '/_authenticated/projects'
     | '/_authenticated/settings'
+    | '/_authenticated/social'
     | '/_authenticated/social-accounts'
     | '/_authenticated/staff-email'
     | '/_authenticated/templates'
@@ -1084,6 +1096,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/social': {
+      id: '/_authenticated/social'
+      path: '/social'
+      fullPath: '/social'
+      preLoaderRoute: typeof AuthenticatedSocialRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/social-accounts': {
       id: '/_authenticated/social-accounts'
       path: '/social-accounts'
@@ -1348,6 +1367,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPostsRoute: typeof AuthenticatedPostsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSocialRoute: typeof AuthenticatedSocialRoute
   AuthenticatedSocialAccountsRoute: typeof AuthenticatedSocialAccountsRoute
   AuthenticatedStaffEmailRoute: typeof AuthenticatedStaffEmailRoute
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
@@ -1381,6 +1401,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPostsRoute: AuthenticatedPostsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSocialRoute: AuthenticatedSocialRoute,
   AuthenticatedSocialAccountsRoute: AuthenticatedSocialAccountsRoute,
   AuthenticatedStaffEmailRoute: AuthenticatedStaffEmailRoute,
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,

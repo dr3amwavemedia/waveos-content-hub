@@ -70,6 +70,7 @@ const CLIENT_NAV: NavItem[] = [
   { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
   { to: "/content", label: "Social Posts", icon: Images, feature: "can_view_media_library" },
+  { to: "/social", label: "Social Dashboard", icon: Share2, feature: "can_connect_socials" },
   { to: "/posts", label: "Posts", icon: FileText, feature: "can_create_content" },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
