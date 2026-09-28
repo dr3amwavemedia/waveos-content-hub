@@ -92,7 +92,7 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { workspaceId: string; platform: SocialPlatform }) => data)
   .handler(async ({ data, context }) => {
-    const { requireSocialWorkspaceAccess, toZernioPlatform, zernioRequest } =
+    const { requireSocialWorkspaceAccess, toZernioPlatform, waveOsPublicOrigin, zernioRequest } =
       await import("./zernio.server");
     await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -103,8 +103,7 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
       .maybeSingle();
     const profile = profileResult.data as { profile_id: string } | null;
     if (!profile) throw new Error("Create this workspace's Zernio profile first.");
-    const appBaseUrl = (process.env.APP_BASE_URL ?? "").replace(/\/$/, "");
-    if (!appBaseUrl) throw new Error("APP_BASE_URL is missing from deployment settings.");
+    const appBaseUrl = waveOsPublicOrigin();
     const params = new URLSearchParams({
       profileId: profile.profile_id,
       redirect_url: `${appBaseUrl}/social-connections/callback?workspaceId=${encodeURIComponent(data.workspaceId)}&provider=zernio`,

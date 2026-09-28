@@ -4,6 +4,7 @@ import type { Database } from "@/integrations/supabase/types";
 import type { SocialPlatform } from "@/hooks/use-content";
 
 const ZERNIO_BASE_URL = "https://zernio.com/api/v1";
+const DEFAULT_WAVEOS_PUBLIC_URL = "https://waveos.dreamwavemedia.co";
 
 export type ZernioAccount = {
   id: string;
@@ -19,6 +20,19 @@ export type ZernioAccount = {
 
 export function zernioConfigured() {
   return Boolean(process.env.ZERNIO_API_KEY);
+}
+
+export function normalizeWaveOsPublicOrigin(configuredUrl: string | undefined) {
+  const candidate = configuredUrl?.trim() || DEFAULT_WAVEOS_PUBLIC_URL;
+  const parsed = new URL(candidate);
+  if (parsed.protocol !== "https:") {
+    throw new Error("WaveOS public URL must use HTTPS.");
+  }
+  return parsed.origin;
+}
+
+export function waveOsPublicOrigin() {
+  return normalizeWaveOsPublicOrigin(process.env.WAVEOS_APP_URL);
 }
 
 export async function zernioRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
