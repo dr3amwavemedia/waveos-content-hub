@@ -46,6 +46,11 @@ import { serviceFeePercentLabel } from "@/lib/invoice-service-fee";
 import { AuthorizeAutopayButton } from "@/components/app/authorize-autopay-button";
 
 export type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
+/** One recorded transaction against an invoice (card payment, automatic charge, import or refund). */
+export type PaymentEntry = Pick<
+  Database["public"]["Tables"]["payment_ledger"]["Row"],
+  "id" | "invoice_id" | "kind" | "amount_cents" | "currency" | "occurred_at" | "source"
+>;
 type AutopaySchedule = Pick<
   Database["public"]["Tables"]["invoice_autopay_schedules"]["Row"],
   | "id"
@@ -242,6 +247,22 @@ export function Layer1Overview() {
     },
   });
 
+  const paymentsQ = useQuery({
+    queryKey: ["layer1", "payments", wsId],
+    enabled: !!wsId,
+    staleTime: 15_000,
+    queryFn: async (): Promise<PaymentEntry[]> => {
+      const { data, error } = await supabase
+        .from("payment_ledger")
+        .select("id,invoice_id,kind,amount_cents,currency,occurred_at,source")
+        .eq("workspace_id", wsId!)
+        .eq("status", "posted")
+        .order("occurred_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const contractsQ = useQuery({
     queryKey: ["layer1", "contracts", wsId],
     enabled: !!wsId,
@@ -322,6 +343,13 @@ export function Layer1Overview() {
     return items[0] ?? null;
   }, [deliveriesQ.data]);
 
+  const activeContracts = (contractsQ.data ?? []).filter((contract) =>
+    ["sent", "viewed"].includes(contract.status),
+  );
+  const activeInvoices = (invoicesQ.data ?? []).filter(
+    (invoice) => invoice.status !== "paid" && invoice.status !== "void",
+  );
+
   const projectName = brandQ.data?.business_name?.trim() || activeWorkspace?.name || "Your project";
 
   const statusLabel = wsMetaQ.data?.account_status
@@ -362,8 +390,8 @@ export function Layer1Overview() {
 
       <nav aria-label="Your workspace tools" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
-          { id: "invoices", label: "Invoices", count: invoicesQ.data?.length },
-          { id: "contracts", label: "Contracts", count: contractsQ.data?.length },
+          { id: "invoices", label: "Invoices", count: activeInvoices.length },
+          { id: "contracts", label: "Contracts", count: activeContracts.length },
         ].map((item) => (
           <a
             key={item.id}
@@ -484,9 +512,9 @@ export function Layer1Overview() {
       >
         <div className="flex flex-wrap items-end justify-between gap-2">
           <h2 className="text-lg font-semibold text-foreground">Contracts & Agreements</h2>
-          {(contractsQ.data?.length ?? 0) > 1 && (
+          {activeContracts.length > 1 && (
             <span className="text-xs text-muted-foreground">
-              {contractsQ.data!.length} contracts
+              {activeContracts.length} contracts
             </span>
           )}
         </div>
@@ -496,14 +524,17 @@ export function Layer1Overview() {
           <div className="surface-card p-5 text-sm text-destructive">
             Contracts could not be loaded. Refresh the page to try again.
           </div>
-        ) : (contractsQ.data ?? []).length > 0 ? (
+        ) : activeContracts.length > 0 ? (
           <div className="space-y-3">
-            {contractsQ.data?.map((contract) => (
+            {activeContracts.map((contract) => (
               <ContractCard key={contract.id} contract={contract} />
             ))}
           </div>
         ) : (
-          <PolishedEmpty icon={FileText} body="You currently have no contracts requiring action." />
+          <PolishedEmpty
+            icon={FileText}
+            body="No contracts need your attention. Completed agreements are saved in Settings."
+          />
         )}
       </ExpandableSection>
 
@@ -514,9 +545,9 @@ export function Layer1Overview() {
         className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4"
       >
         <div className="flex flex-wrap items-end justify-between gap-2">
-          {(invoicesQ.data?.length ?? 0) > 1 && (
+          {activeInvoices.length > 1 && (
             <span className="text-xs text-muted-foreground">
-              {invoicesQ.data!.length} invoices · newest first
+              {activeInvoices.length} open invoices · newest first
             </span>
           )}
         </div>
@@ -526,9 +557,9 @@ export function Layer1Overview() {
           <div className="surface-card p-5 text-sm text-destructive">
             Invoices could not be loaded. Refresh the page to try again.
           </div>
-        ) : (invoicesQ.data ?? []).length > 0 ? (
+        ) : activeInvoices.length > 0 ? (
           <div className="space-y-3">
-            {invoicesQ.data!.map((invoice) => (
+            {activeInvoices.map((invoice) => (
               <InvoiceCard
                 key={invoice.id}
                 invoice={invoice}
@@ -540,11 +571,15 @@ export function Layer1Overview() {
                       : schedule.source_invoice_id === invoice.id,
                   ) ?? null
                 }
+                payments={(paymentsQ.data ?? []).filter((entry) => entry.invoice_id === invoice.id)}
               />
             ))}
           </div>
         ) : (
-          <PolishedEmpty icon={FileText} body="You currently have no invoices requiring action." />
+          <PolishedEmpty
+            icon={FileText}
+            body="No payments need your attention. Paid invoices and receipts are saved in Settings."
+          />
         )}
       </ExpandableSection>
 
@@ -923,11 +958,16 @@ export function InvoiceCard({
   invoice,
   clientName = "Client",
   autopay = null,
+  payments = [],
 }: {
   invoice: Invoice;
   clientName?: string;
   autopay?: AutopaySchedule | null;
+  payments?: PaymentEntry[];
 }) {
+  const paymentHistory = [...payments].sort(
+    (a, b) => new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime(),
+  );
   const lineItems = invoiceItemsFromJson(invoice.line_items);
   const amount = formatMoney(invoice.amount_cents, invoice.currency);
   const due = formatDate(invoice.due_at);
@@ -993,6 +1033,33 @@ export function InvoiceCard({
       </div>
 
       <PaymentProgress invoice={invoice} />
+      {paymentHistory.length > 0 && (
+        <div className="space-y-2 rounded-xl border border-border/70 bg-muted/30 p-4">
+          <p className="text-sm font-semibold text-foreground">Payment history</p>
+          <ul className="space-y-1.5">
+            {paymentHistory.map((entry) => (
+              <li
+                key={entry.id}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm"
+              >
+                <span className="text-muted-foreground">
+                  {entry.kind === "refund" ? "Refund" : "Payment received"} ·{" "}
+                  {formatDate(entry.occurred_at)}
+                </span>
+                <span
+                  className={
+                    "font-medium " +
+                    (entry.kind === "refund" ? "text-destructive" : "text-foreground")
+                  }
+                >
+                  {entry.kind === "refund" ? "−" : ""}
+                  {formatMoney(entry.amount_cents, entry.currency)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {autopay && (
         <div className="space-y-2 rounded-xl border border-primary/30 bg-primary/5 p-4 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1087,13 +1154,19 @@ export function InvoiceCard({
           (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0) > 0 && (
             <PayInvoiceButton
               invoiceId={invoice.id}
-              label={nextInvoicePaymentLabel({
+              scheduledLabel={nextInvoicePaymentLabel({
                 amountCents: invoice.amount_cents,
                 amountPaidCents: invoice.amount_paid_cents,
                 paymentPlan: invoice.payment_plan,
                 checkoutPaymentType: invoice.checkout_payment_type,
                 checkoutPaymentCents: invoice.checkout_payment_cents,
               })}
+              scheduledCents={nextPaymentCents}
+              remainingCents={Math.max(
+                0,
+                (invoice.amount_cents ?? 0) - (invoice.amount_paid_cents ?? 0),
+              )}
+              currency={invoice.currency}
             />
           )}
         {canOpen && (

@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -23,6 +23,9 @@ type PostsFilter = "all" | "draft" | "scheduled" | "published" | "failed";
 type PublishAttempt = Database["public"]["Tables"]["publish_attempts"]["Row"];
 
 export const Route = createFileRoute("/_authenticated/posts")({
+  beforeLoad: () => {
+    throw redirect({ to: "/social", search: { view: "posts" } });
+  },
   validateSearch: (search: Record<string, unknown>): { status?: PostsFilter } => {
     const allowed: PostsFilter[] = ["all", "draft", "scheduled", "published", "failed"];
     return typeof search.status === "string" && allowed.includes(search.status as PostsFilter)

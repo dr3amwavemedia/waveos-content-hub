@@ -57,6 +57,27 @@
       "when": 1789711185954,
       "tag": "0007_global_invoice_numbering_2026",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790042011756,
+      "tag": "0008_lock_sensitive_tables_service_role_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790085715524,
+      "tag": "0009_payment_ledger_client_and_staff_read",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1790185163339,
+      "tag": "0010_autopay_allow_partial_scheduled_charge",
+      "breakpoints": true
     }
   ]
 }

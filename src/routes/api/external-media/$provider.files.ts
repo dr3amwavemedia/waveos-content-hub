@@ -14,17 +14,28 @@ type ProviderFile = {
   thumbnailUrl: string | null;
   webUrl: string | null;
   parentId: string | null;
+  path: string | null;
+  modifiedAt: string | null;
+  width: number | null;
+  height: number | null;
+  durationSeconds: number | null;
 };
+
+type ProviderFolder = {
+  id: string;
+  name: string;
+  parentId: string | null;
+  path: string | null;
+};
+
+const SUPPORTED_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "video/mp4", "video/quicktime"]);
 
 export const Route = createFileRoute("/api/external-media/$provider/files")({
   server: {
     handlers: {
       POST: async ({ request, params }) => {
-        const {
-          externalAccessToken,
-          getExternalConnection,
-          requireExternalMediaWorkspace,
-        } = await import("@/lib/external-media.server");
+        const { externalAccessToken, getExternalConnection, requireExternalMediaWorkspace } =
+          await import("@/lib/external-media.server");
         const provider = params.provider;
         if (provider !== "google_drive" && provider !== "dropbox")
           return json({ error: "unsupported_provider" }, 404);
@@ -117,10 +128,9 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
           if (!files.length || files.length > 20) return json({ error: "invalid_files" }, 400);
           const rows = files.map((entry) => {
             const file = entry as Partial<ProviderFile>;
-            if (!file.id || !file.name || !file.mimeType)
-              throw new Error("invalid_external_file");
+            if (!file.id || !file.name || !file.mimeType) throw new Error("invalid_external_file");
             const mimeType = externalMediaMimeType(file.name, file.mimeType);
-            if (!/^(image|video)\//i.test(mimeType))
+            if (!SUPPORTED_MEDIA_TYPES.has(mimeType.toLowerCase()))
               throw new Error("invalid_external_file");
             return {
               workspace_id: workspaceId,
@@ -135,7 +145,14 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
               external_parent_id: file.parentId ?? null,
               source_web_url: file.webUrl ?? null,
               thumbnail_url: file.thumbnailUrl ?? null,
-              source_metadata: { imported_at: new Date().toISOString() },
+              width: positiveNumberOrNull(file.width),
+              height: positiveNumberOrNull(file.height),
+              duration_seconds: positiveNumberOrNull(file.durationSeconds),
+              source_metadata: {
+                imported_at: new Date().toISOString(),
+                source_path: file.path ?? null,
+                source_modified_at: file.modifiedAt ?? null,
+              },
             };
           });
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -156,7 +173,10 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
             if (lookupError) return json({ error: lookupError.message }, 500);
 
             const query = existing?.id
-              ? supabaseAdmin.from("media_assets").update(row as never).eq("id", existing.id)
+              ? supabaseAdmin
+                  .from("media_assets")
+                  .update(row as never)
+                  .eq("id", existing.id)
               : supabaseAdmin.from("media_assets").insert(row as never);
             const { data: saved, error: saveError } = await query.select("id,name").single();
             if (saveError) return json({ error: saveError.message }, 500);
@@ -168,27 +188,49 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
 
         if (body.action !== "list") return json({ error: "invalid_action" }, 400);
         const query = typeof body.query === "string" ? body.query.trim() : "";
+        const folderId = typeof body.folderId === "string" ? body.folderId : null;
 
         if (provider === "google_drive") {
           const filters = ["trashed = false"];
           if (query) filters.push(`name contains '${query.replaceAll("'", "\\'")}'`);
+          else if (folderId) filters.push(`'${folderId.replaceAll("'", "\\'")}' in parents`);
           const endpoint = new URL("https://www.googleapis.com/drive/v3/files");
           endpoint.search = new URLSearchParams({
             q: filters.join(" and "),
             pageSize: "100",
             orderBy: "modifiedTime desc",
             fields:
-              "files(id,name,mimeType,size,thumbnailLink,webViewLink,parents,videoMediaMetadata,imageMediaMetadata)",
+              "files(id,name,mimeType,size,thumbnailLink,webViewLink,parents,modifiedTime,videoMediaMetadata,imageMediaMetadata)",
           }).toString();
           const response = await fetch(endpoint, {
             headers: { Authorization: `Bearer ${accessToken}` },
           });
           const result = (await response.json()) as Record<string, unknown>;
-          if (!response.ok) return json({ error: "google_drive_list_failed", details: result }, 502);
-          const files = (Array.isArray(result.files) ? result.files : [])
+          if (!response.ok)
+            return json({ error: "google_drive_list_failed", details: result }, 502);
+          const entries = Array.isArray(result.files) ? result.files : [];
+          const folders = entries
+            .filter(
+              (entry) =>
+                (entry as Record<string, unknown>).mimeType ===
+                "application/vnd.google-apps.folder",
+            )
+            .map((entry) => {
+              const folder = entry as Record<string, unknown>;
+              const parents = Array.isArray(folder.parents) ? folder.parents : [];
+              return {
+                id: String(folder.id ?? ""),
+                name: String(folder.name ?? "Untitled folder"),
+                parentId: typeof parents[0] === "string" ? parents[0] : null,
+                path: null,
+              } satisfies ProviderFolder;
+            });
+          const files = entries
             .map((entry) => {
               const file = entry as Record<string, unknown>;
               const parents = Array.isArray(file.parents) ? file.parents : [];
+              const imageMetadata = recordOrEmpty(file.imageMediaMetadata);
+              const videoMetadata = recordOrEmpty(file.videoMediaMetadata);
               return {
                 id: String(file.id ?? ""),
                 name: String(file.name ?? "Untitled"),
@@ -197,10 +239,15 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
                 thumbnailUrl: typeof file.thumbnailLink === "string" ? file.thumbnailLink : null,
                 webUrl: typeof file.webViewLink === "string" ? file.webViewLink : null,
                 parentId: typeof parents[0] === "string" ? parents[0] : null,
+                path: null,
+                modifiedAt: typeof file.modifiedTime === "string" ? file.modifiedTime : null,
+                width: positiveNumberOrNull(imageMetadata.width ?? videoMetadata.width),
+                height: positiveNumberOrNull(imageMetadata.height ?? videoMetadata.height),
+                durationSeconds: millisecondsToSeconds(videoMetadata.durationMillis),
               } satisfies ProviderFile;
             })
-            .filter((file) => /^(image|video)\//.test(file.mimeType));
-          return json({ files });
+            .filter((file) => SUPPORTED_MEDIA_TYPES.has(file.mimeType.toLowerCase()));
+          return json({ files, folders });
         }
 
         const response = await fetch(
@@ -216,19 +263,41 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
             body: JSON.stringify(
               query
                 ? { query, options: { max_results: 100, file_status: "active" } }
-                : { path: "", recursive: true, include_deleted: false, limit: 100 },
+                : {
+                    path: folderId ?? "",
+                    recursive: false,
+                    include_deleted: false,
+                    include_media_info: true,
+                    limit: 100,
+                  },
             ),
           },
         );
         const result = (await response.json()) as Record<string, unknown>;
         if (!response.ok) return json({ error: "dropbox_list_failed", details: result }, 502);
         const rawEntries = query
-          ? (Array.isArray(result.matches) ? result.matches : []).map((match) =>
-              (match as Record<string, unknown>).metadata,
+          ? (Array.isArray(result.matches) ? result.matches : []).map(
+              (match) => (match as Record<string, unknown>).metadata,
             )
           : Array.isArray(result.entries)
             ? result.entries
             : [];
+        const folders = query
+          ? []
+          : rawEntries
+              .map((entry) => {
+                const wrapped = entry as Record<string, unknown>;
+                const folder = (wrapped.metadata ?? wrapped) as Record<string, unknown>;
+                if (folder[".tag"] !== "folder") return null;
+                const path = typeof folder.path_lower === "string" ? folder.path_lower : null;
+                return {
+                  id: path ?? String(folder.id ?? ""),
+                  name: String(folder.name ?? "Untitled folder"),
+                  parentId: dropboxParentPath(path),
+                  path: typeof folder.path_display === "string" ? folder.path_display : path,
+                } satisfies ProviderFolder;
+              })
+              .filter((folder): folder is ProviderFolder => Boolean(folder?.id));
         const files = rawEntries
           .map((entry) => {
             const wrapped = entry as Record<string, unknown>;
@@ -237,6 +306,10 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
             const extension = name.split(".").pop()?.toLowerCase() ?? "";
             const mimeType = dropboxMimeType(extension);
             if (!mimeType) return null;
+            const path = typeof file.path_lower === "string" ? file.path_lower : null;
+            const mediaInfo = recordOrEmpty(file.media_info);
+            const mediaMetadata = recordOrEmpty(mediaInfo.metadata);
+            const dimensions = recordOrEmpty(mediaMetadata.dimensions);
             return {
               id: String(file.id ?? file.path_lower ?? ""),
               name,
@@ -244,11 +317,16 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
               sizeBytes: Number(file.size ?? 0),
               thumbnailUrl: null,
               webUrl: null,
-              parentId: typeof file.path_lower === "string" ? file.path_lower : null,
+              parentId: dropboxParentPath(path),
+              path: typeof file.path_display === "string" ? file.path_display : path,
+              modifiedAt: typeof file.server_modified === "string" ? file.server_modified : null,
+              width: positiveNumberOrNull(dimensions.width),
+              height: positiveNumberOrNull(dimensions.height),
+              durationSeconds: millisecondsToSeconds(mediaMetadata.duration),
             } satisfies ProviderFile;
           })
-          .filter(Boolean);
-        return json({ files });
+          .filter(Boolean) as ProviderFile[];
+        return json({ files, folders });
       },
     },
   },
@@ -259,40 +337,41 @@ function dropboxMimeType(extension: string) {
     jpg: "image/jpeg",
     jpeg: "image/jpeg",
     png: "image/png",
-    webp: "image/webp",
-    gif: "image/gif",
     mp4: "video/mp4",
     mov: "video/quicktime",
-    webm: "video/webm",
-    avi: "video/x-msvideo",
   };
   return types[extension] ?? null;
 }
 
 function externalMediaMimeType(name: string, mimeType: string) {
-  if (/^(image|video)\//i.test(mimeType)) return mimeType;
+  if (SUPPORTED_MEDIA_TYPES.has(mimeType.toLowerCase())) return mimeType.toLowerCase();
   const extension = name.split(".").pop()?.toLowerCase() ?? "";
   const types: Record<string, string> = {
-    avif: "image/avif",
-    bmp: "image/bmp",
-    gif: "image/gif",
-    heic: "image/heic",
-    heif: "image/heif",
     jpeg: "image/jpeg",
     jpg: "image/jpeg",
     png: "image/png",
-    tif: "image/tiff",
-    tiff: "image/tiff",
-    webp: "image/webp",
-    "3gp": "video/3gpp",
-    avi: "video/x-msvideo",
-    m4v: "video/x-m4v",
-    mkv: "video/x-matroska",
     mov: "video/quicktime",
     mp4: "video/mp4",
-    mpeg: "video/mpeg",
-    mpg: "video/mpeg",
-    webm: "video/webm",
   };
   return types[extension] ?? mimeType;
+}
+
+function recordOrEmpty(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function positiveNumberOrNull(value: unknown) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function millisecondsToSeconds(value: unknown) {
+  const milliseconds = positiveNumberOrNull(value);
+  return milliseconds === null ? null : milliseconds / 1000;
+}
+
+function dropboxParentPath(path: string | null) {
+  if (!path) return null;
+  const slash = path.lastIndexOf("/");
+  return slash > 0 ? path.slice(0, slash) : "";
 }

@@ -16,6 +16,7 @@ const CREW_ALLOWED_ROUTES = [
 ];
 const MEDIA_MANAGER_ALLOWED_ROUTES = [
   ...TEAM_ALLOWED_ROUTES,
+  "/social",
   "/content",
   "/calendar",
   "/create",

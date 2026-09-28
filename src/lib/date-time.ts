@@ -74,3 +74,19 @@ export function zonedDateTimeToIso(value: string, timeZone: string) {
 
   return new Date(candidate).toISOString();
 }
+
+/** Add one calendar month while preserving local wall-clock time and clamping month-end dates. */
+export function nextMonthlyChargeAt(iso: string, timeZone: string) {
+  const local = isoToDateTimeLocal(iso, timeZone);
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local);
+  if (!match) throw new Error("invalid_autopay_charge_at");
+  const [, year, month, day, hour, minute] = match.map(Number);
+  const nextMonthStart = new Date(Date.UTC(year, month, 1));
+  const nextYear = nextMonthStart.getUTCFullYear();
+  const nextMonth = nextMonthStart.getUTCMonth() + 1;
+  const lastDay = new Date(Date.UTC(nextYear, nextMonth, 0)).getUTCDate();
+  const nextLocal = `${nextYear}-${String(nextMonth).padStart(2, "0")}-${String(
+    Math.min(day, lastDay),
+  ).padStart(2, "0")}T${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  return zonedDateTimeToIso(nextLocal, timeZone);
+}

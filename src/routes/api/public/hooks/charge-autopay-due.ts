@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { stripeRequest, type StripePaymentIntent } from "@/lib/stripe.server";
+import { nextMonthlyChargeAt } from "@/lib/date-time";
 
 function authorized(request: Request) {
   const secret = process.env.CRON_SECRET ?? "";
@@ -19,6 +20,18 @@ export const Route = createFileRoute("/api/public/hooks/charge-autopay-due")({
       POST: async ({ request }) => {
         if (!authorized(request)) return new Response("unauthorized", { status: 401 });
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const readiness = await supabaseAdmin.rpc("record_autopay_payment", {
+          _schedule_id: "00000000-0000-0000-0000-000000000000",
+          _invoice_id: "00000000-0000-0000-0000-000000000000",
+          _payment_id: "readiness-check",
+          _amount_cents: 1,
+          _currency: "USD",
+          _occurred_at: new Date().toISOString(),
+          _next_charge_at: undefined,
+        });
+        if (!readiness.error?.message.includes("autopay_schedule_missing")) {
+          return new Response("autopay_backend_not_ready", { status: 503 });
+        }
         const { data: schedules } = await supabaseAdmin
           .from("invoice_autopay_schedules")
           .select("*")
@@ -28,18 +41,21 @@ export const Route = createFileRoute("/api/public/hooks/charge-autopay-due")({
           .limit(20);
         let processed = 0;
         for (const schedule of schedules ?? []) {
+          if (!schedule.stripe_customer_id || !schedule.stripe_payment_method_id) {
+            await supabaseAdmin
+              .from("invoice_autopay_schedules")
+              .update({ status: "action_required", last_error: "card_authorization_missing" })
+              .eq("id", schedule.id)
+              .eq("status", "active");
+            continue;
+          }
           const claim = await supabaseAdmin
             .from("invoice_autopay_schedules")
             .update({ status: "processing", last_attempt_at: new Date().toISOString() })
             .eq("id", schedule.id)
             .eq("status", "active")
             .select("id");
-          if (
-            !claim.data?.length ||
-            !schedule.stripe_customer_id ||
-            !schedule.stripe_payment_method_id
-          )
-            continue;
+          if (!claim.data?.length) continue;
           try {
             let invoiceId = schedule.current_invoice_id ?? schedule.source_invoice_id;
             if (
@@ -47,7 +63,7 @@ export const Route = createFileRoute("/api/public/hooks/charge-autopay-due")({
               schedule.last_succeeded_at &&
               !schedule.current_invoice_id
             ) {
-              const number = await supabaseAdmin.rpc("next_invoice_number", {
+              const number = await supabaseAdmin.rpc("next_service_invoice_number", {
                 _workspace_id: schedule.workspace_id,
               });
               if (number.error || !number.data) throw new Error("invoice_number_failed");
@@ -80,6 +96,23 @@ export const Route = createFileRoute("/api/public/hooks/charge-autopay-due")({
                 .update({ current_invoice_id: invoiceId })
                 .eq("id", schedule.id);
             }
+            const target = await supabaseAdmin
+              .from("client_invoices")
+              .select("amount_cents,amount_paid_cents,currency,workspace_id")
+              .eq("id", invoiceId)
+              .eq("workspace_id", schedule.workspace_id)
+              .maybeSingle();
+            if (target.error || !target.data) throw new Error("invoice_missing");
+            const remaining = Math.max(
+              0,
+              (target.data.amount_cents ?? 0) - (target.data.amount_paid_cents ?? 0),
+            );
+            if (
+              schedule.amount_cents > remaining ||
+              target.data.currency.toUpperCase() !== schedule.currency.toUpperCase()
+            ) {
+              throw new Error("invoice_balance_changed");
+            }
             const intent = await stripeRequest<StripePaymentIntent>("/payment_intents", {
               body: {
                 amount: schedule.amount_cents,
@@ -96,6 +129,10 @@ export const Route = createFileRoute("/api/public/hooks/charge-autopay-due")({
                   autopay_schedule_id: schedule.id,
                   invoice_id: invoiceId,
                   workspace_id: schedule.workspace_id,
+                  next_charge_at:
+                    schedule.frequency === "monthly"
+                      ? nextMonthlyChargeAt(schedule.charge_at, schedule.timezone)
+                      : "",
                 },
               },
               idempotencyKey: `autopay:${schedule.id}:${schedule.charge_at}`,

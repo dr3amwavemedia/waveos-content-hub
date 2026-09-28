@@ -56,9 +56,7 @@ const GROWTH_90_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   "can_view_calendar_preview",
   "can_view_media_library",
   "can_upload_media",
-  "can_create_content",
   "can_use_ai_tools",
-  "can_view_analytics",
   "can_view_activity_log",
   "can_invite_members",
   "can_manage_workspace",
@@ -106,12 +104,21 @@ export function hasFeature(access: WorkspaceAccess, feature: FeatureKey): boolea
 // A feature can be shown in "preview / locked" mode to a client. Preview is used
 // when the module should visually appear (Layer 2 sees the full product) but the
 // user cannot actually operate it. Fully hidden = never in navigation.
+const SOCIAL_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
+  "can_create_content",
+  "can_connect_socials",
+  "can_schedule_content",
+  "can_publish_content",
+  "can_view_analytics",
+]);
 export function featureVisibility(
   access: WorkspaceAccess,
   feature: FeatureKey,
 ): "enabled" | "preview" | "hidden" {
   if (hasFeature(access, feature)) return "enabled";
-  // Layer 2 (growth_90) sees premium modules as previews to demonstrate value.
+  // Social tools are never previewed to clients without access (owner decision).
+  if (SOCIAL_FEATURES.has(feature)) return "hidden";
+  // Layer 2 (growth_90) sees other premium modules as previews to demonstrate value.
   if (access.tier === "growth_90") return "preview";
   return "hidden";
 }

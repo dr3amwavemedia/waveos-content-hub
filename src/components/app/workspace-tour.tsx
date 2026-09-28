@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
 
 type Destination = { to: string; hash?: string; label: string };
 const OPEN_WORKSPACE_TOUR_EVENT = "waveos:open-workspace-tour";
@@ -29,10 +30,12 @@ function explanation(item: Destination) {
 
 /** A user/workspace-scoped guide; completion never changes service access. */
 export function WorkspaceTour({
+  userId,
   storageKey,
   destinations,
   audience = "your workspace",
 }: {
+  userId: string;
   storageKey: string;
   destinations: Destination[];
   audience?: string;
@@ -58,7 +61,28 @@ export function WorkspaceTour({
     }
   });
   const [progress, setProgress] = useState(initialState.progress);
-  const [open, setOpen] = useState(initialState.firstVisit);
+  const [open, setOpen] = useState(false);
+  async function rememberCompletion() {
+    try {
+      await (
+        supabase as never as {
+          from: (table: string) => {
+            upsert: (
+              value: Record<string, unknown>,
+              options: { onConflict: string },
+            ) => Promise<unknown>;
+          };
+        }
+      )
+        .from("user_experience_preferences")
+        .upsert(
+          { user_id: userId, client_guide_completed_at: new Date().toISOString() },
+          { onConflict: "user_id" },
+        );
+    } catch {
+      // Local storage remains a safe fallback until the migration is deployed.
+    }
+  }
   function save(step: number, done = false) {
     const next = { step, done };
     setProgress(next);
@@ -67,27 +91,61 @@ export function WorkspaceTour({
     } catch {
       /* Guide remains usable without browser storage. */
     }
+    if (done) void rememberCompletion();
   }
   useEffect(() => {
-    // Opening the guide once marks the account/browser as introduced. The guide
-    // never leaves a persistent banner behind and can be reopened from Settings.
-    const resetAndRemember = () => {
+    let active = true;
+    const reset = () => {
       const next = { step: 0, done: true };
       setProgress(next);
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(next));
-      } catch {
-        /* Guide remains usable without browser storage. */
-      }
     };
-    if (initialState.firstVisit) resetAndRemember();
+    async function checkFirstLogin() {
+      if (!initialState.firstVisit || initialState.progress.done) return;
+      try {
+        const { data, error } = await (
+          supabase as never as {
+            from: (table: string) => {
+              select: (columns: string) => {
+                eq: (
+                  column: string,
+                  value: string,
+                ) => {
+                  maybeSingle: () => Promise<{
+                    data: { client_guide_completed_at: string | null } | null;
+                    error: { message?: string } | null;
+                  }>;
+                };
+              };
+            };
+          }
+        )
+          .from("user_experience_preferences")
+          .select("client_guide_completed_at")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (!active) return;
+        if (!error && data?.client_guide_completed_at) {
+          save(0, true);
+          return;
+        }
+      } catch {
+        // A local first-run guide is preferable to blocking the portal.
+      }
+      if (active) setOpen(true);
+    }
+    void checkFirstLogin();
     const reopen = () => {
-      resetAndRemember();
+      reset();
       setOpen(true);
     };
     window.addEventListener(OPEN_WORKSPACE_TOUR_EVENT, reopen);
-    return () => window.removeEventListener(OPEN_WORKSPACE_TOUR_EVENT, reopen);
-  }, [initialState.firstVisit, storageKey]);
+    return () => {
+      active = false;
+      window.removeEventListener(OPEN_WORKSPACE_TOUR_EVENT, reopen);
+    };
+    // This check intentionally runs once per signed-in user/workspace mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
   if (!steps.length) return null;
   const index = Math.min(progress.step, steps.length - 1);
   const current = steps[index];

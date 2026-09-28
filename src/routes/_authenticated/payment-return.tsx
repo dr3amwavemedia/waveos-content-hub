@@ -45,7 +45,7 @@ function PaymentReturn() {
   // webhook without making the client stare at an indefinite waiting screen.
   useEffect(() => {
     if (cancelled) return;
-    const timer = setTimeout(() => setWaitedOut(true), 90_000);
+    const timer = setTimeout(() => setWaitedOut(true), 15_000);
     return () => clearTimeout(timer);
   }, [cancelled]);
 

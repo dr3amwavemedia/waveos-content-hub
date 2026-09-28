@@ -104,12 +104,27 @@ export function useCreateFolder(workspaceId: string | null | undefined) {
 export function useUploadAsset(workspaceId: string | null | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: {
-      file: File;
-      folderId: string | null;
-      tags: string[];
-    }) => {
+    mutationFn: async (input: { file: File; folderId: string | null; tags: string[] }) => {
       if (!workspaceId) throw new Error("No workspace");
+      const supportedTypes = new Set(["image/jpeg", "image/png", "video/mp4", "video/quicktime"]);
+      const extension = input.file.name.split(".").pop()?.toLowerCase() ?? "";
+      if (
+        !supportedTypes.has(input.file.type.toLowerCase()) &&
+        !["jpg", "jpeg", "png", "mp4", "mov"].includes(extension)
+      ) {
+        throw new Error("Use a JPG, PNG, MP4 or MOV file.");
+      }
+      const normalizedMimeType = supportedTypes.has(input.file.type.toLowerCase())
+        ? input.file.type.toLowerCase()
+        : (
+            {
+              jpg: "image/jpeg",
+              jpeg: "image/jpeg",
+              png: "image/png",
+              mp4: "video/mp4",
+              mov: "video/quicktime",
+            } as Record<string, string>
+          )[extension];
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user) throw new Error("Not signed in");
 
@@ -119,13 +134,11 @@ export function useUploadAsset(workspaceId: string | null | undefined) {
       const cleanName = input.file.name.replace(/[^a-zA-Z0-9._-]+/g, "-");
       const path = `${workspaceId}/${crypto.randomUUID()}-${cleanName}`;
 
-      const { error: upErr } = await supabase.storage
-        .from("media")
-        .upload(path, input.file, {
-          cacheControl: "3600",
-          contentType: input.file.type || "application/octet-stream",
-          upsert: false,
-        });
+      const { error: upErr } = await supabase.storage.from("media").upload(path, input.file, {
+        cacheControl: "3600",
+        contentType: normalizedMimeType,
+        upsert: false,
+      });
       if (upErr) throw upErr;
 
       const { data, error } = await supabase
@@ -135,7 +148,7 @@ export function useUploadAsset(workspaceId: string | null | undefined) {
           folder_id: input.folderId,
           name: input.file.name,
           storage_path: path,
-          mime_type: input.file.type || "application/octet-stream",
+          mime_type: normalizedMimeType,
           size_bytes: input.file.size,
           width: probe.width,
           height: probe.height,
@@ -190,9 +203,7 @@ export function useUpdateAssetTags(workspaceId: string | null | undefined) {
 }
 
 export async function getSignedMediaUrl(path: string, expiresIn = 3600) {
-  const { data, error } = await supabase.storage
-    .from("media")
-    .createSignedUrl(path, expiresIn);
+  const { data, error } = await supabase.storage.from("media").createSignedUrl(path, expiresIn);
   if (error) throw error;
   return data.signedUrl;
 }
@@ -240,8 +251,7 @@ async function probeMedia(file: File): Promise<{
       const v = document.createElement("video");
       v.preload = "metadata";
       const meta = await new Promise<{ w: number; h: number; d: number } | null>((resolve) => {
-        v.onloadedmetadata = () =>
-          resolve({ w: v.videoWidth, h: v.videoHeight, d: v.duration });
+        v.onloadedmetadata = () => resolve({ w: v.videoWidth, h: v.videoHeight, d: v.duration });
         v.onerror = () => resolve(null);
         v.src = url;
       });
