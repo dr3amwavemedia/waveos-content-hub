@@ -426,7 +426,7 @@ function ErrorPanel({
       <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
         {contact && (
           <a
-            href="mailto:dr3amwavemedia@outlook.com?subject=WaveOS%20invite%20request"
+            href="mailto:jessehayes@dwmsrq.com?subject=WaveOS%20invite%20request"
             className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110"
           >
             Contact Dream Wave Media

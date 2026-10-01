@@ -1,7 +1,7 @@
 import { adminClient, corsHeaders, json } from "../_shared/outlook.ts";
 
 const portal = "https://waveos.dreamwavemedia.co";
-const TEST_ADMIN_EMAILS = ["dr3amwavemedia@gmail.com", "jean@dwmsrq.com"] as const;
+const TEST_ADMIN_EMAILS = ["jessehayes@dwmsrq.com", "jean@dwmsrq.com"] as const;
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")

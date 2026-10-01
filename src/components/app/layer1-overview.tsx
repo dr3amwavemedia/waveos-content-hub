@@ -89,7 +89,7 @@ const externalDb = supabase as unknown as {
 const DREAM_WAVE_CONTACT = {
   name: "Dream Wave Media",
   role: "Your creative team",
-  email: "dr3amwavemedia@outlook.com",
+  email: "jessehayes@dwmsrq.com",
   phone: "941-914-4711" as string | null,
 };
 

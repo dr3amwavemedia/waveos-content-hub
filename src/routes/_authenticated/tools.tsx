@@ -189,7 +189,7 @@ function TestEmailsTab() {
           <div>
             <h2 className="text-base font-semibold text-foreground">Test emails</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Send real previews to dr3amwavemedia@gmail.com and jean@dwmsrq.com. Tests do not
+              Send real previews to jessehayes@dwmsrq.com and jean@dwmsrq.com. Tests do not
               contact clients or change the live notification switches.
             </p>
           </div>
