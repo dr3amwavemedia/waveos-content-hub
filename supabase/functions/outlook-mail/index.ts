@@ -45,7 +45,7 @@ async function staffSignature(
       : team?.staff_type === "sales"
         ? "Sales"
         : "Dream Wave Media Team";
-  const email = user.email ?? "dr3amwavemedia@outlook.com";
+  const email = user.email ?? "jessehayes@dwmsrq.com";
   return {
     html: `<div style="margin-top:28px;padding-top:16px;border-top:1px solid #d7dde5;font-family:Arial,Helvetica,sans-serif;color:#172033;line-height:1.45"><div style="font-size:15px;font-weight:700">${escapeHtml(name)}</div><div style="font-size:13px;color:#536174">${escapeHtml(role)} | Dream Wave Media</div><div style="margin-top:5px;font-size:12px;color:#536174"><a href="mailto:${escapeHtml(email)}" style="color:#1688c8;text-decoration:none">${escapeHtml(email)}</a> &nbsp;•&nbsp; <a href="https://dreamwavemedia.co" style="color:#1688c8;text-decoration:none">dreamwavemedia.co</a></div></div>`,
     text: `\n\n—\n${name}\n${role} | Dream Wave Media\n${email}\ndreamwavemedia.co`,

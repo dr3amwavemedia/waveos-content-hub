@@ -178,7 +178,7 @@ function AuthPage() {
             <button type="submit" disabled={busy || !hydrated} className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110 disabled:opacity-60">{busy && <Loader2 className="h-4 w-4 animate-spin" />}{mode === "signin" ? "Sign in" : "Send reset link"}</button>
             {mode === "reset" && <button type="button" onClick={() => setMode("signin")} className="w-full text-center text-xs text-muted-foreground hover:text-foreground">← Back to sign in</button>}
           </form>
-          <p className="mt-6 text-center text-xs text-muted-foreground">WaveOS is invite-only. Need access?{" "}<a href="mailto:dr3amwavemedia@outlook.com?subject=WaveOS%20access%20request" className="font-medium text-primary hover:text-primary-glow">Contact Dream Wave Media</a></p>
+          <p className="mt-6 text-center text-xs text-muted-foreground">WaveOS is invite-only. Need access?{" "}<a href="mailto:jessehayes@dwmsrq.com?subject=WaveOS%20access%20request" className="font-medium text-primary hover:text-primary-glow">Contact Dream Wave Media</a>. Technical problem?{" "}<a href="mailto:jean@dwmsrq.com?subject=WaveOS%20technical%20support" className="font-medium text-primary hover:text-primary-glow">jean@dwmsrq.com</a></p>
         </div>
         <p className="mt-6 text-center text-[11px] uppercase tracking-[0.2em] text-muted-foreground">A Dream Wave Media platform</p>
       </div>

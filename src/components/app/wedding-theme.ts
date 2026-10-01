@@ -162,4 +162,4 @@ export function deliveryActionLabel(delivery: WeddingDelivery): string {
   return "Open delivery";
 }
 
-export const WEDDING_CONTACT_EMAIL = "dr3amwavemedia@outlook.com";
+export const WEDDING_CONTACT_EMAIL = "jessehayes@dwmsrq.com";

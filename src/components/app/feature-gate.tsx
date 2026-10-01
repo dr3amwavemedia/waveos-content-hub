@@ -55,7 +55,7 @@ export function LockedPreview({
           type="button"
           className="mt-2 inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
           onClick={() => {
-            window.location.href = "mailto:dr3amwavemedia@outlook.com?subject=Upgrade%20my%20WaveOS%20access";
+            window.location.href = "mailto:jessehayes@dwmsrq.com?subject=Upgrade%20my%20WaveOS%20access";
           }}
         >
           <Sparkles className="h-4 w-4" /> Learn about full access
