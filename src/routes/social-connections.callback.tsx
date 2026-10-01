@@ -24,6 +24,11 @@ function SocialConnectionsCallback() {
   const search = Route.useSearch();
   const refresh = useServerFn(refreshZernioConnections);
   const [status, setStatus] = useState<CallbackStatus>("notifying");
+  const [hasOpener, setHasOpener] = useState(false);
+
+  useEffect(() => {
+    setHasOpener(Boolean(window.opener));
+  }, []);
 
   useEffect(() => {
     const finish = async () => {
@@ -83,7 +88,7 @@ function SocialConnectionsCallback() {
         <p className="text-sm text-muted-foreground">
           {search.error
             ? `Connection was not completed: ${search.error}`
-            : window.opener
+            : hasOpener
               ? "Returning you to WaveOS."
               : "Returning to your Social Media accounts."}
         </p>

@@ -34,6 +34,8 @@ import {
 } from "lucide-react";
 
 import { RequireFeature } from "@/components/app/require-feature";
+import { PublishResults, type PublishAttempt } from "@/components/social/publish-results";
+import { usePublishAttempts } from "@/hooks/use-content";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { usePermissions } from "@/hooks/use-permissions";
 import {
@@ -1099,6 +1101,13 @@ function PostList({
   emptyText: string;
   compact?: boolean;
 }) {
+  const attemptsQ = usePublishAttempts(items.map((item) => item.id));
+  const attemptsByItem = new Map<string, PublishAttempt[]>();
+  for (const attempt of (attemptsQ.data ?? []) as PublishAttempt[]) {
+    const list = attemptsByItem.get(attempt.content_item_id) ?? [];
+    list.push(attempt);
+    attemptsByItem.set(attempt.content_item_id, list);
+  }
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-background/25 p-7 text-center text-sm text-muted-foreground">
@@ -1158,6 +1167,7 @@ function PostList({
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:text-primary" />
               </div>
             </Link>
+            {!compact && <PublishResults attempts={attemptsByItem.get(item.id) ?? []} />}
           </li>
         );
       })}
