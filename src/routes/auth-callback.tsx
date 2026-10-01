@@ -27,7 +27,7 @@ export const Route = createFileRoute("/auth-callback")({
 
 function safeNext(next: string | undefined): string {
   if (!next) return "/home";
-  if (!next.startsWith("/") || next.startsWith("//")) return "/home";
+  if (!next.startsWith("/") || next.startsWith("//") || next.includes("\\")) return "/home";
   const pathname = next.split(/[?#]/, 1)[0];
   if (pathname === "/auth" || pathname === "/auth-callback") return "/home";
   return next;
