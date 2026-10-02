@@ -161,13 +161,15 @@ async function loadWorkspaces(
         })
       : (workspaces ?? []);
 
-  // A user's own workspace (where they are the owner member) sorts first so
-  // staff land in their personal workspace instead of the shared staff one.
-  visibleWorkspaces.sort((a, b) => {
-    const aOwn = membershipMap.get(a.id) === "owner" ? 0 : 1;
-    const bOwn = membershipMap.get(b.id) === "owner" ? 0 : 1;
-    return aOwn - bOwn;
-  });
+  // Landing order: the main admin (owner of the Dream Wave Media workspace)
+  // always lands there. Other staff land in a workspace they own (their
+  // personal one) instead of the shared staff workspace.
+  const ownsStaffWorkspace = membershipMap.get(STAFF_WORKSPACE_ID) === "owner";
+  const rank = (id: string) => {
+    if (ownsStaffWorkspace) return id === STAFF_WORKSPACE_ID ? 0 : 1;
+    return membershipMap.get(id) === "owner" ? 0 : 1;
+  };
+  visibleWorkspaces.sort((a, b) => rank(a.id) - rank(b.id));
 
   return visibleWorkspaces.map((w) => {
     const role = membershipMap.get(w.id);
