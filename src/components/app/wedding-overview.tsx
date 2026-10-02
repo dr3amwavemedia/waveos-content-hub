@@ -21,7 +21,7 @@ import {
 
 import { supabase } from "@/integrations/supabase/client";
 import { useWorkspace } from "@/components/app/workspace-context";
-
+import { canViewClientFinancials } from "@/lib/client-account-access";
 
 import {
   ContractCard,
@@ -52,8 +52,8 @@ const externalDb = supabase as unknown as {
 
 export function WeddingOverview() {
   const { activeWorkspace } = useWorkspace();
-  
   const wsId = activeWorkspace?.id;
+  const canViewFinancials = canViewClientFinancials(activeWorkspace?.role);
 
   const workspaceQ = useWeddingWorkspace(wsId);
   const ws = workspaceQ.data;
@@ -61,7 +61,7 @@ export function WeddingOverview() {
 
   const invoicesQ = useQuery({
     queryKey: ["wedding", "invoices", wsId],
-    enabled: !!wsId,
+    enabled: !!wsId && canViewFinancials,
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -77,12 +77,14 @@ export function WeddingOverview() {
 
   const contractsQ = useQuery({
     queryKey: ["wedding", "contracts", wsId],
-    enabled: !!wsId,
+    enabled: !!wsId && canViewFinancials,
     staleTime: 30_000,
     queryFn: async (): Promise<Contract[]> => {
       const { data, error } = await externalDb
         .from("client_contracts")
-        .select("id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,published_at,provider_document_id")
+        .select(
+          "id,title,description,provider,hosted_url,status,sent_at,signed_at,expires_at,published_at,provider_document_id",
+        )
         .eq("workspace_id", wsId!)
         .neq("status", "draft")
         .order("created_at", { ascending: false });
@@ -157,14 +159,14 @@ export function WeddingOverview() {
               center
             />
             <p className="mx-auto mt-6 max-w-md text-base leading-7 text-stone-600">
-              You’re part of the Dream Wave family. Your contract and payment details are ready
-              below, and we’ll open the rest of your wedding space as soon as your deposit is
-              confirmed.
+              {canViewFinancials
+                ? "You’re part of the Dream Wave family. Your contract and payment details are ready below, and we’ll open the rest of your wedding space as soon as your deposit is confirmed."
+                : "You’re part of the Dream Wave family. Your shared wedding content and planning tools will appear here as they become available."}
             </p>
           </div>
         </section>
 
-        <WeddingShortcuts active={isActive} />
+        <WeddingShortcuts active={isActive} canViewFinancials={canViewFinancials} />
         <WeddingAtAGlance
           daysUntilWedding={daysUntilWedding}
           venue={ws?.wedding_venue}
@@ -173,16 +175,22 @@ export function WeddingOverview() {
           palette={palette}
         />
 
-        <WeddingNextSteps
-          contractSigned={contractSigned}
-          paymentComplete={Boolean(paymentComplete)}
-          meetingReady={false}
-          isActive={false}
-          palette={palette}
-        />
+        {canViewFinancials && (
+          <WeddingNextSteps
+            contractSigned={contractSigned}
+            paymentComplete={Boolean(paymentComplete)}
+            meetingReady={false}
+            isActive={false}
+            palette={palette}
+          />
+        )}
 
-        <WeddingContractsSection contractsQ={contractsQ} palette={palette} />
-        <WeddingInvoicesSection invoicesQ={invoicesQ} palette={palette} />
+        {canViewFinancials && (
+          <>
+            <WeddingContractsSection contractsQ={contractsQ} palette={palette} />
+            <WeddingInvoicesSection invoicesQ={invoicesQ} palette={palette} />
+          </>
+        )}
 
         <section
           id="wedding-contact"
@@ -245,7 +253,7 @@ export function WeddingOverview() {
         </div>
       </header>
 
-      <WeddingShortcuts active={isActive} />
+      <WeddingShortcuts active={isActive} canViewFinancials={canViewFinancials} />
       <WeddingAtAGlance
         daysUntilWedding={daysUntilWedding}
         venue={ws?.wedding_venue}
@@ -254,13 +262,15 @@ export function WeddingOverview() {
         palette={palette}
       />
 
-      <WeddingNextSteps
-        contractSigned={contractSigned}
-        paymentComplete={Boolean(paymentComplete)}
-        meetingReady={meetingReady}
-        isActive
-        palette={palette}
-      />
+      {canViewFinancials && (
+        <WeddingNextSteps
+          contractSigned={contractSigned}
+          paymentComplete={Boolean(paymentComplete)}
+          meetingReady={meetingReady}
+          isActive
+          palette={palette}
+        />
+      )}
 
       <section
         className="rounded-[1.75rem] border bg-white p-5 sm:p-7"
@@ -399,10 +409,10 @@ export function WeddingOverview() {
       </section>
 
       {/* Contracts */}
-      <WeddingContractsSection contractsQ={contractsQ} palette={palette} />
+      {canViewFinancials && <WeddingContractsSection contractsQ={contractsQ} palette={palette} />}
 
       {/* Invoices */}
-      <WeddingInvoicesSection invoicesQ={invoicesQ} palette={palette} />
+      {canViewFinancials && <WeddingInvoicesSection invoicesQ={invoicesQ} palette={palette} />}
 
       {/* Contact */}
       <section
@@ -720,23 +730,33 @@ function Muted({ text, wash }: { text: string; wash: string }) {
   );
 }
 
-function WeddingShortcuts({ active }: { active: boolean }) {
+function WeddingShortcuts({
+  active,
+  canViewFinancials,
+}: {
+  active: boolean;
+  canViewFinancials: boolean;
+}) {
   return (
     <nav aria-label="Wedding quick access" className="grid grid-cols-2 gap-2">
-      <a
-        href="#wedding-contracts"
-        className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm"
-      >
-        <FileSignature className="h-4 w-4" />
-        Contracts
-      </a>
-      <a
-        href="#wedding-invoices"
-        className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm"
-      >
-        <CreditCard className="h-4 w-4" />
-        Payments
-      </a>
+      {canViewFinancials && (
+        <a
+          href="#wedding-contracts"
+          className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm"
+        >
+          <FileSignature className="h-4 w-4" />
+          Contracts
+        </a>
+      )}
+      {canViewFinancials && (
+        <a
+          href="#wedding-invoices"
+          className="flex min-h-14 items-center justify-center gap-2 rounded-xl border border-border bg-surface px-3 text-sm"
+        >
+          <CreditCard className="h-4 w-4" />
+          Payments
+        </a>
+      )}
       {active && (
         <Link
           to="/wedding-content"

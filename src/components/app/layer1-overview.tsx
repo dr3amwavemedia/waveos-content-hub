@@ -44,6 +44,7 @@ import { PortalReturnHint } from "@/components/app/portal-return-hint";
 import { nextInvoicePaymentCents, nextInvoicePaymentLabel } from "@/lib/invoice-payment-schedule";
 import { serviceFeePercentLabel } from "@/lib/invoice-service-fee";
 import { AuthorizeAutopayButton } from "@/components/app/authorize-autopay-button";
+import { canViewClientFinancials } from "@/lib/client-account-access";
 
 export type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
 /** One recorded transaction against an invoice (card payment, automatic charge, import or refund). */
@@ -170,6 +171,7 @@ export function Layer1Overview() {
   const { data: user } = useCurrentUser();
   const { activeWorkspace } = useWorkspace();
   const wsId = activeWorkspace?.id;
+  const canViewFinancials = canViewClientFinancials(activeWorkspace?.role);
   useEffect(() => {
     const reveal = () => {
       const id = window.location.hash.slice(1);
@@ -217,7 +219,7 @@ export function Layer1Overview() {
 
   const invoicesQ = useQuery({
     queryKey: ["layer1", "invoices", wsId],
-    enabled: !!wsId,
+    enabled: !!wsId && canViewFinancials,
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -232,7 +234,7 @@ export function Layer1Overview() {
   });
   const autopayQ = useQuery({
     queryKey: ["layer1", "autopay", wsId],
-    enabled: !!wsId,
+    enabled: !!wsId && canViewFinancials,
     staleTime: 15_000,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -249,7 +251,7 @@ export function Layer1Overview() {
 
   const paymentsQ = useQuery({
     queryKey: ["layer1", "payments", wsId],
-    enabled: !!wsId,
+    enabled: !!wsId && canViewFinancials,
     staleTime: 15_000,
     queryFn: async (): Promise<PaymentEntry[]> => {
       const { data, error } = await supabase
@@ -265,7 +267,7 @@ export function Layer1Overview() {
 
   const contractsQ = useQuery({
     queryKey: ["layer1", "contracts", wsId],
-    enabled: !!wsId,
+    enabled: !!wsId && canViewFinancials,
     staleTime: 30_000,
     queryFn: async (): Promise<Contract[]> => {
       const { data, error } = await externalDb
@@ -356,7 +358,10 @@ export function Layer1Overview() {
     ? STATUS_LABELS[wsMetaQ.data.account_status]
     : null;
 
-  const primaryAction = derivePrimaryAction(primaryInvoice, primaryDelivery);
+  const primaryAction = derivePrimaryAction(
+    canViewFinancials ? primaryInvoice : null,
+    primaryDelivery,
+  );
 
   return (
     <div className="space-y-8">
@@ -389,10 +394,13 @@ export function Layer1Overview() {
       </div>
 
       <nav aria-label="Your workspace tools" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          { id: "invoices", label: "Invoices", count: activeInvoices.length },
-          { id: "contracts", label: "Contracts", count: activeContracts.length },
-        ].map((item) => (
+        {(canViewFinancials
+          ? [
+              { id: "invoices", label: "Invoices", count: activeInvoices.length },
+              { id: "contracts", label: "Contracts", count: activeContracts.length },
+            ]
+          : []
+        ).map((item) => (
           <a
             key={item.id}
             href={`#${item.id}`}
@@ -505,83 +513,89 @@ export function Layer1Overview() {
       </section>
 
       {/* Contracts */}
-      <ExpandableSection
-        title="Contracts"
-        id="contracts"
-        className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4"
-      >
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          <h2 className="text-lg font-semibold text-foreground">Contracts & Agreements</h2>
-          {activeContracts.length > 1 && (
-            <span className="text-xs text-muted-foreground">
-              {activeContracts.length} contracts
-            </span>
+      {canViewFinancials && (
+        <ExpandableSection
+          title="Contracts"
+          id="contracts"
+          className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4"
+        >
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <h2 className="text-lg font-semibold text-foreground">Contracts & Agreements</h2>
+            {activeContracts.length > 1 && (
+              <span className="text-xs text-muted-foreground">
+                {activeContracts.length} contracts
+              </span>
+            )}
+          </div>
+          {contractsQ.isLoading ? (
+            <div className="surface-card p-5 text-sm text-muted-foreground">Loading contracts…</div>
+          ) : contractsQ.isError ? (
+            <div className="surface-card p-5 text-sm text-destructive">
+              Contracts could not be loaded. Refresh the page to try again.
+            </div>
+          ) : activeContracts.length > 0 ? (
+            <div className="space-y-3">
+              {activeContracts.map((contract) => (
+                <ContractCard key={contract.id} contract={contract} />
+              ))}
+            </div>
+          ) : (
+            <PolishedEmpty
+              icon={FileText}
+              body="No contracts need your attention. Completed agreements are saved in Settings."
+            />
           )}
-        </div>
-        {contractsQ.isLoading ? (
-          <div className="surface-card p-5 text-sm text-muted-foreground">Loading contracts…</div>
-        ) : contractsQ.isError ? (
-          <div className="surface-card p-5 text-sm text-destructive">
-            Contracts could not be loaded. Refresh the page to try again.
-          </div>
-        ) : activeContracts.length > 0 ? (
-          <div className="space-y-3">
-            {activeContracts.map((contract) => (
-              <ContractCard key={contract.id} contract={contract} />
-            ))}
-          </div>
-        ) : (
-          <PolishedEmpty
-            icon={FileText}
-            body="No contracts need your attention. Completed agreements are saved in Settings."
-          />
-        )}
-      </ExpandableSection>
+        </ExpandableSection>
+      )}
 
       {/* Invoices */}
-      <ExpandableSection
-        title="Invoices & Payments"
-        id="invoices"
-        className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4"
-      >
-        <div className="flex flex-wrap items-end justify-between gap-2">
-          {activeInvoices.length > 1 && (
-            <span className="text-xs text-muted-foreground">
-              {activeInvoices.length} open invoices · newest first
-            </span>
+      {canViewFinancials && (
+        <ExpandableSection
+          title="Invoices & Payments"
+          id="invoices"
+          className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4"
+        >
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            {activeInvoices.length > 1 && (
+              <span className="text-xs text-muted-foreground">
+                {activeInvoices.length} open invoices · newest first
+              </span>
+            )}
+          </div>
+          {invoicesQ.isLoading ? (
+            <div className="surface-card p-5 text-sm text-muted-foreground">Loading invoices…</div>
+          ) : invoicesQ.isError ? (
+            <div className="surface-card p-5 text-sm text-destructive">
+              Invoices could not be loaded. Refresh the page to try again.
+            </div>
+          ) : activeInvoices.length > 0 ? (
+            <div className="space-y-3">
+              {activeInvoices.map((invoice) => (
+                <InvoiceCard
+                  key={invoice.id}
+                  invoice={invoice}
+                  clientName={projectName}
+                  autopay={
+                    (autopayQ.data ?? []).find((schedule) =>
+                      schedule.current_invoice_id
+                        ? schedule.current_invoice_id === invoice.id
+                        : schedule.source_invoice_id === invoice.id,
+                    ) ?? null
+                  }
+                  payments={(paymentsQ.data ?? []).filter(
+                    (entry) => entry.invoice_id === invoice.id,
+                  )}
+                />
+              ))}
+            </div>
+          ) : (
+            <PolishedEmpty
+              icon={FileText}
+              body="No payments need your attention. Paid invoices and receipts are saved in Settings."
+            />
           )}
-        </div>
-        {invoicesQ.isLoading ? (
-          <div className="surface-card p-5 text-sm text-muted-foreground">Loading invoices…</div>
-        ) : invoicesQ.isError ? (
-          <div className="surface-card p-5 text-sm text-destructive">
-            Invoices could not be loaded. Refresh the page to try again.
-          </div>
-        ) : activeInvoices.length > 0 ? (
-          <div className="space-y-3">
-            {activeInvoices.map((invoice) => (
-              <InvoiceCard
-                key={invoice.id}
-                invoice={invoice}
-                clientName={projectName}
-                autopay={
-                  (autopayQ.data ?? []).find((schedule) =>
-                    schedule.current_invoice_id
-                      ? schedule.current_invoice_id === invoice.id
-                      : schedule.source_invoice_id === invoice.id,
-                  ) ?? null
-                }
-                payments={(paymentsQ.data ?? []).filter((entry) => entry.invoice_id === invoice.id)}
-              />
-            ))}
-          </div>
-        ) : (
-          <PolishedEmpty
-            icon={FileText}
-            body="No payments need your attention. Paid invoices and receipts are saved in Settings."
-          />
-        )}
-      </ExpandableSection>
+        </ExpandableSection>
+      )}
 
       {/* Content */}
       <section id="your-content" className="scroll-mt-24 space-y-3">
