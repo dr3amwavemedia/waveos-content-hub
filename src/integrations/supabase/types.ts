@@ -660,6 +660,7 @@ export type Database = {
           created_by: string | null
           currency: string
           description: string | null
+          delivery_lock_enabled: boolean
           discount_type: string | null
           discount_value: number | null
           due_at: string | null
@@ -693,6 +694,7 @@ export type Database = {
           created_by?: string | null
           currency?: string
           description?: string | null
+          delivery_lock_enabled?: boolean
           discount_type?: string | null
           discount_value?: number | null
           due_at?: string | null
@@ -726,6 +728,7 @@ export type Database = {
           created_by?: string | null
           currency?: string
           description?: string | null
+          delivery_lock_enabled?: boolean
           discount_type?: string | null
           discount_value?: number | null
           due_at?: string | null
@@ -1766,6 +1769,39 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_delivery_locks: {
+        Row: {
+          created_at: string
+          delivery_id: string
+          invoice_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_id: string
+          invoice_id: string
+        }
+        Update: {
+          created_at?: string
+          delivery_id?: string
+          invoice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_delivery_locks_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "client_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_delivery_locks_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "client_invoices"
             referencedColumns: ["id"]
           },
         ]
@@ -3831,6 +3867,10 @@ export type Database = {
       next_service_invoice_number: {
         Args: { _workspace_id: string }
         Returns: string
+      }
+      delivery_access_unlocked: {
+        Args: { _delivery_id: string }
+        Returns: boolean
       }
       notify_delivery_revisions_updated: {
         Args: { _delivery_id: string }

@@ -62,6 +62,8 @@ function PaymentReturn() {
     if (!query.data?.confirmed) return;
     void queryClient.invalidateQueries({ queryKey: ["layer1", "invoices"] });
     void queryClient.invalidateQueries({ queryKey: ["client-invoices"] });
+    void queryClient.invalidateQueries({ queryKey: ["layer1", "deliveries"] });
+    void queryClient.invalidateQueries({ queryKey: ["your-content"] });
   }, [query.data?.confirmed, queryClient]);
 
   const view = useMemo(() => {

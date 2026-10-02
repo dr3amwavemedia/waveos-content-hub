@@ -67,6 +67,7 @@ import { invitationContact } from "@/lib/invitation-contact";
 import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display";
 import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
+import { Switch } from "@/components/ui/switch";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -116,6 +117,7 @@ type InvoiceListItem = Pick<
   | "discount_value"
   | "service_fee_percent"
   | "service_fee_cents"
+  | "delivery_lock_enabled"
 >;
 type CrmAccountRow = Database["public"]["Tables"]["crm_accounts"]["Row"];
 type CrmContactRow = Pick<
@@ -1945,6 +1947,8 @@ function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
         _delivery_id: deliveryId,
       });
       if (error) throw error;
+      const inApp = typeof data === "number" ? data : 0;
+      if (inApp < 0) return { locked: true, inApp: 0, email: { sent: 0 } };
       const delivery = q.data?.find((item) => item.id === deliveryId);
       const email = await tryEmail(() =>
         sendWorkspaceEmail({
@@ -1954,16 +1958,21 @@ function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
           url: delivery?.url,
         }),
       );
-      return { inApp: typeof data === "number" ? data : 0, email };
+      return { locked: false, inApp, email };
     },
-    onSuccess: ({ inApp: recipientCount, email }) =>
+    onSuccess: ({ locked, inApp: recipientCount, email }) => {
+      if (locked) {
+        toast.success("Revisions saved. Client access will unlock after the invoice is paid.");
+        return;
+      }
       toast.success(
         email.sent
           ? `Revision update emailed to ${email.sent} client member${email.sent === 1 ? "" : "s"}.`
           : recipientCount === 1
             ? "Revision notification sent to 1 client member."
             : `Revision notification sent to ${recipientCount} client members.`,
-      ),
+      );
+    },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Could not notify the client."),
   });
@@ -2066,21 +2075,27 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
         }
         throw error;
       }
-      await tryEmail(() =>
-        sendWorkspaceEmail({
-          workspaceId,
-          event: "content_added",
-          title: title.trim(),
-          url: trimmed,
-        }),
-      );
-      return data;
+      const access = await db.rpc("delivery_access_unlocked", { _delivery_id: data.id });
+      if (access.error) throw access.error;
+      if (access.data === true) {
+        await tryEmail(() =>
+          sendWorkspaceEmail({
+            workspaceId,
+            event: "content_added",
+            title: title.trim(),
+            url: trimmed,
+          }),
+        );
+      }
+      return { ...data, locked: access.data !== true };
     },
-    onSuccess: () => {
+    onSuccess: ({ locked }) => {
       qc.invalidateQueries({ queryKey: ["client-deliveries", workspaceId] });
       qc.invalidateQueries({ queryKey: ["your-content", workspaceId] });
       qc.invalidateQueries({ queryKey: ["layer1", "deliveries", workspaceId] });
-      toast.success("Delivery added.");
+      toast.success(
+        locked ? "Delivery added and locked until the invoice is paid." : "Delivery added.",
+      );
       onDone();
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
@@ -2551,7 +2566,7 @@ function InvoicesTab({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
       const invoiceColumns =
-        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,service_fee_percent,service_fee_cents,checkout_payment_type,checkout_payment_cents";
+        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,service_fee_percent,service_fee_cents,checkout_payment_type,checkout_payment_cents,delivery_lock_enabled";
       const { data, error } = await supabase
         .from("client_invoices")
         .select(`${invoiceColumns},line_items`)
@@ -2594,6 +2609,28 @@ function InvoicesTab({
       toast.success("Invoice removed.");
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
+  });
+
+  const updateDeliveryLock = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      const { error } = await supabase
+        .from("client_invoices")
+        .update({ delivery_lock_enabled: enabled })
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
+      if (error) throw error;
+      return { id, enabled };
+    },
+    onSuccess: async ({ enabled }) => {
+      await refreshInvoices();
+      toast.success(
+        enabled
+          ? "Invoice lock is on for new and revised deliveries."
+          : "Invoice lock is off. Associated deliveries are available now.",
+      );
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not update the invoice lock."),
   });
 
   return (
@@ -2652,7 +2689,7 @@ function InvoicesTab({
           {q.data!.map((i) => (
             <li
               key={i.id}
-              className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-surface/40 p-3"
+              className="flex flex-col items-stretch justify-between gap-3 rounded-lg border border-border/60 bg-surface/40 p-3 sm:flex-row sm:items-start"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -2719,7 +2756,21 @@ function InvoicesTab({
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <div
+                  className="mr-1 flex min-h-11 items-center gap-2 rounded-lg border border-border/60 px-2.5 text-xs text-muted-foreground"
+                  title="Lock deliveries created or revised while this invoice is unpaid"
+                >
+                  <Switch
+                    checked={i.delivery_lock_enabled}
+                    disabled={updateDeliveryLock.isPending}
+                    onCheckedChange={(enabled) => updateDeliveryLock.mutate({ id: i.id, enabled })}
+                    aria-label={`${i.number || "Invoice"} delivery lock`}
+                  />
+                  <span className="whitespace-nowrap">
+                    Delivery lock {i.delivery_lock_enabled ? "on" : "off"}
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
