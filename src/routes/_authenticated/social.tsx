@@ -779,7 +779,10 @@ function AccountsView({
   const status = useQuery({
     queryKey: ["zernio-status", workspaceId],
     queryFn: () => getStatus({ data: { workspaceId } }),
+    retry: (count, error) => !(error instanceof Error && error.message === "forbidden") && count < 2,
   });
+  const statusErrorForbidden =
+    status.error instanceof Error && status.error.message === "forbidden";
 
   const refresh = async (quiet = false) => {
     setBusy("refresh");
@@ -885,18 +888,32 @@ function AccountsView({
           />
           <div className="min-w-0 flex-1">
             <h2 className="font-semibold text-foreground">
-              {!status.data?.configured
-                ? "Zernio key needs deployment setup"
-                : status.data.hasProfile
-                  ? `Zernio is ready for ${status.data.profileName ?? "this client"}`
-                  : "Prepare this client's publishing profile"}
+              {status.isPending
+                ? "Checking publishing setup…"
+                : status.isError
+                  ? statusErrorForbidden
+                    ? "Social publishing isn't included in this client's plan"
+                    : "Couldn't check publishing setup"
+                  : !status.data?.configured
+                    ? "Zernio key needs deployment setup"
+                    : status.data.hasProfile
+                      ? `Zernio is ready for ${status.data.profileName ?? "this client"}`
+                      : "Prepare this client's publishing profile"}
             </h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              {!status.data?.configured
-                ? "Add ZERNIO_API_KEY to the deployment secrets. WaveOS will never expose its value in the browser."
-                : status.data.hasProfile
-                  ? "Each client stays isolated in its own Zernio profile. Refresh runs live account-health checks before publishing."
-                  : "One click creates a separate Zernio profile for this workspace; it does not publish anything."}
+              {status.isPending
+                ? "One moment."
+                : status.isError
+                  ? statusErrorForbidden
+                    ? "Connecting social accounts is available on the Full Retainer and Social Management plans. Change this client's plan in Clients to turn it on."
+                    : status.error instanceof Error
+                      ? status.error.message
+                      : "Please try again in a moment."
+                  : !status.data?.configured
+                    ? "Add ZERNIO_API_KEY to the deployment secrets. WaveOS will never expose its value in the browser."
+                    : status.data.hasProfile
+                      ? "Each client stays isolated in its own Zernio profile. Refresh runs live account-health checks before publishing."
+                      : "One click creates a separate Zernio profile for this workspace; it does not publish anything."}
             </p>
             {status.data?.lastError && (
               <p className="mt-2 text-xs text-rose-300">Last check: {status.data.lastError}</p>
