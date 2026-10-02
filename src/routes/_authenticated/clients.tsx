@@ -505,7 +505,7 @@ function ClientsPage() {
                     key={w.id}
                     type="button"
                     onClick={() => setSelectedWs(w)}
-                    className="group flex min-h-24 items-center gap-4 rounded-2xl border border-border bg-surface/70 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-elevated/70 hover:shadow-[var(--shadow-glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    className="group flex min-h-24 w-full min-w-0 items-center gap-4 rounded-2xl border border-border bg-surface/70 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-elevated/70 hover:shadow-[var(--shadow-glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     aria-label={`Open ${clientName} profile`}
                   >
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-sm font-semibold text-primary transition group-hover:border-primary/40 group-hover:bg-primary/15">
