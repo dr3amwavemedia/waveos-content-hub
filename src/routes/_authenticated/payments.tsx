@@ -548,7 +548,7 @@ function PaymentsPage() {
             </div>
             {chartData.length ? (
               <div
-                className="w-full overflow-x-auto pb-2"
+                className="w-full min-w-0 max-w-full overflow-x-auto pb-2"
                 aria-label="Cash collected, refunds, and expected incoming chart"
               >
                 <div className="h-72 min-w-[42rem] sm:h-80 sm:min-w-0">
@@ -688,7 +688,7 @@ function PaymentsPage() {
             </div>
           )}
         </section>
-        <section className="rounded-2xl border border-border bg-card p-6">
+        <section className="rounded-2xl border border-border bg-card p-4 sm:p-6">
           <h2 className="text-xl font-semibold">Import Bloom CSV</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Drop in a full Bloom export. WaveOS reads the columns on its own, works out which rows
@@ -699,6 +699,7 @@ function PaymentsPage() {
           <div className="mt-5 flex flex-wrap items-center gap-4">
             <input
               aria-label="Bloom CSV file"
+              className="w-full min-w-0 max-w-full text-sm"
               type="file"
               accept=".csv,text/csv"
               onChange={(event) => {
