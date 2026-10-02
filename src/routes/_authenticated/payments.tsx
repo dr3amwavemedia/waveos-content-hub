@@ -548,7 +548,7 @@ function PaymentsPage() {
             </div>
             {chartData.length ? (
               <div
-                className="w-full overflow-x-auto pb-2"
+                className="w-full min-w-0 max-w-full overflow-x-auto pb-2"
                 aria-label="Cash collected, refunds, and expected incoming chart"
               >
                 <div className="h-72 min-w-[42rem] sm:h-80 sm:min-w-0">
