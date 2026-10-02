@@ -117,13 +117,16 @@ async function loadWorkspaces(
   if (membershipError) throw membershipError;
   const membershipMap = new Map((memberships ?? []).map((m) => [m.workspace_id, m.role]));
 
+  // Staff always keep the shared Dream Wave staff workspace, plus any
+  // workspaces they personally belong to (e.g. their own personal workspace).
+  const ownIds = Array.from(membershipMap.keys());
   const workspaceIds = previewWorkspaceId
     ? [previewWorkspaceId]
     : ctx.isDreamWaveOwner
-      ? [STAFF_WORKSPACE_ID]
+      ? [STAFF_WORKSPACE_ID, ...ownIds]
       : ctx.isStaff && ctx.staffType !== "media_manager"
-        ? [STAFF_WORKSPACE_ID]
-        : Array.from(membershipMap.keys());
+        ? [STAFF_WORKSPACE_ID, ...ownIds]
+        : ownIds;
 
   if (!workspaceIds.length && ctx.staffType !== "media_manager") return [];
 
@@ -151,11 +154,20 @@ async function loadWorkspaces(
               : {};
           return (
             workspace.id === STAFF_WORKSPACE_ID ||
+            membershipMap.has(workspace.id) ||
             workspace.access_tier === "social_management" ||
             overrides.social_management_access === true
           );
         })
       : (workspaces ?? []);
+
+  // A user's own workspace (where they are the owner member) sorts first so
+  // staff land in their personal workspace instead of the shared staff one.
+  visibleWorkspaces.sort((a, b) => {
+    const aOwn = membershipMap.get(a.id) === "owner" ? 0 : 1;
+    const bOwn = membershipMap.get(b.id) === "owner" ? 0 : 1;
+    return aOwn - bOwn;
+  });
 
   return visibleWorkspaces.map((w) => {
     const role = membershipMap.get(w.id);
