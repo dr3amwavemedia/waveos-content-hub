@@ -52,6 +52,16 @@ export async function applyStripeCheckoutPayment(
     checkoutPaymentType: invoice.checkout_payment_type,
     checkoutPaymentCents: invoice.checkout_payment_cents,
   });
+  // The checkout may collect the scheduled minimum, the full remaining
+  // balance, or any amount in between (createInvoiceCheckout enforces those
+  // bounds). Accept any paid amount within them; when the session recorded the
+  // amount it was created for, require an exact match with that too.
+  const balance = Math.max(total - alreadyPaid, 0);
+  const declaredAmount = Number(session.metadata?.payment_amount_cents ?? NaN);
+  const amountMatches =
+    received >= expectedDue &&
+    received <= balance &&
+    (Number.isSafeInteger(declaredAmount) ? received === declaredAmount : true);
   const matchesInvoice =
     session.payment_status === "paid" &&
     stripeModeMatches(session.livemode) &&
@@ -59,7 +69,7 @@ export async function applyStripeCheckoutPayment(
     session.client_reference_id === invoice.id &&
     session.metadata?.invoice_id === invoice.id &&
     String(session.currency ?? "").toUpperCase() === invoice.currency.toUpperCase() &&
-    received === expectedDue;
+    amountMatches;
 
   if (!paymentId || !Number.isSafeInteger(received) || received <= 0) {
     return { kind: "invalid", paidNow: alreadyPaid, settled: false };

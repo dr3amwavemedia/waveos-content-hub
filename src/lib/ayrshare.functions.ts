@@ -8,6 +8,10 @@ export const getIntegrationStatus = createServerFn({ method: "GET" })
     const { envReady } = await import("./ayrshare.server");
     const cfg = envReady();
     return {
+      zernio: {
+        api_key: Boolean(process.env.ZERNIO_API_KEY),
+        webhook_secret: Boolean(process.env.ZERNIO_WEBHOOK_SECRET),
+      },
       ayrshare: {
         api_key: Boolean(cfg.apiKey),
         domain: Boolean(cfg.domain),

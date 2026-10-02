@@ -42,6 +42,7 @@ import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedPostsRouteImport } from './routes/_authenticated/posts'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedSocialRouteImport } from './routes/_authenticated/social'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
@@ -74,6 +75,7 @@ import { Route as ApiPublicHooksChargeAutopayDueRouteImport } from './routes/api
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 import { Route as ApiPublicHooksSignwellRouteImport } from './routes/api/public/hooks/signwell'
 import { Route as ApiPublicHooksStripeRouteImport } from './routes/api/public/hooks/stripe'
+import { Route as ApiPublicHooksZernioRouteImport } from './routes/api/public/hooks/zernio'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -240,6 +242,11 @@ const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedSocialRoute = AuthenticatedSocialRouteImport.update({
+  id: '/social',
+  path: '/social',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedSocialAccountsRoute =
@@ -415,6 +422,11 @@ const ApiPublicHooksStripeRoute = ApiPublicHooksStripeRouteImport.update({
   path: '/api/public/hooks/stripe',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksZernioRoute = ApiPublicHooksZernioRouteImport.update({
+  id: '/api/public/hooks/zernio',
+  path: '/api/public/hooks/zernio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -449,6 +461,7 @@ export interface FileRoutesByFullPath {
   '/posts': typeof AuthenticatedPostsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/social': typeof AuthenticatedSocialRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/templates': typeof AuthenticatedTemplatesRoute
@@ -481,6 +494,7 @@ export interface FileRoutesByFullPath {
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
+  '/api/public/hooks/zernio': typeof ApiPublicHooksZernioRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -515,6 +529,7 @@ export interface FileRoutesByTo {
   '/posts': typeof AuthenticatedPostsRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/social': typeof AuthenticatedSocialRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/templates': typeof AuthenticatedTemplatesRoute
@@ -547,6 +562,7 @@ export interface FileRoutesByTo {
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
+  '/api/public/hooks/zernio': typeof ApiPublicHooksZernioRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -583,6 +599,7 @@ export interface FileRoutesById {
   '/_authenticated/posts': typeof AuthenticatedPostsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/social': typeof AuthenticatedSocialRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
@@ -615,6 +632,7 @@ export interface FileRoutesById {
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
+  '/api/public/hooks/zernio': typeof ApiPublicHooksZernioRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -651,6 +669,7 @@ export interface FileRouteTypes {
     | '/posts'
     | '/projects'
     | '/settings'
+    | '/social'
     | '/social-accounts'
     | '/staff-email'
     | '/templates'
@@ -683,6 +702,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/signwell'
     | '/api/public/hooks/stripe'
+    | '/api/public/hooks/zernio'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -717,6 +737,7 @@ export interface FileRouteTypes {
     | '/posts'
     | '/projects'
     | '/settings'
+    | '/social'
     | '/social-accounts'
     | '/staff-email'
     | '/templates'
@@ -749,6 +770,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/signwell'
     | '/api/public/hooks/stripe'
+    | '/api/public/hooks/zernio'
   id:
     | '__root__'
     | '/'
@@ -784,6 +806,7 @@ export interface FileRouteTypes {
     | '/_authenticated/posts'
     | '/_authenticated/projects'
     | '/_authenticated/settings'
+    | '/_authenticated/social'
     | '/_authenticated/social-accounts'
     | '/_authenticated/staff-email'
     | '/_authenticated/templates'
@@ -816,6 +839,7 @@ export interface FileRouteTypes {
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/signwell'
     | '/api/public/hooks/stripe'
+    | '/api/public/hooks/zernio'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -849,6 +873,7 @@ export interface RootRouteChildren {
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
   ApiPublicHooksSignwellRoute: typeof ApiPublicHooksSignwellRoute
   ApiPublicHooksStripeRoute: typeof ApiPublicHooksStripeRoute
+  ApiPublicHooksZernioRoute: typeof ApiPublicHooksZernioRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1084,6 +1109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/social': {
+      id: '/_authenticated/social'
+      path: '/social'
+      fullPath: '/social'
+      preLoaderRoute: typeof AuthenticatedSocialRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/social-accounts': {
       id: '/_authenticated/social-accounts'
       path: '/social-accounts'
@@ -1308,6 +1340,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksStripeRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/zernio': {
+      id: '/api/public/hooks/zernio'
+      path: '/api/public/hooks/zernio'
+      fullPath: '/api/public/hooks/zernio'
+      preLoaderRoute: typeof ApiPublicHooksZernioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -1348,6 +1387,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPostsRoute: typeof AuthenticatedPostsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedSocialRoute: typeof AuthenticatedSocialRoute
   AuthenticatedSocialAccountsRoute: typeof AuthenticatedSocialAccountsRoute
   AuthenticatedStaffEmailRoute: typeof AuthenticatedStaffEmailRoute
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
@@ -1381,6 +1421,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPostsRoute: AuthenticatedPostsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedSocialRoute: AuthenticatedSocialRoute,
   AuthenticatedSocialAccountsRoute: AuthenticatedSocialAccountsRoute,
   AuthenticatedStaffEmailRoute: AuthenticatedStaffEmailRoute,
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
@@ -1457,6 +1498,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
   ApiPublicHooksSignwellRoute: ApiPublicHooksSignwellRoute,
   ApiPublicHooksStripeRoute: ApiPublicHooksStripeRoute,
+  ApiPublicHooksZernioRoute: ApiPublicHooksZernioRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

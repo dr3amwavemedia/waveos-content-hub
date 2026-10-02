@@ -6,8 +6,12 @@ import {
   Calendar as CalendarIcon,
   CalendarClock,
   Check,
+  ChevronRight,
   Cloud,
+  FileImage,
   FileText,
+  FileVideo,
+  FolderOpen,
   ImagePlus,
   Loader2,
   Plus,
@@ -34,6 +38,7 @@ import {
   startExternalMediaConnection,
   type ExternalMediaProvider,
   type ExternalProviderFile,
+  type ExternalProviderFolder,
 } from "@/hooks/use-external-media";
 import {
   getFrameioWorkspaceStatus,
@@ -60,11 +65,16 @@ import { useCurrentUser } from "@/hooks/use-waveos";
 
 export const Route = createFileRoute("/_authenticated/create")({
   component: () => (
-    <RequireFeature feature="can_create_content" title="Content creation isn't included in your plan">
+    <RequireFeature
+      feature="can_connect_socials"
+      title="Social content creation isn't included in your plan"
+      description="Social planning and post creation are available on Full Retainer and Social Management plans."
+    >
       <CreatePost />
     </RequireFeature>
   ),
-  validateSearch: (s: Record<string, unknown>): { id?: string } => (typeof s.id === "string" ? { id: s.id } : {}),
+  validateSearch: (s: Record<string, unknown>): { id?: string } =>
+    typeof s.id === "string" ? { id: s.id } : {},
   head: () => ({
     meta: [{ title: "Create Post — WaveOS" }, { name: "robots", content: "noindex" }],
   }),
@@ -130,7 +140,11 @@ function CreatePost() {
       }
 
       if (Array.isArray(parsed.pickedMedia)) {
-        setPickedMedia(parsed.pickedMedia.filter((mediaId: unknown): mediaId is string => typeof mediaId === "string"));
+        setPickedMedia(
+          parsed.pickedMedia.filter(
+            (mediaId: unknown): mediaId is string => typeof mediaId === "string",
+          ),
+        );
       }
 
       if (typeof parsed.scheduledAt === "string") {
@@ -145,7 +159,10 @@ function CreatePost() {
 
     const timeout = window.setTimeout(() => {
       const hasDraftContent =
-        title.trim().length > 0 || caption.trim().length > 0 || pickedMedia.length > 0 || scheduledAt.length > 0;
+        title.trim().length > 0 ||
+        caption.trim().length > 0 ||
+        pickedMedia.length > 0 ||
+        scheduledAt.length > 0;
 
       if (!hasDraftContent) {
         window.localStorage.removeItem(draftStorageKey);
@@ -194,8 +211,11 @@ function CreatePost() {
   }, [title, caption, platforms, pickedMedia, scheduledAt]);
   const status = existing.data?.item?.status ?? "draft";
   const locked = status === "published" || status === "publishing" || status === "in_review";
-  const isStaffWorkspace = Boolean(user?.isStaff && activeWorkspace?.id === "11111111-1111-1111-1111-111111111111");
-  const needsApproval = status !== "approved" && !isStaffWorkspace && activeWorkspace?.approval_required !== false;
+  const isStaffWorkspace = Boolean(
+    user?.isStaff && activeWorkspace?.id === "11111111-1111-1111-1111-111111111111",
+  );
+  const needsApproval =
+    status !== "approved" && !isStaffWorkspace && activeWorkspace?.approval_required !== false;
 
   if (!activeWorkspace) {
     return (
@@ -354,14 +374,21 @@ function CreatePost() {
         toast.success(
           `Published to ${res.success}; ${res.pending} channel${res.pending === 1 ? " is" : "s are"} still processing`,
         );
-      else toast.warning(`Published to ${res.success}, ${res.failed} failed — open Posts to retry`);
-      navigate({ to: "/posts" });
+      else
+        toast.warning(
+          `Published to ${res.success}, ${res.failed} failed — open Posts & insights to retry`,
+        );
+      navigate({ to: "/social", search: { view: "posts" } });
     } catch (e) {
       const message = (e as Error).message;
       if (message === "frameio_share_not_ready") {
-        toast.error("Frame.io media is not ready. Re-sync the assigned Frame.io Share and try again.");
+        toast.error(
+          "Frame.io media is not ready. Re-sync the assigned Frame.io Share and try again.",
+        );
       } else if (message === "frameio_file_removed_from_share") {
-        toast.error("This file is no longer in the assigned Frame.io Share. Pick it again or choose another file.");
+        toast.error(
+          "This file is no longer in the assigned Frame.io Share. Pick it again or choose another file.",
+        );
       } else {
         toast.error(message);
       }
@@ -382,7 +409,9 @@ function CreatePost() {
   }
 
   function handleStartNew() {
-    const hasWork = Boolean(savedId || title.trim() || caption.trim() || pickedMedia.length || scheduledAt);
+    const hasWork = Boolean(
+      savedId || title.trim() || caption.trim() || pickedMedia.length || scheduledAt,
+    );
     if (
       hasWork &&
       !confirm(
@@ -418,7 +447,9 @@ function CreatePost() {
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div>
-            <h1 className="text-xl font-semibold text-foreground">{savedId ? "Edit post" : "Create post"}</h1>
+            <h1 className="text-xl font-semibold text-foreground">
+              {savedId ? "Edit post" : "Create post"}
+            </h1>
             <p className="text-xs uppercase tracking-widest text-muted-foreground">
               {activeWorkspace.name} · Status: {status.replace("_", " ")}
             </p>
@@ -470,15 +501,27 @@ function CreatePost() {
             ) : (
               <CalendarClock className="h-4 w-4" />
             )}
-            {status === "in_review" ? "Waiting for approval" : needsApproval ? "Post approval" : "Schedule later"}
+            {status === "in_review"
+              ? "Waiting for approval"
+              : needsApproval
+                ? "Post approval"
+                : "Schedule later"}
           </button>
           <button
             disabled={locked || publishing !== null || !caption.trim() || !platforms.length}
             onClick={handlePublishNow}
             className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
           >
-            {publishing === "now" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            {status === "in_review" ? "Waiting for approval" : needsApproval ? "Send for approval" : "Publish now"}
+            {publishing === "now" ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+            {status === "in_review"
+              ? "Waiting for approval"
+              : needsApproval
+                ? "Send for approval"
+                : "Publish now"}
           </button>
         </div>
       </div>
@@ -538,6 +581,7 @@ function CreatePost() {
               picked={pickedMedia}
               onRemove={(id) => setPickedMedia((cur) => cur.filter((x) => x !== id))}
             />
+            <PlatformMediaGuide platforms={platforms} />
           </div>
 
           <div className="surface-card p-5">
@@ -562,7 +606,9 @@ function CreatePost() {
                     return current;
                   }
 
-                  const nextPlatforms = isEnabled ? current.filter((platform) => platform !== p) : [...current, p];
+                  const nextPlatforms = isEnabled
+                    ? current.filter((platform) => platform !== p)
+                    : [...current, p];
 
                   if (activePlatform === p && isEnabled) {
                     setActivePlatform(nextPlatforms[0]);
@@ -612,7 +658,9 @@ function CreatePost() {
                 className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60"
               />
             </div>
-            <p className="text-[11px] text-muted-foreground">Leave empty to publish immediately after approval.</p>
+            <p className="text-[11px] text-muted-foreground">
+              Leave empty to publish immediately after approval.
+            </p>
           </div>
 
           <div className="surface-card space-y-3 p-5">
@@ -640,16 +688,121 @@ function CreatePost() {
   );
 }
 
+const PLATFORM_MEDIA_GUIDE: Record<
+  SocialPlatform,
+  { image: string; video: string; accent: string }
+> = {
+  instagram: {
+    image: "Feed 1080×1350 · Story 1080×1920",
+    video: "Reel/Story 1080×1920 · MP4 or MOV",
+    accent: "border-fuchsia-400/30 bg-fuchsia-400/10",
+  },
+  facebook: {
+    image: "Feed 1200×630 · Story 1080×1920",
+    video: "Feed 1280×720+ · Reel 9:16 · MP4 or MOV",
+    accent: "border-blue-400/30 bg-blue-400/10",
+  },
+  tiktok: {
+    image: "Portrait carousel · JPG or PNG",
+    video: "Vertical 1080×1920 · MP4 or MOV",
+    accent: "border-cyan-400/30 bg-cyan-400/10",
+  },
+  youtube: {
+    image: "Thumbnail 1280×720",
+    video: "Video 1920×1080 · Short 1080×1920",
+    accent: "border-red-400/30 bg-red-400/10",
+  },
+  linkedin: {
+    image: "Landscape 1200×627 · Square 1080×1080",
+    video: "Recommended 1920×1080 · MP4 or MOV",
+    accent: "border-sky-400/30 bg-sky-400/10",
+  },
+  x: {
+    image: "Landscape 1600×900 · JPG or PNG",
+    video: "Landscape 1920×1080 · MP4 or MOV",
+    accent: "border-slate-400/30 bg-slate-400/10",
+  },
+  pinterest: {
+    image: "Pin 1000×1500 (2:3)",
+    video: "Vertical 1080×1920 · MP4 or MOV",
+    accent: "border-rose-400/30 bg-rose-400/10",
+  },
+  threads: {
+    image: "Portrait 1080×1350 · JPG or PNG",
+    video: "Portrait 1080×1920 · MP4 or MOV",
+    accent: "border-zinc-400/30 bg-zinc-400/10",
+  },
+  bluesky: {
+    image: "Landscape 1200×675 · max 2000×2000",
+    video: "Recommended 1280×720 · MP4",
+    accent: "border-blue-300/30 bg-blue-300/10",
+  },
+  gmb: {
+    image: "Recommended 1200×900 · JPG or PNG",
+    video: "Google Business posts do not support video",
+    accent: "border-emerald-400/30 bg-emerald-400/10",
+  },
+  snapchat: {
+    image: "Story 1080×1920 · JPG or PNG",
+    video: "Story 1080×1920 · MP4",
+    accent: "border-yellow-300/30 bg-yellow-300/10",
+  },
+};
+
+function PlatformMediaGuide({ platforms }: { platforms: SocialPlatform[] }) {
+  return (
+    <div className="mt-4 border-t border-border pt-4">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Export guide for this post
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            WaveOS accepts JPG, PNG, MP4 and MOV. These are recommended publishing sizes, not upload
+            promises.
+          </p>
+        </div>
+        {platforms.includes("instagram") && (
+          <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[11px] font-medium text-amber-200">
+            4K is not the Instagram export target
+          </span>
+        )}
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {platforms.map((platform) => {
+          const guide = PLATFORM_MEDIA_GUIDE[platform];
+          return (
+            <div key={platform} className={cn("rounded-xl border p-3", guide.accent)}>
+              <p className="text-xs font-semibold text-foreground">{PLATFORM_LABEL[platform]}</p>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground/80">Image:</span> {guide.image}
+                <br />
+                <span className="font-medium text-foreground/80">Video:</span> {guide.video}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function CheckRow({ line, label }: { line: boolean; label: string }) {
   return (
     <div className="flex items-center gap-2 text-sm">
       <span
         className={cn(
           "flex h-5 w-5 items-center justify-center rounded-full border",
-          line ? "border-primary bg-primary/20 text-primary" : "border-border text-muted-foreground",
+          line
+            ? "border-primary bg-primary/20 text-primary"
+            : "border-border text-muted-foreground",
         )}
       >
-        {line ? <Check className="h-3 w-3" /> : <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />}
+        {line ? (
+          <Check className="h-3 w-3" />
+        ) : (
+          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
+        )}
       </span>
       <span className={cn(line ? "text-foreground" : "text-muted-foreground")}>{label}</span>
     </div>
@@ -699,7 +852,9 @@ function PlatformTabs({
               onClick={() => onActive(p)}
               className={cn(
                 "rounded-md px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors",
-                active === p ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                active === p
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               {PLATFORM_LABEL[p]}
@@ -839,7 +994,9 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
       ) : url && asset.mime_type.startsWith("video/") ? (
         <video src={url} className="h-full w-full object-cover" muted />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">{asset.name}</div>
+        <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+          {asset.name}
+        </div>
       )}
       <button
         onClick={onRemove}
@@ -873,7 +1030,9 @@ function MediaPicker({
     (async () => {
       const items = assets.data ?? [];
       const entries = await Promise.all(
-        items.map(async (a) => [a.id, (await getMediaPreviewUrl(a, 600, "thumbnail")) ?? ""] as const),
+        items.map(
+          async (a) => [a.id, (await getMediaPreviewUrl(a, 600, "thumbnail")) ?? ""] as const,
+        ),
       );
       setUrls(Object.fromEntries(entries));
     })();
@@ -887,18 +1046,23 @@ function MediaPicker({
             <div className="text-base font-semibold text-foreground">Pick from library</div>
             <div className="text-xs text-muted-foreground">{selected.length} selected</div>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:text-foreground">
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-muted-foreground hover:text-foreground"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="border-b border-border p-4">
           <div className="mb-3 flex flex-wrap gap-2">
-            {([
-              ["waveos", "WaveOS"],
-              ["google_drive", "Google Drive"],
-              ["dropbox", "Dropbox"],
-              ["frameio", "Frame.io"],
-            ] as const).map(([value, label]) => (
+            {(
+              [
+                ["waveos", "WaveOS"],
+                ["google_drive", "Google Drive"],
+                ["dropbox", "Dropbox"],
+                ["frameio", "Frame.io"],
+              ] as const
+            ).map(([value, label]) => (
               <button
                 key={value}
                 type="button"
@@ -958,14 +1122,24 @@ function MediaPicker({
                 return (
                   <button
                     key={a.id}
-                    onClick={() => setSelected((s) => (isSel ? s.filter((x) => x !== a.id) : [...s, a.id]))}
+                    onClick={() =>
+                      setSelected((s) => (isSel ? s.filter((x) => x !== a.id) : [...s, a.id]))
+                    }
                     className={cn(
                       "group relative aspect-square overflow-hidden rounded-lg border bg-elevated",
-                      isSel ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/40",
+                      isSel
+                        ? "border-primary ring-2 ring-primary/40"
+                        : "border-border hover:border-primary/40",
                     )}
                   >
-                    {urls[a.id] && (a.source_provider === "google_drive" || a.mime_type.startsWith("image/")) ? (
-                      <img src={urls[a.id]} alt={a.name} className="h-full w-full object-cover" loading="lazy" />
+                    {urls[a.id] &&
+                    (a.source_provider === "google_drive" || a.mime_type.startsWith("image/")) ? (
+                      <img
+                        src={urls[a.id]}
+                        alt={a.name}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
                     ) : urls[a.id] && a.mime_type.startsWith("video/") ? (
                       <video src={urls[a.id]} className="h-full w-full object-cover" muted />
                     ) : (
@@ -1036,7 +1210,8 @@ function FrameioProviderPicker({
           setLabel(result.label);
         }
       } catch (reason) {
-        if (active) setError(reason instanceof Error ? reason.message : "Could not load Frame.io media.");
+        if (active)
+          setError(reason instanceof Error ? reason.message : "Could not load Frame.io media.");
       } finally {
         if (active) setLoading(false);
       }
@@ -1053,7 +1228,9 @@ function FrameioProviderPicker({
       const result = await importFrameioWorkspaceMedia(workspaceId, chosen);
       onImported(result.imported.map((item) => item.id).filter((id) => !selected.includes(id)));
       setChosen([]);
-      toast.success(`Added ${result.imported.length} item${result.imported.length === 1 ? "" : "s"} from Frame.io.`);
+      toast.success(
+        `Added ${result.imported.length} item${result.imported.length === 1 ? "" : "s"} from Frame.io.`,
+      );
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : "Could not add Frame.io media.");
     } finally {
@@ -1062,41 +1239,118 @@ function FrameioProviderPicker({
   }
 
   if (loading)
-    return <div className="flex items-center justify-center py-16 text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Frame.io…</div>;
+    return (
+      <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Frame.io…
+      </div>
+    );
   if (!ready)
-    return <div className="py-16 text-center text-sm text-muted-foreground">Your Dream Wave team has not assigned a ready Frame.io gallery yet.</div>;
+    return (
+      <div className="py-16 text-center text-sm text-muted-foreground">
+        Your Dream Wave team has not assigned a ready Frame.io gallery yet.
+      </div>
+    );
   if (error) return <div className="py-16 text-center text-sm text-destructive">{error}</div>;
   return (
     <div className="space-y-4">
-      <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-elevated/60 px-3 py-2">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {label}
+          </div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">
+            Assigned Frame.io gallery · client-isolated
+          </div>
+        </div>
+        <span className="text-[11px] text-muted-foreground">JPG · PNG · MP4 · MOV only</span>
+      </div>
       {files.length ? (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {files.map((file) => {
             const isChosen = chosen.includes(file.id);
             return (
               <button
                 key={file.id}
                 type="button"
-                onClick={() => setChosen((current) => isChosen ? current.filter((id) => id !== file.id) : [...current, file.id])}
-                className={cn("group relative aspect-square overflow-hidden rounded-lg border bg-elevated", isChosen ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/40")}
+                onClick={() =>
+                  setChosen((current) =>
+                    isChosen ? current.filter((id) => id !== file.id) : [...current, file.id],
+                  )
+                }
+                className={cn(
+                  "group relative flex min-w-0 gap-3 overflow-hidden rounded-xl border bg-elevated p-3 text-left",
+                  isChosen
+                    ? "border-primary ring-2 ring-primary/40"
+                    : "border-border hover:border-primary/40",
+                )}
               >
-                {file.thumbnailUrl ? <img src={file.thumbnailUrl} alt={file.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="flex h-full items-center justify-center p-2 text-center text-[10px] text-muted-foreground">{file.name}</div>}
-                <span
-                  title={file.name}
-                  className="absolute inset-x-0 bottom-0 truncate bg-background/85 px-2 py-1.5 text-left text-[11px] font-medium text-foreground backdrop-blur-sm"
-                >
-                  {file.name}
+                {file.thumbnailUrl ? (
+                  <img
+                    src={file.thumbnailUrl}
+                    alt={file.name}
+                    className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                    loading="lazy"
+                  />
+                ) : (
+                  <span
+                    className={cn(
+                      "flex h-16 w-16 shrink-0 items-center justify-center rounded-lg",
+                      file.mediaType.startsWith("video/")
+                        ? "bg-violet-400/10 text-violet-300"
+                        : "bg-emerald-400/10 text-emerald-300",
+                    )}
+                  >
+                    {file.mediaType.startsWith("video/") ? (
+                      <FileVideo className="h-6 w-6" />
+                    ) : (
+                      <FileImage className="h-6 w-6" />
+                    )}
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span
+                    title={file.name}
+                    className="block truncate text-sm font-semibold text-foreground"
+                  >
+                    {file.name}
+                  </span>
+                  <span className="mt-1 block text-[11px] text-muted-foreground">
+                    {file.mediaType.startsWith("video/") ? "Video" : "Image"}
+                  </span>
+                  <span className="mt-2 block text-[11px] text-muted-foreground">
+                    {[
+                      file.width && file.height ? `${file.width}×${file.height}` : null,
+                      file.durationSeconds ? formatDuration(file.durationSeconds) : null,
+                      file.sizeBytes ? formatFileSize(file.sizeBytes) : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "Details unavailable"}
+                  </span>
                 </span>
-                {isChosen && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" /></span>}
+                {isChosen && (
+                  <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <Check className="h-3 w-3" />
+                  </span>
+                )}
               </button>
             );
           })}
         </div>
-      ) : <div className="py-16 text-center text-sm text-muted-foreground">No matching photos or videos in this Frame.io Share.</div>}
+      ) : (
+        <div className="py-16 text-center text-sm text-muted-foreground">
+          No matching photos or videos in this Frame.io Share.
+        </div>
+      )}
       {chosen.length > 0 && (
         <div className="sticky bottom-0 flex justify-end border-t border-border bg-surface/95 pt-3 backdrop-blur">
-          <button type="button" onClick={addChosen} disabled={importing} className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-            {importing && <Loader2 className="h-4 w-4 animate-spin" />} Add {chosen.length} to this post
+          <button
+            type="button"
+            onClick={addChosen}
+            disabled={importing}
+            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+          >
+            {importing && <Loader2 className="h-4 w-4 animate-spin" />} Add {chosen.length} to this
+            post
           </button>
         </div>
       )}
@@ -1118,6 +1372,8 @@ function ExternalProviderPicker({
   onImported: (ids: string[]) => void;
 }) {
   const [files, setFiles] = useState<ExternalProviderFile[]>([]);
+  const [folders, setFolders] = useState<ExternalProviderFolder[]>([]);
+  const [folderStack, setFolderStack] = useState<ExternalProviderFolder[]>([]);
   const [chosen, setChosen] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -1125,6 +1381,12 @@ function ExternalProviderPicker({
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const providerLabel = provider === "google_drive" ? "Google Drive" : "Dropbox";
+  const currentFolderId = folderStack.at(-1)?.id ?? null;
+
+  useEffect(() => {
+    setFolderStack([]);
+    setChosen([]);
+  }, [provider, workspaceId]);
 
   useEffect(() => {
     let active = true;
@@ -1138,10 +1400,19 @@ function ExternalProviderPicker({
         setConfigured(status.configured);
         if (!status.connected) {
           setFiles([]);
+          setFolders([]);
           return;
         }
-        const result = await listExternalMedia(provider, workspaceId, query);
-        if (active) setFiles(result.files);
+        if (provider === "google_drive") {
+          setFiles([]);
+          setFolders([]);
+          return;
+        }
+        const result = await listExternalMedia(provider, workspaceId, query, currentFolderId);
+        if (active) {
+          setFiles(result.files);
+          setFolders(result.folders);
+        }
       } catch (reason) {
         if (active) setError(reason instanceof Error ? reason.message : "Could not load files.");
       } finally {
@@ -1152,7 +1423,7 @@ function ExternalProviderPicker({
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [provider, workspaceId, query]);
+  }, [provider, workspaceId, query, currentFolderId]);
 
   async function connect() {
     try {
@@ -1171,7 +1442,9 @@ function ExternalProviderPicker({
       const result = await importExternalMedia(provider, workspaceId, picked);
       onImported(result.imported.map((item) => item.id).filter((id) => !selected.includes(id)));
       setChosen([]);
-      toast.success(`Added ${result.imported.length} item${result.imported.length === 1 ? "" : "s"} from ${providerLabel}.`);
+      toast.success(
+        `Added ${result.imported.length} item${result.imported.length === 1 ? "" : "s"} from ${providerLabel}.`,
+      );
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : "Could not add external media.");
     } finally {
@@ -1217,23 +1490,77 @@ function ExternalProviderPicker({
   if (error) {
     return <div className="py-16 text-center text-sm text-destructive">{error}</div>;
   }
-  if (provider === "google_drive" && window.matchMedia("(min-width: 768px)").matches) {
+  if (provider === "google_drive") {
     return (
-      <GoogleDrivePicker
-        workspaceId={workspaceId}
-        selected={selected}
-        onImported={onImported}
-      />
+      <GoogleDrivePicker workspaceId={workspaceId} selected={selected} onImported={onImported} />
     );
   }
   return (
     <div className="space-y-4">
-      {files.length === 0 ? (
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-elevated/60 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-1 text-xs">
+          <button
+            type="button"
+            onClick={() => setFolderStack([])}
+            className="rounded-md px-2 py-1 font-medium text-foreground hover:bg-surface-2"
+          >
+            Dropbox
+          </button>
+          {folderStack.map((folder, index) => (
+            <span key={folder.id} className="flex min-w-0 items-center gap-1">
+              <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+              <button
+                type="button"
+                onClick={() => setFolderStack((current) => current.slice(0, index + 1))}
+                className="max-w-40 truncate rounded-md px-2 py-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+              >
+                {folder.name}
+              </button>
+            </span>
+          ))}
+        </div>
+        <span className="text-[11px] text-muted-foreground">JPG · PNG · MP4 · MOV only</span>
+      </div>
+
+      {!query && folders.length > 0 && (
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Folders
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {folders.map((folder) => (
+              <button
+                key={folder.id}
+                type="button"
+                onClick={() => setFolderStack((current) => [...current, folder])}
+                className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-elevated p-3 text-left hover:border-primary/40 hover:bg-surface-2"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-400/10 text-sky-300">
+                  <FolderOpen className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-foreground">
+                    {folder.name}
+                  </span>
+                  <span className="block truncate text-[11px] text-muted-foreground">
+                    {folder.path ?? "Dropbox folder"}
+                  </span>
+                </span>
+                <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {files.length === 0 && folders.length === 0 ? (
         <div className="py-16 text-center text-sm text-muted-foreground">
-          No compatible photos or videos found.
+          {query
+            ? "No matching media found."
+            : "No compatible photos, videos or folders found here."}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {files.map((file) => {
             const isChosen = chosen.includes(file.id);
             return (
@@ -1246,18 +1573,49 @@ function ExternalProviderPicker({
                   )
                 }
                 className={cn(
-                  "group relative aspect-square overflow-hidden rounded-lg border bg-elevated",
-                  isChosen ? "border-primary ring-2 ring-primary/40" : "border-border hover:border-primary/40",
+                  "group relative flex min-w-0 gap-3 overflow-hidden rounded-xl border bg-elevated p-3 text-left",
+                  isChosen
+                    ? "border-primary ring-2 ring-primary/40"
+                    : "border-border hover:border-primary/40",
                 )}
               >
                 {file.thumbnailUrl ? (
-                  <img src={file.thumbnailUrl} alt={file.name} className="h-full w-full object-cover" loading="lazy" />
+                  <img
+                    src={file.thumbnailUrl}
+                    alt={file.name}
+                    className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                    loading="lazy"
+                  />
                 ) : (
-                  <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-2 text-center text-[10px] text-muted-foreground">
-                    <Cloud className="h-5 w-5" />
-                    <span className="line-clamp-2">{file.name}</span>
-                  </div>
+                  <span
+                    className={cn(
+                      "flex h-16 w-16 shrink-0 items-center justify-center rounded-lg",
+                      file.mimeType.startsWith("video/")
+                        ? "bg-violet-400/10 text-violet-300"
+                        : "bg-emerald-400/10 text-emerald-300",
+                    )}
+                  >
+                    {file.mimeType.startsWith("video/") ? (
+                      <FileVideo className="h-6 w-6" />
+                    ) : (
+                      <FileImage className="h-6 w-6" />
+                    )}
+                  </span>
                 )}
+                <span className="min-w-0 flex-1">
+                  <span
+                    className="block truncate text-sm font-semibold text-foreground"
+                    title={file.name}
+                  >
+                    {file.name}
+                  </span>
+                  <span className="mt-1 block truncate text-[11px] text-muted-foreground">
+                    {file.path ?? "Dropbox"}
+                  </span>
+                  <span className="mt-2 block text-[11px] text-muted-foreground">
+                    {externalFileDetails(file).join(" · ")}
+                  </span>
+                </span>
                 {isChosen && (
                   <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                     <Check className="h-3 w-3" />
@@ -1285,6 +1643,25 @@ function ExternalProviderPicker({
   );
 }
 
+function externalFileDetails(file: ExternalProviderFile) {
+  const details = [file.mimeType.startsWith("video/") ? "Video" : "Image"];
+  if (file.width && file.height) details.push(`${file.width}×${file.height}`);
+  if (file.durationSeconds) details.push(formatDuration(file.durationSeconds));
+  if (file.sizeBytes) details.push(formatFileSize(file.sizeBytes));
+  return details;
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MB`;
+}
+
+function formatDuration(seconds: number) {
+  const rounded = Math.round(seconds);
+  const minutes = Math.floor(rounded / 60);
+  return `${minutes}:${String(rounded % 60).padStart(2, "0")}`;
+}
+
 function GoogleDrivePicker({
   workspaceId,
   selected,
@@ -1307,7 +1684,8 @@ function GoogleDrivePicker({
         .setIncludeFolders(true)
         .setSelectFolderEnabled(false)
         .setEnableDrives(false)
-        .setMode(googleApi.picker.DocsViewMode.LIST);
+        .setMode(googleApi.picker.DocsViewMode.GRID)
+        .setMimeTypes("image/jpeg,image/png,video/mp4,video/quicktime");
       const picker = new googleApi.picker.PickerBuilder()
         .enableFeature(googleApi.picker.Feature.MULTISELECT_ENABLED)
         .setDeveloperKey(config.apiKey)
@@ -1331,14 +1709,23 @@ function GoogleDrivePicker({
               thumbnailUrl: doc.thumbnails?.find((thumbnail) => thumbnail.url)?.url ?? null,
               webUrl: doc.url ?? null,
               parentId: doc.parentId ?? null,
+              path: null,
+              modifiedAt: null,
+              width: null,
+              height: null,
+              durationSeconds: null,
             }));
             const imported = await importExternalMedia("google_drive", workspaceId, files);
-            onImported(imported.imported.map((item) => item.id).filter((id) => !selected.includes(id)));
+            onImported(
+              imported.imported.map((item) => item.id).filter((id) => !selected.includes(id)),
+            );
             toast.success(
               `Added ${imported.imported.length} item${imported.imported.length === 1 ? "" : "s"} from Google Drive.`,
             );
           } catch (reason) {
-            toast.error(reason instanceof Error ? reason.message : "Could not add Google Drive media.");
+            toast.error(
+              reason instanceof Error ? reason.message : "Could not add Google Drive media.",
+            );
           }
         })
         .build();
@@ -1358,7 +1745,12 @@ function GoogleDrivePicker({
       <div>
         <p className="font-semibold text-foreground">Choose from Google Drive</p>
         <p className="mt-1 max-w-md text-xs text-muted-foreground">
-          Google opens its secure picker so WaveOS only receives the files you select.
+          Browse and search your folders in Google's secure picker. WaveOS only receives the JPG,
+          PNG, MP4 or MOV files you select.
+        </p>
+        <p className="max-w-md text-[11px] text-muted-foreground/80">
+          Folder moves and organization stay in Google Drive; this picker is for choosing media
+          only.
         </p>
       </div>
       <button
@@ -1375,33 +1767,24 @@ function GoogleDrivePicker({
 }
 
 function isGoogleDriveMedia(doc: { name: string; mimeType: string }) {
-  return /^(image|video)\//i.test(googleDriveMediaMimeType(doc));
+  return ["image/jpeg", "image/png", "video/mp4", "video/quicktime"].includes(
+    googleDriveMediaMimeType(doc).toLowerCase(),
+  );
 }
 
 function googleDriveMediaMimeType(doc: { name: string; mimeType: string }) {
-  if (/^(image|video)\//i.test(doc.mimeType)) return doc.mimeType;
+  if (
+    ["image/jpeg", "image/png", "video/mp4", "video/quicktime"].includes(doc.mimeType.toLowerCase())
+  ) {
+    return doc.mimeType.toLowerCase();
+  }
   const extension = doc.name.split(".").pop()?.toLowerCase() ?? "";
   const types: Record<string, string> = {
-    avif: "image/avif",
-    bmp: "image/bmp",
-    gif: "image/gif",
-    heic: "image/heic",
-    heif: "image/heif",
     jpeg: "image/jpeg",
     jpg: "image/jpeg",
     png: "image/png",
-    tif: "image/tiff",
-    tiff: "image/tiff",
-    webp: "image/webp",
-    "3gp": "video/3gpp",
-    avi: "video/x-msvideo",
-    m4v: "video/x-m4v",
-    mkv: "video/x-matroska",
     mov: "video/quicktime",
     mp4: "video/mp4",
-    mpeg: "video/mpeg",
-    mpg: "video/mpeg",
-    webm: "video/webm",
   };
   return types[extension] ?? doc.mimeType;
 }
@@ -1441,7 +1824,7 @@ type GooglePickerGlobal = {
     };
     PickerBuilder: new () => GooglePickerBuilder;
     ViewId: { DOCS: string };
-    DocsViewMode: { LIST: string };
+    DocsViewMode: { GRID: string; LIST: string };
     Feature: { MULTISELECT_ENABLED: string };
     Action: { PICKED: string };
   };
@@ -1457,14 +1840,17 @@ type GoogleDocsView = {
 
 let googlePickerLoader: Promise<void> | null = null;
 function loadGooglePickerScript() {
-  if ((window as unknown as { google?: GooglePickerGlobal }).google?.picker) return Promise.resolve();
+  if ((window as unknown as { google?: GooglePickerGlobal }).google?.picker)
+    return Promise.resolve();
   if (googlePickerLoader) return googlePickerLoader;
   googlePickerLoader = new Promise<void>((resolve, reject) => {
     const script = document.createElement("script");
     script.src = "https://apis.google.com/js/api.js";
     script.async = true;
     script.onload = () => {
-      const gapi = (window as unknown as { gapi?: { load: (name: string, callback: () => void) => void } }).gapi;
+      const gapi = (
+        window as unknown as { gapi?: { load: (name: string, callback: () => void) => void } }
+      ).gapi;
       if (!gapi) return reject(new Error("Google API did not load."));
       gapi.load("picker", resolve);
     };

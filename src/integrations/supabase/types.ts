@@ -227,6 +227,85 @@ export type Database = {
           },
         ]
       }
+      calendar_categories: {
+        Row: {
+          category_key: string
+          color: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          category_key: string
+          color: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          category_key?: string
+          color?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_categories_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calendar_color_preferences: {
+        Row: {
+          category_key: string
+          color: string
+          updated_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          category_key: string
+          color: string
+          updated_at?: string
+          user_id?: string
+          workspace_id: string
+        }
+        Update: {
+          category_key?: string
+          color?: string
+          updated_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_color_preferences_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       catalog_items: {
         Row: {
           active: boolean
@@ -2812,6 +2891,8 @@ export type Database = {
           idempotency_key: string
           platform: Database["public"]["Enums"]["social_platform"]
           post_url: string | null
+          provider: string
+          provider_post_id: string | null
           request_snapshot: Json
           response_snapshot: Json
           status: Database["public"]["Enums"]["publish_status"]
@@ -2830,6 +2911,8 @@ export type Database = {
           idempotency_key: string
           platform: Database["public"]["Enums"]["social_platform"]
           post_url?: string | null
+          provider?: string
+          provider_post_id?: string | null
           request_snapshot?: Json
           response_snapshot?: Json
           status?: Database["public"]["Enums"]["publish_status"]
@@ -2848,6 +2931,8 @@ export type Database = {
           idempotency_key?: string
           platform?: Database["public"]["Enums"]["social_platform"]
           post_url?: string | null
+          provider?: string
+          provider_post_id?: string | null
           request_snapshot?: Json
           response_snapshot?: Json
           status?: Database["public"]["Enums"]["publish_status"]
@@ -2875,11 +2960,14 @@ export type Database = {
         Row: {
           avatar_url: string | null
           connected: boolean
+          connection_state: string
           created_at: string
           display_name: string | null
           id: string
           last_synced_at: string | null
           platform: Database["public"]["Enums"]["social_platform"]
+          provider: string
+          provider_account_id: string | null
           raw: Json
           updated_at: string
           username: string | null
@@ -2888,11 +2976,14 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           connected?: boolean
+          connection_state?: string
           created_at?: string
           display_name?: string | null
           id?: string
           last_synced_at?: string | null
           platform: Database["public"]["Enums"]["social_platform"]
+          provider?: string
+          provider_account_id?: string | null
           raw?: Json
           updated_at?: string
           username?: string | null
@@ -2901,11 +2992,14 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           connected?: boolean
+          connection_state?: string
           created_at?: string
           display_name?: string | null
           id?: string
           last_synced_at?: string | null
           platform?: Database["public"]["Enums"]["social_platform"]
+          provider?: string
+          provider_account_id?: string | null
           raw?: Json
           updated_at?: string
           username?: string | null
@@ -2914,6 +3008,84 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "social_connections_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_strategy_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          details: string | null
+          end_date: string | null
+          id: string
+          item_kind: string
+          links: string[]
+          media_asset_ids: string[]
+          owner_id: string | null
+          platforms: string[]
+          priority: string
+          related_content_item_id: string | null
+          start_date: string
+          status: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          details?: string | null
+          end_date?: string | null
+          id?: string
+          item_kind?: string
+          links?: string[]
+          media_asset_ids?: string[]
+          owner_id?: string | null
+          platforms?: string[]
+          priority?: string
+          related_content_item_id?: string | null
+          start_date: string
+          status?: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          details?: string | null
+          end_date?: string | null
+          id?: string
+          item_kind?: string
+          links?: string[]
+          media_asset_ids?: string[]
+          owner_id?: string | null
+          platforms?: string[]
+          priority?: string
+          related_content_item_id?: string | null
+          start_date?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_strategy_items_related_content_item_id_fkey"
+            columns: ["related_content_item_id"]
+            isOneToOne: false
+            referencedRelation: "content_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_strategy_items_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
@@ -3453,6 +3625,50 @@ export type Database = {
           wedding_welcome_message?: string | null
         }
         Relationships: []
+      }
+      zernio_profiles: {
+        Row: {
+          created_at: string
+          id: string
+          last_error: string | null
+          last_synced_at: string | null
+          profile_id: string
+          profile_name: string
+          updated_at: string
+          verified_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          profile_id: string
+          profile_name: string
+          updated_at?: string
+          verified_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_synced_at?: string | null
+          profile_id?: string
+          profile_name?: string
+          updated_at?: string
+          verified_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zernio_profiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

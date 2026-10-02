@@ -1,7 +1,18 @@
 import { RequireFeature } from "@/components/app/require-feature";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useRef, useState } from "react";
-import { Folder, FolderPlus, Images, Loader2, Search, Tag, Trash2, Upload, Video, X } from "lucide-react";
+import {
+  Folder,
+  FolderPlus,
+  Images,
+  Loader2,
+  Search,
+  Tag,
+  Trash2,
+  Upload,
+  Video,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -20,7 +31,10 @@ import {
 
 export const Route = createFileRoute("/_authenticated/content")({
   component: () => (
-    <RequireFeature feature="can_view_media_library" title="Content library isn't included in your plan">
+    <RequireFeature
+      feature="can_view_media_library"
+      title="Content library isn't included in your plan"
+    >
       <ContentLibrary />
     </RequireFeature>
   ),
@@ -78,6 +92,10 @@ function ContentLibrary() {
     const folderId = folderFilter === "all" || folderFilter === "root" ? null : folderFilter;
     let ok = 0;
     for (const file of Array.from(files)) {
+      if (!isSupportedWaveosMedia(file)) {
+        toast.error(`${file.name}: use JPG, PNG, MP4 or MOV.`);
+        continue;
+      }
       try {
         await upload.mutateAsync({ file, folderId, tags: [] });
         ok++;
@@ -99,12 +117,16 @@ function ContentLibrary() {
             <FolderPlus className="h-4 w-4" /> New folder
           </button>
           <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] hover:brightness-110">
-            {upload.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+            {upload.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="h-4 w-4" />
+            )}
             Upload
             <input
               type="file"
               multiple
-              accept="image/*,video/*"
+              accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime"
               className="hidden"
               onChange={(e) => {
                 handleFiles(e.target.files);
@@ -204,9 +226,11 @@ function ContentLibrary() {
                   <Upload className="h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-base font-semibold text-foreground">Drop photos or videos here</p>
+                  <p className="text-base font-semibold text-foreground">
+                    Drop photos or videos here
+                  </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Or use the Upload button above. Images and videos up to your plan limit.
+                    Or use the Upload button above. JPG, PNG, MP4 and MOV only.
                   </p>
                 </div>
               </div>
@@ -263,13 +287,28 @@ function ContentLibrary() {
   );
 }
 
+function isSupportedWaveosMedia(file: File) {
+  const allowedTypes = new Set(["image/jpeg", "image/png", "video/mp4", "video/quicktime"]);
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  return (
+    allowedTypes.has(file.type.toLowerCase()) ||
+    ["jpg", "jpeg", "png", "mp4", "mov"].includes(extension ?? "")
+  );
+}
+
 function Header({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Content</p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">{title}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Every photo and video in your brand's world.</p>
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
+          Content
+        </p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          {title}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Every photo and video in your brand's world.
+        </p>
       </div>
       {children}
     </header>
@@ -320,7 +359,9 @@ function SegmentedFilter({
           onClick={() => onChange(o.value)}
           className={cn(
             "px-3 py-2 text-xs font-medium transition-colors",
-            value === o.value ? "bg-primary/15 text-foreground" : "text-muted-foreground hover:text-foreground",
+            value === o.value
+              ? "bg-primary/15 text-foreground"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           {o.label}
@@ -388,7 +429,13 @@ function AssetCard({ asset, onClick }: { asset: MediaAsset; onClick: () => void 
       {url && (asset.source_provider === "google_drive" || !isVideo) ? (
         <img src={url} alt={asset.name} className="h-full w-full object-cover" loading="lazy" />
       ) : url && isVideo ? (
-        <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+        <video
+          src={url}
+          className="h-full w-full object-cover"
+          muted
+          playsInline
+          preload="metadata"
+        />
       ) : (
         <div className="flex h-full w-full items-center justify-center text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
@@ -504,7 +551,11 @@ function AssetPreview({
             isVideo ? (
               <video src={url} className="max-h-[60vh] w-full rounded-lg object-contain" controls />
             ) : (
-              <img src={url} alt={asset.name} className="max-h-[60vh] w-full rounded-lg object-contain" />
+              <img
+                src={url}
+                alt={asset.name}
+                className="max-h-[60vh] w-full rounded-lg object-contain"
+              />
             )
           ) : (
             <div className="flex h-64 w-full items-center justify-center text-muted-foreground">
@@ -516,7 +567,9 @@ function AssetPreview({
         <div className="space-y-4">
           <MetaRow label="Type" value={asset.mime_type} />
           <MetaRow label="Size" value={formatBytes(asset.size_bytes)} />
-          {asset.width && asset.height && <MetaRow label="Dimensions" value={`${asset.width}×${asset.height}`} />}
+          {asset.width && asset.height && (
+            <MetaRow label="Dimensions" value={`${asset.width}×${asset.height}`} />
+          )}
           {asset.duration_seconds != null && (
             <MetaRow label="Duration" value={`${asset.duration_seconds.toFixed(1)}s`} />
           )}
@@ -632,7 +685,12 @@ function ModalShell({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8" role="dialog">
       <div className="absolute inset-0 bg-background/70 backdrop-blur" onClick={onClose} />
-      <div className={cn("surface-card relative w-full overflow-hidden p-6", wide ? "max-w-4xl" : "max-w-md")}>
+      <div
+        className={cn(
+          "surface-card relative w-full overflow-hidden p-6",
+          wide ? "max-w-4xl" : "max-w-md",
+        )}
+      >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="truncate text-base font-semibold text-foreground">{title}</h2>
           <button

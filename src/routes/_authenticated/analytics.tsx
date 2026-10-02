@@ -1,5 +1,5 @@
 import { RequireFeature } from "@/components/app/require-feature";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { BarChart3, TrendingUp } from "lucide-react";
 
 import { useWorkspace } from "@/components/app/workspace-context";
@@ -7,6 +7,9 @@ import { EmptyState } from "@/components/app/empty-state";
 import { useContentItems, useSocialConnections, PLATFORM_LABEL } from "@/hooks/use-content";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
+  beforeLoad: () => {
+    throw redirect({ to: "/social", search: { view: "posts" } });
+  },
   component: () => (
     <RequireFeature feature="can_view_analytics" title="Analytics isn't included in your plan">
       <AnalyticsPage />
