@@ -261,7 +261,6 @@ const db = supabase as unknown as {
 };
 
 function ClientsPage() {
-  const [dataTab, setDataTab] = useState<"client_data" | "os_data">("client_data");
   const [open, setOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [newInviteLink, setNewInviteLink] = useState<{
@@ -294,8 +293,9 @@ function ClientsPage() {
   const workspacesQ = useQuery({
     queryKey: ["clients", "workspaces"],
     queryFn: async () => {
-      const BASE_COLS =
-        "id,name,client_name,business_name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at,data_source";
+      const LEGACY_BASE_COLS =
+        "id,name,client_name,business_name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at";
+      const BASE_COLS = `${LEGACY_BASE_COLS},data_source`;
       // Wedding columns are optional: if the Layer 5 migration has not reached
       // this environment yet, the client list must still load.
       let missing = false;
@@ -306,14 +306,26 @@ function ClientsPage() {
           `${BASE_COLS},wedding_display_name,wedding_theme,wedding_scheduling_url,wedding_date,wedding_venue,wedding_city,wedding_state,wedding_location,wedding_meeting_at,wedding_stage,wedding_welcome_message`,
         )
         .order("created_at", { ascending: false });
+      let dataSourceMissing = false;
       if (first.error) {
         const fallback = await supabase
           .from("workspaces")
           .select(BASE_COLS)
           .order("created_at", { ascending: false });
-        if (fallback.error) throw fallback.error;
+        if (fallback.error) {
+          // Existing environments may not have the OS/client separation migration yet.
+          // Keep all legacy workspaces visible as Dream Wave clients until it lands.
+          const legacy = await supabase
+            .from("workspaces")
+            .select(LEGACY_BASE_COLS)
+            .order("created_at", { ascending: false });
+          if (legacy.error) throw legacy.error;
+          dataSourceMissing = true;
+          ws = (legacy.data ?? []) as unknown as Record<string, unknown>[];
+        } else {
+          ws = (fallback.data ?? []) as unknown as Record<string, unknown>[];
+        }
         missing = true;
-        ws = (fallback.data ?? []) as unknown as Record<string, unknown>[];
       } else {
         ws = (first.data ?? []) as unknown as Record<string, unknown>[];
       }
@@ -356,6 +368,7 @@ function ClientsPage() {
           : "";
         return {
           ...w,
+          data_source: dataSourceMissing ? "client_data" : (w.data_source ?? "client_data"),
           client_name: w.client_name?.trim() || primaryContactName || w.name,
           business_name: w.business_name?.trim() || crm?.business_name?.trim() || w.name,
           wedding_display_name: w.wedding_display_name ?? null,
@@ -382,7 +395,7 @@ function ClientsPage() {
 
   const normalizedClientSearch = clientSearch.trim().toLocaleLowerCase();
   const visibleWorkspaces = (workspacesQ.data ?? []).filter((workspace) => {
-    if (workspace.data_source !== dataTab) return false;
+    if (workspace.data_source !== "client_data") return false;
     if (!normalizedClientSearch) return true;
     return [
       workspace.name,
@@ -440,32 +453,9 @@ function ClientsPage() {
       </header>
 
       <DocumentDraftTools />
-      <div className="inline-flex rounded-xl border border-border bg-surface p-1">
-        <button
-          type="button"
-          onClick={() => {
-            setDataTab("client_data");
-            setClientSearch("");
-          }}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold ${dataTab === "client_data" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          Client data
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setDataTab("os_data");
-            setClientSearch("");
-          }}
-          className={`rounded-lg px-4 py-2 text-sm font-semibold ${dataTab === "os_data" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
-        >
-          OS data
-        </button>
-      </div>
       <p className="text-sm text-muted-foreground">
-        {dataTab === "client_data"
-          ? "Dream Wave clients added manually by staff."
-          : "Public-app and API accounts, kept separate from agency client records."}
+        Dream Wave clients added manually by staff. Public-app accounts are managed separately in OS
+        Data.
       </p>
       <div className="relative max-w-xl">
         <Search
@@ -476,9 +466,7 @@ function ClientsPage() {
           type="search"
           value={clientSearch}
           onChange={(event) => setClientSearch(event.target.value)}
-          placeholder={
-            dataTab === "os_data" ? "Search OS accounts…" : "Search by client or business name…"
-          }
+          placeholder="Search by client or business name…"
           aria-label="Search clients"
           className="h-11 w-full rounded-xl border border-border bg-surface pl-11 pr-10 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
@@ -494,97 +482,93 @@ function ClientsPage() {
         )}
       </div>
 
-      {dataTab === "os_data" && <OsDataPanel search={clientSearch} />}
-
-      {dataTab === "client_data" && weddingColumnsMissing && (
+      {weddingColumnsMissing && (
         <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
           Wedding portal settings are awaiting a database migration. All clients below are still
           shown using their standard workspace fields.
         </div>
       )}
-      {dataTab === "client_data" && workspacesQ.isError && (
+      {workspacesQ.isError && (
         <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
           <p className="font-semibold">The client list could not be loaded.</p>
           <p className="mt-1 break-words font-mono text-xs">
-            {workspacesQ.error instanceof Error ? workspacesQ.error.message : "Unknown error"}
+            {readableError(workspacesQ.error, "Please refresh and try again.")}
           </p>
         </div>
       )}
 
-      {dataTab === "client_data" && (
-        <section className="space-y-3">
-          {!workspacesQ.isLoading && !workspacesQ.isError && visibleWorkspaces.length > 0 && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <p>
-                {visibleWorkspaces.length} client{visibleWorkspaces.length === 1 ? "" : "s"}
-              </p>
-              <p>Choose a client to open their profile</p>
+      <section className="space-y-3">
+        {!workspacesQ.isLoading && !workspacesQ.isError && visibleWorkspaces.length > 0 && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <p>
+              {visibleWorkspaces.length} client{visibleWorkspaces.length === 1 ? "" : "s"}
+            </p>
+            <p>Choose a client to open their profile</p>
+          </div>
+        )}
+        <div>
+          {workspacesQ.isLoading ? (
+            <div className="surface-card flex h-32 items-center justify-center text-sm text-muted-foreground">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading workspaces…
+            </div>
+          ) : workspacesQ.isError ? (
+            <div className="surface-card p-6 text-sm text-muted-foreground">
+              Client list unavailable — see the error above.
+            </div>
+          ) : (workspacesQ.data ?? []).length === 0 ? (
+            <div className="surface-card p-6">
+              <EmptyState
+                icon={Users2}
+                title="No client workspaces yet"
+                body="Click New client to create your first workspace and send an invite."
+              />
+            </div>
+          ) : visibleWorkspaces.length === 0 ? (
+            <div className="surface-card p-6">
+              <EmptyState
+                icon={Search}
+                title="No clients found"
+                body={`No clients match “${clientSearch.trim()}”. Try a different search.`}
+              />
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {visibleWorkspaces.map((w) => {
+                const clientName = w.client_name?.trim() || w.name;
+                const businessName = w.business_name?.trim() || w.name;
+                const initials = clientName
+                  .split(/\s+/)
+                  .slice(0, 2)
+                  .map((part) => part.charAt(0))
+                  .join("")
+                  .toUpperCase();
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setSelectedWs(w)}
+                    className="group flex min-h-24 w-full min-w-0 items-center gap-4 rounded-2xl border border-border bg-surface/70 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-elevated/70 hover:shadow-[var(--shadow-glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-label={`Open ${clientName} profile`}
+                  >
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-sm font-semibold text-primary transition group-hover:border-primary/40 group-hover:bg-primary/15">
+                      {initials || "CL"}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-foreground transition group-hover:text-primary">
+                        {clientName}
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-muted-foreground">
+                        {businessName}
+                      </span>
+                    </span>
+                    <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" />
+                  </button>
+                );
+              })}
             </div>
           )}
-          <div>
-            {workspacesQ.isLoading ? (
-              <div className="surface-card flex h-32 items-center justify-center text-sm text-muted-foreground">
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading workspaces…
-              </div>
-            ) : workspacesQ.isError ? (
-              <div className="surface-card p-6 text-sm text-muted-foreground">
-                Client list unavailable — see the error above.
-              </div>
-            ) : (workspacesQ.data ?? []).length === 0 ? (
-              <div className="surface-card p-6">
-                <EmptyState
-                  icon={Users2}
-                  title="No client workspaces yet"
-                  body="Click New client to create your first workspace and send an invite."
-                />
-              </div>
-            ) : visibleWorkspaces.length === 0 ? (
-              <div className="surface-card p-6">
-                <EmptyState
-                  icon={Search}
-                  title="No clients found"
-                  body={`No clients match “${clientSearch.trim()}”. Try a different search.`}
-                />
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {visibleWorkspaces.map((w) => {
-                  const clientName = w.client_name?.trim() || w.name;
-                  const businessName = w.business_name?.trim() || w.name;
-                  const initials = clientName
-                    .split(/\s+/)
-                    .slice(0, 2)
-                    .map((part) => part.charAt(0))
-                    .join("")
-                    .toUpperCase();
-                  return (
-                    <button
-                      key={w.id}
-                      type="button"
-                      onClick={() => setSelectedWs(w)}
-                      className="group flex min-h-24 w-full min-w-0 items-center gap-4 rounded-2xl border border-border bg-surface/70 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-elevated/70 hover:shadow-[var(--shadow-glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      aria-label={`Open ${clientName} profile`}
-                    >
-                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-sm font-semibold text-primary transition group-hover:border-primary/40 group-hover:bg-primary/15">
-                        {initials || "CL"}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-foreground transition group-hover:text-primary">
-                          {clientName}
-                        </span>
-                        <span className="mt-1 block truncate text-xs text-muted-foreground">
-                          {businessName}
-                        </span>
-                      </span>
-                      <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" />
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {open && (
         <OnboardingModal
@@ -622,7 +606,7 @@ function ClientsPage() {
   );
 }
 
-function OsDataPanel({ search }: { search: string }) {
+export function OsDataPanel({ search }: { search: string }) {
   const list = useServerFn(listOsAccounts);
   const reset = useServerFn(sendOsAccountPasswordReset);
   const setPayments = useServerFn(setOsAccountPayments);

@@ -27,6 +27,7 @@ import {
   QrCode,
   FolderKanban,
   Tag,
+  Database,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clearAuthenticatedBrowserState } from "@/lib/auth-session-state";
@@ -97,6 +98,7 @@ const STAFF_NAV: NavItem[] = [
       ]
     : []),
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true, ownerOnly: true },
+  { to: "/os-data", label: "OS Data", icon: Database, staffOnly: true, ownerOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
   { to: "/templates", label: "DOCUMENTS", icon: FileStack, staffOnly: true, ownerOnly: true },
