@@ -76,6 +76,14 @@ function Landing() {
         <div className="flex items-center gap-3">
           <Link
             to="/auth"
+            search={{ mode: "signup" }}
+            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
+          >
+            Start free trial
+          </Link>
+          <Link
+            to="/auth"
+            search={{}}
             className="rounded-full border border-border bg-surface/60 px-4 py-2 text-sm font-medium text-foreground/90 backdrop-blur transition-colors hover:bg-elevated"
           >
             Sign in
@@ -86,36 +94,37 @@ function Landing() {
       <main className="relative mx-auto max-w-6xl px-6 pt-16 pb-24 sm:pt-24">
         <div className="mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/60 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground backdrop-blur">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_10px] shadow-primary/80" />A Dream Wave
-            Media platform
+            <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_10px] shadow-primary/80" />
+            A Dream Wave Media platform
           </span>
           <h1 className="mt-6 text-balance text-5xl font-bold leading-[1.05] tracking-tight text-foreground sm:text-6xl md:text-7xl">
             Create. Approve. <span className="text-gradient-primary">Schedule. Grow.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-pretty text-lg text-muted-foreground">
-            WaveOS is the content operating system for Dream Wave Media clients. Your content, social accounts,
-            analytics, and brand voice — organized in one calm, cinematic place.
+            WaveOS is the content operating system for Dream Wave Media clients. Your content,
+            social accounts, analytics, and brand voice — organized in one calm, cinematic place.
           </p>
 
           <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
             <Link
               to="/auth"
+              search={{ mode: "signup" }}
               className="group inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
             >
-              Sign in to your workspace
+              Start your 30-day free trial
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
-            <a
-              href="https://dreamwavemedia.co"
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              to="/auth"
+              search={{}}
               className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/60 px-6 py-3 text-sm font-medium text-foreground backdrop-blur transition-colors hover:bg-elevated"
             >
-              Learn about Dream Wave Media
-            </a>
+              Sign in to your workspace
+            </Link>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            WaveOS is invite‑only. Contact Dream Wave Media to get access.
+            No card required · Connect up to 2 social accounts · Existing Dream Wave Media clients
+            can sign in normally.
           </p>
         </div>
 

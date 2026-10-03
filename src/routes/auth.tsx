@@ -12,8 +12,10 @@ const POST_AUTH_NEXT_KEY = "waveos.postAuthNext";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
-  validateSearch: (s: Record<string, unknown>): { next?: string } =>
-    typeof s.next === "string" ? { next: s.next } : {},
+  validateSearch: (s: Record<string, unknown>): { next?: string; mode?: "signup" } => ({
+    ...(typeof s.next === "string" ? { next: s.next } : {}),
+    ...(s.mode === "signup" ? { mode: "signup" as const } : {}),
+  }),
   head: () => ({
     meta: [
       { title: "Sign in — WaveOS" },
@@ -39,10 +41,16 @@ function safeNext(next: string | undefined): string {
 function AuthPage() {
   const navigate = useNavigate();
   const search = Route.useSearch();
-  const nextPath = safeNext(search.next);
-  const [mode, setMode] = useState<"signin" | "reset">("signin");
+  const requestedNext = safeNext(search.next);
+  const [mode, setMode] = useState<"signin" | "signup" | "reset">(
+    search.mode === "signup" ? "signup" : "signin",
+  );
+  const nextPath = mode === "signup" ? "/onboarding" : requestedNext;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [signupSent, setSignupSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => setHydrated(true), []);
@@ -119,6 +127,37 @@ function AuthPage() {
     if (!watchdogFired) toast.success("Welcome back.");
   }
 
+  async function handleEmailSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    sessionStorage.setItem(POST_AUTH_NEXT_KEY, "/onboarding");
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth-callback?next=${encodeURIComponent("/onboarding")}`,
+        data: {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          account_source: "os_data",
+          signup_source: "public_trial",
+        },
+      },
+    });
+    setBusy(false);
+    if (error) {
+      sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
+      toast.error(error.message);
+      return;
+    }
+    if (data.session) {
+      navigate({ to: "/onboarding", replace: true });
+      return;
+    }
+    setSignupSent(true);
+    toast.success("Check your email to finish creating your WaveOS account.");
+  }
+
   async function handleReset(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -180,12 +219,18 @@ function AuthPage() {
         <div className="surface-card p-8">
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              {mode === "signin" ? "Sign in to WaveOS" : "Reset your password"}
+              {mode === "signin"
+                ? "Sign in to WaveOS"
+                : mode === "signup"
+                  ? "Start your free trial"
+                  : "Reset your password"}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {mode === "signin"
                 ? "Welcome back — sign in to your workspace."
-                : "We'll email you a secure link to set a new password."}
+                : mode === "signup"
+                  ? "30 days, two connected accounts, and no card required."
+                  : "We'll email you a secure link to set a new password."}
             </p>
           </div>
           {mode === "signin" && (
@@ -206,9 +251,45 @@ function AuthPage() {
             </>
           )}
           <form
-            onSubmit={mode === "signin" ? handleEmailSignIn : handleReset}
+            onSubmit={
+              mode === "signin"
+                ? handleEmailSignIn
+                : mode === "signup"
+                  ? handleEmailSignup
+                  : handleReset
+            }
             className="space-y-4"
           >
+            {mode === "signup" && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    First name
+                  </label>
+                  <input
+                    autoComplete="given-name"
+                    required
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+                    placeholder="First"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                    Last name
+                  </label>
+                  <input
+                    autoComplete="family-name"
+                    required
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+                    placeholder="Last"
+                  />
+                </div>
+              </div>
+            )}
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                 Email
@@ -223,11 +304,12 @@ function AuthPage() {
                 placeholder="you@company.com"
               />
             </div>
-            {mode === "signin" && (
+            {(mode === "signin" || mode === "signup") && (
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <label className="text-xs font-medium text-muted-foreground">Password</label>
                   <button
+                    hidden={mode !== "signin"}
                     type="button"
                     onClick={() => setMode("reset")}
                     className="text-xs text-primary hover:text-primary-glow"
@@ -237,12 +319,13 @@ function AuthPage() {
                 </div>
                 <input
                   type="password"
-                  autoComplete="current-password"
+                  autoComplete={mode === "signup" ? "new-password" : "current-password"}
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
-                  placeholder="••••••••"
+                  placeholder={mode === "signup" ? "At least 8 characters" : "••••••••"}
+                  minLength={mode === "signup" ? 8 : undefined}
                 />
               </div>
             )}
@@ -252,27 +335,43 @@ function AuthPage() {
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110 disabled:opacity-60"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
-              {mode === "signin" ? "Sign in" : "Send reset link"}
+              {mode === "signin"
+                ? "Sign in"
+                : mode === "signup"
+                  ? "Create account & start trial"
+                  : "Send reset link"}
             </button>
-            {mode === "reset" && (
+            {(mode === "reset" || mode === "signup") && (
               <button
                 type="button"
-                onClick={() => setMode("signin")}
+                onClick={() => {
+                  setMode("signin");
+                  setSignupSent(false);
+                }}
                 className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
               >
-                ← Back to sign in
+                {mode === "signup" ? "Already have an account? Sign in" : "← Back to sign in"}
               </button>
             )}
           </form>
+          {signupSent && (
+            <p className="mt-4 rounded-lg border border-primary/20 bg-primary/10 p-3 text-center text-xs text-foreground">
+              We sent a confirmation link to {email}. Open it to finish setup and create your trial
+              workspace.
+            </p>
+          )}
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            WaveOS is invite-only. Need access?{" "}
-            <a
-              href="mailto:jessehayes@dwmsrq.com?subject=WaveOS%20access%20request"
-              className="font-medium text-primary hover:text-primary-glow"
-            >
-              Contact Dream Wave Media
-            </a>
-            . Technical problem?{" "}
+            {mode === "signup" ? "No card required. " : "New to WaveOS? "}
+            {mode !== "signup" && (
+              <button
+                type="button"
+                onClick={() => setMode("signup")}
+                className="font-medium text-primary hover:text-primary-glow"
+              >
+                Start a free trial
+              </button>
+            )}
+            {mode !== "signup" && ". "}Technical problem?{" "}
             <a
               href="mailto:jean@dwmsrq.com?subject=WaveOS%20technical%20support"
               className="font-medium text-primary hover:text-primary-glow"

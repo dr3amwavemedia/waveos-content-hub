@@ -30,6 +30,7 @@ export interface CurrentUserContext {
   roles: string[];
   actingAsStaff: boolean;
   actualUserId: string;
+  accountSource: "client_data" | "os_data";
 }
 
 const STAFF_WORKSPACE_ID = "11111111-1111-1111-1111-111111111111";
@@ -79,6 +80,7 @@ async function loadContext(): Promise<CurrentUserContext> {
       roles: ["dream_wave_team"],
       actingAsStaff: true,
       actualUserId: user.id,
+      accountSource: "client_data",
     };
   }
 
@@ -102,6 +104,7 @@ async function loadContext(): Promise<CurrentUserContext> {
     roles: roleList,
     actingAsStaff: false,
     actualUserId: user.id,
+    accountSource: user.user_metadata?.account_source === "os_data" ? "os_data" : "client_data",
   };
 }
 

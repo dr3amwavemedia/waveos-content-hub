@@ -38,6 +38,7 @@ export const Route = createFileRoute("/_authenticated/home")({
 function HomeRoute() {
   const { access, isStaff, isLoading } = usePermissions();
   const { workspaces, isLoading: wsLoading } = useWorkspace();
+  const { data: user } = useCurrentUser();
 
   // Signed in but no workspace membership yet — invite hasn't been accepted
   // or the admin hasn't provisioned one. Show a clear dead-end instead of a
@@ -50,18 +51,21 @@ function HomeRoute() {
             <Mail className="h-5 w-5" />
           </div>
           <h1 className="mt-4 text-xl font-semibold tracking-tight text-foreground">
-            You haven't been invited to a workspace yet.
+            {user?.accountSource === "os_data"
+              ? "Finish setting up your WaveOS trial"
+              : "You haven't been invited to a workspace yet."}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            WaveOS access is provisioned by Dream Wave Media. Once your team sends you an invite,
-            your workspace will appear here automatically.
+            {user?.accountSource === "os_data"
+              ? "Create your brand workspace to activate 30 days of access for two social accounts."
+              : "WaveOS access is provisioned by Dream Wave Media. Once your team sends you an invite, your workspace will appear here automatically."}
           </p>
-          <a
-            href="mailto:jessehayes@dwmsrq.com?subject=WaveOS%20access%20request"
+          <Link
+            to={user?.accountSource === "os_data" ? "/onboarding" : "/feedback"}
             className="mt-6 inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
           >
-            Contact Dream Wave Media
-          </a>
+            {user?.accountSource === "os_data" ? "Create trial workspace" : "Contact support"}
+          </Link>
         </div>
       </div>
     );

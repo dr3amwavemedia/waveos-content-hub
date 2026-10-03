@@ -17,17 +17,42 @@ export const Route = createFileRoute("/_authenticated/onboarding")({
 type Step = "welcome" | "details" | "done";
 
 const INDUSTRIES = [
-  "Agency", "E-commerce", "Restaurant / Food", "Real Estate", "Fitness / Wellness",
-  "Beauty / Salon", "Professional Services", "Coach / Creator", "Nonprofit",
-  "Healthcare", "SaaS / Tech", "Other",
+  "Agency",
+  "E-commerce",
+  "Restaurant / Food",
+  "Real Estate",
+  "Fitness / Wellness",
+  "Beauty / Salon",
+  "Professional Services",
+  "Coach / Creator",
+  "Nonprofit",
+  "Healthcare",
+  "SaaS / Tech",
+  "Other",
 ];
 
 const TIMEZONES = [
-  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
-  "America/Phoenix", "America/Anchorage", "Pacific/Honolulu", "America/Toronto",
-  "America/Mexico_City", "America/Sao_Paulo", "Europe/London", "Europe/Paris",
-  "Europe/Berlin", "Europe/Madrid", "Africa/Johannesburg", "Asia/Dubai",
-  "Asia/Kolkata", "Asia/Singapore", "Asia/Tokyo", "Australia/Sydney", "UTC",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Phoenix",
+  "America/Anchorage",
+  "Pacific/Honolulu",
+  "America/Toronto",
+  "America/Mexico_City",
+  "America/Sao_Paulo",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Madrid",
+  "Africa/Johannesburg",
+  "Asia/Dubai",
+  "Asia/Kolkata",
+  "Asia/Singapore",
+  "Asia/Tokyo",
+  "Australia/Sydney",
+  "UTC",
 ];
 
 function OnboardingPage() {
@@ -62,7 +87,7 @@ function OnboardingPage() {
 
   // Keep this return below every hook so switching user state never changes
   // the component's hook order.
-  if (!userLoading && user && !user.isStaff) {
+  if (!userLoading && user && !user.isStaff && user.accountSource !== "os_data") {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
         <div className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
@@ -91,7 +116,14 @@ function OnboardingPage() {
     }
     setBusy(true);
     try {
-      const { data, error } = await supabase.rpc("create_brand_workspace", {
+      const rpcName =
+        user?.accountSource === "os_data" ? "create_os_trial_workspace" : "create_brand_workspace";
+      const { data, error } = await (
+        supabase.rpc as unknown as (
+          name: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: Error | null }>
+      )(rpcName, {
         _name: name.trim(),
         _business_name: businessName.trim() || undefined,
         _industry: industry || undefined,
@@ -102,14 +134,18 @@ function OnboardingPage() {
         _target_audience: audience.trim() || undefined,
       });
       if (error) throw error;
-      const row = Array.isArray(data) ? data[0] : data;
+      const row = Array.isArray(data) ? data[0] : (data as { id?: string } | null);
       const newId = row?.id as string | undefined;
       if (!newId) throw new Error("Workspace was created but no id returned.");
       await qc.invalidateQueries({ queryKey: ["waveos", "workspaces"] });
       setActiveWorkspaceId(newId);
       setCreatedId(newId);
       setStep("done");
-      toast.success("Workspace created.");
+      toast.success(
+        user?.accountSource === "os_data"
+          ? "Your workspace and 30-day trial are ready."
+          : "Workspace created.",
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("workspace_limit_reached")) {
@@ -145,8 +181,8 @@ function OnboardingPage() {
               Welcome to WaveOS
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Create your own Brand Workspace in under a minute. You'll get a media library,
-              content calendar, brand profile, and room for your team.
+              Create your own Brand Workspace in under a minute. You'll get a media library, content
+              calendar, brand profile, and room for your team.
             </p>
           </div>
           <button
@@ -205,7 +241,9 @@ function OnboardingPage() {
               >
                 <option value="">Select…</option>
                 {INDUSTRIES.map((i) => (
-                  <option key={i} value={i}>{i}</option>
+                  <option key={i} value={i}>
+                    {i}
+                  </option>
                 ))}
               </select>
             </Field>
@@ -222,14 +260,24 @@ function OnboardingPage() {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Timezone">
-              <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className={inputClass}>
+              <select
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className={inputClass}
+              >
                 {TIMEZONES.map((tz) => (
-                  <option key={tz} value={tz}>{tz}</option>
+                  <option key={tz} value={tz}>
+                    {tz}
+                  </option>
                 ))}
               </select>
             </Field>
             <Field label="Primary language">
-              <select value={language} onChange={(e) => setLanguage(e.target.value)} className={inputClass}>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className={inputClass}
+              >
                 <option value="en">English</option>
                 <option value="es">Spanish</option>
                 <option value="fr">French</option>
