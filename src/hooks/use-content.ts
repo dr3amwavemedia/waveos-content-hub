@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
+import { deleteContentItem } from "@/lib/content-management.functions";
 
 export type ContentStatus = Database["public"]["Enums"]["content_status"];
 export type SocialPlatform = Database["public"]["Enums"]["social_platform"];
@@ -224,12 +226,16 @@ export function usePublishAttempts(contentIds: string[]) {
 
 export function useDeleteContentItem() {
   const qc = useQueryClient();
+  const remove = useServerFn(deleteContentItem);
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("content_items").delete().eq("id", id);
-      if (error) throw error;
+      await remove({ data: { contentId: id } });
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["content-items"] }),
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ["content-items"] });
+      qc.removeQueries({ queryKey: ["content-item", id] });
+      qc.invalidateQueries({ queryKey: ["publish-attempts"] });
+    },
   });
 }
 

@@ -488,13 +488,23 @@ function CreatePost() {
 
   async function handleDelete() {
     if (!savedId) {
-      navigate({ to: "/content" });
+      navigate({ to: "/social", search: { view: "posts" } });
       return;
     }
-    if (!confirm("Delete this draft?")) return;
-    await del.mutateAsync(savedId);
-    toast.success("Draft deleted");
-    navigate({ to: "/content" });
+    const published = status === "published";
+    const message = published
+      ? "Delete this post record from WaveOS? This will not remove the already-published post from the social platform."
+      : status === "scheduled"
+        ? "Delete this scheduled post? It will no longer publish at the scheduled time."
+        : "Delete this post from WaveOS? This cannot be undone.";
+    if (!confirm(message)) return;
+    try {
+      await del.mutateAsync(savedId);
+      toast.success(published ? "WaveOS post record deleted." : "Post deleted.");
+      navigate({ to: "/social", search: { view: "posts" } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Post could not be deleted.");
+    }
   }
 
   function handleStartNew() {
@@ -584,6 +594,15 @@ function CreatePost() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="space-y-6">
+          {locked && (
+            <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
+              {status === "published"
+                ? "This is a published record. You can review or delete it here, but changing it would not update the live social-platform post."
+                : status === "publishing"
+                  ? "This post is publishing now. Editing and deletion will unlock when the publishing attempt finishes."
+                  : "This post is currently in client review. Editing is paused until the review is completed or changes are requested."}
+            </div>
+          )}
           <div className="surface-card space-y-4 p-5">
             <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Internal title
