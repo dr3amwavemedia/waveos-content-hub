@@ -199,7 +199,9 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
   const [note, setNote] = useState("");
   const [comment, setComment] = useState("");
   const role = activeWorkspace?.role;
-  const canApprove = Boolean(user?.isStaff || role === "owner" || role === "admin" || role === "approver");
+  const canApprove = Boolean(
+    user?.isStaff || role === "owner" || role === "admin" || role === "approver" || role === "editor",
+  );
   const metadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
     ? item.metadata as Record<string, unknown>
     : {};
