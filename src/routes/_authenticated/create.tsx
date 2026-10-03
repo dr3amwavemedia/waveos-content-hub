@@ -24,6 +24,8 @@ import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { publishContentItem } from "@/lib/publish.functions";
+import { waveAssist } from "@/lib/wave-assist.functions";
+import { SOCIAL_PLATFORM_GUIDANCE } from "@/lib/social-platform-guidance";
 
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/app/empty-state";
@@ -199,8 +201,10 @@ function CreatePost() {
   }, [existing.data?.item?.id]);
 
   const publishFn = useServerFn(publishContentItem);
+  const assist = useServerFn(waveAssist);
 
   const [publishing, setPublishing] = useState<null | "now" | "schedule">(null);
+  const [assisting, setAssisting] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
@@ -227,14 +231,14 @@ function CreatePost() {
     );
   }
 
-  async function ensureSaved(): Promise<string | null> {
+  async function ensureSaved(primaryCaption = caption): Promise<string | null> {
     if (!workspaceId) return null;
     if (savedId) {
       await update.mutateAsync({
         id: savedId,
         patch: {
           title: title || null,
-          primary_caption: caption || null,
+          primary_caption: primaryCaption || null,
           media_asset_ids: pickedMedia,
           scheduled_at: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
         },
@@ -243,13 +247,13 @@ function CreatePost() {
         contentId: savedId,
         workspaceId,
         platforms,
-        primaryCaption: caption,
+        primaryCaption,
       });
       return savedId;
     }
     const item = await create.mutateAsync({
       title,
-      primary_caption: caption,
+      primary_caption: primaryCaption,
       media_asset_ids: pickedMedia,
       platforms,
       scheduled_at: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
@@ -298,6 +302,43 @@ function CreatePost() {
     } catch (e) {
       setSaveStatus("error");
       toast.error((e as Error).message);
+    }
+  }
+
+  async function handleCaptionAssist() {
+    if (!workspaceId) return;
+    const brief = caption.trim() || title.trim();
+    if (!brief) return toast.error("Add a short post idea or internal title first.");
+    if (
+      caption.trim() &&
+      !confirm("Replace the primary and selected platform captions with new Brand Voice drafts?")
+    )
+      return;
+    setAssisting(true);
+    try {
+      const result = await assist({
+        data: { mode: "caption_suite", input: brief, workspaceId, platforms },
+      });
+      setCaption(result.primaryCaption ?? result.suggestion);
+      const id = await ensureSaved(result.primaryCaption ?? result.suggestion);
+      if (!id) throw new Error("Save the draft before adapting its captions.");
+      await qc.invalidateQueries({ queryKey: ["content-item", id] });
+      const refreshed = (await existing.refetch()).data;
+      const variants = refreshed?.variants ?? existing.data?.variants ?? [];
+      for (const generated of result.variants) {
+        const variant = variants.find((row) => row.platform === generated.platform);
+        if (variant)
+          await updateVariant.mutateAsync({
+            id: variant.id,
+            patch: { caption: generated.caption },
+          });
+      }
+      await qc.invalidateQueries({ queryKey: ["content-item", id] });
+      toast.success("Brand Voice caption and platform adaptations are ready to review.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Caption assistant failed.");
+    } finally {
+      setAssisting(false);
     }
   }
 
@@ -553,11 +594,21 @@ function CreatePost() {
               placeholder="Write the base caption. You can tailor per platform below."
               className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60"
             />
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>{caption.length} chars</span>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2 py-1 text-primary">
-                <Sparkles className="h-3 w-3" /> Wave Assistant coming soon
-              </span>
+              <button
+                type="button"
+                disabled={locked || assisting || !platforms.length}
+                onClick={() => void handleCaptionAssist()}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+              >
+                {assisting ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                Draft with Brand Voice
+              </button>
             </div>
           </div>
 
@@ -688,67 +739,6 @@ function CreatePost() {
   );
 }
 
-const PLATFORM_MEDIA_GUIDE: Record<
-  SocialPlatform,
-  { image: string; video: string; accent: string }
-> = {
-  instagram: {
-    image: "Feed 1080×1350 · Story 1080×1920",
-    video: "Reel/Story 1080×1920 · MP4 or MOV",
-    accent: "border-fuchsia-400/30 bg-fuchsia-400/10",
-  },
-  facebook: {
-    image: "Feed 1200×630 · Story 1080×1920",
-    video: "Feed 1280×720+ · Reel 9:16 · MP4 or MOV",
-    accent: "border-blue-400/30 bg-blue-400/10",
-  },
-  tiktok: {
-    image: "Portrait carousel · JPG or PNG",
-    video: "Vertical 1080×1920 · MP4 or MOV",
-    accent: "border-cyan-400/30 bg-cyan-400/10",
-  },
-  youtube: {
-    image: "Thumbnail 1280×720",
-    video: "Video 1920×1080 · Short 1080×1920",
-    accent: "border-red-400/30 bg-red-400/10",
-  },
-  linkedin: {
-    image: "Landscape 1200×627 · Square 1080×1080",
-    video: "Recommended 1920×1080 · MP4 or MOV",
-    accent: "border-sky-400/30 bg-sky-400/10",
-  },
-  x: {
-    image: "Landscape 1600×900 · JPG or PNG",
-    video: "Landscape 1920×1080 · MP4 or MOV",
-    accent: "border-slate-400/30 bg-slate-400/10",
-  },
-  pinterest: {
-    image: "Pin 1000×1500 (2:3)",
-    video: "Vertical 1080×1920 · MP4 or MOV",
-    accent: "border-rose-400/30 bg-rose-400/10",
-  },
-  threads: {
-    image: "Portrait 1080×1350 · JPG or PNG",
-    video: "Portrait 1080×1920 · MP4 or MOV",
-    accent: "border-zinc-400/30 bg-zinc-400/10",
-  },
-  bluesky: {
-    image: "Landscape 1200×675 · max 2000×2000",
-    video: "Recommended 1280×720 · MP4",
-    accent: "border-blue-300/30 bg-blue-300/10",
-  },
-  gmb: {
-    image: "Recommended 1200×900 · JPG or PNG",
-    video: "Google Business posts do not support video",
-    accent: "border-emerald-400/30 bg-emerald-400/10",
-  },
-  snapchat: {
-    image: "Story 1080×1920 · JPG or PNG",
-    video: "Story 1080×1920 · MP4",
-    accent: "border-yellow-300/30 bg-yellow-300/10",
-  },
-};
-
 function PlatformMediaGuide({ platforms }: { platforms: SocialPlatform[] }) {
   return (
     <div className="mt-4 border-t border-border pt-4">
@@ -758,8 +748,7 @@ function PlatformMediaGuide({ platforms }: { platforms: SocialPlatform[] }) {
             Export guide for this post
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            WaveOS accepts JPG, PNG, MP4 and MOV. These are recommended publishing sizes, not upload
-            promises.
+            Current provider limits and supported post types for every selected destination.
           </p>
         </div>
         {platforms.includes("instagram") && (
@@ -770,14 +759,25 @@ function PlatformMediaGuide({ platforms }: { platforms: SocialPlatform[] }) {
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         {platforms.map((platform) => {
-          const guide = PLATFORM_MEDIA_GUIDE[platform];
+          const guide = SOCIAL_PLATFORM_GUIDANCE[platform];
           return (
             <div key={platform} className={cn("rounded-xl border p-3", guide.accent)}>
               <p className="text-xs font-semibold text-foreground">{PLATFORM_LABEL[platform]}</p>
               <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground/80">Post types:</span>{" "}
+                {guide.postTypes}
+                <br />
+                <span className="font-medium text-foreground/80">Caption:</span> {guide.caption}
+                <br />
                 <span className="font-medium text-foreground/80">Image:</span> {guide.image}
                 <br />
                 <span className="font-medium text-foreground/80">Video:</span> {guide.video}
+                {guide.note && (
+                  <>
+                    <br />
+                    <span className="font-medium text-foreground/80">Note:</span> {guide.note}
+                  </>
+                )}
               </p>
             </div>
           );
@@ -827,10 +827,12 @@ function PlatformTabs({
       <div className="flex flex-wrap gap-2">
         {ALL_PLATFORMS.map((p) => {
           const enabled = platforms.includes(p);
+          const available = SOCIAL_PLATFORM_GUIDANCE[p].available;
           return (
             <button
               key={p}
-              disabled={locked}
+              disabled={locked || !available}
+              title={available ? undefined : SOCIAL_PLATFORM_GUIDANCE[p].note}
               onClick={() => onTogglePlatform(p)}
               className={cn(
                 "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
@@ -840,6 +842,7 @@ function PlatformTabs({
               )}
             >
               {PLATFORM_LABEL[p]}
+              {!available && " · Closed beta"}
             </button>
           );
         })}
@@ -883,6 +886,8 @@ function VariantEditor({
 }) {
   const variant = variants.find((v) => v.platform === platform);
   const [text, setText] = useState(variant?.caption ?? "");
+  const options = (variant?.platform_options ?? {}) as { contentType?: string };
+  const storySupported = SOCIAL_PLATFORM_GUIDANCE[platform].storySupported;
 
   useEffect(() => {
     setText(variant?.caption ?? "");
@@ -905,6 +910,30 @@ function VariantEditor({
 
   return (
     <div className="space-y-2">
+      {storySupported && (
+        <div className="flex items-center justify-between rounded-lg border border-border bg-elevated/50 px-3 py-2">
+          <div>
+            <p className="text-xs font-semibold text-foreground">Publish format</p>
+            <p className="text-[11px] text-muted-foreground">
+              Stories require one supported media item and disappear after 24 hours.
+            </p>
+          </div>
+          <select
+            value={options.contentType === "story" ? "story" : "feed"}
+            disabled={locked}
+            onChange={(event) =>
+              void onUpdate(variant.id, {
+                platform_options:
+                  event.target.value === "story" ? { ...options, contentType: "story" } : {},
+              })
+            }
+            className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground"
+          >
+            <option value="feed">Feed</option>
+            <option value="story">Story</option>
+          </select>
+        </div>
+      )}
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}

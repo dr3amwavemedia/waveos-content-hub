@@ -52,9 +52,14 @@ import {
   createZernioConnectUrl,
   disconnectZernioAccount,
   ensureZernioProfile,
+  getZernioAnalytics,
+  getZernioCommentInbox,
   getZernioWorkspaceStatus,
+  replyToZernioComment,
   refreshZernioConnections,
 } from "@/lib/zernio.functions";
+import { waveAssist } from "@/lib/wave-assist.functions";
+import { SOCIAL_PLATFORM_GUIDANCE } from "@/lib/social-platform-guidance";
 
 type SocialView = "overview" | "posts" | "accounts";
 type DateRange = "all" | "7" | "30" | "90";
@@ -355,20 +360,24 @@ function SocialWorkspace() {
       </nav>
 
       {activeView === "overview" && (
-        <OverviewView
-          items={items}
-          upcoming={upcoming}
-          connectedCount={connectedCount}
-          attentionCount={attentionCount}
-          accountRows={accountRows}
-          onOpenPosts={() => setView("posts")}
-          onOpenAccounts={() => setView("accounts")}
-          count={count}
-        />
+        <>
+          <AchievementHighlight workspaceId={workspaceId!} />
+          <OverviewView
+            items={items}
+            upcoming={upcoming}
+            connectedCount={connectedCount}
+            attentionCount={attentionCount}
+            accountRows={accountRows}
+            onOpenPosts={() => setView("posts")}
+            onOpenAccounts={() => setView("accounts")}
+            count={count}
+          />
+        </>
       )}
 
       {activeView === "posts" && (
         <PostsAndInsights
+          workspaceId={workspaceId!}
           items={filteredItems}
           allItems={items}
           connectedCount={connectedCount}
@@ -390,6 +399,48 @@ function SocialWorkspace() {
         />
       )}
     </div>
+  );
+}
+
+function AchievementHighlight({ workspaceId }: { workspaceId: string }) {
+  const analyticsFn = useServerFn(getZernioAnalytics);
+  const analytics = useQuery({
+    queryKey: ["zernio-achievement", workspaceId, 30],
+    queryFn: () => analyticsFn({ data: { workspaceId, days: 30 } }),
+    retry: false,
+  });
+  const combined = analytics.data
+    ? {
+        reach:
+          (analytics.data.organic?.reach ?? 0) +
+          (analytics.data.external?.reach ?? 0) +
+          (analytics.data.paid?.reach ?? 0),
+        impressions:
+          (analytics.data.organic?.impressions ?? 0) +
+          (analytics.data.external?.impressions ?? 0) +
+          (analytics.data.paid?.impressions ?? 0),
+        likes:
+          (analytics.data.organic?.likes ?? 0) +
+          (analytics.data.external?.likes ?? 0) +
+          (analytics.data.paid?.likes ?? 0),
+      }
+    : null;
+  const highlight = combined
+    ? (["reach", "impressions", "likes"] as const)
+        .map((key) => [key, combined[key]] as const)
+        .find(([, value]) => value > 0)
+    : null;
+  if (!highlight) return null;
+  return (
+    <section className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-100">
+      <p className="font-semibold">
+        <Sparkles className="mr-2 inline h-4 w-4" /> Your combined {highlight[0]} reached{" "}
+        {highlight[1].toLocaleString()} in the last 30 days. Great work—keep it going!
+      </p>
+      <p className="mt-1 text-xs text-emerald-100/75">
+        Open Posts & insights to separate Organic, Paid and Combined results.
+      </p>
+    </section>
   );
 }
 
@@ -611,6 +662,7 @@ function MetricCard({
 }
 
 function PostsAndInsights({
+  workspaceId,
   items,
   allItems,
   connectedCount,
@@ -621,6 +673,7 @@ function PostsAndInsights({
   setStatus,
   setRange,
 }: {
+  workspaceId: string;
   items: ContentItem[];
   allItems: ContentItem[];
   connectedCount: number;
@@ -704,29 +757,11 @@ function PostsAndInsights({
         </div>
       </section>
 
-      <section className="rounded-2xl border border-border bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,var(--surface)),var(--surface))] p-5 sm:p-6">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-          <div className="max-w-2xl">
-            <div className="flex items-center gap-2 text-primary">
-              <BarChart3 className="h-5 w-5" />
-              <p className="text-xs font-semibold uppercase tracking-[0.18em]">Insights</p>
-            </div>
-            <h2 className="mt-2 text-xl font-semibold text-foreground">
-              Performance stays beside the posts it belongs to
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Network metrics will populate after Zernio is connected and the first verified post
-              publishes. No placeholder numbers are shown as real results.
-            </p>
-          </div>
-          <div className="grid w-full gap-3 sm:grid-cols-2 lg:max-w-md">
-            <InsightStat label="Published posts" value={String(published)} />
-            <InsightStat label="Connected channels" value={String(connectedCount)} />
-            <InsightStat label="Impressions" value="—" muted />
-            <InsightStat label="Engagement" value="—" muted />
-          </div>
-        </div>
-      </section>
+      <AnalyticsAndComments
+        workspaceId={workspaceId}
+        published={published}
+        connectedCount={connectedCount}
+      />
     </div>
   );
 }
@@ -737,6 +772,217 @@ function CompactStat({ label, value, tone }: { label: string; value: number; ton
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p className={cn("mt-1 text-3xl font-semibold", tone)}>{value}</p>
     </div>
+  );
+}
+
+type AnalyticsMode = "combined" | "organic" | "paid";
+
+function AnalyticsAndComments({
+  workspaceId,
+  published,
+  connectedCount,
+}: {
+  workspaceId: string;
+  published: number;
+  connectedCount: number;
+}) {
+  const analyticsFn = useServerFn(getZernioAnalytics);
+  const commentsFn = useServerFn(getZernioCommentInbox);
+  const replyFn = useServerFn(replyToZernioComment);
+  const assistFn = useServerFn(waveAssist);
+  const [mode, setMode] = useState<AnalyticsMode>("combined");
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const analytics = useQuery({
+    queryKey: ["zernio-analytics", workspaceId, 30],
+    queryFn: () => analyticsFn({ data: { workspaceId, days: 30 } }),
+    retry: false,
+  });
+  const comments = useQuery({
+    queryKey: ["zernio-comment-inbox", workspaceId],
+    queryFn: () => commentsFn({ data: { workspaceId } }),
+    retry: false,
+  });
+  const metric = (key: "impressions" | "reach" | "likes" | "comments" | "clicks" | "views") => {
+    const organic = (analytics.data?.organic?.[key] ?? 0) + (analytics.data?.external?.[key] ?? 0);
+    const paid = analytics.data?.paid?.[key] ?? 0;
+    return mode === "organic" ? organic : mode === "paid" ? paid : organic + paid;
+  };
+  const positive = [
+    ["reach", metric("reach")],
+    ["impressions", metric("impressions")],
+    ["likes", metric("likes")],
+    ["comments", metric("comments")],
+    ["clicks", metric("clicks")],
+  ].find(([, value]) => Number(value) > 0);
+
+  const draftReply = async (comment: { id: string; platform: string; text: string }) => {
+    try {
+      const result = await assistFn({
+        data: {
+          mode: "comment_reply",
+          input: `Platform: ${comment.platform}\nCustomer comment: ${comment.text}`,
+          workspaceId,
+          platform: comment.platform,
+        },
+      });
+      setDrafts((current) => ({ ...current, [comment.id]: result.suggestion }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not draft a reply.");
+    }
+  };
+
+  return (
+    <>
+      <section className="rounded-2xl border border-border bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,var(--surface)),var(--surface))] p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 text-primary">
+              <BarChart3 className="h-5 w-5" />
+              <p className="text-xs font-semibold uppercase tracking-[0.18em]">
+                Verified analytics
+              </p>
+            </div>
+            <h2 className="mt-2 text-xl font-semibold text-foreground">
+              Organic, paid and combined progress
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Last 30 days. WaveOS never substitutes placeholder numbers for provider results.
+            </p>
+          </div>
+          <div className="flex rounded-xl border border-border bg-background/50 p-1">
+            {(["combined", "organic", "paid"] as AnalyticsMode[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMode(value)}
+                className={cn(
+                  "rounded-lg px-3 py-1.5 text-xs font-semibold capitalize",
+                  mode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground",
+                )}
+              >
+                {value}
+              </button>
+            ))}
+          </div>
+        </div>
+        {mode === "paid" && !analytics.data?.paidAvailable && (
+          <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
+            Paid metrics will appear after an eligible Zernio ads connection is available. Organic
+            data remains separate.
+          </p>
+        )}
+        {positive && (
+          <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">
+            <Sparkles className="mr-2 inline h-4 w-4" />
+            Great work—your {String(positive[0])} reached {Number(positive[1]).toLocaleString()} in
+            this view. Keep the momentum going.
+          </div>
+        )}
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <InsightStat label="Published posts" value={String(published)} />
+          <InsightStat label="Connected channels" value={String(connectedCount)} />
+          <InsightStat
+            label="Impressions"
+            value={analytics.isPending ? "…" : metric("impressions").toLocaleString()}
+          />
+          <InsightStat
+            label="Engagements"
+            value={
+              analytics.isPending ? "…" : (metric("likes") + metric("comments")).toLocaleString()
+            }
+          />
+          <InsightStat
+            label="Reach"
+            value={analytics.isPending ? "…" : metric("reach").toLocaleString()}
+          />
+          <InsightStat
+            label="Views"
+            value={analytics.isPending ? "…" : metric("views").toLocaleString()}
+          />
+          <InsightStat
+            label="Comments"
+            value={analytics.isPending ? "…" : metric("comments").toLocaleString()}
+          />
+          <InsightStat
+            label="Clicks"
+            value={analytics.isPending ? "…" : metric("clicks").toLocaleString()}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-border bg-surface/55 p-5">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            Community inbox
+          </p>
+          <h2 className="mt-1 text-xl font-semibold text-foreground">
+            Comments and Brand Voice replies
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Facebook, Instagram, YouTube, LinkedIn organization pages, Threads, X and Bluesky. Every
+            AI draft requires review before posting.
+          </p>
+        </div>
+        <div className="mt-4 space-y-3">
+          {(comments.data?.comments ?? []).slice(0, 5).map((comment) => (
+            <div key={comment.id} className="rounded-xl border border-border bg-background/40 p-4">
+              <p className="text-xs font-semibold text-foreground">
+                {comment.author} · {comment.platform}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">{comment.text}</p>
+              {drafts[comment.id] && (
+                <textarea
+                  value={drafts[comment.id]}
+                  onChange={(event) =>
+                    setDrafts((current) => ({ ...current, [comment.id]: event.target.value }))
+                  }
+                  rows={3}
+                  className="mt-3 w-full rounded-lg border border-border bg-elevated p-3 text-sm text-foreground"
+                />
+              )}
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void draftReply(comment)}
+                  className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary"
+                >
+                  Draft with Brand Voice
+                </button>
+                {drafts[comment.id] && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm("Post this reviewed reply publicly?")) return;
+                      await replyFn({
+                        data: {
+                          workspaceId,
+                          postId: comment.postId,
+                          commentId: comment.id,
+                          accountId: comment.accountId,
+                          message: drafts[comment.id],
+                        },
+                      });
+                      setDrafts((current) => ({ ...current, [comment.id]: "" }));
+                      await comments.refetch();
+                      toast.success("Reply posted.");
+                    }}
+                    className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground"
+                  >
+                    Approve and reply
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+          {!comments.isPending && !(comments.data?.comments ?? []).length && (
+            <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+              No supported comments are available yet. Reconnect older accounts if Zernio requests
+              new comment permissions.
+            </p>
+          )}
+        </div>
+      </section>
+    </>
   );
 }
 
@@ -779,7 +1025,8 @@ function AccountsView({
   const status = useQuery({
     queryKey: ["zernio-status", workspaceId],
     queryFn: () => getStatus({ data: { workspaceId } }),
-    retry: (count, error) => !(error instanceof Error && error.message === "forbidden") && count < 2,
+    retry: (count, error) =>
+      !(error instanceof Error && error.message === "forbidden") && count < 2,
   });
   const statusErrorForbidden =
     status.error instanceof Error && status.error.message === "forbidden";

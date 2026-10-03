@@ -15,10 +15,20 @@ export const sendInviteEmail = (inviteId: string, url: string) =>
 export const sendMemberJoinedEmail = (workspaceId: string, name?: string) =>
   invoke({ type: "member_joined", workspaceId, name });
 
+/** Anonymous-safe request: the edge function rate-limits and only emails configured admins. */
+export const sendAccountSupportRequest = (
+  email: string,
+  requestType: "sign_in" | "password_reset" | "account_help",
+) => invoke({ type: "account_support", email, requestType });
 
 export const sendWorkspaceEmail = (payload: {
   workspaceId: string;
-  event: "request_updated" | "invoice_updated" | "revisions_updated" | "content_added" | "contract_ready";
+  event:
+    | "request_updated"
+    | "invoice_updated"
+    | "revisions_updated"
+    | "content_added"
+    | "contract_ready";
   title: string;
   status?: string;
   url?: string | null;
@@ -32,4 +42,3 @@ export async function tryEmail(action: () => Promise<Result>) {
     return { configured: false, sent: 0 } satisfies Result;
   }
 }
-

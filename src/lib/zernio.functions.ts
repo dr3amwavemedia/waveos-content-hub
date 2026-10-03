@@ -11,6 +11,149 @@ type ZernioProfileRow = {
   last_error: string | null;
 };
 
+const METRIC_KEYS = [
+  "followers",
+  "impressions",
+  "reach",
+  "likes",
+  "comments",
+  "shares",
+  "saves",
+  "clicks",
+  "views",
+  "storyViews",
+] as const;
+
+function sumMetrics(payload: Record<string, unknown>) {
+  const totals = Object.fromEntries(METRIC_KEYS.map((key) => [key, 0])) as Record<
+    (typeof METRIC_KEYS)[number],
+    number
+  >;
+  const visit = (value: unknown) => {
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) return value.forEach(visit);
+    const row = value as Record<string, unknown>;
+    for (const key of METRIC_KEYS) {
+      const candidate = Number(row[key] ?? (key === "storyViews" ? row.story_views : undefined));
+      if (Number.isFinite(candidate) && candidate > 0) totals[key] += candidate;
+    }
+  };
+  visit(payload.analytics ?? payload.overview ?? payload.data ?? payload.posts ?? payload);
+  return totals;
+}
+
+export const getZernioAnalytics = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { workspaceId: string; days?: 7 | 30 | 90 }) => data)
+  .handler(async ({ data, context }) => {
+    const { requireSocialWorkspaceAccess, zernioRequest } = await import("./zernio.server");
+    await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const profileResult = await supabaseAdmin
+      .from("zernio_profiles" as never)
+      .select("profile_id")
+      .eq("workspace_id", data.workspaceId)
+      .maybeSingle();
+    const profile = profileResult.data as { profile_id: string } | null;
+    if (!profile) return { organic: null, external: null, paid: null, paidAvailable: false };
+    const toDate = new Date();
+    const fromDate = new Date(toDate.getTime() - (data.days ?? 30) * 86_400_000);
+    const base = new URLSearchParams({
+      profileId: profile.profile_id,
+      fromDate: fromDate.toISOString().slice(0, 10),
+      toDate: toDate.toISOString().slice(0, 10),
+    });
+    const [organicPayload, externalPayload] = await Promise.all([
+      zernioRequest<Record<string, unknown>>(`/analytics?${base}&source=late`),
+      zernioRequest<Record<string, unknown>>(`/analytics?${base}&source=external`),
+    ]);
+    let paid: ReturnType<typeof sumMetrics> | null = null;
+    try {
+      const adsPayload = await zernioRequest<Record<string, unknown>>(`/ads?${base}`);
+      paid = sumMetrics(adsPayload);
+    } catch (reason) {
+      const error = reason as Error & { status?: number };
+      if (![400, 403, 404].includes(error.status ?? 0)) throw reason;
+    }
+    return {
+      organic: sumMetrics(organicPayload),
+      external: sumMetrics(externalPayload),
+      paid,
+      paidAvailable: Boolean(paid),
+    };
+  });
+
+export const getZernioCommentInbox = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { workspaceId: string }) => data)
+  .handler(async ({ data, context }) => {
+    const { requireSocialWorkspaceAccess, zernioRequest } = await import("./zernio.server");
+    await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const profileResult = await supabaseAdmin
+      .from("zernio_profiles" as never)
+      .select("profile_id")
+      .eq("workspace_id", data.workspaceId)
+      .maybeSingle();
+    const profile = profileResult.data as { profile_id: string } | null;
+    if (!profile) return { comments: [] };
+    const payload = await zernioRequest<Record<string, unknown>>(
+      `/inbox/comments?profileId=${encodeURIComponent(profile.profile_id)}&limit=25&sortBy=date&sortOrder=desc`,
+    );
+    const rows = Array.isArray(payload.comments)
+      ? payload.comments
+      : Array.isArray(payload.data)
+        ? payload.data
+        : [];
+    return {
+      comments: rows.flatMap((value) => {
+        if (!value || typeof value !== "object") return [];
+        const row = value as Record<string, unknown>;
+        const id = String(row.id ?? row.commentId ?? "");
+        const postId = String(row.postId ?? row.platformPostId ?? "");
+        const accountId = String(row.accountId ?? "");
+        if (!id || !postId || !accountId) return [];
+        return [
+          {
+            id,
+            postId,
+            accountId,
+            platform: String(row.platform ?? ""),
+            author: String(row.authorName ?? row.username ?? "Customer"),
+            text: String(row.text ?? row.message ?? ""),
+            createdAt: String(row.createdAt ?? row.date ?? ""),
+          },
+        ];
+      }),
+    };
+  });
+
+export const replyToZernioComment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (data: {
+      workspaceId: string;
+      postId: string;
+      commentId: string;
+      accountId: string;
+      message: string;
+    }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    const { requireSocialWorkspaceAccess, zernioRequest } = await import("./zernio.server");
+    await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
+    if (!data.message.trim()) throw new Error("Reply cannot be empty.");
+    await zernioRequest(`/inbox/comments/${encodeURIComponent(data.postId)}`, {
+      method: "POST",
+      body: JSON.stringify({
+        accountId: data.accountId,
+        commentId: data.commentId,
+        message: data.message.trim(),
+      }),
+    });
+    return { replied: true };
+  });
+
 export const verifyZernioIntegration = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
@@ -31,6 +174,23 @@ export const getZernioWorkspaceStatus = createServerFn({ method: "POST" })
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
     const profile = result.data as ZernioProfileRow | null;
+    const [{ data: limit }, { count: connectedAccounts }, subscriptionResult] = await Promise.all([
+      context.supabase.rpc(
+        "social_account_limit" as never,
+        { _workspace_id: data.workspaceId } as never,
+      ),
+      supabaseAdmin
+        .from("social_connections")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", data.workspaceId)
+        .eq("provider", "zernio")
+        .eq("connected", true),
+      supabaseAdmin
+        .from("workspace_social_subscriptions" as never)
+        .select("plan,status,trial_ends_at,current_period_end")
+        .eq("workspace_id", data.workspaceId)
+        .maybeSingle(),
+    ]);
     return {
       configured: zernioConfigured(),
       hasProfile: Boolean(profile),
@@ -38,6 +198,14 @@ export const getZernioWorkspaceStatus = createServerFn({ method: "POST" })
       verifiedAt: profile?.verified_at ?? null,
       lastSyncedAt: profile?.last_synced_at ?? null,
       lastError: profile?.last_error ?? null,
+      accountLimit: Number(limit ?? 0),
+      connectedAccounts: connectedAccounts ?? 0,
+      subscription: subscriptionResult.data as {
+        plan: string;
+        status: string;
+        trial_ends_at: string | null;
+        current_period_end: string | null;
+      } | null,
     };
   });
 
@@ -96,6 +264,36 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
       await import("./zernio.server");
     await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    if (data.platform === "snapchat") {
+      throw new Error("Snapchat connections are still a closed Zernio beta.");
+    }
+    const [{ data: limit }, { count: connectedAccounts }, existingConnection] = await Promise.all([
+      context.supabase.rpc(
+        "social_account_limit" as never,
+        { _workspace_id: data.workspaceId } as never,
+      ),
+      supabaseAdmin
+        .from("social_connections")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", data.workspaceId)
+        .eq("provider", "zernio")
+        .eq("connected", true),
+      supabaseAdmin
+        .from("social_connections")
+        .select("connected")
+        .eq("workspace_id", data.workspaceId)
+        .eq("provider", "zernio")
+        .eq("platform", data.platform)
+        .maybeSingle(),
+    ]);
+    if (
+      !(existingConnection.data as { connected?: boolean } | null)?.connected &&
+      (connectedAccounts ?? 0) >= Number(limit ?? 0)
+    ) {
+      throw new Error(
+        `This plan allows ${Number(limit ?? 0)} connected social accounts. Upgrade or disconnect one first.`,
+      );
+    }
     const profileResult = await supabaseAdmin
       .from("zernio_profiles" as never)
       .select("profile_id")

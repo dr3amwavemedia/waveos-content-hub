@@ -36,6 +36,7 @@ export const ALL_PLATFORMS: SocialPlatform[] = [
   "pinterest",
   "threads",
   "bluesky",
+  "snapchat",
 ];
 
 export function useContentItems(workspaceId: string | null, status?: ContentStatus[]) {
@@ -347,7 +348,10 @@ export function useMarkNotificationRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read_at: new Date().toISOString() })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),

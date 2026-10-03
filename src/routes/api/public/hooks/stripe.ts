@@ -9,6 +9,7 @@ import {
 import { applyStripeCheckoutPayment } from "@/lib/stripe-invoice-payment.server";
 import { nextMonthlyChargeAt } from "@/lib/date-time";
 import { claimWebhookEvent } from "@/lib/webhook-claim.server";
+import { applySocialSubscriptionEvent } from "@/lib/social-subscription-webhook.server";
 
 /**
  * Stripe webhook receiver.
@@ -76,6 +77,14 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
             .eq("external_id", eventId);
           return new Response(message, { status: 503 });
         };
+
+        try {
+          if (await applySocialSubscriptionEvent(eventType, object)) {
+            return new Response("ok", { status: 200 });
+          }
+        } catch {
+          return retryableFailure("social_subscription_reconcile_failed");
+        }
 
         const autopayScheduleId = metadata.autopay_schedule_id;
         if (
