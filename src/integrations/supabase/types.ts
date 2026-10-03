@@ -3747,6 +3747,10 @@ export type Database = {
         Args: { _user_id: string; _workspace_id?: string }
         Returns: Json
       }
+      admin_set_client_invite_access: {
+        Args: { _access: string; _invite_id: string }
+        Returns: undefined
+      }
       admin_set_client_member_name: {
         Args: {
           _first_name?: string
@@ -3813,6 +3817,10 @@ export type Database = {
           _processed_at: string
           _source: string
         }
+        Returns: boolean
+      }
+      client_can_view_financials: {
+        Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
       create_brand_workspace: {
