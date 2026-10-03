@@ -25,6 +25,7 @@ import { InvoiceDocumentTools } from "@/components/app/invoice-document-tools";
 import { PaymentProgress } from "@/components/app/payment-progress";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   Archive,
@@ -40,6 +41,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Tag,
   Trash2,
   Users2,
   X,
@@ -75,6 +77,17 @@ import {
   workspaceRoleForClientAccess,
   type ClientAccountAccess,
 } from "@/lib/client-account-access";
+import {
+  deleteOsAccount,
+  createOsPromoCode,
+  listOsPromoCodes,
+  listOsAccounts,
+  sendOsAccountPasswordReset,
+  setOsAccountPayments,
+  setOsPromoCodeActive,
+  type OsPromoColor,
+  updateOsAccount,
+} from "@/lib/os-accounts.functions";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -204,6 +217,7 @@ interface ClientWorkspace {
   feature_overrides: Record<string, boolean>;
   last_activity_at: string | null;
   created_at: string;
+  data_source: "client_data" | "os_data";
   wedding_display_name: string | null;
   wedding_theme: string;
   wedding_scheduling_url: string | null;
@@ -247,6 +261,7 @@ const db = supabase as unknown as {
 };
 
 function ClientsPage() {
+  const [dataTab, setDataTab] = useState<"client_data" | "os_data">("client_data");
   const [open, setOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [newInviteLink, setNewInviteLink] = useState<{
@@ -280,7 +295,7 @@ function ClientsPage() {
     queryKey: ["clients", "workspaces"],
     queryFn: async () => {
       const BASE_COLS =
-        "id,name,client_name,business_name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at";
+        "id,name,client_name,business_name,slug,industry,timezone,is_demo,status,access_tier,account_status,agreement_term,access_starts_at,access_expires_at,feature_overrides,last_activity_at,created_at,data_source";
       // Wedding columns are optional: if the Layer 5 migration has not reached
       // this environment yet, the client list must still load.
       let missing = false;
@@ -367,6 +382,7 @@ function ClientsPage() {
 
   const normalizedClientSearch = clientSearch.trim().toLocaleLowerCase();
   const visibleWorkspaces = (workspacesQ.data ?? []).filter((workspace) => {
+    if (workspace.data_source !== dataTab) return false;
     if (!normalizedClientSearch) return true;
     return [
       workspace.name,
@@ -424,6 +440,33 @@ function ClientsPage() {
       </header>
 
       <DocumentDraftTools />
+      <div className="inline-flex rounded-xl border border-border bg-surface p-1">
+        <button
+          type="button"
+          onClick={() => {
+            setDataTab("client_data");
+            setClientSearch("");
+          }}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold ${dataTab === "client_data" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+        >
+          Client data
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setDataTab("os_data");
+            setClientSearch("");
+          }}
+          className={`rounded-lg px-4 py-2 text-sm font-semibold ${dataTab === "os_data" ? "bg-primary text-primary-foreground" : "text-muted-foreground"}`}
+        >
+          OS data
+        </button>
+      </div>
+      <p className="text-sm text-muted-foreground">
+        {dataTab === "client_data"
+          ? "Dream Wave clients added manually by staff."
+          : "Public-app and API accounts, kept separate from agency client records."}
+      </p>
       <div className="relative max-w-xl">
         <Search
           aria-hidden="true"
@@ -433,7 +476,9 @@ function ClientsPage() {
           type="search"
           value={clientSearch}
           onChange={(event) => setClientSearch(event.target.value)}
-          placeholder="Search by client or business name…"
+          placeholder={
+            dataTab === "os_data" ? "Search OS accounts…" : "Search by client or business name…"
+          }
           aria-label="Search clients"
           className="h-11 w-full rounded-xl border border-border bg-surface pl-11 pr-10 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
         />
@@ -449,13 +494,15 @@ function ClientsPage() {
         )}
       </div>
 
-      {weddingColumnsMissing && (
+      {dataTab === "os_data" && <OsDataPanel search={clientSearch} />}
+
+      {dataTab === "client_data" && weddingColumnsMissing && (
         <div className="rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm text-warning">
           Wedding portal settings are awaiting a database migration. All clients below are still
           shown using their standard workspace fields.
         </div>
       )}
-      {workspacesQ.isError && (
+      {dataTab === "client_data" && workspacesQ.isError && (
         <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
           <p className="font-semibold">The client list could not be loaded.</p>
           <p className="mt-1 break-words font-mono text-xs">
@@ -464,78 +511,80 @@ function ClientsPage() {
         </div>
       )}
 
-      <section className="space-y-3">
-        {!workspacesQ.isLoading && !workspacesQ.isError && visibleWorkspaces.length > 0 && (
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <p>
-              {visibleWorkspaces.length} client{visibleWorkspaces.length === 1 ? "" : "s"}
-            </p>
-            <p>Choose a client to open their profile</p>
-          </div>
-        )}
-        <div>
-          {workspacesQ.isLoading ? (
-            <div className="surface-card flex h-32 items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading workspaces…
-            </div>
-          ) : workspacesQ.isError ? (
-            <div className="surface-card p-6 text-sm text-muted-foreground">
-              Client list unavailable — see the error above.
-            </div>
-          ) : (workspacesQ.data ?? []).length === 0 ? (
-            <div className="surface-card p-6">
-              <EmptyState
-                icon={Users2}
-                title="No client workspaces yet"
-                body="Click New client to create your first workspace and send an invite."
-              />
-            </div>
-          ) : visibleWorkspaces.length === 0 ? (
-            <div className="surface-card p-6">
-              <EmptyState
-                icon={Search}
-                title="No clients found"
-                body={`No clients match “${clientSearch.trim()}”. Try a different search.`}
-              />
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {visibleWorkspaces.map((w) => {
-                const clientName = w.client_name?.trim() || w.name;
-                const businessName = w.business_name?.trim() || w.name;
-                const initials = clientName
-                  .split(/\s+/)
-                  .slice(0, 2)
-                  .map((part) => part.charAt(0))
-                  .join("")
-                  .toUpperCase();
-                return (
-                  <button
-                    key={w.id}
-                    type="button"
-                    onClick={() => setSelectedWs(w)}
-                    className="group flex min-h-24 w-full min-w-0 items-center gap-4 rounded-2xl border border-border bg-surface/70 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-elevated/70 hover:shadow-[var(--shadow-glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    aria-label={`Open ${clientName} profile`}
-                  >
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-sm font-semibold text-primary transition group-hover:border-primary/40 group-hover:bg-primary/15">
-                      {initials || "CL"}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-foreground transition group-hover:text-primary">
-                        {clientName}
-                      </span>
-                      <span className="mt-1 block truncate text-xs text-muted-foreground">
-                        {businessName}
-                      </span>
-                    </span>
-                    <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" />
-                  </button>
-                );
-              })}
+      {dataTab === "client_data" && (
+        <section className="space-y-3">
+          {!workspacesQ.isLoading && !workspacesQ.isError && visibleWorkspaces.length > 0 && (
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <p>
+                {visibleWorkspaces.length} client{visibleWorkspaces.length === 1 ? "" : "s"}
+              </p>
+              <p>Choose a client to open their profile</p>
             </div>
           )}
-        </div>
-      </section>
+          <div>
+            {workspacesQ.isLoading ? (
+              <div className="surface-card flex h-32 items-center justify-center text-sm text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading workspaces…
+              </div>
+            ) : workspacesQ.isError ? (
+              <div className="surface-card p-6 text-sm text-muted-foreground">
+                Client list unavailable — see the error above.
+              </div>
+            ) : (workspacesQ.data ?? []).length === 0 ? (
+              <div className="surface-card p-6">
+                <EmptyState
+                  icon={Users2}
+                  title="No client workspaces yet"
+                  body="Click New client to create your first workspace and send an invite."
+                />
+              </div>
+            ) : visibleWorkspaces.length === 0 ? (
+              <div className="surface-card p-6">
+                <EmptyState
+                  icon={Search}
+                  title="No clients found"
+                  body={`No clients match “${clientSearch.trim()}”. Try a different search.`}
+                />
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {visibleWorkspaces.map((w) => {
+                  const clientName = w.client_name?.trim() || w.name;
+                  const businessName = w.business_name?.trim() || w.name;
+                  const initials = clientName
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((part) => part.charAt(0))
+                    .join("")
+                    .toUpperCase();
+                  return (
+                    <button
+                      key={w.id}
+                      type="button"
+                      onClick={() => setSelectedWs(w)}
+                      className="group flex min-h-24 w-full min-w-0 items-center gap-4 rounded-2xl border border-border bg-surface/70 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-elevated/70 hover:shadow-[var(--shadow-glow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      aria-label={`Open ${clientName} profile`}
+                    >
+                      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-sm font-semibold text-primary transition group-hover:border-primary/40 group-hover:bg-primary/15">
+                        {initials || "CL"}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-foreground transition group-hover:text-primary">
+                          {clientName}
+                        </span>
+                        <span className="mt-1 block truncate text-xs text-muted-foreground">
+                          {businessName}
+                        </span>
+                      </span>
+                      <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {open && (
         <OnboardingModal
@@ -568,6 +617,525 @@ function ClientsPage() {
           }}
           onRefresh={() => qc.invalidateQueries({ queryKey: ["clients", "workspaces"] })}
         />
+      )}
+    </div>
+  );
+}
+
+function OsDataPanel({ search }: { search: string }) {
+  const list = useServerFn(listOsAccounts);
+  const reset = useServerFn(sendOsAccountPasswordReset);
+  const setPayments = useServerFn(setOsAccountPayments);
+  const update = useServerFn(updateOsAccount);
+  const remove = useServerFn(deleteOsAccount);
+  const [section, setSection] = useState<"accounts" | "promos">("accounts");
+  const [page, setPage] = useState(1);
+  const query = useQuery({
+    queryKey: ["os-accounts", search, page],
+    queryFn: () => list({ data: { search, page, pageSize: 30 } }),
+  });
+  useEffect(() => setPage(1), [search]);
+  const refresh = () => query.refetch();
+  if (section === "promos") {
+    return (
+      <section className="space-y-5">
+        <OsDataNavigation section={section} onSection={setSection} />
+        <OsPromoCodesPanel />
+      </section>
+    );
+  }
+  if (query.isLoading)
+    return (
+      <div className="surface-card p-6 text-sm text-muted-foreground">
+        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+        Loading OS accounts…
+      </div>
+    );
+  if (query.isError)
+    return (
+      <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+        {query.error instanceof Error ? query.error.message : "OS data could not be loaded."}
+      </div>
+    );
+  return (
+    <section className="space-y-3">
+      <OsDataNavigation section={section} onSection={setSection} />
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>{query.data?.total ?? 0} public app accounts</span>
+        <span>30 per page</span>
+      </div>
+      <div className="space-y-2">
+        {(query.data?.accounts ?? []).map((account) => {
+          const name =
+            [account.firstName, account.lastName].filter(Boolean).join(" ") || "WaveOS member";
+          return (
+            <article
+              key={account.id}
+              className="rounded-2xl border border-border bg-surface/70 p-4"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-foreground">{name}</p>
+                  <p className="text-sm text-muted-foreground">{account.email}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {account.lastSignInAt
+                      ? `Last sign-in ${new Date(account.lastSignInAt).toLocaleDateString()}`
+                      : "Has not signed in yet"}
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-foreground">
+                    {account.plan
+                      ? `${account.plan === "expanded" ? "Upgraded" : account.plan} · ${account.connectedAccounts}/${account.accountLimit} used · ${account.remainingAccounts} remaining`
+                      : "No social plan yet"}
+                  </p>
+                  {account.promoCode && (
+                    <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-violet-400/25 bg-violet-500/10 px-2.5 py-1 text-[11px] font-semibold text-violet-200">
+                      <Tag className="h-3 w-3" /> {account.promoCode} · +
+                      {account.promoBonusTrialDays} trial days
+                    </p>
+                  )}
+                </div>
+                <span
+                  className={cn(
+                    "rounded-full px-3 py-1 text-xs font-semibold",
+                    account.paymentsEnabled
+                      ? "bg-success/15 text-success"
+                      : "bg-warning/15 text-warning",
+                  )}
+                >
+                  {account.paymentsEnabled ? "Payments on" : "Payments off"}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await reset({ data: { userId: account.id } });
+                    toast.success("Secure password-reset email sent.");
+                  }}
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-semibold"
+                >
+                  Send password reset
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (
+                      !confirm(
+                        `${account.paymentsEnabled ? "Disable" : "Enable"} payments for ${account.email}?`,
+                      )
+                    )
+                      return;
+                    await setPayments({
+                      data: { userId: account.id, enabled: !account.paymentsEnabled },
+                    });
+                    await refresh();
+                    toast.success("Payment access updated.");
+                  }}
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-semibold"
+                >
+                  {account.paymentsEnabled ? "Disable payments" : "Enable payments"}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const firstName = prompt("First name", account.firstName ?? "");
+                    if (firstName === null) return;
+                    const lastName = prompt("Last name", account.lastName ?? "");
+                    if (lastName === null) return;
+                    const email = prompt("Email", account.email);
+                    if (!email) return;
+                    await update({ data: { userId: account.id, firstName, lastName, email } });
+                    await refresh();
+                    toast.success("OS account updated.");
+                  }}
+                  className="rounded-lg border border-border px-3 py-2 text-xs font-semibold"
+                >
+                  Edit details
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const confirmation = prompt(
+                      `Type ${account.email} to permanently delete this OS account.`,
+                    );
+                    if (!confirmation) return;
+                    await remove({ data: { userId: account.id, confirmEmail: confirmation } });
+                    await refresh();
+                    toast.success("OS account deleted.");
+                  }}
+                  className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive"
+                >
+                  Delete account
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+      {!query.data?.accounts.length && (
+        <EmptyState
+          icon={Users2}
+          title="No OS accounts found"
+          body="Public app and API sign-ups will appear here without mixing into Client data."
+        />
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          disabled={page === 1}
+          onClick={() => setPage((value) => value - 1)}
+          className="rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-40"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          disabled={page * 30 >= (query.data?.total ?? 0)}
+          onClick={() => setPage((value) => value + 1)}
+          className="rounded-lg border border-border px-3 py-2 text-xs disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function OsDataNavigation({
+  section,
+  onSection,
+}: {
+  section: "accounts" | "promos";
+  onSection: (section: "accounts" | "promos") => void;
+}) {
+  return (
+    <div className="grid gap-2 rounded-2xl border border-border bg-surface/60 p-2 sm:grid-cols-2">
+      <button
+        type="button"
+        onClick={() => onSection("accounts")}
+        className={cn(
+          "flex min-h-12 items-center gap-3 rounded-xl px-4 text-left transition-colors",
+          section === "accounts"
+            ? "bg-primary/15 text-primary ring-1 ring-primary/30"
+            : "text-muted-foreground hover:bg-elevated hover:text-foreground",
+        )}
+      >
+        <Users2 className="h-4 w-4" />
+        <span>
+          <span className="block text-sm font-semibold">Public accounts</span>
+          <span className="block text-[11px] opacity-75">Users, plans and payment access</span>
+        </span>
+      </button>
+      <button
+        type="button"
+        onClick={() => onSection("promos")}
+        className={cn(
+          "flex min-h-12 items-center gap-3 rounded-xl px-4 text-left transition-colors",
+          section === "promos"
+            ? "bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/30"
+            : "text-muted-foreground hover:bg-elevated hover:text-foreground",
+        )}
+      >
+        <Tag className="h-4 w-4" />
+        <span>
+          <span className="block text-sm font-semibold">Promo codes</span>
+          <span className="block text-[11px] opacity-75">Public trial campaigns and usage</span>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+const promoThemeStyles: Record<OsPromoColor, string> = {
+  ocean: "border-sky-400/30 bg-sky-500/10 text-sky-200",
+  violet: "border-violet-400/30 bg-violet-500/10 text-violet-200",
+  emerald: "border-emerald-400/30 bg-emerald-500/10 text-emerald-200",
+  sunset: "border-orange-400/30 bg-orange-500/10 text-orange-200",
+};
+
+function generatePromoCode() {
+  const bytes = crypto.getRandomValues(new Uint8Array(4));
+  const suffix = Array.from(bytes, (byte) => (byte % 36).toString(36))
+    .join("")
+    .toUpperCase();
+  return `WAVE-${suffix}`;
+}
+
+function OsPromoCodesPanel() {
+  const list = useServerFn(listOsPromoCodes);
+  const createPromo = useServerFn(createOsPromoCode);
+  const setActive = useServerFn(setOsPromoCodeActive);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [bonusDays, setBonusDays] = useState(14);
+  const [maxRedemptions, setMaxRedemptions] = useState(100);
+  const [startsAt, setStartsAt] = useState("");
+  const [expiresAt, setExpiresAt] = useState("");
+  const [colorTheme, setColorTheme] = useState<OsPromoColor>("violet");
+  const [saving, setSaving] = useState(false);
+  const promos = useQuery({
+    queryKey: ["os-promo-codes"],
+    queryFn: () => list({ data: {} }),
+  });
+
+  async function handleCreate() {
+    setSaving(true);
+    try {
+      await createPromo({
+        data: {
+          code,
+          name,
+          bonusTrialDays: bonusDays,
+          maxRedemptions,
+          startsAt: startsAt || null,
+          expiresAt: expiresAt || null,
+          colorTheme,
+        },
+      });
+      setCode("");
+      setName("");
+      setBonusDays(14);
+      setMaxRedemptions(100);
+      setStartsAt("");
+      setExpiresAt("");
+      await promos.refetch();
+      toast.success("OS promo code created.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Promo code could not be created.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <section className="overflow-hidden rounded-2xl border border-violet-400/25 bg-gradient-to-br from-violet-500/12 via-surface/80 to-sky-500/10 p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 text-violet-200">
+              <Tag className="h-5 w-5" />
+              <h2 className="text-base font-semibold">Create an OS promo code</h2>
+            </div>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Promo codes belong only to the public WaveOS app. A valid code adds bonus days to the
+              standard 30-day, two-account trial.
+            </p>
+          </div>
+          <span className="rounded-full border border-violet-400/30 bg-violet-500/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-violet-200">
+            OS data only
+          </span>
+        </div>
+
+        <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="space-y-1.5 sm:col-span-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Promo code
+            </span>
+            <div className="flex gap-2">
+              <input
+                value={code}
+                onChange={(event) => setCode(event.target.value.toUpperCase())}
+                placeholder="WAVE-LAUNCH"
+                maxLength={24}
+                className="min-w-0 flex-1 rounded-lg border border-border bg-background/70 px-3 py-2 font-mono text-sm uppercase tracking-wider"
+              />
+              <button
+                type="button"
+                onClick={() => setCode(generatePromoCode())}
+                className="rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 text-xs font-semibold text-violet-200"
+              >
+                Generate
+              </button>
+            </div>
+          </label>
+          <label className="space-y-1.5 sm:col-span-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Internal campaign name
+            </span>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Local launch bonus"
+              maxLength={80}
+              className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Bonus trial days
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={90}
+              value={bonusDays}
+              onChange={(event) => setBonusDays(Number(event.target.value))}
+              className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Redemption limit
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={100000}
+              value={maxRedemptions}
+              onChange={(event) => setMaxRedemptions(Number(event.target.value))}
+              className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Starts
+            </span>
+            <input
+              type="datetime-local"
+              value={startsAt}
+              onChange={(event) => setStartsAt(event.target.value)}
+              className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="space-y-1.5">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Expires
+            </span>
+            <input
+              type="datetime-local"
+              value={expiresAt}
+              onChange={(event) => setExpiresAt(event.target.value)}
+              className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm"
+            />
+          </label>
+          <label className="space-y-1.5 sm:col-span-2">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Color label
+            </span>
+            <select
+              value={colorTheme}
+              onChange={(event) => setColorTheme(event.target.value as OsPromoColor)}
+              className="w-full rounded-lg border border-border bg-background/70 px-3 py-2 text-sm"
+            >
+              <option value="ocean">Ocean blue</option>
+              <option value="violet">Wave violet</option>
+              <option value="emerald">Growth green</option>
+              <option value="sunset">Launch orange</option>
+            </select>
+          </label>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => void handleCreate()}
+          disabled={saving || !code.trim() || !name.trim()}
+          className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-violet-500 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-violet-500/20 hover:bg-violet-400 disabled:opacity-50"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          Create promo code
+        </button>
+      </section>
+
+      {promos.isLoading ? (
+        <div className="surface-card p-8 text-center text-sm text-muted-foreground">
+          <Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading promo codes…
+        </div>
+      ) : !promos.data?.length ? (
+        <EmptyState
+          icon={Tag}
+          title="No OS promo codes yet"
+          body="Create a code above for a public signup campaign."
+        />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {promos.data.map((promo) => {
+            const now = Date.now();
+            const starts = new Date(promo.starts_at).getTime();
+            const expires = promo.expires_at ? new Date(promo.expires_at).getTime() : null;
+            const exhausted = promo.redemption_count >= promo.max_redemptions;
+            const status = !promo.is_active
+              ? "Paused"
+              : exhausted
+                ? "Fully redeemed"
+                : starts > now
+                  ? "Scheduled"
+                  : expires && expires <= now
+                    ? "Expired"
+                    : "Active";
+            const statusStyle =
+              status === "Active"
+                ? "bg-emerald-500/15 text-emerald-300"
+                : status === "Scheduled"
+                  ? "bg-sky-500/15 text-sky-300"
+                  : status === "Paused"
+                    ? "bg-amber-500/15 text-amber-300"
+                    : "bg-rose-500/15 text-rose-300";
+            return (
+              <article
+                key={promo.id}
+                className={cn("rounded-2xl border p-5", promoThemeStyles[promo.color_theme])}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-current">{promo.name}</p>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await navigator.clipboard.writeText(promo.code);
+                        toast.success("Promo code copied.");
+                      }}
+                      className="mt-2 inline-flex items-center gap-2 rounded-lg border border-current/20 bg-black/10 px-3 py-1.5 font-mono text-sm font-bold tracking-wider"
+                    >
+                      {promo.code} <Copy className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <span
+                    className={cn(
+                      "rounded-full px-2.5 py-1 text-[10px] font-bold uppercase",
+                      statusStyle,
+                    )}
+                  >
+                    {status}
+                  </span>
+                </div>
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-xl bg-black/10 p-3">
+                    <p className="text-lg font-bold">+{promo.bonus_trial_days}</p>
+                    <p className="text-[10px] uppercase opacity-70">Bonus days</p>
+                  </div>
+                  <div className="rounded-xl bg-black/10 p-3">
+                    <p className="text-lg font-bold">{promo.redemption_count}</p>
+                    <p className="text-[10px] uppercase opacity-70">Used</p>
+                  </div>
+                  <div className="rounded-xl bg-black/10 p-3">
+                    <p className="text-lg font-bold">
+                      {promo.max_redemptions - promo.redemption_count}
+                    </p>
+                    <p className="text-[10px] uppercase opacity-70">Remaining</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[11px] opacity-80">
+                  <span>
+                    {promo.expires_at
+                      ? `Expires ${new Date(promo.expires_at).toLocaleDateString()}`
+                      : "No expiration"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await setActive({ data: { promoId: promo.id, active: !promo.is_active } });
+                      await promos.refetch();
+                      toast.success(promo.is_active ? "Promo paused." : "Promo activated.");
+                    }}
+                    className="rounded-lg border border-current/25 bg-black/10 px-3 py-2 font-semibold"
+                  >
+                    {promo.is_active ? "Pause code" : "Activate code"}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       )}
     </div>
   );

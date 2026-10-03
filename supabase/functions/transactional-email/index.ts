@@ -146,9 +146,11 @@ Deno.serve(async (request) => {
     // A newly joined member is not staff yet, so this event authenticates as
     // any signed-in user and only ever mails the fixed admin recipients.
     const auth =
-      body.type === "member_joined"
-        ? await authenticatedUser(request)
-        : await authenticatedStaff(request);
+      body.type === "account_support"
+        ? { db: adminClient(), user: null }
+        : body.type === "member_joined"
+          ? await authenticatedUser(request)
+          : await authenticatedStaff(request);
     if (!auth) return json({ error: "staff_required" }, 403);
     let workspaceId: string | null = null;
     let inviteId: string | null = null;
@@ -157,7 +159,51 @@ Deno.serve(async (request) => {
     let subject = "";
     let html = "";
 
-    if (body.type === "invite") {
+    if (body.type === "account_support") {
+      const email = cleanText(body.email, "", 254).toLowerCase();
+      const requestType = ["sign_in", "password_reset", "account_help"].includes(body.requestType)
+        ? body.requestType
+        : "account_help";
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "invalid_email" }, 400);
+      const since = new Date(Date.now() - 15 * 60_000).toISOString();
+      const { count } = await auth.db
+        .from("os_account_support_requests")
+        .select("id", { count: "exact", head: true })
+        .eq("email", email)
+        .gte("created_at", since);
+      if ((count ?? 0) > 0) return json({ configured: true, sent: 0, skipped: true });
+      const created = await auth.db
+        .from("os_account_support_requests")
+        .insert({ email, request_type: requestType })
+        .select("id")
+        .single();
+      if (created.error) return json({ error: "support_request_store_failed" }, 503);
+      recipients = [...new Set([...ADMIN_NOTIFICATION_EMAILS, ...(await staffEmails(auth.db))])];
+      eventType = "os_account_support";
+      subject = "WaveOS account support request";
+      html = layout(
+        "A WaveOS member needs account help",
+        `${email} requested ${String(requestType).replaceAll("_", " ")} support. Verify the account before making changes.`,
+      );
+      const results = await Promise.all(
+        recipients.map((recipient) => sendEmail(recipient, subject, html)),
+      );
+      const sent = results.filter((result) => result.id).length;
+      const configured = results.some((result) => result.configured);
+      const errors = results
+        .map((result) => result.error)
+        .filter(Boolean)
+        .join("; ")
+        .slice(0, 500);
+      await auth.db
+        .from("os_account_support_requests")
+        .update({
+          delivery_status: !configured ? "skipped" : sent > 0 ? "sent" : "failed",
+          delivery_error: errors || null,
+        })
+        .eq("id", created.data.id);
+      return json({ configured, sent, attempted: recipients.length });
+    } else if (body.type === "invite") {
       inviteId = cleanText(body.inviteId, "", 80);
       const inviteUrl = safeHttpsUrl(body.url);
       if (!inviteId || !inviteUrl) return json({ error: "invalid_invite" }, 400);

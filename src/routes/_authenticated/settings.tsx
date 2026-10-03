@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import {
   AlertCircle,
@@ -45,6 +46,11 @@ import {
   clientAccountAccessLabel,
   clientAccountAccess,
 } from "@/lib/client-account-access";
+import {
+  createSocialSubscriptionCheckout,
+  getSocialSubscription,
+  startSocialTrial,
+} from "@/lib/social-subscriptions.functions";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -182,6 +188,10 @@ function SettingsPage() {
       )}
 
       {activeWorkspace && canManageBranding && (
+        <SocialPlanSettings workspaceId={activeWorkspace.id} canManage={canManageBranding} />
+      )}
+
+      {activeWorkspace && canManageBranding && (
         <WorkspaceBrandingEditor
           workspaceId={activeWorkspace.id}
           workspaceName={activeWorkspace.name}
@@ -255,6 +265,128 @@ function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function SocialPlanSettings({
+  workspaceId,
+  canManage,
+}: {
+  workspaceId: string;
+  canManage: boolean;
+}) {
+  const getPlan = useServerFn(getSocialSubscription);
+  const startTrial = useServerFn(startSocialTrial);
+  const checkout = useServerFn(createSocialSubscriptionCheckout);
+  const query = useQuery({
+    queryKey: ["social-subscription", workspaceId],
+    queryFn: () => getPlan({ data: { workspaceId } }),
+  });
+  const trial = useMutation({
+    mutationFn: () => startTrial({ data: { workspaceId } }),
+    onSuccess: async () => {
+      await query.refetch();
+      toast.success("Your 30-day social trial is active with two connected accounts.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not start trial."),
+  });
+  const subscribe = useMutation({
+    mutationFn: (input: { plan: "standard" | "expanded"; interval: "monthly" | "annual" }) =>
+      checkout({ data: { workspaceId, ...input } }),
+    onSuccess: (result) => {
+      if (result.url) window.location.assign(result.url);
+      else toast.error("Stripe did not return a checkout link.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not open checkout."),
+  });
+  const subscription = query.data?.subscription;
+  return (
+    <section className="surface-card p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            Layer Six
+          </p>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">Social publishing plan</h2>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            A separate app subscription that adds social accounts, scheduling and verified analytics
+            without changing your Dream Wave service plan.
+          </p>
+        </div>
+        <span className="rounded-full border border-border bg-elevated px-3 py-1 text-xs font-semibold text-foreground">
+          {subscription
+            ? `${subscription.plan} · ${query.data?.connectedAccounts ?? 0}/${subscription.account_limit} accounts`
+            : "Not started"}
+        </span>
+      </div>
+      {canManage && (
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          {!subscription && (
+            <button
+              type="button"
+              disabled={trial.isPending}
+              onClick={() => trial.mutate()}
+              className="rounded-xl border border-primary/30 bg-primary/10 p-4 text-left hover:bg-primary/15 disabled:opacity-50"
+            >
+              <strong className="text-sm text-foreground">Start 30-day trial</strong>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                No card · up to 2 accounts
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={subscribe.isPending}
+            onClick={() => subscribe.mutate({ plan: "standard", interval: "monthly" })}
+            className="rounded-xl border border-border bg-elevated p-4 text-left hover:border-primary/30 disabled:opacity-50"
+          >
+            <strong className="text-sm text-foreground">Standard · $39.99/mo</strong>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Up to 3 connected accounts
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={subscribe.isPending}
+            onClick={() => subscribe.mutate({ plan: "expanded", interval: "monthly" })}
+            className="rounded-xl border border-border bg-elevated p-4 text-left hover:border-primary/30 disabled:opacity-50"
+          >
+            <strong className="text-sm text-foreground">Expanded / Upgraded · $65/mo</strong>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Up to 6 connected accounts
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={subscribe.isPending}
+            onClick={() => subscribe.mutate({ plan: "standard", interval: "annual" })}
+            className="rounded-xl border border-border bg-elevated p-4 text-left hover:border-primary/30 disabled:opacity-50"
+          >
+            <strong className="text-sm text-foreground">Standard annual · $479.88</strong>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              3 accounts · billed yearly
+            </span>
+          </button>
+          <button
+            type="button"
+            disabled={subscribe.isPending}
+            onClick={() => subscribe.mutate({ plan: "expanded", interval: "annual" })}
+            className="rounded-xl border border-border bg-elevated p-4 text-left hover:border-primary/30 disabled:opacity-50"
+          >
+            <strong className="text-sm text-foreground">Upgraded annual · $780</strong>
+            <span className="mt-1 block text-xs text-muted-foreground">
+              6 accounts · billed yearly
+            </span>
+          </button>
+        </div>
+      )}
+      <p className="mt-3 text-[11px] text-muted-foreground">
+        Annual billing is supported at $479.88 Standard or $780 Expanded. Checkout remains Stripe
+        test mode until launch approval.
+      </p>
+    </section>
   );
 }
 

@@ -36,6 +36,7 @@ export const ALL_PLATFORMS: SocialPlatform[] = [
   "pinterest",
   "threads",
   "bluesky",
+  "snapchat",
 ];
 
 export function useContentItems(workspaceId: string | null, status?: ContentStatus[]) {
@@ -254,6 +255,36 @@ export function useSubmitForApproval() {
   });
 }
 
+export function useStaffContentRelease() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      contentId: string;
+      releaseMode: "approval" | "direct";
+      requestedAction: "publish_now" | "schedule";
+      scheduledAt?: string | null;
+    }) => {
+      const { error } = await (
+        supabase.rpc as unknown as (
+          name: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ error: Error | null }>
+      )("staff_release_content", {
+        _content_id: input.contentId,
+        _release_mode: input.releaseMode,
+        _requested_action: input.requestedAction,
+        _scheduled_at: input.scheduledAt ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["content-items"] });
+      qc.invalidateQueries({ queryKey: ["content-item"] });
+      qc.invalidateQueries({ queryKey: ["approvals"] });
+    },
+  });
+}
+
 export function useDecideApproval() {
   const qc = useQueryClient();
   return useMutation({
@@ -347,7 +378,10 @@ export function useMarkNotificationRead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id);
+      const { error } = await supabase
+        .from("notifications")
+        .update({ read_at: new Date().toISOString() })
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications"] }),

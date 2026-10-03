@@ -153,6 +153,45 @@ function RootComponent() {
   const router = useRouter();
 
   useEffect(() => {
+    let refreshing = false;
+
+    const resumeSession = async () => {
+      if (refreshing || (typeof navigator !== "undefined" && !navigator.onLine)) return;
+      refreshing = true;
+      try {
+        const { data } = await supabase.auth.getSession();
+        const expiresAt = data.session?.expires_at;
+        // Supabase already refreshes active browser sessions. This handles
+        // mobile home-screen apps and tabs returning after a long suspension.
+        if (expiresAt && expiresAt * 1000 <= Date.now() + 5 * 60 * 1000) {
+          await supabase.auth.refreshSession();
+        }
+      } catch {
+        // Keep the persisted session during temporary offline/network errors.
+        // Supabase will retry when the app becomes visible or online again.
+      } finally {
+        refreshing = false;
+      }
+    };
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void resumeSession();
+    };
+    const onPageShow = () => void resumeSession();
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("online", onPageShow);
+    void resumeSession();
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("online", onPageShow);
+    };
+  }, []);
+
+  useEffect(() => {
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (
         event !== "INITIAL_SESSION" &&

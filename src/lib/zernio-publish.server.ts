@@ -46,6 +46,18 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
     .eq("provider", "zernio")
     .eq("connected", true);
   if (connectionsError) throw connectionsError;
+  const { data: rawLimit } = await supabaseAdmin.rpc(
+    "social_account_limit" as never,
+    {
+      _workspace_id: item.workspace_id,
+    } as never,
+  );
+  const accountLimit = Number(rawLimit ?? 0);
+  if ((connections?.length ?? 0) > accountLimit) {
+    throw new Error(
+      `This workspace has ${connections?.length ?? 0} connected accounts but its plan allows ${accountLimit}. Disconnect the extra accounts or upgrade before publishing.`,
+    );
+  }
   const accountByPlatform = new Map(
     (connections ?? []).map((connection) => [connection.platform, connection]),
   );
@@ -85,6 +97,17 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
   for (const variant of variants) {
     const connection = accountByPlatform.get(variant.platform);
     const idempotencyKey = `${contentId}:${variant.platform}`;
+    const platformOptions =
+      variant.platform_options && typeof variant.platform_options === "object"
+        ? (variant.platform_options as Record<string, unknown>)
+        : {};
+    const contentType = platformOptions.contentType === "story" ? "story" : null;
+    if (contentType && !["instagram", "facebook"].includes(variant.platform)) {
+      throw new Error(`${variant.platform} does not support Story publishing through Zernio.`);
+    }
+    if (contentType && mediaItems.length !== 1) {
+      throw new Error(`${variant.platform} Stories require exactly one media item.`);
+    }
     const requestBody = {
       content: variant.caption || item.primary_caption || "",
       ...(mediaItems.length ? { mediaItems } : {}),
@@ -92,6 +115,7 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
         {
           platform: toZernioPlatform(variant.platform),
           accountId: connection?.provider_account_id,
+          ...(contentType ? { platformSpecificData: { contentType } } : {}),
         },
       ],
       publishNow: true,

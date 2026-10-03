@@ -1,0 +1,46 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+import ts from "typescript";
+
+const planSource = readFileSync("src/lib/social-plans.ts", "utf8");
+const compiled = ts.transpileModule(planSource, {
+  compilerOptions: { module: ts.ModuleKind.CommonJS },
+}).outputText;
+const planExports = {};
+new Function("exports", compiled)(planExports);
+const migration = readFileSync(
+  "supabase/migrations/20261003120000_layer_six_social_subscriptions.sql",
+  "utf8",
+);
+const zernio = readFileSync("src/lib/zernio.functions.ts", "utf8");
+const publisher = readFileSync("src/lib/zernio-publish.server.ts", "utf8");
+const createRoute = readFileSync("src/routes/_authenticated/create.tsx", "utf8");
+const assistant = readFileSync("src/lib/wave-assist.functions.ts", "utf8");
+
+test("trial, Standard and Expanded enforce the requested account caps and prices", () => {
+  assert.equal(planExports.SOCIAL_PLANS.trial.accountLimit, 2);
+  assert.equal(planExports.SOCIAL_PLANS.standard.accountLimit, 3);
+  assert.equal(planExports.SOCIAL_PLANS.standard.monthlyCents, 3999);
+  assert.equal(planExports.SOCIAL_PLANS.expanded.accountLimit, 6);
+  assert.equal(planExports.SOCIAL_PLANS.expanded.monthlyCents, 6500);
+});
+
+test("existing agency clients stay unchanged except grandfathered social-management clients", () => {
+  assert.match(migration, /Existing Social Management clients keep full access/);
+  assert.match(migration, /ON CONFLICT \(workspace_id\) DO NOTHING/);
+  assert.doesNotMatch(migration, /UPDATE public\.workspaces SET/);
+});
+
+test("connection limits are enforced server-side and Snapchat remains closed beta", () => {
+  assert.match(zernio, /connectedAccounts.*>= Number\(limit/);
+  assert.match(zernio, /Snapchat connections are still a closed Zernio beta/);
+  assert.match(publisher, /Disconnect the extra accounts or upgrade before publishing/);
+});
+
+test("caption suite uses Brand Voice and Story selection is explicit", () => {
+  assert.match(assistant, /Saved Brand Voice/);
+  assert.match(assistant, /caption_suite/);
+  assert.match(createRoute, /Draft with Brand Voice/);
+  assert.match(createRoute, /value="story"/);
+});
