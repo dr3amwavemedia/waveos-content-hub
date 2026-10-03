@@ -2,10 +2,13 @@
 -- workspace roles: owner/admin are Client Admin, while editor is a Client
 -- Second Account. Grandfather every existing client membership and pending
 -- client invitation as Client Admin so this release never removes access.
+-- Existing owner/admin memberships already map to Client Admin and must keep
+-- their internal role for compatibility with owner-only logic.
 
 UPDATE public.workspace_members AS member
 SET role = 'admin'::public.workspace_member_role
-WHERE EXISTS (
+WHERE member.role NOT IN ('owner', 'admin')
+AND EXISTS (
   SELECT 1
   FROM public.user_roles AS client_role
   WHERE client_role.user_id = member.user_id
