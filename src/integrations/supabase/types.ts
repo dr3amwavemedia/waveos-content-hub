@@ -738,8 +738,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           currency: string
-          description: string | null
           delivery_lock_enabled: boolean
+          description: string | null
           discount_type: string | null
           discount_value: number | null
           due_at: string | null
@@ -772,8 +772,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
-          description?: string | null
           delivery_lock_enabled?: boolean
+          description?: string | null
           discount_type?: string | null
           discount_value?: number | null
           due_at?: string | null
@@ -806,8 +806,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
-          description?: string | null
           delivery_lock_enabled?: boolean
+          description?: string | null
           discount_type?: string | null
           discount_value?: number | null
           due_at?: string | null
@@ -1852,39 +1852,6 @@ export type Database = {
           },
         ]
       }
-      invoice_delivery_locks: {
-        Row: {
-          created_at: string
-          delivery_id: string
-          invoice_id: string
-        }
-        Insert: {
-          created_at?: string
-          delivery_id: string
-          invoice_id: string
-        }
-        Update: {
-          created_at?: string
-          delivery_id?: string
-          invoice_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "invoice_delivery_locks_delivery_id_fkey"
-            columns: ["delivery_id"]
-            isOneToOne: false
-            referencedRelation: "client_deliveries"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "invoice_delivery_locks_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "client_invoices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       invoice_autopay_schedules: {
         Row: {
           amount_cents: number
@@ -1987,6 +1954,39 @@ export type Database = {
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_delivery_locks: {
+        Row: {
+          created_at: string
+          delivery_id: string
+          invoice_id: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_id: string
+          invoice_id: string
+        }
+        Update: {
+          created_at?: string
+          delivery_id?: string
+          invoice_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_delivery_locks_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "client_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_delivery_locks_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "client_invoices"
             referencedColumns: ["id"]
           },
         ]
@@ -3747,6 +3747,10 @@ export type Database = {
         Args: { _user_id: string; _workspace_id?: string }
         Returns: Json
       }
+      admin_set_client_invite_access: {
+        Args: { _access: string; _invite_id: string }
+        Returns: undefined
+      }
       admin_set_client_member_name: {
         Args: {
           _first_name?: string
@@ -3797,6 +3801,10 @@ export type Database = {
         }
         Returns: string
       }
+      attach_outstanding_invoice_locks: {
+        Args: { _delivery_id: string }
+        Returns: number
+      }
       can_staff_manage_workspace: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
@@ -3809,6 +3817,10 @@ export type Database = {
           _processed_at: string
           _source: string
         }
+        Returns: boolean
+      }
+      client_can_view_financials: {
+        Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
       create_brand_workspace: {
@@ -3943,6 +3955,10 @@ export type Database = {
           _project_id?: string
           _workspace_id: string
         }
+        Returns: boolean
+      }
+      delivery_access_unlocked: {
+        Args: { _delivery_id: string }
         Returns: boolean
       }
       ensure_production_checklist: {
@@ -4083,10 +4099,6 @@ export type Database = {
       next_service_invoice_number: {
         Args: { _workspace_id: string }
         Returns: string
-      }
-      delivery_access_unlocked: {
-        Args: { _delivery_id: string }
-        Returns: boolean
       }
       notify_delivery_revisions_updated: {
         Args: { _delivery_id: string }
