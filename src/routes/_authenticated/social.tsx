@@ -15,6 +15,7 @@ import {
   Facebook,
   FileText,
   Globe,
+  Eye,
   Instagram,
   LayoutDashboard,
   Linkedin,
@@ -22,6 +23,7 @@ import {
   Megaphone,
   Music2,
   PenSquare,
+  Trash2,
   Send,
   Settings2,
   Sparkles,
@@ -42,6 +44,7 @@ import {
   ALL_PLATFORMS,
   PLATFORM_LABEL,
   useContentItems,
+  useDeleteContentItem,
   useSocialConnections,
   type ContentItem,
   type ContentStatus,
@@ -1366,6 +1369,7 @@ function PostList({
   compact?: boolean;
 }) {
   const attemptsQ = usePublishAttempts(items.map((item) => item.id));
+  const remove = useDeleteContentItem();
   const attemptsByItem = new Map<string, PublishAttempt[]>();
   for (const attempt of (attemptsQ.data ?? []) as PublishAttempt[]) {
     const list = attemptsByItem.get(attempt.content_item_id) ?? [];
@@ -1380,57 +1384,109 @@ function PostList({
     );
   }
 
+  async function handleDelete(item: ContentItem) {
+    const published = item.status === "published";
+    const message = published
+      ? "Delete this post record from WaveOS? This will not remove the already-published post from the social platform."
+      : item.status === "scheduled"
+        ? "Delete this scheduled post? It will no longer publish at the scheduled time."
+        : "Delete this post from WaveOS? This cannot be undone.";
+    if (!confirm(message)) return;
+    try {
+      await remove.mutateAsync(item.id);
+      toast.success(published ? "WaveOS post record deleted." : "Post deleted.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Post could not be deleted.");
+    }
+  }
+
   return (
     <ul className="space-y-2">
       {items.map((item) => {
         const platforms = itemPlatforms(item);
         return (
           <li key={item.id}>
-            <Link
-              to="/create"
-              search={{ id: item.id }}
-              className="group flex flex-col gap-3 rounded-xl border border-border bg-background/30 p-3.5 transition hover:border-primary/30 hover:bg-elevated/60 sm:flex-row sm:items-center"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-semibold text-foreground">
-                    {item.title || "Untitled post"}
-                  </p>
-                  <span
-                    className={cn(
-                      "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-                      STATUS_TONE[item.status],
-                    )}
-                  >
-                    {STATUS_LABEL[item.status]}
-                  </span>
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-background/30 p-3.5 transition hover:border-primary/30 hover:bg-elevated/60 sm:flex-row sm:items-center">
+              <Link
+                to="/create"
+                search={{ id: item.id }}
+                className="group flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {item.title || "Untitled post"}
+                    </p>
+                    <span
+                      className={cn(
+                        "shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                        STATUS_TONE[item.status],
+                      )}
+                    >
+                      {STATUS_LABEL[item.status]}
+                    </span>
+                  </div>
+                  {!compact && (
+                    <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
+                      {item.primary_caption || "No caption yet"}
+                    </p>
+                  )}
                 </div>
-                {!compact && (
-                  <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                    {item.primary_caption || "No caption yet"}
-                  </p>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-2 text-muted-foreground">
-                {platforms.slice(0, 4).map((socialPlatform) => {
-                  const Icon = PLATFORM_ICON[socialPlatform] ?? Globe;
-                  return (
-                    <Icon
-                      key={socialPlatform}
-                      className="h-4 w-4"
-                      aria-label={PLATFORM_LABEL[socialPlatform]}
-                    />
-                  );
-                })}
-                <span className="text-xs">
-                  {new Date(itemDate(item)).toLocaleDateString(undefined, {
-                    month: "short",
-                    day: "numeric",
+                <div className="flex shrink-0 items-center gap-2 text-muted-foreground">
+                  {platforms.slice(0, 4).map((socialPlatform) => {
+                    const Icon = PLATFORM_ICON[socialPlatform] ?? Globe;
+                    return (
+                      <Icon
+                        key={socialPlatform}
+                        className="h-4 w-4"
+                        aria-label={PLATFORM_LABEL[socialPlatform]}
+                      />
+                    );
                   })}
-                </span>
-                <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:text-primary" />
-              </div>
-            </Link>
+                  <span className="text-xs">
+                    {new Date(itemDate(item)).toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </span>
+                  <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                </div>
+              </Link>
+              {!compact && (
+                <div className="flex shrink-0 items-center gap-2 border-t border-border/70 pt-3 sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0">
+                  <Link
+                    to="/create"
+                    search={{ id: item.id }}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-surface"
+                  >
+                    {item.status === "published" || item.status === "publishing" ? (
+                      <Eye className="h-3.5 w-3.5" />
+                    ) : (
+                      <PenSquare className="h-3.5 w-3.5" />
+                    )}
+                    {item.status === "published" || item.status === "publishing" ? "View" : "Edit"}
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(item)}
+                    disabled={remove.isPending || item.status === "publishing"}
+                    title={
+                      item.status === "publishing"
+                        ? "Wait for publishing to finish before deleting"
+                        : "Delete post"
+                    }
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-destructive/35 bg-destructive/10 px-3 py-2 text-xs font-semibold text-destructive hover:bg-destructive/20 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    {remove.isPending && remove.variables === item.id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                    Delete
+                  </button>
+                </div>
+              )}
+            </div>
             {!compact && <PublishResults attempts={attemptsByItem.get(item.id) ?? []} />}
           </li>
         );
