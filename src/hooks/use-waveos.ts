@@ -31,6 +31,7 @@ export interface CurrentUserContext {
   actingAsStaff: boolean;
   actualUserId: string;
   accountSource: "client_data" | "os_data";
+  promoCode: string | null;
 }
 
 const STAFF_WORKSPACE_ID = "11111111-1111-1111-1111-111111111111";
@@ -81,6 +82,7 @@ async function loadContext(): Promise<CurrentUserContext> {
       actingAsStaff: true,
       actualUserId: user.id,
       accountSource: "client_data",
+      promoCode: null,
     };
   }
 
@@ -105,6 +107,8 @@ async function loadContext(): Promise<CurrentUserContext> {
     actingAsStaff: false,
     actualUserId: user.id,
     accountSource: user.user_metadata?.account_source === "os_data" ? "os_data" : "client_data",
+    promoCode:
+      typeof user.user_metadata?.promo_code === "string" ? user.user_metadata.promo_code : null,
   };
 }
 

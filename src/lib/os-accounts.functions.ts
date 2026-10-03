@@ -13,6 +13,115 @@ async function requireOwner(userId: string) {
   return supabaseAdmin;
 }
 
+export type OsPromoColor = "ocean" | "violet" | "emerald" | "sunset";
+
+export const listOsPromoCodes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: Record<string, never>) => data)
+  .handler(async ({ context }) => {
+    const admin = await requireOwner(context.userId);
+    const { data, error } = await admin
+      .from("os_promo_codes" as never)
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data ?? []) as Array<{
+      id: string;
+      code: string;
+      name: string;
+      bonus_trial_days: number;
+      max_redemptions: number;
+      redemption_count: number;
+      starts_at: string;
+      expires_at: string | null;
+      is_active: boolean;
+      color_theme: OsPromoColor;
+      created_at: string;
+    }>;
+  });
+
+export const createOsPromoCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (data: {
+      code: string;
+      name: string;
+      bonusTrialDays: number;
+      maxRedemptions: number;
+      startsAt?: string | null;
+      expiresAt?: string | null;
+      colorTheme: OsPromoColor;
+    }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await requireOwner(context.userId);
+    const code = data.code.trim().toUpperCase();
+    const name = data.name.trim();
+    if (!/^[A-Z0-9][A-Z0-9-]{2,23}$/.test(code))
+      throw new Error("Use 3–24 letters, numbers, or hyphens for the promo code.");
+    if (!name || name.length > 80) throw new Error("Add a promo name up to 80 characters.");
+    if (
+      !Number.isInteger(data.bonusTrialDays) ||
+      data.bonusTrialDays < 1 ||
+      data.bonusTrialDays > 90
+    )
+      throw new Error("Bonus trial days must be between 1 and 90.");
+    if (
+      !Number.isInteger(data.maxRedemptions) ||
+      data.maxRedemptions < 1 ||
+      data.maxRedemptions > 100000
+    )
+      throw new Error("Redemption limit must be between 1 and 100,000.");
+    const startsAt = data.startsAt ? new Date(data.startsAt) : new Date();
+    const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+    if (Number.isNaN(startsAt.getTime()) || (expiresAt && Number.isNaN(expiresAt.getTime())))
+      throw new Error("Enter valid promo dates.");
+    if (expiresAt && expiresAt <= startsAt)
+      throw new Error("Expiration must be after the start date.");
+    const result = await admin.from("os_promo_codes" as never).insert({
+      code,
+      name,
+      bonus_trial_days: data.bonusTrialDays,
+      max_redemptions: data.maxRedemptions,
+      starts_at: startsAt.toISOString(),
+      expires_at: expiresAt?.toISOString() ?? null,
+      color_theme: data.colorTheme,
+      created_by: context.userId,
+    } as never);
+    if (result.error) {
+      if (result.error.message.toLowerCase().includes("unique"))
+        throw new Error("That promo code already exists.");
+      throw result.error;
+    }
+    await admin.from("activity_logs").insert({
+      actor_user_id: context.userId,
+      action: "os_promo_code_created",
+      entity_type: "os_promo_code",
+      safe_metadata: { code, bonus_trial_days: data.bonusTrialDays },
+    });
+    return { created: true };
+  });
+
+export const setOsPromoCodeActive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { promoId: string; active: boolean }) => data)
+  .handler(async ({ data, context }) => {
+    const admin = await requireOwner(context.userId);
+    const result = await admin
+      .from("os_promo_codes" as never)
+      .update({ is_active: data.active } as never)
+      .eq("id", data.promoId);
+    if (result.error) throw result.error;
+    await admin.from("activity_logs").insert({
+      actor_user_id: context.userId,
+      action: "os_promo_code_status_changed",
+      entity_type: "os_promo_code",
+      entity_id: data.promoId,
+      safe_metadata: { active: data.active },
+    });
+    return { updated: true };
+  });
+
 export const listOsAccounts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { search?: string; page?: number; pageSize?: number }) => data)
@@ -54,6 +163,31 @@ export const listOsAccounts = createServerFn({ method: "POST" })
       account_limit: number;
     }>;
     const subscriptionByWorkspace = new Map(subscriptions.map((row) => [row.workspace_id, row]));
+    const { data: rawRedemptions } = workspaceIds.length
+      ? await admin
+          .from("os_promo_redemptions" as never)
+          .select("workspace_id,promo_code_id,bonus_trial_days")
+          .in("workspace_id", workspaceIds)
+      : { data: [] };
+    const redemptions = (rawRedemptions ?? []) as Array<{
+      workspace_id: string;
+      promo_code_id: string;
+      bonus_trial_days: number;
+    }>;
+    const promoIds = [...new Set(redemptions.map((row) => row.promo_code_id))];
+    const { data: rawPromos } = promoIds.length
+      ? await admin
+          .from("os_promo_codes" as never)
+          .select("id,code,name")
+          .in("id", promoIds)
+      : { data: [] };
+    const promoById = new Map(
+      ((rawPromos ?? []) as Array<{ id: string; code: string; name: string }>).map((row) => [
+        row.id,
+        row,
+      ]),
+    );
+    const redemptionByWorkspace = new Map(redemptions.map((row) => [row.workspace_id, row]));
     const { data: connectionRows } = workspaceIds.length
       ? await admin
           .from("social_connections")
@@ -85,6 +219,8 @@ export const listOsAccounts = createServerFn({ method: "POST" })
         const workspaceId = workspaceByUser.get(profile.id);
         const subscription = workspaceId ? subscriptionByWorkspace.get(workspaceId) : undefined;
         const connectedAccounts = workspaceId ? (connectionCount.get(workspaceId) ?? 0) : 0;
+        const redemption = workspaceId ? redemptionByWorkspace.get(workspaceId) : undefined;
+        const promo = redemption ? promoById.get(redemption.promo_code_id) : undefined;
         return {
           id: profile.id,
           email: user?.email ?? "",
@@ -98,6 +234,9 @@ export const listOsAccounts = createServerFn({ method: "POST" })
           accountLimit: subscription?.account_limit ?? 0,
           connectedAccounts,
           remainingAccounts: Math.max(0, (subscription?.account_limit ?? 0) - connectedAccounts),
+          promoCode: promo?.code ?? null,
+          promoName: promo?.name ?? null,
+          promoBonusTrialDays: redemption?.bonus_trial_days ?? 0,
         };
       }),
       total: filtered.length,

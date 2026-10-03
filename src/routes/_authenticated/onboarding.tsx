@@ -132,6 +132,7 @@ function OnboardingPage() {
         _primary_language: language,
         _service_area: serviceArea.trim() || undefined,
         _target_audience: audience.trim() || undefined,
+        ...(user?.accountSource === "os_data" ? { _promo_code: user.promoCode } : {}),
       });
       if (error) throw error;
       const row = Array.isArray(data) ? data[0] : (data as { id?: string } | null);
