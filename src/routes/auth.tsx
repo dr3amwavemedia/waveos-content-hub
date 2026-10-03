@@ -242,7 +242,7 @@ function AuthPage() {
               {mode === "signin"
                 ? "Sign in to WaveOS"
                 : mode === "signup"
-                  ? "Start your free trial"
+                  ? "Sign up"
                   : "Reset your password"}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -373,7 +373,7 @@ function AuthPage() {
               {mode === "signin"
                 ? "Sign in"
                 : mode === "signup"
-                  ? "Create account & start trial"
+                  ? "Sign up"
                   : "Send reset link"}
             </button>
             {(mode === "reset" || mode === "signup") && (
