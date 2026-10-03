@@ -32,6 +32,7 @@ import {
   BellRing,
   Check,
   Copy,
+  Download,
   Eye,
   ExternalLink,
   Loader2,
@@ -614,12 +615,96 @@ export function OsDataPanel({ search }: { search: string }) {
   const remove = useServerFn(deleteOsAccount);
   const [section, setSection] = useState<"accounts" | "promos">("accounts");
   const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
   const query = useQuery({
     queryKey: ["os-accounts", search, page],
     queryFn: () => list({ data: { search, page, pageSize: 30 } }),
   });
   useEffect(() => setPage(1), [search]);
   const refresh = () => query.refetch();
+
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      type OsAccount = NonNullable<typeof query.data>["accounts"][number];
+      const accounts: OsAccount[] = [];
+      let exportPage = 1;
+      let total = 0;
+      do {
+        const result = await list({ data: { search, page: exportPage, pageSize: 1000 } });
+        accounts.push(...result.accounts);
+        total = result.total;
+        exportPage += 1;
+      } while (accounts.length < total);
+
+      const headers = [
+        "User ID",
+        "Workspace ID",
+        "First name",
+        "Last name",
+        "Email",
+        "Account created",
+        "Last sign-in",
+        "Payments enabled",
+        "Plan",
+        "Plan status",
+        "Billing interval",
+        "Account limit",
+        "Connected accounts",
+        "Remaining accounts",
+        "Trial started",
+        "Trial ends",
+        "Current period ends",
+        "Cancels at period end",
+        "Promo code",
+        "Promo name",
+        "Promo bonus trial days",
+      ];
+      const safeCell = (value: unknown) => {
+        let text = value === null || value === undefined ? "" : String(value);
+        // Prevent spreadsheet programs from interpreting user-entered text as a formula.
+        if (/^[=+\-@]/.test(text)) text = `'${text}`;
+        return `"${text.replaceAll('"', '""')}"`;
+      };
+      const rows = accounts.map((account) => [
+        account.id,
+        account.workspaceId,
+        account.firstName,
+        account.lastName,
+        account.email,
+        account.createdAt,
+        account.lastSignInAt,
+        account.paymentsEnabled ? "Yes" : "No",
+        account.plan,
+        account.planStatus,
+        account.billingInterval,
+        account.accountLimit,
+        account.connectedAccounts,
+        account.remainingAccounts,
+        account.trialStartedAt,
+        account.trialEndsAt,
+        account.currentPeriodEnd,
+        account.cancelAtPeriodEnd ? "Yes" : "No",
+        account.promoCode,
+        account.promoName,
+        account.promoBonusTrialDays,
+      ]);
+      const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(safeCell).join(",")).join("\r\n")}`;
+      const href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = href;
+      link.download = `waveos-os-users-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(href);
+      toast.success(
+        `${accounts.length} OS user${accounts.length === 1 ? "" : "s"} exported to CSV.`,
+      );
+    } catch (error) {
+      toast.error(readableError(error, "OS user data could not be exported."));
+    } finally {
+      setExporting(false);
+    }
+  }
   if (section === "promos") {
     return (
       <section className="space-y-5">
@@ -644,9 +729,24 @@ export function OsDataPanel({ search }: { search: string }) {
   return (
     <section className="space-y-3">
       <OsDataNavigation section={section} onSection={setSection} />
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
         <span>{query.data?.total ?? 0} public app accounts</span>
-        <span>30 per page</span>
+        <div className="flex items-center gap-3">
+          <span>30 per page</span>
+          <button
+            type="button"
+            onClick={() => void exportCsv()}
+            disabled={exporting}
+            className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-violet-400/30 bg-violet-500/10 px-3 py-2 font-semibold text-violet-200 transition hover:bg-violet-500/20 disabled:opacity-50"
+          >
+            {exporting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+            Export CSV
+          </button>
+        </div>
       </div>
       <div className="space-y-2">
         {(query.data?.accounts ?? []).map((account) => {
