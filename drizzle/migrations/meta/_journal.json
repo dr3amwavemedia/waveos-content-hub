@@ -78,6 +78,13 @@
       "when": 1790185163339,
       "tag": "0010_autopay_allow_partial_scheduled_charge",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790988323137,
+      "tag": "0011_invoice_delivery_access_locks",
+      "breakpoints": true
     }
   ]
 }
