@@ -15,7 +15,9 @@ import {
   ImagePlus,
   Loader2,
   Plus,
+  Rocket,
   Send,
+  ShieldCheck,
   Sparkles,
   Trash2,
   X,
@@ -58,6 +60,7 @@ import {
   useUpdateVariant,
   useSyncPostVariants,
   useSubmitForApproval,
+  useStaffContentRelease,
   type PostVariant,
   type SocialPlatform,
 } from "@/hooks/use-content";
@@ -100,6 +103,7 @@ function CreatePost() {
   const syncVariants = useSyncPostVariants();
   const del = useDeleteContentItem();
   const submitForApproval = useSubmitForApproval();
+  const staffRelease = useStaffContentRelease();
 
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
@@ -108,6 +112,7 @@ function CreatePost() {
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [activePlatform, setActivePlatform] = useState<SocialPlatform>("instagram");
   const [showLibrary, setShowLibrary] = useState(false);
+  const [releaseMode, setReleaseMode] = useState<"approval" | "direct">("approval");
 
   const draftStorageKey = workspaceId ? `waveos-create-draft-${workspaceId}` : null;
 
@@ -220,6 +225,10 @@ function CreatePost() {
   );
   const needsApproval =
     status !== "approved" && !isStaffWorkspace && activeWorkspace?.approval_required !== false;
+  const canChooseStaffRelease = Boolean(
+    user?.isDreamWaveOwner || (user?.isStaff && user.staffType === "media_manager"),
+  );
+  const shouldRequestApproval = canChooseStaffRelease ? releaseMode === "approval" : needsApproval;
 
   if (!activeWorkspace) {
     return (
@@ -355,6 +364,24 @@ function CreatePost() {
     try {
       const id = await ensureSaved();
       if (!id) return;
+      if (canChooseStaffRelease) {
+        await staffRelease.mutateAsync({
+          contentId: id,
+          releaseMode,
+          requestedAction: "schedule",
+          scheduledAt: when.toISOString(),
+        });
+        qc.invalidateQueries({ queryKey: ["content-items"] });
+        qc.invalidateQueries({ queryKey: ["content-item", id] });
+        if (releaseMode === "approval") {
+          toast.success("Sent to the client for schedule approval.");
+          navigate({ to: "/approvals" });
+        } else {
+          toast.success(`Scheduled without approval for ${when.toLocaleString()}`);
+          navigate({ to: "/calendar" });
+        }
+        return;
+      }
       if (needsApproval) {
         await submitForApproval.mutateAsync({
           contentId: id,
@@ -389,7 +416,25 @@ function CreatePost() {
     try {
       const id = await ensureSaved();
       if (!id) return;
-      if (needsApproval) {
+      if (canChooseStaffRelease) {
+        if (
+          releaseMode === "direct" &&
+          !confirm("Post without client approval and publish to the selected channels right now?")
+        )
+          return;
+        await staffRelease.mutateAsync({
+          contentId: id,
+          releaseMode,
+          requestedAction: "publish_now",
+        });
+        if (releaseMode === "approval") {
+          qc.invalidateQueries({ queryKey: ["content-items"] });
+          qc.invalidateQueries({ queryKey: ["content-item", id] });
+          toast.success("Sent to the client for publishing approval.");
+          navigate({ to: "/approvals" });
+          return;
+        }
+      } else if (needsApproval) {
         await submitForApproval.mutateAsync({
           contentId: id,
           requestedAction: "publish_now",
@@ -400,12 +445,15 @@ function CreatePost() {
         navigate({ to: "/approvals" });
         return;
       }
-      if (!confirm("This post is approved. Publish it to the selected channels right now?")) return;
-      // Self-service: mark approved so the publisher accepts it.
-      await update.mutateAsync({
-        id,
-        patch: { status: "approved", scheduled_at: null },
-      });
+      if (!canChooseStaffRelease) {
+        if (!confirm("This post is approved. Publish it to the selected channels right now?"))
+          return;
+        // Self-service: mark approved so the publisher accepts it.
+        await update.mutateAsync({
+          id,
+          patch: { status: "approved", scheduled_at: null },
+        });
+      }
       const res = await publishFn({ data: { contentId: id } });
       qc.invalidateQueries({ queryKey: ["content-items"] });
       qc.invalidateQueries({ queryKey: ["content-item", id] });
@@ -531,39 +579,6 @@ function CreatePost() {
             {saveStatus === "saved" && <span className="text-primary">Saved</span>}
             {saveStatus === "error" && <span className="text-destructive">Save failed</span>}
           </span>
-
-          <button
-            disabled={locked || publishing !== null || !caption.trim() || !scheduledAt}
-            onClick={handleScheduleLater}
-            className="inline-flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
-          >
-            {publishing === "schedule" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <CalendarClock className="h-4 w-4" />
-            )}
-            {status === "in_review"
-              ? "Waiting for approval"
-              : needsApproval
-                ? "Post approval"
-                : "Schedule later"}
-          </button>
-          <button
-            disabled={locked || publishing !== null || !caption.trim() || !platforms.length}
-            onClick={handlePublishNow}
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
-          >
-            {publishing === "now" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            {status === "in_review"
-              ? "Waiting for approval"
-              : needsApproval
-                ? "Send for approval"
-                : "Publish now"}
-          </button>
         </div>
       </div>
 
@@ -710,8 +725,105 @@ function CreatePost() {
               />
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Leave empty to publish immediately after approval.
+              Leave empty when you want to publish immediately.
             </p>
+          </div>
+
+          <div className="surface-card space-y-4 p-5">
+            <div>
+              <div className="text-sm font-semibold text-foreground">Publish workflow</div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {canChooseStaffRelease
+                  ? "Choose whether this post needs client approval. This choice applies only to this post."
+                  : shouldRequestApproval
+                    ? "This workspace requires approval before publishing."
+                    : "This post can be published or scheduled immediately."}
+              </p>
+            </div>
+
+            {canChooseStaffRelease && (
+              <div className="grid gap-2" role="radiogroup" aria-label="Post approval choice">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={releaseMode === "approval"}
+                  onClick={() => setReleaseMode("approval")}
+                  className={cn(
+                    "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
+                    releaseMode === "approval"
+                      ? "border-primary/50 bg-primary/10"
+                      : "border-border bg-elevated/50 hover:bg-elevated",
+                  )}
+                >
+                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <span>
+                    <span className="block text-sm font-semibold text-foreground">
+                      Send for approval
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      The client reviews it before it is scheduled or published.
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={releaseMode === "direct"}
+                  onClick={() => setReleaseMode("direct")}
+                  className={cn(
+                    "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
+                    releaseMode === "direct"
+                      ? "border-primary/50 bg-primary/10"
+                      : "border-border bg-elevated/50 hover:bg-elevated",
+                  )}
+                >
+                  <Rocket className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                  <span>
+                    <span className="block text-sm font-semibold text-foreground">
+                      Post without approval
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      Authorized social staff can publish or schedule immediately.
+                    </span>
+                  </span>
+                </button>
+              </div>
+            )}
+
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              <button
+                disabled={locked || publishing !== null || !caption.trim() || !scheduledAt}
+                onClick={handleScheduleLater}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+              >
+                {publishing === "schedule" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CalendarClock className="h-4 w-4" />
+                )}
+                {status === "in_review"
+                  ? "Waiting for approval"
+                  : shouldRequestApproval
+                    ? "Send schedule for approval"
+                    : "Schedule without approval"}
+              </button>
+              <button
+                disabled={locked || publishing !== null || !caption.trim() || !platforms.length}
+                onClick={handlePublishNow}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
+              >
+                {publishing === "now" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+                {status === "in_review"
+                  ? "Waiting for approval"
+                  : shouldRequestApproval
+                    ? "Send for approval"
+                    : "Post without approval"}
+              </button>
+            </div>
           </div>
 
           <div className="surface-card space-y-3 p-5">

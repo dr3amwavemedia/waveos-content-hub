@@ -146,6 +146,27 @@ async function loadWorkspaces(
   const { data: workspaces, error } = await workspacesQuery;
   if (error) throw error;
 
+  let subscribedWorkspaceIds = new Set<string>();
+  if (ctx.staffType === "media_manager" && !previewWorkspaceId) {
+    const { data: subscriptions, error: subscriptionsError } = await db
+      .from("workspace_social_subscriptions")
+      .select("workspace_id,status,trial_ends_at")
+      .in("status", ["active", "trialing"]);
+    if (subscriptionsError) throw subscriptionsError;
+    const now = Date.now();
+    subscribedWorkspaceIds = new Set(
+      (subscriptions ?? [])
+        .filter(
+          (subscription: { status: string; trial_ends_at: string | null }) =>
+            subscription.status === "active" ||
+            (subscription.status === "trialing" &&
+              Boolean(subscription.trial_ends_at) &&
+              new Date(subscription.trial_ends_at!).getTime() > now),
+        )
+        .map((subscription: { workspace_id: string }) => subscription.workspace_id),
+    );
+  }
+
   const visibleWorkspaces =
     ctx.staffType === "media_manager" && !previewWorkspaceId
       ? (workspaces ?? []).filter((workspace) => {
@@ -159,6 +180,7 @@ async function loadWorkspaces(
             workspace.id === STAFF_WORKSPACE_ID ||
             membershipMap.has(workspace.id) ||
             workspace.access_tier === "social_management" ||
+            subscribedWorkspaceIds.has(workspace.id) ||
             overrides.social_management_access === true
           );
         })

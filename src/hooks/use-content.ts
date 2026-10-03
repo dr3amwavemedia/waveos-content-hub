@@ -255,6 +255,36 @@ export function useSubmitForApproval() {
   });
 }
 
+export function useStaffContentRelease() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      contentId: string;
+      releaseMode: "approval" | "direct";
+      requestedAction: "publish_now" | "schedule";
+      scheduledAt?: string | null;
+    }) => {
+      const { error } = await (
+        supabase.rpc as unknown as (
+          name: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ error: Error | null }>
+      )("staff_release_content", {
+        _content_id: input.contentId,
+        _release_mode: input.releaseMode,
+        _requested_action: input.requestedAction,
+        _scheduled_at: input.scheduledAt ?? null,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["content-items"] });
+      qc.invalidateQueries({ queryKey: ["content-item"] });
+      qc.invalidateQueries({ queryKey: ["approvals"] });
+    },
+  });
+}
+
 export function useDecideApproval() {
   const qc = useQueryClient();
   return useMutation({
