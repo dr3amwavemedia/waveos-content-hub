@@ -2214,6 +2214,126 @@ export type Database = {
           },
         ]
       }
+      os_account_support_requests: {
+        Row: {
+          created_at: string
+          delivery_error: string | null
+          delivery_status: string
+          detail: string | null
+          email: string
+          id: string
+          request_type: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_error?: string | null
+          delivery_status?: string
+          detail?: string | null
+          email: string
+          id?: string
+          request_type: string
+        }
+        Update: {
+          created_at?: string
+          delivery_error?: string | null
+          delivery_status?: string
+          detail?: string | null
+          email?: string
+          id?: string
+          request_type?: string
+        }
+        Relationships: []
+      }
+      os_promo_codes: {
+        Row: {
+          bonus_trial_days: number
+          code: string
+          color_theme: string
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_redemptions: number
+          name: string
+          redemption_count: number
+          starts_at: string
+          updated_at: string
+        }
+        Insert: {
+          bonus_trial_days: number
+          code: string
+          color_theme?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_redemptions: number
+          name: string
+          redemption_count?: number
+          starts_at?: string
+          updated_at?: string
+        }
+        Update: {
+          bonus_trial_days?: number
+          code?: string
+          color_theme?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_redemptions?: number
+          name?: string
+          redemption_count?: number
+          starts_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      os_promo_redemptions: {
+        Row: {
+          bonus_trial_days: number
+          id: string
+          promo_code_id: string
+          redeemed_at: string
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          bonus_trial_days: number
+          id?: string
+          promo_code_id: string
+          redeemed_at?: string
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          bonus_trial_days?: number
+          id?: string
+          promo_code_id?: string
+          redeemed_at?: string
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "os_promo_redemptions_promo_code_id_fkey"
+            columns: ["promo_code_id"]
+            isOneToOne: false
+            referencedRelation: "os_promo_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_promo_redemptions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       outlook_connections: {
         Row: {
           access_token_encrypted: string
@@ -2554,6 +2674,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_source: string
           avatar_url: string | null
           business_name: string | null
           client_name: string | null
@@ -2561,9 +2682,11 @@ export type Database = {
           first_name: string | null
           id: string
           last_name: string | null
+          payments_enabled: boolean
           updated_at: string
         }
         Insert: {
+          account_source?: string
           avatar_url?: string | null
           business_name?: string | null
           client_name?: string | null
@@ -2571,9 +2694,11 @@ export type Database = {
           first_name?: string | null
           id: string
           last_name?: string | null
+          payments_enabled?: boolean
           updated_at?: string
         }
         Update: {
+          account_source?: string
           avatar_url?: string | null
           business_name?: string | null
           client_name?: string | null
@@ -2581,6 +2706,7 @@ export type Database = {
           first_name?: string | null
           id?: string
           last_name?: string | null
+          payments_enabled?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -3491,6 +3617,65 @@ export type Database = {
           },
         ]
       }
+      workspace_social_subscriptions: {
+        Row: {
+          account_limit: number
+          billing_interval: string | null
+          cancel_at_period_end: boolean
+          created_at: string
+          current_period_end: string | null
+          plan: string
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          trial_ends_at: string | null
+          trial_started_at: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          account_limit: number
+          billing_interval?: string | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          plan: string
+          status: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          account_limit?: number
+          billing_interval?: string | null
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          plan?: string
+          status?: string
+          stripe_checkout_session_id?: string | null
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          trial_ends_at?: string | null
+          trial_started_at?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_social_subscriptions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspaces: {
         Row: {
           access_expires_at: string | null
@@ -3508,6 +3693,7 @@ export type Database = {
           crm_external_id: string | null
           crm_last_sync_at: string | null
           crm_sync_status: Database["public"]["Enums"]["crm_sync_status"]
+          data_source: string
           feature_overrides: Json
           id: string
           industry: string | null
@@ -3552,6 +3738,7 @@ export type Database = {
           crm_external_id?: string | null
           crm_last_sync_at?: string | null
           crm_sync_status?: Database["public"]["Enums"]["crm_sync_status"]
+          data_source?: string
           feature_overrides?: Json
           id?: string
           industry?: string | null
@@ -3596,6 +3783,7 @@ export type Database = {
           crm_external_id?: string | null
           crm_last_sync_at?: string | null
           crm_sync_status?: Database["public"]["Enums"]["crm_sync_status"]
+          data_source?: string
           feature_overrides?: Json
           id?: string
           industry?: string | null
@@ -3764,6 +3952,10 @@ export type Database = {
         Args: { _first_name?: string; _invite_id: string; _last_name?: string }
         Returns: undefined
       }
+      admin_set_os_account_payments: {
+        Args: { _enabled: boolean; _user_id: string }
+        Returns: undefined
+      }
       admin_set_workspace_member_role: {
         Args: {
           _role: Database["public"]["Enums"]["workspace_member_role"]
@@ -3875,6 +4067,42 @@ export type Database = {
         }
         Returns: string
       }
+      create_os_trial_workspace:
+        | {
+            Args: {
+              _business_name?: string
+              _industry?: string
+              _name: string
+              _primary_language?: string
+              _service_area?: string
+              _target_audience?: string
+              _timezone?: string
+              _website?: string
+            }
+            Returns: {
+              id: string
+              name: string
+              slug: string
+            }[]
+          }
+        | {
+            Args: {
+              _business_name?: string
+              _industry?: string
+              _name: string
+              _primary_language?: string
+              _promo_code?: string
+              _service_area?: string
+              _target_audience?: string
+              _timezone?: string
+              _website?: string
+            }
+            Returns: {
+              id: string
+              name: string
+              slug: string
+            }[]
+          }
       create_staff_invite:
         | {
             Args: { _email: string; _expires_days?: number }
@@ -4234,6 +4462,45 @@ export type Database = {
         Args: { _enabled: boolean; _workspace_id: string }
         Returns: boolean
       }
+      social_account_limit: { Args: { _workspace_id: string }; Returns: number }
+      social_subscription_is_active: {
+        Args: { _workspace_id: string }
+        Returns: boolean
+      }
+      staff_release_content: {
+        Args: {
+          _content_id: string
+          _release_mode: string
+          _requested_action: string
+          _scheduled_at?: string
+        }
+        Returns: Database["public"]["Enums"]["content_status"]
+      }
+      start_workspace_social_trial: {
+        Args: { _workspace_id: string }
+        Returns: {
+          account_limit: number
+          billing_interval: string | null
+          cancel_at_period_end: boolean
+          created_at: string
+          current_period_end: string | null
+          plan: string
+          status: string
+          stripe_checkout_session_id: string | null
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          trial_ends_at: string | null
+          trial_started_at: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "workspace_social_subscriptions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       submit_content_for_approval: {
         Args: {
           _content_id: string
@@ -4243,6 +4510,14 @@ export type Database = {
         Returns: Database["public"]["Enums"]["content_status"]
       }
       text_has_blocked_language: { Args: { _text: string }; Returns: boolean }
+      validate_os_promo_code: {
+        Args: { _code: string }
+        Returns: {
+          bonus_trial_days: number
+          color_theme: string
+          name: string
+        }[]
+      }
       workspace_role: {
         Args: { _user_id: string; _workspace_id: string }
         Returns: Database["public"]["Enums"]["workspace_member_role"]
