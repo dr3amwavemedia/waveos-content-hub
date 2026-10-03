@@ -40,6 +40,11 @@ import { TeamSettings } from "@/components/app/team-settings";
 import { EmailAutomationSettings } from "@/components/app/email-automation-settings";
 import { openWorkspaceTour } from "@/components/app/workspace-tour";
 import { ClientDocumentRecords } from "@/components/app/client-document-records";
+import {
+  canViewClientFinancials,
+  clientAccountAccessLabel,
+  clientAccountAccess,
+} from "@/lib/client-account-access";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -62,6 +67,7 @@ function SettingsPage() {
     activeWorkspace?.role === "owner" ||
     activeWorkspace?.role === "admin";
   const canManageTeam = canManageBranding;
+  const canViewFinancials = canViewClientFinancials(activeWorkspace?.role);
   const automaticApproval = activeWorkspace?.approval_required === false;
   const updateApproval = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -129,12 +135,19 @@ function SettingsPage() {
             <Row label="Name" value={activeWorkspace?.name ?? "—"} />
             <Row label="Industry" value={activeWorkspace?.industry ?? "Not set"} />
             <Row label="Timezone" value={activeWorkspace?.timezone ?? "—"} />
-            <Row label="Your access" value={activeWorkspace?.role ?? "—"} />
+            <Row
+              label="Your access"
+              value={
+                activeWorkspace
+                  ? clientAccountAccessLabel(clientAccountAccess(activeWorkspace.role))
+                  : "—"
+              }
+            />
           </dl>
         </div>
       </div>
 
-      {!user?.isStaff && activeWorkspace && (
+      {!user?.isStaff && activeWorkspace && canViewFinancials && (
         <ClientDocumentRecords workspaceId={activeWorkspace.id} clientName={activeWorkspace.name} />
       )}
 

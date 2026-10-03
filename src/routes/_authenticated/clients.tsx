@@ -67,6 +67,14 @@ import { invitationContact } from "@/lib/invitation-contact";
 import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display";
 import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
+import { Switch } from "@/components/ui/switch";
+import {
+  appRoleForClientAccess,
+  clientAccountAccess,
+  clientAccountAccessLabel,
+  workspaceRoleForClientAccess,
+  type ClientAccountAccess,
+} from "@/lib/client-account-access";
 
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
@@ -116,6 +124,7 @@ type InvoiceListItem = Pick<
   | "discount_value"
   | "service_fee_percent"
   | "service_fee_cents"
+  | "delivery_lock_enabled"
 >;
 type CrmAccountRow = Database["public"]["Tables"]["crm_accounts"]["Row"];
 type CrmContactRow = Pick<
@@ -1945,6 +1954,8 @@ function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
         _delivery_id: deliveryId,
       });
       if (error) throw error;
+      const inApp = typeof data === "number" ? data : 0;
+      if (inApp < 0) return { locked: true, inApp: 0, email: { sent: 0 } };
       const delivery = q.data?.find((item) => item.id === deliveryId);
       const email = await tryEmail(() =>
         sendWorkspaceEmail({
@@ -1954,16 +1965,21 @@ function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
           url: delivery?.url,
         }),
       );
-      return { inApp: typeof data === "number" ? data : 0, email };
+      return { locked: false, inApp, email };
     },
-    onSuccess: ({ inApp: recipientCount, email }) =>
+    onSuccess: ({ locked, inApp: recipientCount, email }) => {
+      if (locked) {
+        toast.success("Revisions saved. Client access will unlock after the invoice is paid.");
+        return;
+      }
       toast.success(
         email.sent
           ? `Revision update emailed to ${email.sent} client member${email.sent === 1 ? "" : "s"}.`
           : recipientCount === 1
             ? "Revision notification sent to 1 client member."
             : `Revision notification sent to ${recipientCount} client members.`,
-      ),
+      );
+    },
     onError: (e: unknown) =>
       toast.error(e instanceof Error ? e.message : "Could not notify the client."),
   });
@@ -2066,21 +2082,27 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
         }
         throw error;
       }
-      await tryEmail(() =>
-        sendWorkspaceEmail({
-          workspaceId,
-          event: "content_added",
-          title: title.trim(),
-          url: trimmed,
-        }),
-      );
-      return data;
+      const access = await db.rpc("delivery_access_unlocked", { _delivery_id: data.id });
+      if (access.error) throw access.error;
+      if (access.data === true) {
+        await tryEmail(() =>
+          sendWorkspaceEmail({
+            workspaceId,
+            event: "content_added",
+            title: title.trim(),
+            url: trimmed,
+          }),
+        );
+      }
+      return { ...data, locked: access.data !== true };
     },
-    onSuccess: () => {
+    onSuccess: ({ locked }) => {
       qc.invalidateQueries({ queryKey: ["client-deliveries", workspaceId] });
       qc.invalidateQueries({ queryKey: ["your-content", workspaceId] });
       qc.invalidateQueries({ queryKey: ["layer1", "deliveries", workspaceId] });
-      toast.success("Delivery added.");
+      toast.success(
+        locked ? "Delivery added and locked until the invoice is paid." : "Delivery added.",
+      );
       onDone();
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
@@ -2551,7 +2573,7 @@ function InvoicesTab({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
       const invoiceColumns =
-        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,service_fee_percent,service_fee_cents,checkout_payment_type,checkout_payment_cents";
+        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,service_fee_percent,service_fee_cents,checkout_payment_type,checkout_payment_cents,delivery_lock_enabled";
       const { data, error } = await supabase
         .from("client_invoices")
         .select(`${invoiceColumns},line_items`)
@@ -2594,6 +2616,28 @@ function InvoicesTab({
       toast.success("Invoice removed.");
     },
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Failed."),
+  });
+
+  const updateDeliveryLock = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      const { error } = await supabase
+        .from("client_invoices")
+        .update({ delivery_lock_enabled: enabled })
+        .eq("id", id)
+        .eq("workspace_id", workspaceId);
+      if (error) throw error;
+      return { id, enabled };
+    },
+    onSuccess: async ({ enabled }) => {
+      await refreshInvoices();
+      toast.success(
+        enabled
+          ? "Invoice lock is on for new and revised deliveries."
+          : "Invoice lock is off. Associated deliveries are available now.",
+      );
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not update the invoice lock."),
   });
 
   return (
@@ -2652,7 +2696,7 @@ function InvoicesTab({
           {q.data!.map((i) => (
             <li
               key={i.id}
-              className="flex items-start justify-between gap-3 rounded-lg border border-border/60 bg-surface/40 p-3"
+              className="flex flex-col items-stretch justify-between gap-3 rounded-lg border border-border/60 bg-surface/40 p-3 sm:flex-row sm:items-start"
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -2719,7 +2763,21 @@ function InvoicesTab({
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                <div
+                  className="mr-1 flex min-h-11 items-center gap-2 rounded-lg border border-border/60 px-2.5 text-xs text-muted-foreground"
+                  title="Lock deliveries created or revised while this invoice is unpaid"
+                >
+                  <Switch
+                    checked={i.delivery_lock_enabled}
+                    disabled={updateDeliveryLock.isPending}
+                    onCheckedChange={(enabled) => updateDeliveryLock.mutate({ id: i.id, enabled })}
+                    aria-label={`${i.number || "Invoice"} delivery lock`}
+                  />
+                  <span className="whitespace-nowrap">
+                    Delivery lock {i.delivery_lock_enabled ? "on" : "off"}
+                  </span>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -3689,6 +3747,22 @@ function InvitesTab({
     onError: (e: unknown) => toast.error(e instanceof Error ? e.message : "Could not change role."),
   });
 
+  const changeInviteAccess = useMutation({
+    mutationFn: async ({ inviteId, access }: { inviteId: string; access: ClientAccountAccess }) => {
+      const { error } = await db.rpc("admin_set_client_invite_access", {
+        _invite_id: inviteId,
+        _access: access,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["clients", "invites", workspace.id] });
+      toast.success("Invite access updated.");
+    },
+    onError: (e: unknown) =>
+      toast.error(e instanceof Error ? e.message : "Could not update invite access."),
+  });
+
   const revoke = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.rpc("revoke_invite", { _invite_id: id });
@@ -3809,13 +3883,29 @@ function InvitesTab({
                     >
                       {stateLabel}
                     </span>
-                    <span>{inv.workspace_role}</span>
+                    <span>{clientAccountAccessLabel(clientAccountAccess(inv.workspace_role))}</span>
                     {inv.status === "pending" && inv.expires_at && (
                       <span>expires {new Date(inv.expires_at).toLocaleDateString()}</span>
                     )}
                   </div>
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  {inv.status === "pending" && (
+                    <label className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground">
+                      <Switch
+                        checked={clientAccountAccess(inv.workspace_role) === "client_admin"}
+                        disabled={changeInviteAccess.isPending}
+                        onCheckedChange={(checked) =>
+                          changeInviteAccess.mutate({
+                            inviteId: inv.invite_id,
+                            access: checked ? "client_admin" : "client_second_account",
+                          })
+                        }
+                        aria-label={`Set ${inv.email} as Client Admin`}
+                      />
+                      {clientAccountAccessLabel(clientAccountAccess(inv.workspace_role))}
+                    </label>
+                  )}
                   {inv.status === "pending" && (
                     <button
                       onClick={() => revoke.mutate(inv.invite_id)}
@@ -3876,12 +3966,8 @@ function ClientMemberRow({
   const [health, setHealth] = useState<AccountHealth | null>(null);
 
   const email = visibleAccountEmail(member.email);
-  const roleLabel =
-    member.workspace_role === "owner"
-      ? "Client owner"
-      : member.workspace_role === "approver"
-        ? "Client approver"
-        : "Client viewer";
+  const access = clientAccountAccess(member.workspace_role);
+  const roleLabel = clientAccountAccessLabel(access);
   const name = accountDisplayName({
     firstName: member.first_name,
     lastName: member.last_name,
@@ -3931,17 +4017,19 @@ function ClientMemberRow({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={member.workspace_role}
-            disabled={roleBusy}
-            onChange={(e) => onChangeRole(e.target.value)}
-            className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground"
-            title="Change workspace role"
-          >
-            <option value="owner">Owner</option>
-            <option value="approver">Approver</option>
-            <option value="viewer">Viewer</option>
-          </select>
+          <label className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground">
+            <Switch
+              checked={access === "client_admin"}
+              disabled={roleBusy}
+              onCheckedChange={(checked) =>
+                onChangeRole(
+                  workspaceRoleForClientAccess(checked ? "client_admin" : "client_second_account"),
+                )
+              }
+              aria-label={`Set ${email || name} as Client Admin`}
+            />
+            {roleLabel}
+          </label>
           <button
             type="button"
             onClick={() => setEditing((v) => !v)}
@@ -4082,20 +4170,14 @@ function InviteQuickForm({
   const email = emailOverride ?? contactQ.data?.email ?? "";
   const firstName = firstNameOverride ?? contactQ.data?.firstName ?? "";
   const lastName = lastNameOverride ?? contactQ.data?.lastName ?? "";
-  const [role, setRole] = useState<"owner" | "approver" | "viewer">("owner");
+  const [access, setAccess] = useState<ClientAccountAccess>("client_admin");
   const create = useMutation({
     mutationFn: async () => {
-      const appRole =
-        role === "owner"
-          ? "client_owner"
-          : role === "approver"
-            ? "client_approver"
-            : "client_viewer";
       const { data, error } = await supabase.rpc("create_invite", {
         _email: email.trim().toLowerCase(),
         _workspace_id: workspace.id,
-        _workspace_role: role,
-        _app_role: appRole,
+        _workspace_role: workspaceRoleForClientAccess(access),
+        _app_role: appRoleForClientAccess(access),
         _expires_days: 14,
       });
       if (error) throw error;
@@ -4183,19 +4265,20 @@ function InviteQuickForm({
           placeholder="Optional"
         />
       </div>
-      <div>
+      <div className="min-w-[190px]">
         <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Role
+          Access
         </label>
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value as typeof role)}
-          className={inputCls}
-        >
-          <option value="owner">Owner</option>
-          <option value="approver">Approver</option>
-          <option value="viewer">Viewer</option>
-        </select>
+        <label className="flex h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 text-xs text-foreground">
+          <Switch
+            checked={access === "client_admin"}
+            onCheckedChange={(checked) =>
+              setAccess(checked ? "client_admin" : "client_second_account")
+            }
+            aria-label="Invite as Client Admin"
+          />
+          {clientAccountAccessLabel(access)}
+        </label>
       </div>
       <button
         type="submit"
@@ -4227,7 +4310,7 @@ function OnboardingModal({
   const [expiresAt, setExpiresAt] = useState("");
   const [timezone, setTimezone] = useState("America/New_York");
   const [email, setEmail] = useState("");
-  const [role, setRole] = useState<"owner" | "approver" | "viewer">("owner");
+  const [access, setAccess] = useState<ClientAccountAccess>("client_admin");
   const [weddingDisplayName, setWeddingDisplayName] = useState("");
   const [weddingTheme, setWeddingTheme] = useState("olive");
 
@@ -4269,18 +4352,11 @@ function OnboardingModal({
         return { kind: "workspace_only" as const, workspace: ws.name };
       }
 
-      const appRole =
-        role === "owner"
-          ? "client_owner"
-          : role === "approver"
-            ? "client_approver"
-            : "client_viewer";
-
       const { data: inviteData, error: invErr } = await supabase.rpc("create_invite", {
         _email: email.trim().toLowerCase(),
         _workspace_id: ws.id,
-        _workspace_role: role,
-        _app_role: appRole,
+        _workspace_role: workspaceRoleForClientAccess(access),
+        _app_role: appRoleForClientAccess(access),
         _expires_days: 14,
       });
       if (invErr) throw invErr;
@@ -4467,24 +4543,24 @@ function OnboardingModal({
           </p>
         </Field>
 
-        <Field label="Role in this workspace">
-          <div className="grid grid-cols-3 gap-2">
-            {(["owner", "approver", "viewer"] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setRole(r)}
-                className={cn(
-                  "rounded-lg border px-3 py-2 text-xs font-medium capitalize transition-all",
-                  role === r
-                    ? "border-primary/50 bg-primary/15 text-foreground ring-1 ring-primary/40"
-                    : "border-border bg-surface/60 text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+        <Field label="Access in this workspace">
+          <label className="flex items-center gap-3 rounded-xl border border-border bg-surface/60 p-3 text-sm text-foreground">
+            <Switch
+              checked={access === "client_admin"}
+              onCheckedChange={(checked) =>
+                setAccess(checked ? "client_admin" : "client_second_account")
+              }
+              aria-label="Invite as Client Admin"
+            />
+            <span>
+              <span className="block font-medium">{clientAccountAccessLabel(access)}</span>
+              <span className="block text-xs text-muted-foreground">
+                {access === "client_admin"
+                  ? "Can access invoices, contracts, and payment documents."
+                  : "Can use content and social tools, without billing or contract access."}
+              </span>
+            </span>
+          </label>
         </Field>
 
         <div className="flex justify-end gap-2 pt-2">
