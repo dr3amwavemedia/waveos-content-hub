@@ -128,7 +128,9 @@ export const listOsAccounts = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const admin = await requireOwner(context.userId);
     const page = Math.max(1, data.page ?? 1);
-    const pageSize = Math.min(60, Math.max(10, data.pageSize ?? 30));
+    // The UI uses 30 rows. Owner-only CSV exports may request larger pages so
+    // the browser does not repeat the full Auth/profile lookup for every page.
+    const pageSize = Math.min(1000, Math.max(10, data.pageSize ?? 30));
     const { data: rawProfiles, error } = await admin
       .from("profiles" as never)
       .select("id,first_name,last_name,created_at,payments_enabled")
@@ -153,14 +155,21 @@ export const listOsAccounts = createServerFn({ method: "POST" })
     const { data: rawSubscriptions } = workspaceIds.length
       ? await admin
           .from("workspace_social_subscriptions" as never)
-          .select("workspace_id,plan,status,account_limit")
+          .select(
+            "workspace_id,plan,status,billing_interval,account_limit,trial_started_at,trial_ends_at,current_period_end,cancel_at_period_end",
+          )
           .in("workspace_id", workspaceIds)
       : { data: [] };
     const subscriptions = (rawSubscriptions ?? []) as Array<{
       workspace_id: string;
       plan: string;
       status: string;
+      billing_interval: string | null;
       account_limit: number;
+      trial_started_at: string | null;
+      trial_ends_at: string | null;
+      current_period_end: string | null;
+      cancel_at_period_end: boolean;
     }>;
     const subscriptionByWorkspace = new Map(subscriptions.map((row) => [row.workspace_id, row]));
     const { data: rawRedemptions } = workspaceIds.length
@@ -223,6 +232,7 @@ export const listOsAccounts = createServerFn({ method: "POST" })
         const promo = redemption ? promoById.get(redemption.promo_code_id) : undefined;
         return {
           id: profile.id,
+          workspaceId: workspaceId ?? null,
           email: user?.email ?? "",
           firstName: profile.first_name,
           lastName: profile.last_name,
@@ -231,7 +241,12 @@ export const listOsAccounts = createServerFn({ method: "POST" })
           lastSignInAt: user?.last_sign_in_at ?? null,
           plan: subscription?.plan ?? null,
           planStatus: subscription?.status ?? null,
+          billingInterval: subscription?.billing_interval ?? null,
           accountLimit: subscription?.account_limit ?? 0,
+          trialStartedAt: subscription?.trial_started_at ?? null,
+          trialEndsAt: subscription?.trial_ends_at ?? null,
+          currentPeriodEnd: subscription?.current_period_end ?? null,
+          cancelAtPeriodEnd: subscription?.cancel_at_period_end ?? false,
           connectedAccounts,
           remainingAccounts: Math.max(0, (subscription?.account_limit ?? 0) - connectedAccounts),
           promoCode: promo?.code ?? null,
