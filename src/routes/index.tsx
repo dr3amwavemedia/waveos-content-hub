@@ -79,7 +79,7 @@ function Landing() {
             search={{ mode: "signup" }}
             className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
           >
-            Start free trial
+            Sign up
           </Link>
           <Link
             to="/auth"
@@ -111,7 +111,7 @@ function Landing() {
               search={{ mode: "signup" }}
               className="group inline-flex items-center gap-2 rounded-full bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
             >
-              Start your 30-day free trial
+              Sign up
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
             <Link

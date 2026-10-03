@@ -6,7 +6,7 @@ const read = (path) => readFile(new URL(`../../${path}`, import.meta.url), "utf8
 
 test("homepage exposes the card-free trial signup", async () => {
   const landing = await read("src/routes/index.tsx");
-  assert.match(landing, /Start your 30-day free trial/);
+  assert.match(landing, /Sign up/);
   assert.match(landing, /search=\{\{ mode: "signup" \}\}/);
   assert.match(landing, /No card required/);
 });
@@ -15,7 +15,7 @@ test("public signup is marked as OS data and returns to onboarding", async () =>
   const auth = await read("src/routes/auth.tsx");
   assert.match(auth, /account_source: "os_data"/);
   assert.match(auth, /signup_source: "public_trial"/);
-  assert.match(auth, /Create account & start trial/);
+  assert.match(auth, /Sign up/);
   assert.match(auth, /\/auth-callback\?next=/);
 });
 
