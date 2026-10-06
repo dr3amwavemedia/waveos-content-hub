@@ -88,14 +88,14 @@ test("analytics has its own discoverable workspace and exposes engagement signal
 });
 
 test("Google Picker includes My Drive, Shared with me and Shared drives and remains responsive", () => {
-  const styles = readFileSync("src/styles.css", "utf8");
   assert.match(createRoute, /setEnableDrives\(true\)/);
   assert.match(createRoute, /Feature\.SUPPORT_DRIVES/);
   assert.match(createRoute, /setOwnedByMe\(false\)/);
   assert.match(createRoute, /addView\(sharedWithMeView\)/);
   assert.match(createRoute, /addView\(sharedDrivesView\)/);
-  assert.match(styles, /\.picker-dialog/);
-  assert.match(styles, /100dvh/);
+  assert.match(createRoute, /builder\.toUri\(\)/);
+  assert.match(createRoute, /title="Choose media from Google Drive"/);
+  assert.match(createRoute, /h-\[clamp\(360px,54dvh,620px\)\]/);
   assert.match(pickerConfig, /appIdValid: \/\^\\d\+\$\//);
   assert.match(pickerConfig, /apiKeyValid: \/\^AIza/);
   assert.match(pickerApi, /must be the numeric Google Cloud project number/);

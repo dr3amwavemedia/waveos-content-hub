@@ -332,28 +332,3 @@ select {
 #SignWell-Modal-Embedded {
   z-index: 2147483647 !important;
 }
-
-/* Google renders Picker at the document root with fixed pixel dimensions.
-   Keep it centered and fully usable on phones and short laptop displays. */
-.picker-dialog {
-  position: fixed !important;
-  inset: 50% auto auto 50% !important;
-  width: min(960px, calc(100vw - 24px)) !important;
-  height: min(680px, calc(100dvh - 24px)) !important;
-  transform: translate(-50%, -50%) !important;
-  max-width: calc(100vw - 24px) !important;
-  max-height: calc(100dvh - 24px) !important;
-}
-
-.picker-dialog-content,
-.picker-dialog iframe,
-.picker-frame {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
-}
-
-.picker-dialog-content {
-  overflow: hidden !important;
-}
