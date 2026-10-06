@@ -30,7 +30,8 @@ test("autopay schedules are workspace-scoped and protected by RLS", () => {
 });
 
 test("admins can configure one-time or monthly automatic charge dates", () => {
-  assert.match(adminForm, /Enable automatic card charges/);
+  assert.match(adminForm, /Automatic payments/);
+  assert.match(adminForm, /The client must authorize their card before a scheduled charge/);
   assert.match(adminForm, /One-time fixed service/);
   assert.match(adminForm, /Monthly retainer/);
   assert.match(adminForm, /type="datetime-local"/);

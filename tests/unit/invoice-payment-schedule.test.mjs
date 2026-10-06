@@ -60,7 +60,11 @@ test("fixed mode charges equal installments and clamps the final payment", () =>
 test("WaveOS uses one schedule choice and sends that wording to Stripe", () => {
   const admin = readFileSync("src/routes/_authenticated/clients.tsx", "utf8");
   const stripe = readFileSync("src/lib/payments.functions.ts", "utf8");
-  assert.match(admin, /This selection controls the amount and wording shown in Stripe Checkout/);
+  assert.match(admin, /Client payment options/);
+  assert.match(admin, /Stripe Checkout preview/);
+  assert.match(admin, /Full balance/);
+  assert.match(admin, /Deposit/);
+  assert.match(admin, /Installment/);
   assert.doesNotMatch(admin, /<Field label="Payment link charges">/);
   assert.match(stripe, /payment_type: paymentType/);
   assert.match(stripe, /Deposit toward a/);
