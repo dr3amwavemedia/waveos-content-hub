@@ -24,6 +24,7 @@ import {
   Music2,
   PenSquare,
   Trash2,
+  TrendingUp,
   Send,
   Settings2,
   Sparkles,
@@ -63,14 +64,16 @@ import {
 } from "@/lib/zernio.functions";
 import { waveAssist } from "@/lib/wave-assist.functions";
 import { SOCIAL_PLATFORM_GUIDANCE } from "@/lib/social-platform-guidance";
+import { getSocialPostingGoal, setSocialPostingGoal } from "@/lib/social-goals.functions";
+import { weeklyPostingProgress } from "@/lib/social-goals";
 
-type SocialView = "overview" | "posts" | "accounts";
+type SocialView = "overview" | "posts" | "analytics" | "accounts";
 type DateRange = "all" | "7" | "30" | "90";
 type AccountState = "connected" | "action_required" | "expired" | "error" | "not_connected";
 
 export const Route = createFileRoute("/_authenticated/social")({
   validateSearch: (search: Record<string, unknown>): { view?: SocialView } => {
-    const allowed: SocialView[] = ["overview", "posts", "accounts"];
+    const allowed: SocialView[] = ["overview", "posts", "analytics", "accounts"];
     return typeof search.view === "string" && allowed.includes(search.view as SocialView)
       ? { view: search.view as SocialView }
       : {};
@@ -337,7 +340,7 @@ function SocialWorkspace() {
 
       <nav
         aria-label="Social Media workspace"
-        className="grid grid-cols-3 gap-1 rounded-2xl border border-border bg-surface/70 p-1.5"
+        className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-surface/70 p-1.5 sm:grid-cols-4"
       >
         <WorkspaceTab
           active={activeView === "overview"}
@@ -349,9 +352,16 @@ function SocialWorkspace() {
         <WorkspaceTab
           active={activeView === "posts"}
           icon={BarChart3}
-          label="Posts & insights"
-          description="Content and results"
+          label="Posts"
+          description="Content and publishing"
           onClick={() => setView("posts")}
+        />
+        <WorkspaceTab
+          active={activeView === "analytics"}
+          icon={TrendingUp}
+          label="Analytics"
+          description="Reach and engagement"
+          onClick={() => setView("analytics")}
         />
         <WorkspaceTab
           active={activeView === "accounts"}
@@ -364,6 +374,7 @@ function SocialWorkspace() {
 
       {activeView === "overview" && (
         <>
+          <PostingGoalCard workspaceId={workspaceId!} items={items} />
           <AchievementHighlight workspaceId={workspaceId!} />
           <OverviewView
             items={items}
@@ -380,16 +391,22 @@ function SocialWorkspace() {
 
       {activeView === "posts" && (
         <PostsAndInsights
-          workspaceId={workspaceId!}
           items={filteredItems}
           allItems={items}
-          connectedCount={connectedCount}
           platform={platform}
           status={status}
           range={range}
           setPlatform={setPlatform}
           setStatus={setStatus}
           setRange={setRange}
+        />
+      )}
+
+      {activeView === "analytics" && (
+        <AnalyticsAndComments
+          workspaceId={workspaceId!}
+          published={items.filter((item) => item.status === "published").length}
+          connectedCount={connectedCount}
         />
       )}
 
@@ -402,6 +419,94 @@ function SocialWorkspace() {
         />
       )}
     </div>
+  );
+}
+
+function PostingGoalCard({ workspaceId, items }: { workspaceId: string; items: ContentItem[] }) {
+  const qc = useQueryClient();
+  const readGoal = useServerFn(getSocialPostingGoal);
+  const writeGoal = useServerFn(setSocialPostingGoal);
+  const goal = useQuery({
+    queryKey: ["social-posting-goal", workspaceId],
+    queryFn: () => readGoal({ data: { workspaceId } }),
+  });
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("3");
+  const completed = weeklyPostingProgress(items);
+  const target = goal.data?.weeklyGoal ?? 3;
+  const percent = Math.min(100, Math.round((completed / target) * 100));
+  const remaining = Math.max(0, target - completed);
+
+  return (
+    <section className="rounded-2xl border border-primary/25 bg-primary/[0.07] p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+            Weekly posting goal
+          </p>
+          <p className="mt-1 text-lg font-semibold text-foreground">
+            {completed} of {target} scheduled or published
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {remaining === 0
+              ? "Goal reached—keep the rhythm going."
+              : `${remaining} more ${remaining === 1 ? "post" : "posts"} keeps this week's plan on track.`}
+          </p>
+        </div>
+        {goal.data?.canManage && (
+          <button
+            type="button"
+            onClick={() => {
+              setValue(String(target));
+              setEditing((current) => !current);
+            }}
+            className="rounded-lg border border-primary/30 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10"
+          >
+            Set goal
+          </button>
+        )}
+      </div>
+      <div
+        className="mt-4 h-2 overflow-hidden rounded-full bg-background/70"
+        aria-label={`${percent}% of weekly goal`}
+      >
+        <div
+          className="h-full rounded-full bg-primary transition-[width]"
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+      {editing && (
+        <form
+          className="mt-4 flex flex-wrap items-end gap-2"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            try {
+              await writeGoal({ data: { workspaceId, weeklyGoal: Number(value) } });
+              await qc.invalidateQueries({ queryKey: ["social-posting-goal", workspaceId] });
+              setEditing(false);
+              toast.success("Weekly posting goal updated.");
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Could not update the goal.");
+            }
+          }}
+        >
+          <label className="text-xs text-muted-foreground">
+            Posts per week
+            <input
+              type="number"
+              min={1}
+              max={30}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              className="ml-2 w-20 rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+            />
+          </label>
+          <button className="rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground">
+            Save goal
+          </button>
+        </form>
+      )}
+    </section>
   );
 }
 
@@ -665,10 +770,8 @@ function MetricCard({
 }
 
 function PostsAndInsights({
-  workspaceId,
   items,
   allItems,
-  connectedCount,
   platform,
   status,
   range,
@@ -676,10 +779,8 @@ function PostsAndInsights({
   setStatus,
   setRange,
 }: {
-  workspaceId: string;
   items: ContentItem[];
   allItems: ContentItem[];
-  connectedCount: number;
   platform: SocialPlatform | "all";
   status: ContentStatus | "all";
   range: DateRange;
@@ -759,12 +860,6 @@ function PostsAndInsights({
           <PostList items={items} emptyText="No posts match these filters." />
         </div>
       </section>
-
-      <AnalyticsAndComments
-        workspaceId={workspaceId}
-        published={published}
-        connectedCount={connectedCount}
-      />
     </div>
   );
 }
@@ -893,6 +988,10 @@ function AnalyticsAndComments({
             value={
               analytics.isPending ? "…" : (metric("likes") + metric("comments")).toLocaleString()
             }
+          />
+          <InsightStat
+            label="Likes"
+            value={analytics.isPending ? "…" : metric("likes").toLocaleString()}
           />
           <InsightStat
             label="Reach"

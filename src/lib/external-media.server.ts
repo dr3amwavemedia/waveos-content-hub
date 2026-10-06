@@ -27,8 +27,7 @@ type ExternalAsset = {
   source_web_url: string | null;
 };
 
-const SUPABASE_URL = () =>
-  process.env.SUPABASE_URL ?? "https://clsuecactijyjecxwuxp.supabase.co";
+const SUPABASE_URL = () => process.env.SUPABASE_URL ?? "https://clsuecactijyjecxwuxp.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = () => {
   const value = process.env.SUPABASE_PUBLISHABLE_KEY;
   if (!value) throw new Error("Missing SUPABASE_PUBLISHABLE_KEY");
@@ -52,8 +51,7 @@ export const externalMediaRedirectUri = (provider: ExternalMediaProvider) =>
 
 const encryptionKey = async () => {
   const encoded =
-    process.env.EXTERNAL_MEDIA_TOKEN_ENCRYPTION_KEY ??
-    process.env.OUTLOOK_TOKEN_ENCRYPTION_KEY;
+    process.env.EXTERNAL_MEDIA_TOKEN_ENCRYPTION_KEY ?? process.env.OUTLOOK_TOKEN_ENCRYPTION_KEY;
   if (!encoded) throw new Error("Missing EXTERNAL_MEDIA_TOKEN_ENCRYPTION_KEY");
   const raw = Buffer.from(encoded, "base64");
   if (raw.byteLength !== 32)
@@ -100,10 +98,13 @@ export async function requireExternalMediaWorkspace(request: Request, workspaceI
       .eq("workspace_id", workspaceId)
       .eq("user_id", data.user.id)
       .maybeSingle(),
-    db.rpc("can_staff_manage_workspace" as never, {
-      _user_id: data.user.id,
-      _workspace_id: workspaceId,
-    } as never),
+    db.rpc(
+      "can_staff_manage_workspace" as never,
+      {
+        _user_id: data.user.id,
+        _workspace_id: workspaceId,
+      } as never,
+    ),
   ]);
   const manageable = manageResult.data as unknown as boolean | null;
   if (!membership && manageable !== true) return null;
@@ -121,10 +122,7 @@ export async function pkceChallenge(verifier: string) {
   return Buffer.from(digest).toString("base64url");
 }
 
-export async function getExternalConnection(
-  workspaceId: string,
-  provider: ExternalMediaProvider,
-) {
+export async function getExternalConnection(workspaceId: string, provider: ExternalMediaProvider) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin
     .from("external_media_connections" as never)
@@ -172,9 +170,7 @@ export async function externalAccessToken(connection: ExternalConnection) {
       throw new Error("google_drive_reconnect_required");
     await updateExternalConnection(connection.id, {
       access_token_encrypted: await encryptExternalToken(json.access_token),
-      token_expires_at: new Date(
-        Date.now() + Number(json.expires_in ?? 3600) * 1000,
-      ).toISOString(),
+      token_expires_at: new Date(Date.now() + Number(json.expires_in ?? 3600) * 1000).toISOString(),
       updated_at: new Date().toISOString(),
     });
     return json.access_token;
@@ -216,15 +212,14 @@ export async function createExternalPublishingUrl(asset: ExternalAsset) {
       body: JSON.stringify({ path: asset.external_file_id }),
     });
     const json = (await response.json()) as Record<string, unknown>;
-    if (!response.ok || typeof json.link !== "string")
-      throw new Error("dropbox_file_unavailable");
+    if (!response.ok || typeof json.link !== "string") throw new Error("dropbox_file_unavailable");
     return json.link;
   }
 
   // Keep private Drive files private: Ayrshare receives a short-lived WaveOS
   // relay URL, and WaveOS streams the bytes from Drive without storing them.
   await fetch(
-    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(asset.external_file_id)}?fields=id`,
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(asset.external_file_id)}?fields=id&supportsAllDrives=true`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   ).then((response) => {
     if (!response.ok) throw new Error("google_drive_file_unavailable");
@@ -304,11 +299,8 @@ export async function resolveMediaAssetUrl(asset: {
       frameio_share_id: string | null;
       sync_status: string;
     } | null;
-    if (
-      !source?.frameio_account_id ||
-      !source.frameio_share_id ||
-      source.sync_status !== "ready"
-    ) throw new Error("frameio_share_not_ready");
+    if (!source?.frameio_account_id || !source.frameio_share_id || source.sync_status !== "ready")
+      throw new Error("frameio_share_not_ready");
     const { frameioFileOriginalUrl, listFrameioShareFiles } = await import("@/lib/frameio.server");
     const currentFiles = await listFrameioShareFiles(
       source.frameio_account_id,

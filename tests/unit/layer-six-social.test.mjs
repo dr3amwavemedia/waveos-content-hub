@@ -43,4 +43,25 @@ test("caption suite uses Brand Voice and Story selection is explicit", () => {
   assert.match(assistant, /caption_suite/);
   assert.match(createRoute, /Draft with Brand Voice/);
   assert.match(createRoute, /value="story"/);
+  assert.match(createRoute, /from\("post_variants"\)/);
+  assert.match(createRoute, /content_item_id", id/);
+});
+
+test("analytics has its own discoverable workspace and exposes engagement signals", () => {
+  const social = readFileSync("src/routes/_authenticated/social.tsx", "utf8");
+  const analyticsRoute = readFileSync("src/routes/_authenticated/analytics.tsx", "utf8");
+  assert.match(social, /"overview" \| "posts" \| "analytics" \| "accounts"/);
+  assert.match(social, /label="Likes"/);
+  assert.match(social, /label="Reach"/);
+  assert.match(social, /label="Impressions"/);
+  assert.match(analyticsRoute, /view: "analytics"/);
+});
+
+test("Google Picker includes My Drive and Shared drives and remains responsive", () => {
+  const styles = readFileSync("src/styles.css", "utf8");
+  assert.match(createRoute, /setEnableDrives\(true\)/);
+  assert.match(createRoute, /Feature\.SUPPORT_DRIVES/);
+  assert.match(createRoute, /addView\(sharedDrivesView\)/);
+  assert.match(styles, /\.picker-dialog/);
+  assert.match(styles, /100dvh/);
 });

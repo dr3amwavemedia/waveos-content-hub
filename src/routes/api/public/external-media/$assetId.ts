@@ -14,15 +14,16 @@ async function relayExternalMedia(request: Request, assetId: string, headOnly: b
   const thumbnailOnly = url.searchParams.get("preview") === "thumbnail";
   const expires = url.searchParams.get("expires") ?? "";
   const signature = url.searchParams.get("signature") ?? "";
-  const { verifyExternalRelay, getExternalConnection, externalAccessToken } = await import(
-    "@/lib/external-media.server"
-  );
+  const { verifyExternalRelay, getExternalConnection, externalAccessToken } =
+    await import("@/lib/external-media.server");
   if (!(await verifyExternalRelay(assetId, expires, signature)))
     return new Response("unauthorized", { status: 401 });
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data: asset } = await supabaseAdmin
     .from("media_assets")
-    .select("id,workspace_id,name,mime_type,size_bytes,source_provider,external_file_id,thumbnail_url")
+    .select(
+      "id,workspace_id,name,mime_type,size_bytes,source_provider,external_file_id,thumbnail_url",
+    )
     .eq("id", assetId)
     .maybeSingle();
   if (!asset || asset.source_provider !== "google_drive" || !asset.external_file_id)
@@ -56,7 +57,7 @@ async function relayExternalMedia(request: Request, assetId: string, headOnly: b
     let thumbnailLink = asset.thumbnail_url;
     if (!thumbnailLink) {
       const metadataResponse = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(asset.external_file_id)}?fields=thumbnailLink`,
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(asset.external_file_id)}?fields=thumbnailLink&supportsAllDrives=true`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       const metadata = (await metadataResponse.json().catch(() => ({}))) as {
@@ -83,7 +84,7 @@ async function relayExternalMedia(request: Request, assetId: string, headOnly: b
     });
   }
   const providerResponse = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(asset.external_file_id)}?alt=media`,
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(asset.external_file_id)}?alt=media&supportsAllDrives=true`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,

@@ -6,6 +6,7 @@ export const getIntegrationStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
     const { envReady } = await import("./ayrshare.server");
+    const { stripeIsTestMode } = await import("./stripe.server");
     const cfg = envReady();
     return {
       zernio: {
@@ -26,6 +27,36 @@ export const getIntegrationStatus = createServerFn({ method: "GET" })
       },
       lovable: {
         ai_gateway: Boolean(process.env.LOVABLE_API_KEY),
+      },
+      stripe: {
+        secret_key: Boolean(
+          process.env.WAVEOS_STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY,
+        ),
+        webhook_secret: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
+        cron_secret: Boolean(process.env.CRON_SECRET),
+        test_mode: stripeIsTestMode(),
+      },
+      google_drive: {
+        client_id: Boolean(process.env.GOOGLE_DRIVE_CLIENT_ID),
+        client_secret: Boolean(process.env.GOOGLE_DRIVE_CLIENT_SECRET),
+        picker_app_id: Boolean(process.env.GOOGLE_DRIVE_APP_ID),
+        picker_api_key: Boolean(process.env.GOOGLE_DRIVE_API_KEY),
+      },
+      dropbox: {
+        app_key: Boolean(process.env.DROPBOX_APP_KEY),
+        app_secret: Boolean(process.env.DROPBOX_APP_SECRET),
+      },
+      frameio: {
+        client_id: Boolean(process.env.FRAMEIO_CLIENT_ID),
+        client_secret: Boolean(process.env.FRAMEIO_CLIENT_SECRET),
+      },
+      external_media: {
+        app_url: Boolean(process.env.WAVEOS_APP_URL),
+        token_encryption: Boolean(
+          process.env.EXTERNAL_MEDIA_TOKEN_ENCRYPTION_KEY ||
+          process.env.OUTLOOK_TOKEN_ENCRYPTION_KEY,
+        ),
+        relay_secret: Boolean(process.env.EXTERNAL_MEDIA_RELAY_SECRET),
       },
     };
   });

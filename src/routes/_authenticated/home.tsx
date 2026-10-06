@@ -243,7 +243,7 @@ function HomeDashboard() {
 
             <Link
               to="/social"
-              search={{ view: "posts" }}
+              search={{ view: "analytics" }}
               className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-background/70 px-4 py-2 text-sm font-semibold text-foreground backdrop-blur transition-all hover:border-primary/40 hover:bg-primary/10"
             >
               View full analytics
@@ -254,7 +254,7 @@ function HomeDashboard() {
           <div className="relative mt-6 grid grid-cols-3 gap-2 sm:gap-3">
             <DashboardMetric
               to="/social"
-              search={{ view: "posts" }}
+              search={{ view: "analytics" }}
               label="Published"
               value={stats?.publishedCount ?? "—"}
               tone="success"

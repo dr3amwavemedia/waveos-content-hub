@@ -67,6 +67,7 @@ import {
 import { PenSquare } from "lucide-react";
 import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 import { useCurrentUser } from "@/hooks/use-waveos";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/create")({
   component: () => (
@@ -331,11 +332,16 @@ function CreatePost() {
       setCaption(result.primaryCaption ?? result.suggestion);
       const id = await ensureSaved(result.primaryCaption ?? result.suggestion);
       if (!id) throw new Error("Save the draft before adapting its captions.");
-      await qc.invalidateQueries({ queryKey: ["content-item", id] });
-      const refreshed = (await existing.refetch()).data;
-      const variants = refreshed?.variants ?? existing.data?.variants ?? [];
+      // A newly-created draft changes the hook's id during this event. Query
+      // the saved id directly so every platform gets its generated caption on
+      // the first click, instead of only the primary caption being updated.
+      const { data: variants, error: variantsError } = await supabase
+        .from("post_variants")
+        .select("id,platform")
+        .eq("content_item_id", id);
+      if (variantsError) throw variantsError;
       for (const generated of result.variants) {
-        const variant = variants.find((row) => row.platform === generated.platform);
+        const variant = (variants ?? []).find((row) => row.platform === generated.platform);
         if (variant)
           await updateVariant.mutateAsync({
             id: variant.id,
@@ -1840,19 +1846,28 @@ function GoogleDrivePicker({
       await loadGooglePickerScript();
       const googleApi = (window as unknown as { google?: GooglePickerGlobal }).google;
       if (!googleApi?.picker) throw new Error("Google Picker did not load.");
-      const view = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
+      const mediaTypes = "image/jpeg,image/png,video/mp4,video/quicktime";
+      const myDriveView = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
         .setIncludeFolders(true)
         .setSelectFolderEnabled(false)
         .setEnableDrives(false)
         .setMode(googleApi.picker.DocsViewMode.GRID)
-        .setMimeTypes("image/jpeg,image/png,video/mp4,video/quicktime");
+        .setMimeTypes(mediaTypes);
+      const sharedDrivesView = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(false)
+        .setEnableDrives(true)
+        .setMode(googleApi.picker.DocsViewMode.GRID)
+        .setMimeTypes(mediaTypes);
       const picker = new googleApi.picker.PickerBuilder()
         .enableFeature(googleApi.picker.Feature.MULTISELECT_ENABLED)
+        .enableFeature(googleApi.picker.Feature.SUPPORT_DRIVES)
         .setDeveloperKey(config.apiKey)
         .setAppId(config.appId)
         .setOAuthToken(config.accessToken)
         .setOrigin(window.location.origin)
-        .addView(view)
+        .addView(myDriveView)
+        .addView(sharedDrivesView)
         .setCallback(async (data: GooglePickerResult) => {
           if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
           try {
@@ -1905,8 +1920,8 @@ function GoogleDrivePicker({
       <div>
         <p className="font-semibold text-foreground">Choose from Google Drive</p>
         <p className="mt-1 max-w-md text-xs text-muted-foreground">
-          Browse and search your folders in Google's secure picker. WaveOS only receives the JPG,
-          PNG, MP4 or MOV files you select.
+          Browse My Drive, folders shared with you and Shared drives in Google's secure picker.
+          WaveOS only receives the JPG, PNG, MP4 or MOV files you select.
         </p>
         <p className="max-w-md text-[11px] text-muted-foreground/80">
           Folder moves and organization stay in Google Drive; this picker is for choosing media
@@ -1985,7 +2000,7 @@ type GooglePickerGlobal = {
     PickerBuilder: new () => GooglePickerBuilder;
     ViewId: { DOCS: string };
     DocsViewMode: { GRID: string; LIST: string };
-    Feature: { MULTISELECT_ENABLED: string };
+    Feature: { MULTISELECT_ENABLED: string; SUPPORT_DRIVES: string };
     Action: { PICKED: string };
   };
 };

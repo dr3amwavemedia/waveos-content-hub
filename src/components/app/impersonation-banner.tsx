@@ -8,7 +8,7 @@ import { useWorkspace } from "./workspace-context";
 export function ImpersonationBanner() {
   const qc = useQueryClient();
   const { data: user } = useCurrentUser();
-  const { on, disable, tier, setTier } = useImpersonateClient();
+  const { on, disable, tier, role, name, email, setTier } = useImpersonateClient();
   const acting = useActingStaff();
   const { activeWorkspace, setActiveWorkspaceId } = useWorkspace();
 
@@ -56,8 +56,10 @@ export function ImpersonationBanner() {
       <div className="sticky top-0 z-30 flex flex-wrap items-center justify-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2 text-xs backdrop-blur">
         <Eye className="h-3.5 w-3.5 text-primary" />
         <span className="text-foreground">
-          Viewing <span className="font-semibold">{activeWorkspace?.name ?? "workspace"}</span> as a
-          client. Staff-only controls are hidden.
+          Viewing <span className="font-semibold">{activeWorkspace?.name ?? "workspace"}</span> as
+          {name ? ` ${name}` : " a client"} ({role.replace("_", " ")}). Staff-only controls are
+          hidden. Any change is still securely attributed to your admin login.
+          {email ? <span className="sr-only"> Preview account {email}.</span> : null}
         </span>
         <select
           value={tier ?? ""}
