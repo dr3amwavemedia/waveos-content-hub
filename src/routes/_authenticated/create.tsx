@@ -1853,6 +1853,13 @@ function GoogleDrivePicker({
         .setEnableDrives(false)
         .setMode(googleApi.picker.DocsViewMode.GRID)
         .setMimeTypes(mediaTypes);
+      const sharedWithMeView = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(false)
+        .setEnableDrives(false)
+        .setOwnedByMe(false)
+        .setMode(googleApi.picker.DocsViewMode.GRID)
+        .setMimeTypes(mediaTypes);
       const sharedDrivesView = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
         .setIncludeFolders(true)
         .setSelectFolderEnabled(false)
@@ -1867,6 +1874,7 @@ function GoogleDrivePicker({
         .setOAuthToken(config.accessToken)
         .setOrigin(window.location.origin)
         .addView(myDriveView)
+        .addView(sharedWithMeView)
         .addView(sharedDrivesView)
         .setCallback(async (data: GooglePickerResult) => {
           if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
@@ -1994,6 +2002,7 @@ type GooglePickerGlobal = {
       setIncludeFolders: (included: boolean) => GoogleDocsView;
       setSelectFolderEnabled: (enabled: boolean) => GoogleDocsView;
       setEnableDrives: (enabled: boolean) => GoogleDocsView;
+      setOwnedByMe: (owned: boolean) => GoogleDocsView;
       setMode: (mode: string) => GoogleDocsView;
       setMimeTypes: (value: string) => GoogleDocsView;
     };
@@ -2009,6 +2018,7 @@ type GoogleDocsView = {
   setIncludeFolders: (included: boolean) => GoogleDocsView;
   setSelectFolderEnabled: (enabled: boolean) => GoogleDocsView;
   setEnableDrives: (enabled: boolean) => GoogleDocsView;
+  setOwnedByMe: (owned: boolean) => GoogleDocsView;
   setMode: (mode: string) => GoogleDocsView;
   setMimeTypes: (value: string) => GoogleDocsView;
 };

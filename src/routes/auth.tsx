@@ -9,6 +9,7 @@ import { lovable } from "@/integrations/lovable";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
 const POST_AUTH_NEXT_KEY = "waveos.postAuthNext";
+const PUBLIC_SIGNUP_KEY = "waveos.publicSignup";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -45,7 +46,7 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup" | "reset">(
     search.mode === "signup" ? "signup" : "signin",
   );
-  const nextPath = mode === "signup" ? "/onboarding" : requestedNext;
+  const nextPath = mode === "signup" ? "/home" : requestedNext;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -131,7 +132,7 @@ function AuthPage() {
   async function handleEmailSignup(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
-    sessionStorage.setItem(POST_AUTH_NEXT_KEY, "/onboarding");
+    sessionStorage.setItem(POST_AUTH_NEXT_KEY, "/home");
     const normalizedPromo = promoCode.trim().toUpperCase();
     if (normalizedPromo) {
       const { data: promo, error: promoError } = await (
@@ -154,7 +155,7 @@ function AuthPage() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth-callback?next=${encodeURIComponent("/onboarding")}`,
+        emailRedirectTo: `${window.location.origin}/auth-callback?next=${encodeURIComponent("/home")}`,
         data: {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
@@ -171,7 +172,7 @@ function AuthPage() {
       return;
     }
     if (data.session) {
-      navigate({ to: "/onboarding", replace: true });
+      navigate({ to: "/home", replace: true });
       return;
     }
     setSignupSent(true);
@@ -196,9 +197,11 @@ function AuthPage() {
 
     try {
       sessionStorage.setItem(POST_AUTH_NEXT_KEY, nextPath);
+      if (mode === "signup") sessionStorage.setItem(PUBLIC_SIGNUP_KEY, "1");
+      else sessionStorage.removeItem(PUBLIC_SIGNUP_KEY);
 
       const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth-callback`,
+        redirect_uri: `${window.location.origin}/auth-callback${mode === "signup" ? "?public_signup=1" : ""}`,
         extraParams: {
           prompt: "select_account",
           ...(email ? { login_hint: email } : {}),
@@ -219,6 +222,7 @@ function AuthPage() {
       }
     } catch (error) {
       sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
+      sessionStorage.removeItem(PUBLIC_SIGNUP_KEY);
       setBusy(false);
       console.error("[Google sign-in error]", error);
       toast.error(

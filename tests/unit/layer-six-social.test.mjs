@@ -62,10 +62,12 @@ test("analytics has its own discoverable workspace and exposes engagement signal
   assert.match(analyticsRoute, /view: "analytics"/);
 });
 
-test("Google Picker includes My Drive and Shared drives and remains responsive", () => {
+test("Google Picker includes My Drive, Shared with me and Shared drives and remains responsive", () => {
   const styles = readFileSync("src/styles.css", "utf8");
   assert.match(createRoute, /setEnableDrives\(true\)/);
   assert.match(createRoute, /Feature\.SUPPORT_DRIVES/);
+  assert.match(createRoute, /setOwnedByMe\(false\)/);
+  assert.match(createRoute, /addView\(sharedWithMeView\)/);
   assert.match(createRoute, /addView\(sharedDrivesView\)/);
   assert.match(styles, /\.picker-dialog/);
   assert.match(styles, /100dvh/);

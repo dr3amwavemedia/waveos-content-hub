@@ -53,7 +53,7 @@ async function loadContext(): Promise<CurrentUserContext> {
     await Promise.all([
       supabase
         .from("profiles")
-        .select("first_name,last_name,avatar_url")
+        .select("first_name,last_name,avatar_url,account_source")
         .eq("id", user.id)
         .maybeSingle(),
       db.from("user_roles").select("role,staff_type").eq("user_id", user.id),
@@ -106,7 +106,7 @@ async function loadContext(): Promise<CurrentUserContext> {
     roles: roleList,
     actingAsStaff: false,
     actualUserId: user.id,
-    accountSource: user.user_metadata?.account_source === "os_data" ? "os_data" : "client_data",
+    accountSource: profile?.account_source === "os_data" ? "os_data" : "client_data",
     promoCode:
       typeof user.user_metadata?.promo_code === "string" ? user.user_metadata.promo_code : null,
   };
