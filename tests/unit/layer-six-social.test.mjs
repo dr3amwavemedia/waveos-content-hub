@@ -9,14 +9,27 @@ const compiled = ts.transpileModule(planSource, {
 }).outputText;
 const planExports = {};
 new Function("exports", compiled)(planExports);
-const migration = readFileSync(
-  "supabase/migrations/20261003120000_layer_six_social_subscriptions.sql",
+const separationMigration = readFileSync(
+  "supabase/migrations/20261006040214_separate_public_subscriptions_from_clients.sql",
   "utf8",
 );
 const zernio = readFileSync("src/lib/zernio.functions.ts", "utf8");
 const publisher = readFileSync("src/lib/zernio-publish.server.ts", "utf8");
 const createRoute = readFileSync("src/routes/_authenticated/create.tsx", "utf8");
 const assistant = readFileSync("src/lib/wave-assist.functions.ts", "utf8");
+const subscriptionFunctions = readFileSync(
+  "src/lib/social-subscriptions.functions.ts",
+  "utf8",
+);
+const subscriptionWebhook = readFileSync(
+  "src/lib/social-subscription-webhook.server.ts",
+  "utf8",
+);
+const settingsRoute = readFileSync("src/routes/_authenticated/settings.tsx", "utf8");
+const userContext = readFileSync("src/hooks/use-waveos.ts", "utf8");
+const pickerConfig = readFileSync("src/lib/google-picker-config.server.ts", "utf8");
+const pickerApi = readFileSync("src/routes/api/external-media/$provider.files.ts", "utf8");
+const adminRoute = readFileSync("src/routes/_authenticated/admin.tsx", "utf8");
 
 test("trial, Standard and Expanded enforce the requested account caps and prices", () => {
   assert.equal(planExports.SOCIAL_PLANS.trial.accountLimit, 2);
@@ -30,10 +43,22 @@ test("trial, Standard and Expanded enforce the requested account caps and prices
   assert.equal(planExports.socialPlanAllowsBillingInterval("expanded", "annual"), true);
 });
 
-test("existing agency clients stay unchanged except grandfathered social-management clients", () => {
-  assert.match(migration, /Existing Social Management clients keep full access/);
-  assert.match(migration, /ON CONFLICT \(workspace_id\) DO NOTHING/);
-  assert.doesNotMatch(migration, /UPDATE public\.workspaces SET/);
+test("public subscriptions and Dream Wave client service tiers stay separate", () => {
+  assert.match(separationMigration, /workspace\.data_source = 'os_data'/);
+  assert.match(separationMigration, /public_subscription_workspace_required/);
+  assert.match(separationMigration, /DROP TRIGGER IF EXISTS ensure_social_management_entitlement/);
+  assert.match(separationMigration, /_workspace\.access_tier IN \('retainer_full', 'social_management'\)/);
+  assert.doesNotMatch(separationMigration, /DELETE FROM public\.workspace_social_subscriptions/);
+
+  assert.match(userContext, /data_source: "client_data" \| "os_data"/);
+  assert.match(userContext, /select\("id,name,slug,data_source,/);
+  assert.match(settingsRoute, /activeWorkspace\?\.data_source === "os_data" && canManageBranding/);
+  assert.match(settingsRoute, /activeWorkspace\?\.data_source === "client_data" && canManageApproval/);
+  assert.match(settingsRoute, /activeWorkspace\?\.data_source === "client_data"[\s\S]*canViewFinancials/);
+
+  assert.match(subscriptionFunctions, /requirePublicOsWorkspace/);
+  assert.match(subscriptionFunctions, /workspace\?\.data_source !== "os_data"/);
+  assert.match(subscriptionWebhook, /workspace\?\.data_source !== "os_data"/);
 });
 
 test("connection limits are enforced server-side and Snapchat remains closed beta", () => {
@@ -71,4 +96,10 @@ test("Google Picker includes My Drive, Shared with me and Shared drives and rema
   assert.match(createRoute, /addView\(sharedDrivesView\)/);
   assert.match(styles, /\.picker-dialog/);
   assert.match(styles, /100dvh/);
+  assert.match(pickerConfig, /appIdValid: \/\^\\d\+\$\//);
+  assert.match(pickerConfig, /apiKeyValid: \/\^AIza/);
+  assert.match(pickerApi, /must be the numeric Google Cloud project number/);
+  assert.match(pickerApi, /browser API key beginning with AIza/);
+  assert.match(adminRoute, /picker_app_id_valid/);
+  assert.match(adminRoute, /picker_api_key_valid/);
 });

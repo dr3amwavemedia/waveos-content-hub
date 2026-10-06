@@ -52,6 +52,15 @@ export async function applySocialSubscriptionEvent(
   const plan = metadata.social_plan as "standard" | "expanded" | undefined;
   const interval = metadata.billing_interval as "monthly" | "annual" | undefined;
   if (!workspaceId || !plan || !SOCIAL_PLANS[plan]) return false;
+  const { data: workspace, error: workspaceError } = await supabaseAdmin
+    .from("workspaces")
+    .select("data_source")
+    .eq("id", workspaceId)
+    .maybeSingle();
+  if (workspaceError) throw workspaceError;
+  // Consume stale social-subscription events for Dream Wave client workspaces
+  // without letting them create or update a public WaveOS billing record.
+  if (workspace?.data_source !== "os_data") return Boolean(workspace);
   const result = await supabaseAdmin.from("workspace_social_subscriptions" as never).upsert(
     {
       workspace_id: workspaceId,

@@ -41,6 +41,20 @@ async function requireWorkspaceAdmin(
     throw new Error("workspace_admin_required");
 }
 
+async function requirePublicOsWorkspace(workspaceId: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: workspace, error } = await supabaseAdmin
+    .from("workspaces")
+    .select("id,data_source")
+    .eq("id", workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  if (workspace?.data_source !== "os_data") {
+    throw new Error("public_subscription_workspace_required");
+  }
+  return workspace;
+}
+
 export const getSocialSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { workspaceId: string }) => data)
@@ -59,6 +73,7 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
       ["dream_wave_owner", "dream_wave_team"].includes(row.role),
     );
     if (!member && !staff) throw new Error("forbidden");
+    await requirePublicOsWorkspace(data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const result = await supabaseAdmin
       .from("workspace_social_subscriptions" as never)
@@ -83,6 +98,7 @@ export const startSocialTrial = createServerFn({ method: "POST" })
   .validator((data: { workspaceId: string }) => data)
   .handler(async ({ data, context }) => {
     await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
+    await requirePublicOsWorkspace(data.workspaceId);
     const result = await (
       context.supabase.rpc as unknown as (
         name: string,
@@ -106,6 +122,7 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
   )
   .handler(async ({ data, context }) => {
     await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
+    await requirePublicOsWorkspace(data.workspaceId);
     if (!socialPlanAllowsBillingInterval(data.plan, data.interval))
       throw new Error("Expanded is available with annual billing only.");
     const { stripePublicSubscriptionsEnabled, stripeRequest } = await import(
@@ -118,9 +135,11 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: workspace } = await supabaseAdmin
       .from("workspaces")
-      .select("name")
+      .select("name,data_source")
       .eq("id", data.workspaceId)
       .single();
+    if (workspace?.data_source !== "os_data")
+      throw new Error("public_subscription_workspace_required");
     const amount = socialPlanPrice(data.plan, data.interval);
     const origin = process.env.WAVEOS_APP_URL || "https://waveos.dreamwavemedia.co";
     const session = await stripeRequest<{ id: string; url?: string | null }>("/checkout/sessions", {

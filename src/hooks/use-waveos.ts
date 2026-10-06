@@ -8,6 +8,7 @@ export interface WorkspaceSummary {
   id: string;
   name: string;
   slug: string;
+  data_source: "client_data" | "os_data";
   industry: string | null;
   timezone: string;
   is_demo: boolean;
@@ -140,7 +141,7 @@ async function loadWorkspaces(
 
   let workspacesQuery = supabase
     .from("workspaces")
-    .select("id,name,slug,industry,timezone,is_demo,access_tier,feature_overrides")
+    .select("id,name,slug,data_source,industry,timezone,is_demo,access_tier,feature_overrides")
     .eq("is_archived", false)
     .order("name", { ascending: true });
 
@@ -211,6 +212,7 @@ async function loadWorkspaces(
       id: w.id,
       name: w.name,
       slug: w.slug,
+      data_source: w.data_source === "os_data" ? "os_data" : "client_data",
       industry: w.industry,
       timezone: w.timezone,
       is_demo: w.is_demo,

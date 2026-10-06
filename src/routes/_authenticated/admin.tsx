@@ -808,8 +808,8 @@ function AdminPage() {
             <StatusRow
               label="Google Picker app + API keys"
               ok={
-                !!statusQ.data?.google_drive.picker_app_id &&
-                !!statusQ.data?.google_drive.picker_api_key
+                !!statusQ.data?.google_drive.picker_app_id_valid &&
+                !!statusQ.data?.google_drive.picker_api_key_valid
               }
             />
             <StatusRow

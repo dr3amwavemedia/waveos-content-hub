@@ -69,11 +69,35 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
         }
 
         if (body.action === "picker_token" && provider === "google_drive") {
-          const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID ?? "";
-          const appId = process.env.GOOGLE_DRIVE_APP_ID ?? "";
-          const apiKey = process.env.GOOGLE_DRIVE_API_KEY ?? "";
+          const { googlePickerConfig } = await import("@/lib/google-picker-config.server");
+          const { clientId, appId, apiKey, clientIdValid, appIdValid, apiKeyValid } =
+            googlePickerConfig();
           if (!clientId || !appId || !apiKey)
             return json({ error: "google_picker_not_configured" }, 503);
+          if (!clientIdValid)
+            return json(
+              {
+                error:
+                  "Google Picker OAuth client is invalid. GOOGLE_DRIVE_CLIENT_ID must be a Web client ID ending in .apps.googleusercontent.com.",
+              },
+              503,
+            );
+          if (!appIdValid)
+            return json(
+              {
+                error:
+                  "Google Picker App ID is invalid. GOOGLE_DRIVE_APP_ID must be the numeric Google Cloud project number, not the OAuth client ID.",
+              },
+              503,
+            );
+          if (!apiKeyValid)
+            return json(
+              {
+                error:
+                  "Google Picker developer key is invalid. GOOGLE_DRIVE_API_KEY must be a browser API key beginning with AIza.",
+              },
+              503,
+            );
           return json({ accessToken, clientId, appId, apiKey });
         }
 
