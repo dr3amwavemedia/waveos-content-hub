@@ -3931,16 +3931,7 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { _token: string }; Returns: string }
-      get_access_audit_users: {
-        Args: never
-        Returns: {
-          account_source: string
-          email: string
-          email_confirmed_at: string | null
-          last_sign_in_at: string | null
-          user_id: string
-        }[]
-      }
+      activate_public_os_account: { Args: never; Returns: string }
       admin_account_health: {
         Args: { _user_id: string; _workspace_id?: string }
         Returns: Json
@@ -4203,6 +4194,16 @@ export type Database = {
         Args: { _project_id: string }
         Returns: number
       }
+      get_access_audit_users: {
+        Args: never
+        Returns: {
+          account_source: string
+          email: string
+          email_confirmed_at: string
+          last_sign_in_at: string
+          user_id: string
+        }[]
+      }
       get_client_invite_overview: {
         Args: { _workspace_id: string }
         Returns: {
@@ -4410,6 +4411,14 @@ export type Database = {
       phase4_set_checklist_status: {
         Args: { _item_id: string; _status: string }
         Returns: undefined
+      }
+      provision_os_trial_workspace: {
+        Args: {
+          _promo_code?: string
+          _user_id: string
+          _workspace_name?: string
+        }
+        Returns: string
       }
       record_autopay_payment: {
         Args: {
