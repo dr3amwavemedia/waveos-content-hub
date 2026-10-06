@@ -2,12 +2,23 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const STAFF_WORKSPACE_ID = "11111111-1111-1111-1111-111111111111";
+const AUTH_USERS_PAGE_SIZE = 100;
 
 function describeSupabaseError(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) return error.message;
-  if (error && typeof error === "object" && "message" in error) {
-    const message = String(error.message).trim();
-    if (message) return message;
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const message =
+      error instanceof Error && error.message.trim()
+        ? error.message.trim()
+        : typeof record.message === "string" && record.message.trim()
+          ? record.message.trim()
+          : "Supabase returned an unknown error.";
+    const details = [
+      typeof record.name === "string" ? record.name : null,
+      typeof record.status === "number" ? `HTTP ${record.status}` : null,
+      typeof record.code === "string" && record.code ? record.code : null,
+    ].filter(Boolean);
+    return details.length > 0 ? `${message} (${details.join(", ")})` : message;
   }
   if (typeof error === "string" && error.trim()) return error;
   return "Supabase returned an unknown error.";
@@ -31,14 +42,17 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
     if (!ownerRole) throw new Error("Only the Dream Wave owner can run the access audit.");
 
     const users = [];
-    for (let page = 1; page <= 20; page += 1) {
-      const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    for (let page = 1; page <= 200; page += 1) {
+      const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage: AUTH_USERS_PAGE_SIZE,
+      });
       if (error) throw auditError(`Could not list authentication users (page ${page})`, error);
       if (!data?.users) {
         throw new Error(`Could not list authentication users (page ${page}): empty response.`);
       }
       users.push(...data.users);
-      if (data.users.length < 1000) break;
+      if (data.users.length < AUTH_USERS_PAGE_SIZE) break;
     }
 
     const [
