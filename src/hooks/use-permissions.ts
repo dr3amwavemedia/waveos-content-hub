@@ -25,9 +25,17 @@ interface WorkspaceAccessRow {
   feature_overrides: Record<string, boolean> | null;
 }
 
+export interface PublicSubscriptionState {
+  status: string;
+  trial_ends_at: string | null;
+  payment_failure_count: number;
+  service_locked_at: string | null;
+}
+
 export interface WorkspacePermissions {
   access: WorkspaceAccess | null;
   raw: WorkspaceAccessRow | null;
+  subscription: PublicSubscriptionState | null;
   isLoading: boolean;
   isStaff: boolean;
   can: (feature: FeatureKey) => boolean;
@@ -41,10 +49,40 @@ const STAFF_ACCESS: WorkspaceAccess = {
   overrides: {},
 };
 
+const PUBLIC_OS_FEATURES = new Set<FeatureKey>([
+  "can_view_profile",
+  "can_edit_profile",
+  "can_manage_brand_voice",
+  "can_view_calendar_preview",
+  "can_view_media_library",
+  "can_upload_media",
+  "can_create_content",
+  "can_use_ai_tools",
+  "can_connect_socials",
+  "can_schedule_content",
+  "can_publish_content",
+  "can_view_analytics",
+  "can_view_activity_log",
+  "can_invite_members",
+  "can_manage_workspace",
+]);
+
+function publicSubscriptionActive(subscription: PublicSubscriptionState | null) {
+  if (!subscription || subscription.service_locked_at) return false;
+  if (subscription.status === "active") return true;
+  if (subscription.status === "trialing") {
+    return Boolean(
+      subscription.trial_ends_at && new Date(subscription.trial_ends_at).getTime() > Date.now(),
+    );
+  }
+  return subscription.status === "past_due" && subscription.payment_failure_count < 2;
+}
+
 export function usePermissions(): WorkspacePermissions {
   const { activeWorkspace } = useWorkspace();
   const { data: user } = useCurrentUser();
   const workspaceId = activeWorkspace?.id ?? null;
+  const isPublicOs = activeWorkspace?.data_source === "os_data";
 
   const { data, isLoading } = useQuery({
     queryKey: ["workspace-access", workspaceId],
@@ -60,6 +98,21 @@ export function usePermissions(): WorkspacePermissions {
         .maybeSingle();
       if (error) throw error;
       return (data ?? null) as WorkspaceAccessRow | null;
+    },
+  });
+
+  const subscriptionQuery = useQuery({
+    queryKey: ["workspace-social-subscription-access", workspaceId],
+    enabled: !!workspaceId && isPublicOs,
+    staleTime: 30_000,
+    queryFn: async (): Promise<PublicSubscriptionState | null> => {
+      const { data, error } = await supabase
+        .from("workspace_social_subscriptions")
+        .select("status,trial_ends_at,payment_failure_count,service_locked_at")
+        .eq("workspace_id", workspaceId!)
+        .maybeSingle();
+      if (error) throw error;
+      return data as PublicSubscriptionState | null;
     },
   });
 
@@ -84,6 +137,7 @@ export function usePermissions(): WorkspacePermissions {
       return {
         access: STAFF_ACCESS,
         raw: data ?? null,
+        subscription: subscriptionQuery.data ?? null,
         isLoading,
         isStaff,
         can: (f) => hasFeature(STAFF_ACCESS, f),
@@ -91,13 +145,37 @@ export function usePermissions(): WorkspacePermissions {
       };
     }
 
+    if (isPublicOs) {
+      const subscription = subscriptionQuery.data ?? null;
+      const active = publicSubscriptionActive(subscription);
+      return {
+        access: clientAccess,
+        raw: data ?? null,
+        subscription,
+        isLoading: isLoading || subscriptionQuery.isLoading,
+        isStaff,
+        can: (feature) => active && PUBLIC_OS_FEATURES.has(feature),
+        visibility: (feature) => (active && PUBLIC_OS_FEATURES.has(feature) ? "enabled" : "hidden"),
+      };
+    }
+
     return {
       access: clientAccess,
       raw: data ?? null,
+      subscription: null,
       isLoading,
       isStaff,
       can: (f) => (clientAccess ? hasFeature(clientAccess, f) : false),
       visibility: (f) => (clientAccess ? featureVisibility(clientAccess, f) : "hidden"),
     };
-  }, [data, isLoading, user?.isStaff, impersonate.on, impersonate.tier]);
+  }, [
+    data,
+    isLoading,
+    user?.isStaff,
+    impersonate.on,
+    impersonate.tier,
+    isPublicOs,
+    subscriptionQuery.data,
+    subscriptionQuery.isLoading,
+  ]);
 }

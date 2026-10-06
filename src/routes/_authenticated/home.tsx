@@ -37,7 +37,7 @@ export const Route = createFileRoute("/_authenticated/home")({
 
 function HomeRoute() {
   const { access, isStaff, isLoading } = usePermissions();
-  const { workspaces, isLoading: wsLoading } = useWorkspace();
+  const { activeWorkspace, workspaces, isLoading: wsLoading } = useWorkspace();
   const { data: user } = useCurrentUser();
 
   // Signed in but no workspace membership yet — invite hasn't been accepted
@@ -74,6 +74,7 @@ function HomeRoute() {
   // Client projects and delivery links are universal across every tier.
   // Tier-specific tools remain available through the client navigation.
   if (!isStaff && !isLoading && access) {
+    if (activeWorkspace?.data_source === "os_data") return <HomeDashboard />;
     if (access.tier === "wedding_client") return <WeddingOverview />;
     return <Layer1Overview />;
   }
@@ -84,13 +85,14 @@ function HomeDashboard() {
   const { data: user } = useCurrentUser();
   const { activeWorkspace } = useWorkspace();
   const wsId = activeWorkspace?.id;
+  const isPublicOs = activeWorkspace?.data_source === "os_data";
   const branding = useWorkspaceBranding(wsId);
   const greeting = getGreeting();
   const firstName = user?.firstName?.split(" ")[0] ?? "there";
 
   const statsQ = useQuery({
     queryKey: ["home-stats", wsId],
-    enabled: !!wsId,
+    enabled: !!wsId && !isPublicOs,
     queryFn: async () => {
       const [assets, folders, members, brand, scheduled, awaiting, published] = await Promise.all([
         supabase
@@ -181,9 +183,9 @@ function HomeDashboard() {
         </Link>
       </header>
 
-      <UpcomingShootPanel />
+      {!isPublicOs && <UpcomingShootPanel />}
 
-      {frameioQ.data && frameioQ.data.files.length > 0 && (
+      {!isPublicOs && frameioQ.data && frameioQ.data.files.length > 0 && (
         <Section title={frameioQ.data.label} subtitle="Media curated for your brand by Dream Wave.">
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
             {frameioQ.data.files.slice(0, 6).map((file) => (
@@ -266,12 +268,21 @@ function HomeDashboard() {
               value={stats?.scheduledCount ?? "—"}
               tone="tertiary"
             />
-            <DashboardMetric
-              to="/approvals"
-              label="To review"
-              value={stats?.awaitingCount ?? "—"}
-              tone="highlight"
-            />
+            {isPublicOs ? (
+              <DashboardMetric
+                to="/create"
+                label="Media ready"
+                value={stats?.mediaCount ?? 0}
+                tone="highlight"
+              />
+            ) : (
+              <DashboardMetric
+                to="/approvals"
+                label="To review"
+                value={stats?.awaitingCount ?? "—"}
+                tone="highlight"
+              />
+            )}
           </div>
         </div>
 
@@ -297,7 +308,11 @@ function HomeDashboard() {
         <EmptyState
           icon={CalendarDays}
           title="No posts have been created yet."
-          body="Your Dream Wave Media team is preparing your content. Once scheduled, it will appear here."
+          body={
+            isPublicOs
+              ? "Create or schedule your first post and it will appear here."
+              : "Your Dream Wave Media team is preparing your content. Once scheduled, it will appear here."
+          }
           action={{ label: "Open calendar", to: "/calendar" }}
           tone="var(--workspace-tone-tertiary)"
         />

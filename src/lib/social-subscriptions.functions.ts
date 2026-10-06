@@ -18,6 +18,10 @@ type SocialSubscriptionRow = {
   trial_ends_at: string | null;
   current_period_end: string | null;
   cancel_at_period_end: boolean;
+  payment_failure_count: number;
+  last_payment_failed_at: string | null;
+  service_locked_at: string | null;
+  stripe_customer_id: string | null;
 };
 
 async function requireWorkspaceAdmin(
@@ -78,7 +82,7 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
     const result = await supabaseAdmin
       .from("workspace_social_subscriptions" as never)
       .select(
-        "workspace_id,plan,status,billing_interval,account_limit,trial_ends_at,current_period_end,cancel_at_period_end",
+        "workspace_id,plan,status,billing_interval,account_limit,trial_ends_at,current_period_end,cancel_at_period_end,payment_failure_count,last_payment_failed_at,service_locked_at,stripe_customer_id",
       )
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
@@ -125,9 +129,7 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     await requirePublicOsWorkspace(data.workspaceId);
     if (!socialPlanAllowsBillingInterval(data.plan, data.interval))
       throw new Error("Expanded is available with annual billing only.");
-    const { stripePublicSubscriptionsEnabled, stripeRequest } = await import(
-      "@/lib/stripe.server"
-    );
+    const { stripePublicSubscriptionsEnabled, stripeRequest } = await import("@/lib/stripe.server");
     if (!stripePublicSubscriptionsEnabled())
       throw new Error(
         "Live social subscriptions are not enabled yet. Use Stripe test mode in preview or enable live subscriptions at launch.",
@@ -187,4 +189,29 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
       { onConflict: "workspace_id" },
     );
     return { url: session.url ?? null };
+  });
+
+export const createSocialBillingPortal = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { workspaceId: string }) => data)
+  .handler(async ({ data, context }) => {
+    await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
+    await requirePublicOsWorkspace(data.workspaceId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const result = await supabaseAdmin
+      .from("workspace_social_subscriptions" as never)
+      .select("stripe_customer_id")
+      .eq("workspace_id", data.workspaceId)
+      .maybeSingle();
+    if (result.error) throw result.error;
+    const customerId = (result.data as { stripe_customer_id?: string | null } | null)
+      ?.stripe_customer_id;
+    if (!customerId) throw new Error("No Stripe billing account is connected yet.");
+    const { stripeRequest } = await import("@/lib/stripe.server");
+    const origin = process.env.WAVEOS_APP_URL || "https://waveos.dreamwavemedia.co";
+    const portal = await stripeRequest<{ url?: string | null }>("/billing_portal/sessions", {
+      body: { customer: customerId, return_url: `${origin}/settings?billing=updated` },
+    });
+    if (!portal.url) throw new Error("Stripe did not return a billing portal link.");
+    return { url: portal.url };
   });
