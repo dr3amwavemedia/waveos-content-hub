@@ -23,7 +23,11 @@ test("trial, Standard and Expanded enforce the requested account caps and prices
   assert.equal(planExports.SOCIAL_PLANS.standard.accountLimit, 3);
   assert.equal(planExports.SOCIAL_PLANS.standard.monthlyCents, 3999);
   assert.equal(planExports.SOCIAL_PLANS.expanded.accountLimit, 6);
-  assert.equal(planExports.SOCIAL_PLANS.expanded.monthlyCents, 6500);
+  assert.equal(planExports.SOCIAL_PLANS.expanded.monthlyCents, null);
+  assert.equal(planExports.socialPlanAllowsBillingInterval("standard", "monthly"), true);
+  assert.equal(planExports.socialPlanAllowsBillingInterval("standard", "annual"), true);
+  assert.equal(planExports.socialPlanAllowsBillingInterval("expanded", "monthly"), false);
+  assert.equal(planExports.socialPlanAllowsBillingInterval("expanded", "annual"), true);
 });
 
 test("existing agency clients stay unchanged except grandfathered social-management clients", () => {

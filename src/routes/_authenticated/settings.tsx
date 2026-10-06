@@ -322,7 +322,7 @@ function SocialPlanSettings({
         </span>
       </div>
       {canManage && (
-        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {!subscription && (
             <button
               type="button"
@@ -336,55 +336,49 @@ function SocialPlanSettings({
               </span>
             </button>
           )}
-          <button
-            type="button"
-            disabled={subscribe.isPending}
-            onClick={() => subscribe.mutate({ plan: "standard", interval: "monthly" })}
-            className="rounded-xl border border-border bg-elevated p-4 text-left hover:border-primary/30 disabled:opacity-50"
-          >
-            <strong className="text-sm text-foreground">Standard · $39.99/mo</strong>
+          <div className="rounded-xl border border-border bg-elevated p-4">
+            <strong className="text-sm text-foreground">Standard</strong>
             <span className="mt-1 block text-xs text-muted-foreground">
               Up to 3 connected accounts
             </span>
-          </button>
-          <button
-            type="button"
-            disabled={subscribe.isPending}
-            onClick={() => subscribe.mutate({ plan: "expanded", interval: "monthly" })}
-            className="rounded-xl border border-border bg-elevated p-4 text-left hover:border-primary/30 disabled:opacity-50"
-          >
-            <strong className="text-sm text-foreground">Expanded / Upgraded · $65/mo</strong>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={subscribe.isPending}
+                onClick={() => subscribe.mutate({ plan: "standard", interval: "monthly" })}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/40 disabled:opacity-50"
+              >
+                $39.99 monthly
+              </button>
+              <button
+                type="button"
+                disabled={subscribe.isPending}
+                onClick={() => subscribe.mutate({ plan: "standard", interval: "annual" })}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/40 disabled:opacity-50"
+              >
+                $479.88 annually
+              </button>
+            </div>
+          </div>
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <strong className="text-sm text-foreground">Expanded</strong>
             <span className="mt-1 block text-xs text-muted-foreground">
-              Up to 6 connected accounts
+              Up to 6 connected accounts · annual only
             </span>
-          </button>
-          <button
-            type="button"
-            disabled={subscribe.isPending}
-            onClick={() => subscribe.mutate({ plan: "standard", interval: "annual" })}
-            className="rounded-xl border border-border bg-elevated p-4 text-left hover:border-primary/30 disabled:opacity-50"
-          >
-            <strong className="text-sm text-foreground">Standard annual · $479.88</strong>
-            <span className="mt-1 block text-xs text-muted-foreground">
-              3 accounts · billed yearly
-            </span>
-          </button>
-          <button
-            type="button"
-            disabled={subscribe.isPending}
-            onClick={() => subscribe.mutate({ plan: "expanded", interval: "annual" })}
-            className="rounded-xl border border-border bg-elevated p-4 text-left hover:border-primary/30 disabled:opacity-50"
-          >
-            <strong className="text-sm text-foreground">Upgraded annual · $780</strong>
-            <span className="mt-1 block text-xs text-muted-foreground">
-              6 accounts · billed yearly
-            </span>
-          </button>
+            <button
+              type="button"
+              disabled={subscribe.isPending}
+              onClick={() => subscribe.mutate({ plan: "expanded", interval: "annual" })}
+              className="mt-4 w-full rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              $780 annually
+            </button>
+          </div>
         </div>
       )}
       <p className="mt-3 text-[11px] text-muted-foreground">
-        Annual billing is supported at $479.88 Standard or $780 Expanded. Preview uses Stripe test
-        mode; live subscription checkout remains locked until the launch switch is enabled.
+        Choose Standard with monthly or annual billing, or Expanded with annual billing. Preview
+        uses Stripe test mode; live subscription checkout remains locked until launch.
       </p>
     </section>
   );

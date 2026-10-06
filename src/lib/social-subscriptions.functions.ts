@@ -2,7 +2,12 @@ import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
-import { SOCIAL_PLANS, socialPlanPrice, type SocialBillingInterval } from "@/lib/social-plans";
+import {
+  SOCIAL_PLANS,
+  socialPlanAllowsBillingInterval,
+  socialPlanPrice,
+  type SocialBillingInterval,
+} from "@/lib/social-plans";
 
 type SocialSubscriptionRow = {
   workspace_id: string;
@@ -101,6 +106,8 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
   )
   .handler(async ({ data, context }) => {
     await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
+    if (!socialPlanAllowsBillingInterval(data.plan, data.interval))
+      throw new Error("Expanded is available with annual billing only.");
     const { stripePublicSubscriptionsEnabled, stripeRequest } = await import(
       "@/lib/stripe.server"
     );
