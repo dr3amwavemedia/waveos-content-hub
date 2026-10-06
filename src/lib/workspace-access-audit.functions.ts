@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const STAFF_WORKSPACE_ID = "11111111-1111-1111-1111-111111111111";
-const AUTH_USERS_PAGE_SIZE = 100;
 
 function describeSupabaseError(error: unknown): string {
   if (error && typeof error === "object") {
@@ -41,19 +40,10 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
     if (ownerRoleError) throw auditError("Could not verify owner access", ownerRoleError);
     if (!ownerRole) throw new Error("Only the Dream Wave owner can run the access audit.");
 
-    const users = [];
-    for (let page = 1; page <= 200; page += 1) {
-      const { data, error } = await supabaseAdmin.auth.admin.listUsers({
-        page,
-        perPage: AUTH_USERS_PAGE_SIZE,
-      });
-      if (error) throw auditError(`Could not list authentication users (page ${page})`, error);
-      if (!data?.users) {
-        throw new Error(`Could not list authentication users (page ${page}): empty response.`);
-      }
-      users.push(...data.users);
-      if (data.users.length < AUTH_USERS_PAGE_SIZE) break;
-    }
+    const { data: users, error: usersError } = await context.supabase.rpc(
+      "get_access_audit_users",
+    );
+    if (usersError) throw auditError("Could not load the owner access directory", usersError);
 
     const [
       { data: memberships, error: membershipsError },
@@ -84,9 +74,9 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
       rolesByUser.set(role.user_id, rows);
     }
 
-    const rows = users.map((user) => {
-      const userMemberships = membershipsByUser.get(user.id) ?? [];
-      const userRoles = rolesByUser.get(user.id) ?? [];
+    const rows = (users ?? []).map((user) => {
+      const userMemberships = membershipsByUser.get(user.user_id) ?? [];
+      const userRoles = rolesByUser.get(user.user_id) ?? [];
       const isStaff = userRoles.some((row) =>
         ["dream_wave_owner", "dream_wave_team"].includes(row.role),
       );
@@ -96,8 +86,7 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
       const clientMemberships = activeMemberships.filter(
         (row) => row.workspace_id !== STAFF_WORKSPACE_ID,
       );
-      const accountSource =
-        user.user_metadata?.account_source === "os_data" ? "os_data" : "client_data";
+      const accountSource = user.account_source === "os_data" ? "os_data" : "client_data";
       const issues: string[] = [];
       if (!user.email_confirmed_at) issues.push("Email is not confirmed");
       if (isStaff && !workspaceById.has(STAFF_WORKSPACE_ID)) {
@@ -120,7 +109,7 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
                 a.workspace!.name.localeCompare(b.workspace!.name),
             )[0]?.workspace?.name ?? null);
       return {
-        userId: user.id,
+        userId: user.user_id,
         email: user.email ?? "No email",
         accountSource,
         isStaff,
@@ -135,7 +124,7 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
       };
     });
 
-    const authIds = new Set(users.map((user) => user.id));
+    const authIds = new Set((users ?? []).map((user) => user.user_id));
     for (const membership of memberships ?? []) {
       if (!authIds.has(membership.user_id)) {
         rows.push({
