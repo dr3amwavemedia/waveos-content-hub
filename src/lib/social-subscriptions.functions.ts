@@ -101,9 +101,13 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
   )
   .handler(async ({ data, context }) => {
     await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
-    const { stripeIsTestMode, stripeRequest } = await import("@/lib/stripe.server");
-    if (!stripeIsTestMode())
-      throw new Error("Social subscriptions are restricted to developer test mode.");
+    const { stripePublicSubscriptionsEnabled, stripeRequest } = await import(
+      "@/lib/stripe.server"
+    );
+    if (!stripePublicSubscriptionsEnabled())
+      throw new Error(
+        "Live social subscriptions are not enabled yet. Use Stripe test mode in preview or enable live subscriptions at launch.",
+      );
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: workspace } = await supabaseAdmin
       .from("workspaces")

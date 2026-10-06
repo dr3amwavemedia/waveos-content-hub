@@ -25,6 +25,15 @@ export function stripeIsTestMode(): boolean {
   return key.startsWith("sk_test_") || key.startsWith("rk_test_");
 }
 
+/**
+ * Public subscription checkout is always available with a Stripe test key. A
+ * live key requires an explicit launch switch so a preview cannot accidentally
+ * start real subscriptions merely because the Stripe connector has a live key.
+ */
+export function stripePublicSubscriptionsEnabled(): boolean {
+  return stripeIsTestMode() || process.env.WAVEOS_ENABLE_LIVE_SUBSCRIPTIONS === "true";
+}
+
 /** Stripe objects and events must come from the mode selected by the active key. */
 export function stripeModeMatches(livemode: boolean | undefined): boolean {
   return typeof livemode === "boolean" && livemode === !stripeIsTestMode();

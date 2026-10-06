@@ -383,8 +383,8 @@ function SocialPlanSettings({
         </div>
       )}
       <p className="mt-3 text-[11px] text-muted-foreground">
-        Annual billing is supported at $479.88 Standard or $780 Expanded. Checkout remains Stripe
-        test mode until launch approval.
+        Annual billing is supported at $479.88 Standard or $780 Expanded. Preview uses Stripe test
+        mode; live subscription checkout remains locked until the launch switch is enabled.
       </p>
     </section>
   );

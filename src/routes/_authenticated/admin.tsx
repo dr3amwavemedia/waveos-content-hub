@@ -796,6 +796,10 @@ function AdminPage() {
             <StatusRow label="Autopay cron secret" ok={!!statusQ.data?.stripe.cron_secret} />
             <StatusRow label="Stripe preview/test mode" ok={!!statusQ.data?.stripe.test_mode} />
             <StatusRow
+              label="Public subscription checkout enabled"
+              ok={!!statusQ.data?.stripe.public_subscriptions_enabled}
+            />
+            <StatusRow
               label="Google Drive OAuth client"
               ok={
                 !!statusQ.data?.google_drive.client_id && !!statusQ.data?.google_drive.client_secret

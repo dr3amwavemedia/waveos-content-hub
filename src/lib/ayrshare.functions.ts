@@ -6,7 +6,9 @@ export const getIntegrationStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
     const { envReady } = await import("./ayrshare.server");
-    const { stripeIsTestMode } = await import("./stripe.server");
+    const { stripeIsTestMode, stripePublicSubscriptionsEnabled } = await import(
+      "./stripe.server"
+    );
     const cfg = envReady();
     return {
       zernio: {
@@ -35,6 +37,7 @@ export const getIntegrationStatus = createServerFn({ method: "GET" })
         webhook_secret: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
         cron_secret: Boolean(process.env.CRON_SECRET),
         test_mode: stripeIsTestMode(),
+        public_subscriptions_enabled: stripePublicSubscriptionsEnabled(),
       },
       google_drive: {
         client_id: Boolean(process.env.GOOGLE_DRIVE_CLIENT_ID),
