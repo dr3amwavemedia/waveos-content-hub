@@ -1,6 +1,6 @@
 import { RequireFeature } from "@/components/app/require-feature";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -1840,9 +1840,13 @@ function GoogleDrivePicker({
   onImported: (ids: string[]) => void;
 }) {
   const [opening, setOpening] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [openError, setOpenError] = useState<string | null>(null);
+  const autoOpened = useRef(false);
 
   async function openPicker() {
     setOpening(true);
+    setOpenError(null);
     try {
       const config = await getGooglePickerToken(workspaceId);
       await loadGooglePickerScript();
@@ -1879,7 +1883,12 @@ function GoogleDrivePicker({
         .addView(sharedWithMeView)
         .addView(sharedDrivesView)
         .setCallback(async (data: GooglePickerResult) => {
+          if (data.action === googleApi.picker.Action.CANCEL) {
+            setPickerOpen(false);
+            return;
+          }
           if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
+          setPickerOpen(false);
           try {
             const supportedDocs = data.docs.filter(isGoogleDriveMedia);
             if (!supportedDocs.length) {
@@ -1915,12 +1924,21 @@ function GoogleDrivePicker({
         })
         .build();
       picker.setVisible(true);
+      setPickerOpen(true);
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : "Google Picker could not open.");
+      const message = reason instanceof Error ? reason.message : "Google Picker could not open.";
+      setOpenError(message);
+      toast.error(message);
     } finally {
       setOpening(false);
     }
   }
+
+  useEffect(() => {
+    if (autoOpened.current) return;
+    autoOpened.current = true;
+    void openPicker();
+  }, [workspaceId]);
 
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
@@ -1928,25 +1946,32 @@ function GoogleDrivePicker({
         <Cloud className="h-6 w-6" />
       </div>
       <div>
-        <p className="font-semibold text-foreground">Choose from Google Drive</p>
+        <p className="font-semibold text-foreground">
+          {opening
+            ? "Opening Google Drive…"
+            : pickerOpen
+              ? "Google Drive is open"
+              : openError
+                ? "Google Drive could not open"
+                : "Google Drive picker closed"}
+        </p>
         <p className="mt-1 max-w-md text-xs text-muted-foreground">
-          Browse My Drive, folders shared with you and Shared drives in Google's secure picker.
-          WaveOS only receives the JPG, PNG, MP4 or MOV files you select.
+          Browse My Drive, folders shared with you and Shared drives without leaving WaveOS. WaveOS
+          only receives the JPG, PNG, MP4 or MOV files you select.
         </p>
-        <p className="max-w-md text-[11px] text-muted-foreground/80">
-          Folder moves and organization stay in Google Drive; this picker is for choosing media
-          only.
-        </p>
+        {openError && <p className="mt-2 max-w-md text-[11px] text-destructive">{openError}</p>}
       </div>
-      <button
-        type="button"
-        onClick={openPicker}
-        disabled={opening}
-        className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
-      >
-        {opening && <Loader2 className="h-4 w-4 animate-spin" />}
-        Open Google Picker
-      </button>
+      {opening ? (
+        <Loader2 className="h-5 w-5 animate-spin text-primary" />
+      ) : !pickerOpen ? (
+        <button
+          type="button"
+          onClick={openPicker}
+          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+        >
+          Browse Google Drive again
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -2012,7 +2037,7 @@ type GooglePickerGlobal = {
     ViewId: { DOCS: string };
     DocsViewMode: { GRID: string; LIST: string };
     Feature: { MULTISELECT_ENABLED: string; SUPPORT_DRIVES: string };
-    Action: { PICKED: string };
+    Action: { PICKED: string; CANCEL: string };
   };
 };
 
