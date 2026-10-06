@@ -34,7 +34,9 @@ export const getIntegrationStatus = createServerFn({ method: "GET" })
       },
       stripe: {
         secret_key: Boolean(
-          process.env.WAVEOS_STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY,
+          process.env.WAVEOS_STRIPE_LIVE_SECRET_KEY ||
+            process.env.WAVEOS_STRIPE_TEST_SECRET_KEY ||
+            process.env.STRIPE_SECRET_KEY,
         ),
         webhook_secret: Boolean(process.env.STRIPE_WEBHOOK_SECRET),
         cron_secret: Boolean(process.env.CRON_SECRET),

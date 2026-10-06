@@ -794,7 +794,7 @@ function AdminPage() {
             <StatusRow label="Stripe secret key" ok={!!statusQ.data?.stripe.secret_key} />
             <StatusRow label="Stripe webhook secret" ok={!!statusQ.data?.stripe.webhook_secret} />
             <StatusRow label="Autopay cron secret" ok={!!statusQ.data?.stripe.cron_secret} />
-            <StatusRow label="Stripe preview/test mode" ok={!!statusQ.data?.stripe.test_mode} />
+            <StatusRow label="Stripe live mode" ok={!statusQ.data?.stripe.test_mode} />
             <StatusRow
               label="Public subscription checkout enabled"
               ok={!!statusQ.data?.stripe.public_subscriptions_enabled}
