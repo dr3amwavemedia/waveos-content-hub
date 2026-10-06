@@ -3,22 +3,40 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const STAFF_WORKSPACE_ID = "11111111-1111-1111-1111-111111111111";
 
+function describeSupabaseError(error: unknown): string {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = String(error.message).trim();
+    if (message) return message;
+  }
+  if (typeof error === "string" && error.trim()) return error;
+  return "Supabase returned an unknown error.";
+}
+
+function auditError(stage: string, error: unknown): Error {
+  return new Error(`${stage}: ${describeSupabaseError(error)}`);
+}
+
 export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: ownerRole } = await supabaseAdmin
+    const { data: ownerRole, error: ownerRoleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", context.userId)
       .eq("role", "dream_wave_owner")
       .maybeSingle();
+    if (ownerRoleError) throw auditError("Could not verify owner access", ownerRoleError);
     if (!ownerRole) throw new Error("Only the Dream Wave owner can run the access audit.");
 
     const users = [];
     for (let page = 1; page <= 20; page += 1) {
       const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
-      if (error) throw error;
+      if (error) throw auditError(`Could not list authentication users (page ${page})`, error);
+      if (!data?.users) {
+        throw new Error(`Could not list authentication users (page ${page}): empty response.`);
+      }
       users.push(...data.users);
       if (data.users.length < 1000) break;
     }
@@ -32,9 +50,11 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
       supabaseAdmin.from("user_roles").select("user_id,role,staff_type"),
       supabaseAdmin.from("workspaces").select("id,name,is_archived,data_source"),
     ]);
-    if (membershipsError) throw membershipsError;
-    if (rolesError) throw rolesError;
-    if (workspacesError) throw workspacesError;
+    if (membershipsError) {
+      throw auditError("Could not load workspace memberships", membershipsError);
+    }
+    if (rolesError) throw auditError("Could not load user roles", rolesError);
+    if (workspacesError) throw auditError("Could not load workspaces", workspacesError);
 
     const workspaceById = new Map((workspaces ?? []).map((row) => [row.id, row]));
     const membershipsByUser = new Map<string, typeof memberships>();
