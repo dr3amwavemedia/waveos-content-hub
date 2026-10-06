@@ -41,6 +41,7 @@ test("connection limits are enforced server-side and Snapchat remains closed bet
 test("caption suite uses Brand Voice and Story selection is explicit", () => {
   assert.match(assistant, /Saved Brand Voice/);
   assert.match(assistant, /caption_suite/);
+  assert.match(assistant, /google\/gemini-3\.1-flash-lite/);
   assert.match(createRoute, /Draft with Brand Voice/);
   assert.match(createRoute, /value="story"/);
   assert.match(createRoute, /from\("post_variants"\)/);

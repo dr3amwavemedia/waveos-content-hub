@@ -8,9 +8,10 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
         const {
           encryptExternalToken,
           externalMediaEnv,
+          externalMediaRequestOrigin,
           externalMediaRedirectUri,
         } = await import("@/lib/external-media.server");
-        const appUrl = externalMediaEnv("WAVEOS_APP_URL").replace(/\/$/, "");
+        const appUrl = externalMediaRequestOrigin(request);
         if (provider !== "google_drive" && provider !== "dropbox")
           return Response.redirect(`${appUrl}/settings?storage_error=unsupported_provider`, 302);
         const url = new URL(request.url);
@@ -43,7 +44,7 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
               grant_type: "authorization_code",
               code,
               code_verifier: oauthState.code_verifier,
-              redirect_uri: externalMediaRedirectUri(provider),
+              redirect_uri: externalMediaRedirectUri(provider, appUrl),
             }),
           });
         } else {
@@ -59,7 +60,7 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
               grant_type: "authorization_code",
               code,
               code_verifier: oauthState.code_verifier,
-              redirect_uri: externalMediaRedirectUri(provider),
+              redirect_uri: externalMediaRedirectUri(provider, appUrl),
             }),
           });
         }
@@ -103,8 +104,8 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
         const encryptedRefresh =
           typeof tokens.refresh_token === "string"
             ? await encryptExternalToken(tokens.refresh_token)
-            : (existing.data as unknown as { refresh_token_encrypted?: string } | null)
-                ?.refresh_token_encrypted ?? null;
+            : ((existing.data as unknown as { refresh_token_encrypted?: string } | null)
+                ?.refresh_token_encrypted ?? null);
         const { error: saveError } = await supabaseAdmin
           .from("external_media_connections" as never)
           .upsert(
@@ -116,7 +117,8 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
               access_token_encrypted: await encryptExternalToken(tokens.access_token),
               refresh_token_encrypted: encryptedRefresh,
               token_expires_at: new Date(
-                Date.now() + Number(tokens.expires_in ?? (provider === "dropbox" ? 14400 : 3600)) * 1000,
+                Date.now() +
+                  Number(tokens.expires_in ?? (provider === "dropbox" ? 14400 : 3600)) * 1000,
               ).toISOString(),
               scopes: typeof tokens.scope === "string" ? tokens.scope : "",
               created_by: oauthState.user_id,

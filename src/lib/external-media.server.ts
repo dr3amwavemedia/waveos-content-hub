@@ -46,8 +46,25 @@ export function externalMediaEnv(name: string) {
   return value;
 }
 
-export const externalMediaRedirectUri = (provider: ExternalMediaProvider) =>
-  `${externalMediaEnv("WAVEOS_APP_URL").replace(/\/$/, "")}/api/external-media/${provider}/callback`;
+export function externalMediaRequestOrigin(request: Request) {
+  const configured = new URL(externalMediaEnv("WAVEOS_APP_URL")).origin;
+  const current = new URL(request.url).origin;
+  const host = new URL(current).hostname;
+  if (
+    current === configured ||
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host.endsWith(".lovable.app")
+  ) {
+    return current;
+  }
+  return configured;
+}
+
+export const externalMediaRedirectUri = (
+  provider: ExternalMediaProvider,
+  origin = new URL(externalMediaEnv("WAVEOS_APP_URL")).origin,
+) => `${origin.replace(/\/$/, "")}/api/external-media/${provider}/callback`;
 
 const encryptionKey = async () => {
   const encoded =
