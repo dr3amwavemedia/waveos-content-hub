@@ -1931,6 +1931,10 @@ function GoogleDrivePicker({
             }
           });
 
+        // Initializing the builder first registers Picker's relay/callback state.
+        // Without this step Google can reject the otherwise valid toUri iframe
+        // with a generic 403 even though the standard dialog works.
+        builder.build();
         const uri = builder.toUri();
         if (active) setPickerUri(uri.toString());
       } catch (reason) {
@@ -2036,6 +2040,7 @@ type GooglePickerBuilder = {
   setOrigin: (value: string) => GooglePickerBuilder;
   addView: (value: unknown) => GooglePickerBuilder;
   setCallback: (value: (data: GooglePickerResult) => void) => GooglePickerBuilder;
+  build: () => { setVisible: (visible: boolean) => void };
   toUri: () => string;
 };
 
