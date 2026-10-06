@@ -6,11 +6,16 @@
 const STRIPE_API = "https://api.stripe.com/v1";
 
 /**
- * The dedicated test key always wins while payments are in test phase, so a
- * live/restricted key saved by the Stripe connector can never open a checkout.
+ * An explicit WaveOS live key wins at launch. The dedicated test key remains
+ * available for preview-only testing, followed by Lovable's managed Stripe key.
  */
 function activeStripeKey(): string {
-  return process.env.WAVEOS_STRIPE_TEST_SECRET_KEY || process.env.STRIPE_SECRET_KEY || "";
+  return (
+    process.env.WAVEOS_STRIPE_LIVE_SECRET_KEY ||
+    process.env.WAVEOS_STRIPE_TEST_SECRET_KEY ||
+    process.env.STRIPE_SECRET_KEY ||
+    ""
+  );
 }
 
 function stripeKey(): string {
