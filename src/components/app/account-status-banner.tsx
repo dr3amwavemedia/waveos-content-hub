@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Clock3, PauseCircle } from "lucide-react";
 
 import { usePermissions } from "@/hooks/use-permissions";
@@ -5,12 +6,37 @@ import { useCurrentUser } from "@/hooks/use-waveos";
 import { daysUntil } from "@/lib/permissions";
 
 export function AccountStatusBanner() {
-  const { access, raw, isStaff } = usePermissions();
+  const { access, raw, isStaff, subscription } = usePermissions();
   const { data: user } = useCurrentUser();
   if (!access || isStaff || user?.isStaff) return null;
 
   const remaining = daysUntil(access.expiresAt);
   const common = "flex flex-wrap items-center justify-center gap-2 border-b px-3 py-2 text-xs";
+
+  if (subscription?.service_locked_at || (subscription?.payment_failure_count ?? 0) >= 2) {
+    return (
+      <div className={`${common} border-warning/30 bg-warning/10 text-foreground`}>
+        <PauseCircle className="h-4 w-4 text-warning" />
+        Social tools are paused after two unsuccessful payment attempts. Your accounts and content
+        are safe.
+        <Link to="/settings" className="font-semibold text-primary underline underline-offset-2">
+          Update billing
+        </Link>
+      </div>
+    );
+  }
+  if ((subscription?.payment_failure_count ?? 0) === 1) {
+    return (
+      <div className={`${common} border-warning/30 bg-warning/10 text-foreground`}>
+        <AlertTriangle className="h-4 w-4 text-warning" />
+        Your renewal payment did not go through. Social tools remain available during the next
+        retry.
+        <Link to="/settings" className="font-semibold text-primary underline underline-offset-2">
+          Update billing
+        </Link>
+      </div>
+    );
+  }
 
   if (access.status === "pending") {
     return (

@@ -9,6 +9,7 @@ import {
   BarChart3,
   Share2,
   Sparkles,
+  PenSquare,
   MessageSquare,
   Settings,
   Users2,
@@ -83,6 +84,16 @@ const CLIENT_NAV: NavItem[] = [
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
+const PUBLIC_OS_NAV: NavItem[] = [
+  { to: "/home", label: "Overview", icon: Home },
+  { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
+  { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
+  { to: "/content", label: "Media Library", icon: Images, feature: "can_view_media_library" },
+  { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
+  { to: "/brand-voice", label: "Brand Voice", icon: Sparkles, feature: "can_manage_brand_voice" },
+  { to: "/settings", label: "Settings", icon: Settings },
+];
+
 // Keep Outlook features out of navigation until their Lovable Cloud Edge
 // Functions are deployed. Flip this to true when that backend is ready.
 const OUTLOOK_INTEGRATIONS_ENABLED = false;
@@ -126,6 +137,14 @@ const MOBILE_NAV: NavItem[] = [
   { to: "/social", label: "Social", icon: Share2, feature: "can_connect_socials" },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/content", label: "Library", icon: Images, feature: "can_view_media_library" },
+  { to: "/settings", label: "More", icon: Settings },
+];
+
+const PUBLIC_OS_MOBILE_NAV: NavItem[] = [
+  { to: "/home", label: "Overview", icon: Home },
+  { to: "/create", label: "Create", icon: PenSquare, feature: "can_create_content" },
+  { to: "/social", label: "Social", icon: Share2, feature: "can_connect_socials" },
+  { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/settings", label: "More", icon: Settings },
 ];
 
@@ -205,6 +224,7 @@ function Shell({ children }: { children: ReactNode }) {
   // existing routes only. Staff always keep the full nav.
   const isLayer1 = !isStaff && access?.tier === "project_client";
   const isWeddingClient = !isStaff && access?.tier === "wedding_client";
+  const isPublicOs = !isStaff && activeWorkspace?.data_source === "os_data";
 
   useEffect(() => {
     if (isWeddingClient && !WEDDING_ALLOWED_PATHS.includes(pathname)) {
@@ -220,19 +240,21 @@ function Shell({ children }: { children: ReactNode }) {
       ? TEAM_NAV.slice(0, 1)
       : isMediaManager
         ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV)
-        : isWeddingClient
-          ? access?.status === "active"
-            ? WEDDING_NAV
-            : WEDDING_NAV.filter((item) => item.to !== "/wedding-content")
-          : isLayer1
-            ? LAYER1_NAV
-            : filterByFeature(CLIENT_NAV);
+        : isPublicOs
+          ? filterByFeature(PUBLIC_OS_NAV)
+          : isWeddingClient
+            ? access?.status === "active"
+              ? WEDDING_NAV
+              : WEDDING_NAV.filter((item) => item.to !== "/wedding-content")
+            : isLayer1
+              ? LAYER1_NAV
+              : filterByFeature(CLIENT_NAV);
 
   // "Your Projects" only appears once staff have published a project to this
   // client account. RLS still enforces the same rule on the page itself.
   const clientProjects = useClientProjects(
     activeWorkspace?.id,
-    !isStaff && !isWeddingClient && !!activeWorkspace?.id,
+    !isStaff && !isWeddingClient && !isPublicOs && !!activeWorkspace?.id,
   );
   const hasClientProjects = (clientProjects.data?.projects.length ?? 0) > 0;
   const clientNav =
@@ -255,13 +277,15 @@ function Shell({ children }: { children: ReactNode }) {
       ? TEAM_NAV
       : isMediaManager
         ? filterByFeature(MEDIA_MANAGER_CLIENT_NAV).slice(0, 5)
-        : isWeddingClient
-          ? access?.status === "active"
-            ? WEDDING_MOBILE_NAV
-            : WEDDING_MOBILE_NAV.filter((item) => item.to !== "/wedding-content")
-          : isLayer1
-            ? LAYER1_MOBILE_NAV
-            : filterByFeature(MOBILE_NAV);
+        : isPublicOs
+          ? filterByFeature(PUBLIC_OS_MOBILE_NAV)
+          : isWeddingClient
+            ? access?.status === "active"
+              ? WEDDING_MOBILE_NAV
+              : WEDDING_MOBILE_NAV.filter((item) => item.to !== "/wedding-content")
+            : isLayer1
+              ? LAYER1_MOBILE_NAV
+              : filterByFeature(MOBILE_NAV);
   const mobilePrimaryNav = mobileNav.filter((item) => item.label !== "More").slice(0, 4);
   const nav = [...clientNav, ...staffNav];
   // Phone navigation is intentionally task-focused. Template and catalog

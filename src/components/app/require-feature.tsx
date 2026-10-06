@@ -20,13 +20,8 @@ interface RequireFeatureProps {
  *
  * IMPORTANT: This is UX-only. Server-side RLS is the actual enforcement layer.
  */
-export function RequireFeature({
-  feature,
-  title,
-  description,
-  children,
-}: RequireFeatureProps) {
-  const { can, isLoading, isStaff, access } = usePermissions();
+export function RequireFeature({ feature, title, description, children }: RequireFeatureProps) {
+  const { can, isLoading, isStaff, access, subscription } = usePermissions();
   const { activeWorkspace, isLoading: wsLoading } = useWorkspace();
   const { isLoading: userLoading } = useCurrentUser();
 
@@ -44,9 +39,7 @@ export function RequireFeature({
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-elevated">
           <Lock className="h-5 w-5 text-muted-foreground" />
         </div>
-        <h2 className="mt-4 text-lg font-semibold text-foreground">
-          No workspace selected
-        </h2>
+        <h2 className="mt-4 text-lg font-semibold text-foreground">No workspace selected</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           {isStaff
             ? "Your staff account is active, but no available staff or Social Management workspace could be loaded."
@@ -58,26 +51,35 @@ export function RequireFeature({
 
   if (can(feature)) return <>{children}</>;
 
+  const publicPaymentLock =
+    activeWorkspace.data_source === "os_data" &&
+    (Boolean(subscription?.service_locked_at) || (subscription?.payment_failure_count ?? 0) >= 2);
+
   // Staff should always be able to reach this (retainer_full by default), so
   // hitting this branch means staff is impersonating a client tier without the
   // feature, or an actual client is on a lower tier.
   return (
     <div className="space-y-4">
       <LockedPreview
-        title={title ?? "Not included in your plan"}
+        title={
+          title ??
+          (publicPaymentLock ? "Subscription payment needs attention" : "Not included in your plan")
+        }
         description={
           description ??
-          (access?.status === "expired"
-            ? "Your Dream Wave Media agreement has expired. Contact your account manager to renew and restore access to this tool."
-            : "This workspace tool is included with 6- and 12-month Dream Wave Media retainers. Contact your account manager to upgrade.")
+          (publicPaymentLock
+            ? "Two payment attempts were unsuccessful. Update billing to restore WaveOS social tools. Your connected accounts and content remain safely stored."
+            : access?.status === "expired"
+              ? "Your Dream Wave Media agreement has expired. Contact your account manager to renew and restore access to this tool."
+              : "This workspace tool is included with 6- and 12-month Dream Wave Media retainers. Contact your account manager to upgrade.")
         }
       />
       <div className="text-center">
         <Link
-          to="/home"
+          to={publicPaymentLock ? "/settings" : "/home"}
           className="inline-flex items-center gap-2 rounded-lg border border-border bg-surface/60 px-4 py-2 text-sm text-foreground hover:bg-elevated"
         >
-          Back to overview
+          {publicPaymentLock ? "Update billing" : "Back to overview"}
         </Link>
       </div>
     </div>

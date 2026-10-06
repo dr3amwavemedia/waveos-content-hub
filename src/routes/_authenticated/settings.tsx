@@ -47,6 +47,7 @@ import {
   clientAccountAccess,
 } from "@/lib/client-account-access";
 import {
+  createSocialBillingPortal,
   createSocialSubscriptionCheckout,
   getSocialSubscription,
   startSocialTrial,
@@ -290,6 +291,7 @@ function SocialPlanSettings({
   const getPlan = useServerFn(getSocialSubscription);
   const startTrial = useServerFn(startSocialTrial);
   const checkout = useServerFn(createSocialSubscriptionCheckout);
+  const billingPortal = useServerFn(createSocialBillingPortal);
   const query = useQuery({
     queryKey: ["social-subscription", workspaceId],
     queryFn: () => getPlan({ data: { workspaceId } }),
@@ -313,18 +315,23 @@ function SocialPlanSettings({
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Could not open checkout."),
   });
+  const manageBilling = useMutation({
+    mutationFn: () => billingPortal({ data: { workspaceId } }),
+    onSuccess: (result) => window.location.assign(result.url),
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not open billing settings."),
+  });
   const subscription = query.data?.subscription;
   return (
     <section className="surface-card p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-            Layer Six
+            WaveOS subscription
           </p>
-          <h2 className="mt-1 text-lg font-semibold text-foreground">Social publishing plan</h2>
+          <h2 className="mt-1 text-lg font-semibold text-foreground">Plan and billing</h2>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            A separate app subscription that adds social accounts, scheduling and verified analytics
-            without changing your Dream Wave service plan.
+            Manage your social account limit, renewal, and payment method in one place.
           </p>
         </div>
         <span className="rounded-full border border-border bg-elevated px-3 py-1 text-xs font-semibold text-foreground">
@@ -333,6 +340,31 @@ function SocialPlanSettings({
             : "Not started"}
         </span>
       </div>
+      {subscription &&
+        (subscription.payment_failure_count > 0 || subscription.service_locked_at) && (
+          <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-foreground">
+            <strong>
+              {subscription.service_locked_at
+                ? "Social tools are paused"
+                : "Your renewal payment needs attention"}
+            </strong>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              {subscription.service_locked_at
+                ? "Two payment attempts were unsuccessful. Your connections and content are safe; update billing and access will restore after Stripe confirms payment."
+                : "The first payment attempt was unsuccessful. You can keep using WaveOS while Stripe retries, but please update your payment method to avoid a pause."}
+            </p>
+          </div>
+        )}
+      {canManage && subscription?.stripe_customer_id && (
+        <button
+          type="button"
+          disabled={manageBilling.isPending}
+          onClick={() => manageBilling.mutate()}
+          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-elevated px-4 text-sm font-semibold text-foreground hover:border-primary/40 disabled:opacity-50"
+        >
+          {manageBilling.isPending ? "Opening Stripe…" : "Manage payment method"}
+        </button>
+      )}
       {canManage && (
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
           {!subscription && (
@@ -389,8 +421,8 @@ function SocialPlanSettings({
         </div>
       )}
       <p className="mt-3 text-[11px] text-muted-foreground">
-        Choose Standard with monthly or annual billing, or Expanded with annual billing. Preview
-        uses Stripe test mode; live subscription checkout remains locked until launch.
+        Standard is available monthly or annually. Expanded is annual only. Payments and billing
+        details are securely managed by Stripe.
       </p>
     </section>
   );
