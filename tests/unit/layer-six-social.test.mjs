@@ -93,6 +93,7 @@ test("Google Picker includes My Drive, Shared with me and Shared drives and rema
   assert.match(createRoute, /setOwnedByMe\(false\)/);
   assert.match(createRoute, /addView\(sharedWithMeView\)/);
   assert.match(createRoute, /addView\(sharedDrivesView\)/);
+  assert.match(createRoute, /builder\.build\(\);[\s\S]*builder\.toUri\(\)/);
   assert.match(createRoute, /builder\.toUri\(\)/);
   assert.match(createRoute, /title="Choose media from Google Drive"/);
   assert.match(createRoute, /h-\[clamp\(360px,54dvh,620px\)\]/);
