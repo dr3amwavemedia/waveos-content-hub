@@ -3931,6 +3931,16 @@ export type Database = {
     }
     Functions: {
       accept_invite: { Args: { _token: string }; Returns: string }
+      get_access_audit_users: {
+        Args: never
+        Returns: {
+          account_source: string
+          email: string
+          email_confirmed_at: string | null
+          last_sign_in_at: string | null
+          user_id: string
+        }[]
+      }
       admin_account_health: {
         Args: { _user_id: string; _workspace_id?: string }
         Returns: Json
