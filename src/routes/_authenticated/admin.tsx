@@ -23,6 +23,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { EmptyState } from "@/components/app/empty-state";
 import { useActingStaff } from "@/hooks/use-acting-staff";
 import { getIntegrationStatus } from "@/lib/ayrshare.functions";
+import { scanWorkspaceAccessHealth } from "@/lib/workspace-access-audit.functions";
 import { sendInviteEmail, tryEmail } from "@/lib/transactional-email";
 import type { Database } from "@/integrations/supabase/types";
 
@@ -316,6 +317,12 @@ function AdminPage() {
     queryFn: () => statusFn(),
     staleTime: 60_000,
   });
+  const accessAuditFn = useServerFn(scanWorkspaceAccessHealth);
+  const accessAudit = useQuery({
+    queryKey: ["workspace-access-audit"],
+    queryFn: () => accessAuditFn(),
+    enabled: false,
+  });
 
   return (
     <div className="space-y-6">
@@ -390,6 +397,65 @@ function AdminPage() {
             >
               <Copy className="h-3.5 w-3.5" /> Copy link
             </button>
+          </div>
+        )}
+      </div>
+
+      <div className="surface-card p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">
+              Login and workspace routing audit
+            </h2>
+            <p className="mt-1 max-w-2xl text-xs text-muted-foreground">
+              Checks every existing login, role and active workspace membership. Staff should route
+              to Dream Wave Media; clients and public subscribers should route only to their own
+              workspace.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void accessAudit.refetch()}
+            disabled={accessAudit.isFetching}
+            className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary disabled:opacity-50"
+          >
+            {accessAudit.isFetching && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Run full access audit
+          </button>
+        </div>
+        {accessAudit.isError && (
+          <p className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
+            {accessAudit.error instanceof Error ? accessAudit.error.message : "Audit failed."}
+          </p>
+        )}
+        {accessAudit.data && (
+          <div className="mt-4 space-y-3">
+            <p className="text-xs text-muted-foreground">
+              {accessAudit.data.healthy} of {accessAudit.data.total} accounts passed · scanned{" "}
+              {new Date(accessAudit.data.scannedAt).toLocaleString()}
+            </p>
+            {accessAudit.data.rows.filter((row) => row.issues.length > 0).length === 0 ? (
+              <p className="rounded-lg border border-emerald-400/30 bg-emerald-400/10 p-3 text-sm text-emerald-200">
+                Every login has a valid destination workspace.
+              </p>
+            ) : (
+              <ul className="max-h-80 space-y-2 overflow-y-auto pr-1">
+                {accessAudit.data.rows
+                  .filter((row) => row.issues.length > 0)
+                  .map((row) => (
+                    <li
+                      key={`${row.userId}-${row.email}`}
+                      className="rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs"
+                    >
+                      <p className="font-semibold text-foreground">{row.email}</p>
+                      <p className="mt-1 text-muted-foreground">
+                        Destination: {row.defaultWorkspace ?? "none"} · {row.accountSource}
+                      </p>
+                      <p className="mt-1 text-warning">{row.issues.join(" · ")}</p>
+                    </li>
+                  ))}
+              </ul>
+            )}
           </div>
         )}
       </div>
@@ -725,6 +791,47 @@ function AdminPage() {
             />
             <StatusRow label="App base URL" ok={!!statusQ.data?.app.base_url} />
             <StatusRow label="Lovable AI Gateway" ok={!!statusQ.data?.lovable.ai_gateway} />
+            <StatusRow label="Stripe secret key" ok={!!statusQ.data?.stripe.secret_key} />
+            <StatusRow label="Stripe webhook secret" ok={!!statusQ.data?.stripe.webhook_secret} />
+            <StatusRow label="Autopay cron secret" ok={!!statusQ.data?.stripe.cron_secret} />
+            <StatusRow label="Stripe preview/test mode" ok={!!statusQ.data?.stripe.test_mode} />
+            <StatusRow
+              label="Public subscription checkout enabled"
+              ok={!!statusQ.data?.stripe.public_subscriptions_enabled}
+            />
+            <StatusRow
+              label="Google Drive OAuth client"
+              ok={
+                !!statusQ.data?.google_drive.client_id && !!statusQ.data?.google_drive.client_secret
+              }
+            />
+            <StatusRow
+              label="Google Picker app + API keys"
+              ok={
+                !!statusQ.data?.google_drive.picker_app_id &&
+                !!statusQ.data?.google_drive.picker_api_key
+              }
+            />
+            <StatusRow
+              label="Dropbox OAuth app"
+              ok={!!statusQ.data?.dropbox.app_key && !!statusQ.data?.dropbox.app_secret}
+            />
+            <StatusRow
+              label="Frame.io OAuth app"
+              ok={!!statusQ.data?.frameio.client_id && !!statusQ.data?.frameio.client_secret}
+            />
+            <StatusRow
+              label="External media callback URL"
+              ok={!!statusQ.data?.external_media.app_url}
+            />
+            <StatusRow
+              label="External media token encryption"
+              ok={!!statusQ.data?.external_media.token_encryption}
+            />
+            <StatusRow
+              label="External media relay secret"
+              ok={!!statusQ.data?.external_media.relay_secret}
+            />
           </div>
         )}
       </div>

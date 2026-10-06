@@ -6,15 +6,32 @@ import { useSyncExternalStore } from "react";
 // action changes behavior.
 const KEY = "waveos.view-as-client";
 const TIER_KEY = "waveos.preview-client-tier";
+const ROLE_KEY = "waveos.preview-client-role";
+const NAME_KEY = "waveos.preview-client-name";
+const EMAIL_KEY = "waveos.preview-client-email";
 
-export type PreviewTier = "project_client" | "growth_90" | "retainer_full" | "social_management" | "wedding_client";
+export type PreviewTier =
+  "project_client" | "growth_90" | "retainer_full" | "social_management" | "wedding_client";
+export type PreviewClientRole = "owner" | "admin" | "editor" | "approver" | "viewer";
+
+export type PreviewClientIdentity = {
+  role?: PreviewClientRole;
+  name?: string;
+  email?: string;
+};
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
 
 function readSnapshot(): string {
-  if (typeof window === "undefined") return "0:";
-  return `${sessionStorage.getItem(KEY) === "1" ? "1" : "0"}:${sessionStorage.getItem(TIER_KEY) ?? ""}`;
+  if (typeof window === "undefined") return JSON.stringify({ on: false });
+  return JSON.stringify({
+    on: sessionStorage.getItem(KEY) === "1",
+    tier: sessionStorage.getItem(TIER_KEY),
+    role: sessionStorage.getItem(ROLE_KEY),
+    name: sessionStorage.getItem(NAME_KEY),
+    email: sessionStorage.getItem(EMAIL_KEY),
+  });
 }
 function subscribe(l: Listener) {
   listeners.add(l);
@@ -32,22 +49,40 @@ function notify() {
 }
 
 export function useImpersonateClient() {
-  const snapshot = useSyncExternalStore(subscribe, readSnapshot, () => "0:");
-  const [enabled, savedTier] = snapshot.split(":");
-  const on = enabled === "1";
-  const tier = (savedTier || null) as PreviewTier | null;
+  const snapshot = useSyncExternalStore(subscribe, readSnapshot, () =>
+    JSON.stringify({ on: false }),
+  );
+  const saved = JSON.parse(snapshot) as {
+    on: boolean;
+    tier?: string | null;
+    role?: string | null;
+    name?: string | null;
+    email?: string | null;
+  };
+  const on = saved.on;
+  const tier = (saved.tier || null) as PreviewTier | null;
+  const role = (saved.role || "admin") as PreviewClientRole;
   return {
     on,
     tier,
-    enable(previewTier?: PreviewTier) {
+    role,
+    name: saved.name || null,
+    email: saved.email || null,
+    enable(previewTier?: PreviewTier, identity: PreviewClientIdentity = {}) {
       sessionStorage.setItem(KEY, "1");
       if (previewTier) sessionStorage.setItem(TIER_KEY, previewTier);
       else sessionStorage.removeItem(TIER_KEY);
+      sessionStorage.setItem(ROLE_KEY, identity.role ?? "admin");
+      if (identity.name) sessionStorage.setItem(NAME_KEY, identity.name);
+      else sessionStorage.removeItem(NAME_KEY);
+      if (identity.email) sessionStorage.setItem(EMAIL_KEY, identity.email);
+      else sessionStorage.removeItem(EMAIL_KEY);
       notify();
     },
     disable() {
-      sessionStorage.removeItem(KEY);
-      sessionStorage.removeItem(TIER_KEY);
+      [KEY, TIER_KEY, ROLE_KEY, NAME_KEY, EMAIL_KEY].forEach((key) =>
+        sessionStorage.removeItem(key),
+      );
       notify();
     },
     setTier(previewTier: PreviewTier) {
@@ -56,10 +91,14 @@ export function useImpersonateClient() {
       notify();
     },
     toggle() {
-      if (readSnapshot().startsWith("1:")) {
-        sessionStorage.removeItem(KEY);
-        sessionStorage.removeItem(TIER_KEY);
-      } else sessionStorage.setItem(KEY, "1");
+      if (on) {
+        [KEY, TIER_KEY, ROLE_KEY, NAME_KEY, EMAIL_KEY].forEach((key) =>
+          sessionStorage.removeItem(key),
+        );
+      } else {
+        sessionStorage.setItem(KEY, "1");
+        sessionStorage.setItem(ROLE_KEY, "admin");
+      }
       notify();
     },
   };

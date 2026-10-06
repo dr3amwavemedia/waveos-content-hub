@@ -115,6 +115,7 @@ async function loadContext(): Promise<CurrentUserContext> {
 async function loadWorkspaces(
   ctx: CurrentUserContext,
   previewWorkspaceId: string | null,
+  previewRole: WorkspaceSummary["role"] = "admin",
 ): Promise<WorkspaceSummary[]> {
   const { data: memberships, error: membershipError } = await supabase
     .from("workspace_members")
@@ -190,12 +191,10 @@ async function loadWorkspaces(
         })
       : (workspaces ?? []);
 
-  // Landing order: the main admin (owner of the Dream Wave Media workspace)
-  // always lands there. Other staff land in a workspace they own (their
-  // personal one) instead of the shared staff workspace.
-  const ownsStaffWorkspace = membershipMap.get(STAFF_WORKSPACE_ID) === "owner";
+  // Every staff identity starts in the shared Dream Wave workspace. A client
+  // membership must never silently become a staff member's default workspace.
   const rank = (id: string) => {
-    if (ownsStaffWorkspace) return id === STAFF_WORKSPACE_ID ? 0 : 1;
+    if (ctx.isStaff) return id === STAFF_WORKSPACE_ID ? 0 : 1;
     return membershipMap.get(id) === "owner" ? 0 : 1;
   };
   visibleWorkspaces.sort((a, b) => rank(a.id) - rank(b.id));
@@ -220,7 +219,7 @@ async function loadWorkspaces(
       businessNameOnly: featureOverrides.business_name_only === true,
       approval_required: featureOverrides.automatic_content_approval !== true,
       role: (previewWorkspaceId
-        ? "viewer"
+        ? previewRole
         : w.id === STAFF_WORKSPACE_ID && ctx.isStaff
           ? "staff"
           : (role ?? "viewer")) as "owner" | "admin" | "editor" | "approver" | "viewer" | "staff",
@@ -246,10 +245,15 @@ export function useCurrentUser() {
   // wiped the workspace list until sign-out.
   if (!impersonate.on || !query.data) return query;
 
+  const [firstName, ...lastNameParts] = (impersonate.name ?? "").trim().split(/\s+/);
+
   return {
     ...query,
     data: {
       ...query.data,
+      email: impersonate.email ?? query.data.email,
+      firstName: firstName || query.data.firstName,
+      lastName: lastNameParts.join(" ") || query.data.lastName,
       isStaff: false,
       isDreamWaveOwner: false,
       staffType: null,
@@ -271,8 +275,8 @@ export function useWorkspaces() {
       : null;
 
   return useQuery({
-    queryKey: ["waveos", "workspaces", user?.userId, previewWorkspaceId],
-    queryFn: () => withRequestTimeout(loadWorkspaces(user!, previewWorkspaceId)),
+    queryKey: ["waveos", "workspaces", user?.userId, previewWorkspaceId, impersonate.role],
+    queryFn: () => withRequestTimeout(loadWorkspaces(user!, previewWorkspaceId, impersonate.role)),
     enabled: !!user,
     staleTime: 30_000,
   });

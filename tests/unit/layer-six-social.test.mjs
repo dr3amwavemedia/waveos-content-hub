@@ -23,7 +23,11 @@ test("trial, Standard and Expanded enforce the requested account caps and prices
   assert.equal(planExports.SOCIAL_PLANS.standard.accountLimit, 3);
   assert.equal(planExports.SOCIAL_PLANS.standard.monthlyCents, 3999);
   assert.equal(planExports.SOCIAL_PLANS.expanded.accountLimit, 6);
-  assert.equal(planExports.SOCIAL_PLANS.expanded.monthlyCents, 6500);
+  assert.equal(planExports.SOCIAL_PLANS.expanded.monthlyCents, null);
+  assert.equal(planExports.socialPlanAllowsBillingInterval("standard", "monthly"), true);
+  assert.equal(planExports.socialPlanAllowsBillingInterval("standard", "annual"), true);
+  assert.equal(planExports.socialPlanAllowsBillingInterval("expanded", "monthly"), false);
+  assert.equal(planExports.socialPlanAllowsBillingInterval("expanded", "annual"), true);
 });
 
 test("existing agency clients stay unchanged except grandfathered social-management clients", () => {
@@ -41,6 +45,28 @@ test("connection limits are enforced server-side and Snapchat remains closed bet
 test("caption suite uses Brand Voice and Story selection is explicit", () => {
   assert.match(assistant, /Saved Brand Voice/);
   assert.match(assistant, /caption_suite/);
+  assert.match(assistant, /google\/gemini-3\.1-flash-lite/);
   assert.match(createRoute, /Draft with Brand Voice/);
   assert.match(createRoute, /value="story"/);
+  assert.match(createRoute, /from\("post_variants"\)/);
+  assert.match(createRoute, /content_item_id", id/);
+});
+
+test("analytics has its own discoverable workspace and exposes engagement signals", () => {
+  const social = readFileSync("src/routes/_authenticated/social.tsx", "utf8");
+  const analyticsRoute = readFileSync("src/routes/_authenticated/analytics.tsx", "utf8");
+  assert.match(social, /"overview" \| "posts" \| "analytics" \| "accounts"/);
+  assert.match(social, /label="Likes"/);
+  assert.match(social, /label="Reach"/);
+  assert.match(social, /label="Impressions"/);
+  assert.match(analyticsRoute, /view: "analytics"/);
+});
+
+test("Google Picker includes My Drive and Shared drives and remains responsive", () => {
+  const styles = readFileSync("src/styles.css", "utf8");
+  assert.match(createRoute, /setEnableDrives\(true\)/);
+  assert.match(createRoute, /Feature\.SUPPORT_DRIVES/);
+  assert.match(createRoute, /addView\(sharedDrivesView\)/);
+  assert.match(styles, /\.picker-dialog/);
+  assert.match(styles, /100dvh/);
 });

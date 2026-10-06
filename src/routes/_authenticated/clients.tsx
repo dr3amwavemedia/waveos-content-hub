@@ -1333,7 +1333,10 @@ function WorkspaceDrawer({
             onClick={() => {
               try {
                 localStorage.setItem("waveos.active-workspace", workspace.id);
-                impersonate.enable(workspace.access_tier);
+                impersonate.enable(workspace.access_tier, {
+                  role: "admin",
+                  name: `${workspace.name} client admin`,
+                });
               } catch {
                 /* noop */
               }
@@ -4482,6 +4485,7 @@ function InvitesTab({
               <ClientMemberRow
                 key={member.user_id}
                 workspaceId={workspace.id}
+                workspaceTier={workspace.access_tier}
                 member={member}
                 roleBusy={changeRole.isPending}
                 onChangeRole={(role) => changeRole.mutate({ userId: member.user_id, role })}
@@ -4598,6 +4602,7 @@ type ClientMember = {
 
 function ClientMemberRow({
   workspaceId,
+  workspaceTier,
   member,
   roleBusy,
   resetBusy,
@@ -4605,6 +4610,7 @@ function ClientMemberRow({
   onPasswordReset,
 }: {
   workspaceId: string;
+  workspaceTier: ClientWorkspace["access_tier"];
   member: ClientMember;
   roleBusy: boolean;
   resetBusy: boolean;
@@ -4612,6 +4618,7 @@ function ClientMemberRow({
   onPasswordReset: (email: string) => void;
 }) {
   const qc = useQueryClient();
+  const impersonate = useImpersonateClient();
   const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState(member.first_name ?? "");
   const [lastName, setLastName] = useState(member.last_name ?? "");
@@ -4669,6 +4676,20 @@ function ClientMemberRow({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/home"
+            onClick={() => {
+              localStorage.setItem("waveos.active-workspace", workspaceId);
+              impersonate.enable(workspaceTier, {
+                role: member.workspace_role as "owner" | "admin" | "editor" | "approver" | "viewer",
+                name,
+                email: email || undefined,
+              });
+            }}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary/30 px-3 py-1.5 text-xs text-primary hover:bg-primary/10"
+          >
+            <Eye className="h-3.5 w-3.5" /> View as this account
+          </Link>
           <label className="inline-flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground">
             <Switch
               checked={access === "client_admin"}

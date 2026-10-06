@@ -13,15 +13,20 @@ new Function("exports", "process", compiled)(exports, process);
 
 const previousTest = process.env.WAVEOS_STRIPE_TEST_SECRET_KEY;
 const previousManaged = process.env.STRIPE_SECRET_KEY;
+const previousLiveSubscriptions = process.env.WAVEOS_ENABLE_LIVE_SUBSCRIPTIONS;
 try {
   process.env.WAVEOS_STRIPE_TEST_SECRET_KEY = "sk_test_example";
   process.env.STRIPE_SECRET_KEY = "rk_live_example";
   assert.equal(exports.stripeIsTestMode(), true);
+  assert.equal(exports.stripePublicSubscriptionsEnabled(), true);
   assert.equal(exports.stripeModeMatches(false), true);
   assert.equal(exports.stripeModeMatches(true), false);
 
   delete process.env.WAVEOS_STRIPE_TEST_SECRET_KEY;
   assert.equal(exports.stripeIsTestMode(), false);
+  assert.equal(exports.stripePublicSubscriptionsEnabled(), false);
+  process.env.WAVEOS_ENABLE_LIVE_SUBSCRIPTIONS = "true";
+  assert.equal(exports.stripePublicSubscriptionsEnabled(), true);
   assert.equal(exports.stripeModeMatches(true), true);
   assert.equal(exports.stripeModeMatches(false), false);
   assert.equal(exports.stripeModeMatches(undefined), false);
@@ -30,6 +35,9 @@ try {
   else process.env.WAVEOS_STRIPE_TEST_SECRET_KEY = previousTest;
   if (previousManaged === undefined) delete process.env.STRIPE_SECRET_KEY;
   else process.env.STRIPE_SECRET_KEY = previousManaged;
+  if (previousLiveSubscriptions === undefined)
+    delete process.env.WAVEOS_ENABLE_LIVE_SUBSCRIPTIONS;
+  else process.env.WAVEOS_ENABLE_LIVE_SUBSCRIPTIONS = previousLiveSubscriptions;
 }
 
 console.log("Stripe mode checks passed for test and live keys, sessions, and webhook events.");

@@ -1,7 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-const MODEL = "google/gemini-2.5-flash";
+// Caption generation is a high-volume, lightweight text task. Keep this on a
+// current low-cost Gateway model rather than the deprecated Gemini 2.5 line.
+const MODEL = "google/gemini-3.1-flash-lite";
 
 type AssistMode = "caption" | "caption_suite" | "comment_reply" | "hashtags" | "tone" | "translate";
 

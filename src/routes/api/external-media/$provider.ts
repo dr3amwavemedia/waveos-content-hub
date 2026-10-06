@@ -12,6 +12,7 @@ export const Route = createFileRoute("/api/external-media/$provider")({
       POST: async ({ request, params }) => {
         const {
           externalMediaEnv,
+          externalMediaRequestOrigin,
           externalMediaRedirectUri,
           getExternalConnection,
           pkceChallenge,
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/api/external-media/$provider")({
         if (provider !== "google_drive" && provider !== "dropbox")
           return json({ error: "unsupported_provider" }, 404);
         const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+        const requestOrigin = externalMediaRequestOrigin(request);
         const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : "";
         if (!workspaceId) return json({ error: "workspace_required" }, 400);
         const auth = await requireExternalMediaWorkspace(request, workspaceId);
@@ -32,7 +34,9 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           return json({
             configured:
               provider === "google_drive"
-                ? Boolean(process.env.GOOGLE_DRIVE_CLIENT_ID && process.env.GOOGLE_DRIVE_CLIENT_SECRET)
+                ? Boolean(
+                    process.env.GOOGLE_DRIVE_CLIENT_ID && process.env.GOOGLE_DRIVE_CLIENT_SECRET,
+                  )
                 : Boolean(process.env.DROPBOX_APP_KEY && process.env.DROPBOX_APP_SECRET),
             connected: Boolean(connection),
             account: connection
@@ -83,10 +87,9 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           const authorize = new URL("https://accounts.google.com/o/oauth2/v2/auth");
           authorize.search = new URLSearchParams({
             client_id: externalMediaEnv("GOOGLE_DRIVE_CLIENT_ID"),
-            redirect_uri: externalMediaRedirectUri(provider),
+            redirect_uri: externalMediaRedirectUri(provider, requestOrigin),
             response_type: "code",
-            scope:
-              "openid email profile https://www.googleapis.com/auth/drive.file",
+            scope: "openid email profile https://www.googleapis.com/auth/drive.file",
             access_type: "offline",
             include_granted_scopes: "true",
             prompt: "consent select_account",
@@ -100,7 +103,7 @@ export const Route = createFileRoute("/api/external-media/$provider")({
         const authorize = new URL("https://www.dropbox.com/oauth2/authorize");
         authorize.search = new URLSearchParams({
           client_id: externalMediaEnv("DROPBOX_APP_KEY"),
-          redirect_uri: externalMediaRedirectUri(provider),
+          redirect_uri: externalMediaRedirectUri(provider, requestOrigin),
           response_type: "code",
           token_access_type: "offline",
           state,

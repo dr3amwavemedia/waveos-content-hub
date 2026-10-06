@@ -199,6 +199,8 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
             q: filters.join(" and "),
             pageSize: "100",
             orderBy: "modifiedTime desc",
+            supportsAllDrives: "true",
+            includeItemsFromAllDrives: "true",
             fields:
               "files(id,name,mimeType,size,thumbnailLink,webViewLink,parents,modifiedTime,videoMediaMetadata,imageMediaMetadata)",
           }).toString();

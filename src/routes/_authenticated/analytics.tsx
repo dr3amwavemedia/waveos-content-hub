@@ -8,7 +8,7 @@ import { useContentItems, useSocialConnections, PLATFORM_LABEL } from "@/hooks/u
 
 export const Route = createFileRoute("/_authenticated/analytics")({
   beforeLoad: () => {
-    throw redirect({ to: "/social", search: { view: "posts" } });
+    throw redirect({ to: "/social", search: { view: "analytics" } });
   },
   component: () => (
     <RequireFeature feature="can_view_analytics" title="Analytics isn't included in your plan">
@@ -27,7 +27,13 @@ function AnalyticsPage() {
   const conns = useSocialConnections(workspaceId);
 
   if (!activeWorkspace) {
-    return <EmptyState icon={BarChart3} title="No workspace" body="Select a workspace to view analytics." />;
+    return (
+      <EmptyState
+        icon={BarChart3}
+        title="No workspace"
+        body="Select a workspace to view analytics."
+      />
+    );
   }
 
   const published = (items.data ?? []).length;
@@ -54,21 +60,30 @@ function AnalyticsPage() {
           <TrendingUp className="h-4 w-4 text-primary" /> Per-platform performance
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Per-platform analytics arrive after your first successful publish. WaveOS pulls metrics from each connected
-          channel via Ayrshare; channels that don't expose analytics show "Not available from this platform" here.
+          Per-platform analytics arrive after your first successful publish. WaveOS pulls metrics
+          from each connected channel via Ayrshare; channels that don't expose analytics show "Not
+          available from this platform" here.
         </p>
         <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {(conns.data ?? []).filter((c) => c.connected).map((c) => (
-            <div key={c.platform} className="rounded-lg border border-border bg-elevated/40 p-3">
-              <div className="text-sm font-semibold text-foreground">{PLATFORM_LABEL[c.platform]}</div>
-              <div className="text-xs text-muted-foreground">
-                {c.display_name || c.username || "Connected"}
+          {(conns.data ?? [])
+            .filter((c) => c.connected)
+            .map((c) => (
+              <div key={c.platform} className="rounded-lg border border-border bg-elevated/40 p-3">
+                <div className="text-sm font-semibold text-foreground">
+                  {PLATFORM_LABEL[c.platform]}
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {c.display_name || c.username || "Connected"}
+                </div>
+                <div className="mt-2 text-[11px] text-muted-foreground">
+                  Metrics pending first publish.
+                </div>
               </div>
-              <div className="mt-2 text-[11px] text-muted-foreground">Metrics pending first publish.</div>
-            </div>
-          ))}
+            ))}
           {(conns.data ?? []).filter((c) => c.connected).length === 0 && (
-            <p className="text-sm text-muted-foreground">Connect a channel to start collecting analytics.</p>
+            <p className="text-sm text-muted-foreground">
+              Connect a channel to start collecting analytics.
+            </p>
           )}
         </div>
       </div>
