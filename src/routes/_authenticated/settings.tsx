@@ -127,7 +127,9 @@ function SettingsPage() {
                   ? "Dream Wave Owner"
                   : user?.isStaff
                     ? "Dream Wave Team"
-                    : "Client"
+                    : activeWorkspace?.data_source === "os_data"
+                      ? "WaveOS member"
+                      : "Client"
               }
             />
           </dl>
@@ -153,11 +155,13 @@ function SettingsPage() {
         </div>
       </div>
 
-      {!user?.isStaff && activeWorkspace && canViewFinancials && (
+      {!user?.isStaff &&
+        activeWorkspace?.data_source === "client_data" &&
+        canViewFinancials && (
         <ClientDocumentRecords workspaceId={activeWorkspace.id} clientName={activeWorkspace.name} />
       )}
 
-      {canManageApproval && (
+      {activeWorkspace?.data_source === "client_data" && canManageApproval && (
         <div className="surface-card flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-4">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
@@ -187,7 +191,7 @@ function SettingsPage() {
         </div>
       )}
 
-      {activeWorkspace && canManageBranding && (
+      {activeWorkspace?.data_source === "os_data" && canManageBranding && (
         <SocialPlanSettings workspaceId={activeWorkspace.id} canManage={canManageBranding} />
       )}
 

@@ -9,7 +9,9 @@ export const getIntegrationStatus = createServerFn({ method: "GET" })
     const { stripeIsTestMode, stripePublicSubscriptionsEnabled } = await import(
       "./stripe.server"
     );
+    const { googlePickerConfig } = await import("./google-picker-config.server");
     const cfg = envReady();
+    const picker = googlePickerConfig();
     return {
       zernio: {
         api_key: Boolean(process.env.ZERNIO_API_KEY),
@@ -42,8 +44,10 @@ export const getIntegrationStatus = createServerFn({ method: "GET" })
       google_drive: {
         client_id: Boolean(process.env.GOOGLE_DRIVE_CLIENT_ID),
         client_secret: Boolean(process.env.GOOGLE_DRIVE_CLIENT_SECRET),
-        picker_app_id: Boolean(process.env.GOOGLE_DRIVE_APP_ID),
-        picker_api_key: Boolean(process.env.GOOGLE_DRIVE_API_KEY),
+        picker_app_id: Boolean(picker.appId),
+        picker_api_key: Boolean(picker.apiKey),
+        picker_app_id_valid: picker.appIdValid,
+        picker_api_key_valid: picker.apiKeyValid,
       },
       dropbox: {
         app_key: Boolean(process.env.DROPBOX_APP_KEY),
