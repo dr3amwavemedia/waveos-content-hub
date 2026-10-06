@@ -125,7 +125,21 @@ export async function requireExternalMediaWorkspace(request: Request, workspaceI
   ]);
   const manageable = manageResult.data as unknown as boolean | null;
   if (!membership && manageable !== true) return null;
-  return { user: data.user, db, token };
+  return { user: data.user, db, token, membershipRole: membership?.role ?? null, manageable };
+}
+
+/**
+ * Connecting, replacing, or disconnecting a provider changes the shared
+ * workspace credential. Keep those actions to client owners/admins and the
+ * Dream Wave owner or assigned Social Manager. Other workspace members may
+ * still browse and import from the already-connected account.
+ */
+export async function requireExternalMediaWorkspaceManager(request: Request, workspaceId: string) {
+  const access = await requireExternalMediaWorkspace(request, workspaceId);
+  if (!access) return null;
+  const isWorkspaceManager = access.membershipRole === "owner" || access.membershipRole === "admin";
+  if (!isWorkspaceManager && access.manageable !== true) return null;
+  return access;
 }
 
 export function randomHex(bytes: number) {

@@ -1,6 +1,6 @@
 import { RequireFeature } from "@/components/app/require-feature";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -66,7 +66,7 @@ import {
 } from "@/hooks/use-content";
 import { PenSquare } from "lucide-react";
 import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
-import { useCurrentUser } from "@/hooks/use-waveos";
+import { useActualCurrentUser, useCurrentUser } from "@/hooks/use-waveos";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/create")({
@@ -89,6 +89,7 @@ export const Route = createFileRoute("/_authenticated/create")({
 function CreatePost() {
   const { activeWorkspace } = useWorkspace();
   const { data: user } = useCurrentUser();
+  const { data: actualUser } = useActualCurrentUser();
   const navigate = useNavigate();
   const search = Route.useSearch();
   const qc = useQueryClient();
@@ -227,7 +228,8 @@ function CreatePost() {
   const needsApproval =
     status !== "approved" && !isStaffWorkspace && activeWorkspace?.approval_required !== false;
   const canChooseStaffRelease = Boolean(
-    user?.isDreamWaveOwner || (user?.isStaff && user.staffType === "media_manager"),
+    actualUser?.isDreamWaveOwner ||
+    (actualUser?.isStaff && actualUser.staffType === "media_manager"),
   );
   const shouldRequestApproval = canChooseStaffRelease ? releaseMode === "approval" : needsApproval;
 
@@ -1206,7 +1208,7 @@ function MediaPicker({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur">
-      <div className="surface-card flex max-h-[calc(100dvh-2rem)] w-full max-w-4xl flex-col overflow-hidden">
+      <div className="surface-card w-full max-w-4xl overflow-hidden">
         <div className="flex items-center justify-between border-b border-border p-4">
           <div>
             <div className="text-base font-semibold text-foreground">Pick from library</div>
@@ -1244,16 +1246,14 @@ function MediaPicker({
               </button>
             ))}
           </div>
-          {source !== "google_drive" && (
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or tag"
-              className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm outline-none focus:border-primary/60"
-            />
-          )}
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or tag"
+            className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm outline-none focus:border-primary/60"
+          />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        <div className="max-h-[60vh] overflow-y-auto p-4">
           {source === "frameio" ? (
             <FrameioProviderPicker
               workspaceId={workspaceId}
@@ -1839,159 +1839,114 @@ function GoogleDrivePicker({
   selected: string[];
   onImported: (ids: string[]) => void;
 }) {
-  const [pickerUri, setPickerUri] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-  const selectedRef = useRef(selected);
-  const onImportedRef = useRef(onImported);
+  const [opening, setOpening] = useState(false);
 
-  useEffect(() => {
-    selectedRef.current = selected;
-    onImportedRef.current = onImported;
-  }, [onImported, selected]);
-
-  useEffect(() => {
-    let active = true;
-
-    async function loadPicker() {
-      setLoading(true);
-      setError(null);
-      setPickerUri(null);
-      try {
-        const config = await getGooglePickerToken(workspaceId);
-        await loadGooglePickerScript();
-        const googleApi = (window as unknown as { google?: GooglePickerGlobal }).google;
-        if (!googleApi?.picker) throw new Error("Google Picker did not load.");
-        const mediaTypes = "image/jpeg,image/png,video/mp4,video/quicktime";
-        const myDriveView = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
-          .setIncludeFolders(true)
-          .setSelectFolderEnabled(false)
-          .setEnableDrives(false)
-          .setMode(googleApi.picker.DocsViewMode.GRID)
-          .setMimeTypes(mediaTypes);
-        const sharedWithMeView = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
-          .setIncludeFolders(true)
-          .setSelectFolderEnabled(false)
-          .setEnableDrives(false)
-          .setOwnedByMe(false)
-          .setMode(googleApi.picker.DocsViewMode.GRID)
-          .setMimeTypes(mediaTypes);
-        const sharedDrivesView = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
-          .setIncludeFolders(true)
-          .setSelectFolderEnabled(false)
-          .setEnableDrives(true)
-          .setMode(googleApi.picker.DocsViewMode.GRID)
-          .setMimeTypes(mediaTypes);
-        const builder = new googleApi.picker.PickerBuilder()
-          .enableFeature(googleApi.picker.Feature.MULTISELECT_ENABLED)
-          .enableFeature(googleApi.picker.Feature.SUPPORT_DRIVES)
-          .setDeveloperKey(config.apiKey)
-          .setAppId(config.appId)
-          .setOAuthToken(config.accessToken)
-          .setOrigin(window.location.origin)
-          .addView(myDriveView)
-          .addView(sharedWithMeView)
-          .addView(sharedDrivesView)
-          .setCallback(async (data: GooglePickerResult) => {
-            if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
-            try {
-              const supportedDocs = data.docs.filter(isGoogleDriveMedia);
-              if (!supportedDocs.length) {
-                toast.error("Choose an image or video file to add to this post.");
-                return;
-              }
-              const files: ExternalProviderFile[] = supportedDocs.map((doc) => ({
-                id: doc.id,
-                name: doc.name,
-                mimeType: googleDriveMediaMimeType(doc),
-                sizeBytes: Number(doc.sizeBytes ?? 0),
-                thumbnailUrl: doc.thumbnails?.find((thumbnail) => thumbnail.url)?.url ?? null,
-                webUrl: doc.url ?? null,
-                parentId: doc.parentId ?? null,
-                path: null,
-                modifiedAt: null,
-                width: null,
-                height: null,
-                durationSeconds: null,
-              }));
-              const imported = await importExternalMedia("google_drive", workspaceId, files);
-              onImportedRef.current(
-                imported.imported
-                  .map((item) => item.id)
-                  .filter((id) => !selectedRef.current.includes(id)),
-              );
-              toast.success(
-                `Added ${imported.imported.length} item${imported.imported.length === 1 ? "" : "s"} from Google Drive.`,
-              );
-            } catch (reason) {
-              toast.error(
-                reason instanceof Error ? reason.message : "Could not add Google Drive media.",
-              );
+  async function openPicker() {
+    setOpening(true);
+    try {
+      const config = await getGooglePickerToken(workspaceId);
+      await loadGooglePickerScript();
+      const googleApi = (window as unknown as { google?: GooglePickerGlobal }).google;
+      if (!googleApi?.picker) throw new Error("Google Picker did not load.");
+      const mediaTypes = "image/jpeg,image/png,video/mp4,video/quicktime";
+      const myDriveView = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(false)
+        .setEnableDrives(false)
+        .setMode(googleApi.picker.DocsViewMode.GRID)
+        .setMimeTypes(mediaTypes);
+      const sharedWithMeView = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(false)
+        .setEnableDrives(false)
+        .setOwnedByMe(false)
+        .setMode(googleApi.picker.DocsViewMode.GRID)
+        .setMimeTypes(mediaTypes);
+      const sharedDrivesView = new googleApi.picker.DocsView(googleApi.picker.ViewId.DOCS)
+        .setIncludeFolders(true)
+        .setSelectFolderEnabled(false)
+        .setEnableDrives(true)
+        .setMode(googleApi.picker.DocsViewMode.GRID)
+        .setMimeTypes(mediaTypes);
+      const picker = new googleApi.picker.PickerBuilder()
+        .enableFeature(googleApi.picker.Feature.MULTISELECT_ENABLED)
+        .enableFeature(googleApi.picker.Feature.SUPPORT_DRIVES)
+        .setDeveloperKey(config.apiKey)
+        .setAppId(config.appId)
+        .setOAuthToken(config.accessToken)
+        .setOrigin(window.location.origin)
+        .addView(myDriveView)
+        .addView(sharedWithMeView)
+        .addView(sharedDrivesView)
+        .setCallback(async (data: GooglePickerResult) => {
+          if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
+          try {
+            const supportedDocs = data.docs.filter(isGoogleDriveMedia);
+            if (!supportedDocs.length) {
+              toast.error("Choose an image or video file to add to this post.");
+              return;
             }
-          });
-
-        // Initializing the builder first registers Picker's relay/callback state.
-        // Without this step Google can reject the otherwise valid toUri iframe
-        // with a generic 403 even though the standard dialog works.
-        builder.build();
-        const uri = builder.toUri();
-        if (active) setPickerUri(uri.toString());
-      } catch (reason) {
-        if (active) {
-          setError(reason instanceof Error ? reason.message : "Google Picker could not load.");
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
+            const files: ExternalProviderFile[] = supportedDocs.map((doc) => ({
+              id: doc.id,
+              name: doc.name,
+              mimeType: googleDriveMediaMimeType(doc),
+              sizeBytes: Number(doc.sizeBytes ?? 0),
+              thumbnailUrl: doc.thumbnails?.find((thumbnail) => thumbnail.url)?.url ?? null,
+              webUrl: doc.url ?? null,
+              parentId: doc.parentId ?? null,
+              path: null,
+              modifiedAt: null,
+              width: null,
+              height: null,
+              durationSeconds: null,
+            }));
+            const imported = await importExternalMedia("google_drive", workspaceId, files);
+            onImported(
+              imported.imported.map((item) => item.id).filter((id) => !selected.includes(id)),
+            );
+            toast.success(
+              `Added ${imported.imported.length} item${imported.imported.length === 1 ? "" : "s"} from Google Drive.`,
+            );
+          } catch (reason) {
+            toast.error(
+              reason instanceof Error ? reason.message : "Could not add Google Drive media.",
+            );
+          }
+        })
+        .build();
+      picker.setVisible(true);
+    } catch (reason) {
+      toast.error(reason instanceof Error ? reason.message : "Google Picker could not open.");
+    } finally {
+      setOpening(false);
     }
-
-    void loadPicker();
-    return () => {
-      active = false;
-    };
-  }, [reloadKey, workspaceId]);
+  }
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-elevated/60 px-3 py-2">
-        <div>
-          <p className="text-xs font-semibold text-foreground">Google Drive</p>
-          <p className="text-[11px] text-muted-foreground">
-            My Drive · Shared with me · Shared drives
-          </p>
-        </div>
-        <span className="text-[11px] text-muted-foreground">JPG · PNG · MP4 · MOV only</span>
+    <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <Cloud className="h-6 w-6" />
       </div>
-
-      {loading ? (
-        <div className="flex h-[clamp(360px,54dvh,620px)] items-center justify-center rounded-xl border border-border bg-elevated text-sm text-muted-foreground">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading Google Drive…
-        </div>
-      ) : error ? (
-        <div className="flex h-[clamp(360px,54dvh,620px)] flex-col items-center justify-center gap-3 rounded-xl border border-border bg-elevated px-6 text-center">
-          <Cloud className="h-7 w-7 text-muted-foreground" />
-          <div>
-            <p className="text-sm font-semibold text-foreground">Google Drive could not load</p>
-            <p className="mt-1 max-w-md text-xs text-muted-foreground">{error}</p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setReloadKey((value) => value + 1)}
-            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
-          >
-            Try again
-          </button>
-        </div>
-      ) : pickerUri ? (
-        <iframe
-          key={pickerUri}
-          src={pickerUri}
-          title="Choose media from Google Drive"
-          className="h-[clamp(360px,54dvh,620px)] w-full rounded-xl border border-border bg-white"
-          referrerPolicy="strict-origin-when-cross-origin"
-        />
-      ) : null}
+      <div>
+        <p className="font-semibold text-foreground">Choose from Google Drive</p>
+        <p className="mt-1 max-w-md text-xs text-muted-foreground">
+          Browse My Drive, folders shared with you and Shared drives in Google's secure picker.
+          WaveOS only receives the JPG, PNG, MP4 or MOV files you select.
+        </p>
+        <p className="max-w-md text-[11px] text-muted-foreground/80">
+          Folder moves and organization stay in Google Drive; this picker is for choosing media
+          only.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={openPicker}
+        disabled={opening}
+        className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
+      >
+        {opening && <Loader2 className="h-4 w-4 animate-spin" />}
+        Open Google Picker
+      </button>
     </div>
   );
 }
@@ -2041,7 +1996,6 @@ type GooglePickerBuilder = {
   addView: (value: unknown) => GooglePickerBuilder;
   setCallback: (value: (data: GooglePickerResult) => void) => GooglePickerBuilder;
   build: () => { setVisible: (visible: boolean) => void };
-  toUri: () => string;
 };
 
 type GooglePickerGlobal = {

@@ -17,7 +17,7 @@ import {
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useCurrentUser } from "@/hooks/use-waveos";
+import { useActualCurrentUser, useCurrentUser } from "@/hooks/use-waveos";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -64,6 +64,7 @@ export const Route = createFileRoute("/_authenticated/settings")({
 
 function SettingsPage() {
   const { data: user } = useCurrentUser();
+  const { data: actualUser } = useActualCurrentUser();
   const { activeWorkspace } = useWorkspace();
   const qc = useQueryClient();
   const canManageApproval =
@@ -73,6 +74,12 @@ function SettingsPage() {
     activeWorkspace?.role === "owner" ||
     activeWorkspace?.role === "admin";
   const canManageTeam = canManageBranding;
+  const canManageConnections = Boolean(
+    activeWorkspace?.role === "owner" ||
+    activeWorkspace?.role === "admin" ||
+    actualUser?.isDreamWaveOwner ||
+    (actualUser?.isStaff && actualUser.staffType === "media_manager"),
+  );
   const canViewFinancials = canViewClientFinancials(activeWorkspace?.role);
   const automaticApproval = activeWorkspace?.approval_required === false;
   const updateApproval = useMutation({
@@ -155,9 +162,7 @@ function SettingsPage() {
         </div>
       </div>
 
-      {!user?.isStaff &&
-        activeWorkspace?.data_source === "client_data" &&
-        canViewFinancials && (
+      {!user?.isStaff && activeWorkspace?.data_source === "client_data" && canViewFinancials && (
         <ClientDocumentRecords workspaceId={activeWorkspace.id} clientName={activeWorkspace.name} />
       )}
 
@@ -215,7 +220,8 @@ function SettingsPage() {
           <div>
             <h2 className="text-lg font-semibold text-foreground">Connected media storage</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Let your team pick files from your storage without copying the originals into WaveOS.
+              One connection is shared by this workspace's authorized admins and Social Managers.
+              Files stay in the client's storage account.
             </p>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
@@ -223,11 +229,13 @@ function SettingsPage() {
               provider="google_drive"
               workspaceId={activeWorkspace.id}
               label="Google Drive"
+              canManage={canManageConnections}
             />
             <StorageConnectionCard
               provider="dropbox"
               workspaceId={activeWorkspace.id}
               label="Dropbox"
+              canManage={canManageConnections}
             />
           </div>
         </section>
@@ -679,10 +687,12 @@ function StorageConnectionCard({
   provider,
   workspaceId,
   label,
+  canManage,
 }: {
   provider: ExternalMediaProvider;
   workspaceId: string;
   label: string;
+  canManage: boolean;
 }) {
   const qc = useQueryClient();
   const status = useQuery({
@@ -729,7 +739,11 @@ function StorageConnectionCard({
           </p>
         </div>
       </div>
-      {connected ? (
+      {!canManage ? (
+        <span className="shrink-0 rounded-full border border-border px-3 py-2 text-xs font-medium text-muted-foreground">
+          Shared access
+        </span>
+      ) : connected ? (
         <button
           type="button"
           onClick={() => disconnect.mutate()}
