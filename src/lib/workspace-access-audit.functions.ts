@@ -119,7 +119,7 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
           workspaceName: workspaceById.get(membership.workspace_id)?.name ?? "Missing workspace",
           role: membership.role,
         })),
-        lastSignInAt: user.last_sign_in_at ?? null,
+        lastSignInAt: (user.last_sign_in_at ?? null) as string | null,
         issues,
       };
     });
@@ -141,7 +141,7 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
               role: membership.role,
             },
           ],
-          lastSignInAt: null,
+          lastSignInAt: null as string | null,
           issues: ["Workspace membership has no matching login"],
         });
       }
