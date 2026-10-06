@@ -3,6 +3,21 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const STAFF_WORKSPACE_ID = "11111111-1111-1111-1111-111111111111";
 
+type AccessAuditRow = {
+  userId: string;
+  email: string;
+  accountSource: "client_data" | "os_data";
+  isStaff: boolean;
+  defaultWorkspace: string | null;
+  memberships: Array<{
+    workspaceId: string;
+    workspaceName: string;
+    role: string;
+  }>;
+  lastSignInAt: string | null;
+  issues: string[];
+};
+
 function describeSupabaseError(error: unknown): string {
   if (error && typeof error === "object") {
     const record = error as Record<string, unknown>;
@@ -74,7 +89,7 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
       rolesByUser.set(role.user_id, rows);
     }
 
-    const rows = (users ?? []).map((user) => {
+    const rows: AccessAuditRow[] = (users ?? []).map((user) => {
       const userMemberships = membershipsByUser.get(user.user_id) ?? [];
       const userRoles = rolesByUser.get(user.user_id) ?? [];
       const isStaff = userRoles.some((row) =>
@@ -119,7 +134,7 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
           workspaceName: workspaceById.get(membership.workspace_id)?.name ?? "Missing workspace",
           role: membership.role,
         })),
-        lastSignInAt: (user.last_sign_in_at ?? null) as string | null,
+        lastSignInAt: user.last_sign_in_at ?? null,
         issues,
       };
     });
@@ -141,7 +156,7 @@ export const scanWorkspaceAccessHealth = createServerFn({ method: "GET" })
               role: membership.role,
             },
           ],
-          lastSignInAt: null as string | null,
+          lastSignInAt: null,
           issues: ["Workspace membership has no matching login"],
         });
       }
