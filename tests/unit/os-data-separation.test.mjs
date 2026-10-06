@@ -7,6 +7,7 @@ const migration = readFileSync(
   "utf8",
 );
 const clients = readFileSync("src/routes/_authenticated/clients.tsx", "utf8");
+const osData = readFileSync("src/routes/_authenticated/os-data.tsx", "utf8");
 const accounts = readFileSync("src/lib/os-accounts.functions.ts", "utf8");
 
 test("existing records default to Client data and OS records require an explicit source", () => {
@@ -17,8 +18,9 @@ test("existing records default to Client data and OS records require an explicit
 
 test("admin UI separates Client data and OS data with search and pagination", () => {
   assert.match(clients, /Client data/);
-  assert.match(clients, /OS data/);
-  assert.match(clients, /Search OS accounts/);
+  assert.match(osData, /OS Data/);
+  assert.match(osData, /Search OS users by name or email/);
+  assert.match(osData, /<OsDataPanel search=\{search\}/);
   assert.match(clients, /pageSize: 30/);
 });
 
