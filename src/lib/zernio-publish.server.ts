@@ -1,7 +1,7 @@
 import type { Json } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveMediaAssetUrl } from "@/lib/external-media.server";
-import { toZernioPlatform, zernioRequest } from "@/lib/zernio.server";
+import { normalizeZernioAccounts, toZernioPlatform, zernioRequest } from "@/lib/zernio.server";
 
 type ZernioTarget = {
   platform?: string;
@@ -39,6 +39,30 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
   if (variantsError) throw variantsError;
   if (!variants?.length) throw new Error("No platforms selected.");
 
+  // Resolve the provider profile from the content item's workspace every time.
+  // Neither the acting staff member nor browser state can choose a different
+  // Zernio profile for this publish.
+  const { data: workspaceProfile, error: profileError } = await supabaseAdmin
+    .from("zernio_profiles" as never)
+    .select("profile_id")
+    .eq("workspace_id", item.workspace_id)
+    .maybeSingle();
+  if (profileError) throw profileError;
+  const profile = workspaceProfile as { profile_id: string } | null;
+  if (!profile?.profile_id) {
+    throw new Error("This client workspace does not have a connected Zernio profile.");
+  }
+
+  const accountParams = new URLSearchParams({
+    profileId: profile.profile_id,
+    page: "1",
+    limit: "100",
+  });
+  const providerAccounts = normalizeZernioAccounts(
+    await zernioRequest<Record<string, unknown>>(`/accounts?${accountParams}`),
+  ).filter((account) => !account.profileId || account.profileId === profile.profile_id);
+  const verifiedAccountIds = new Set(providerAccounts.map((account) => account.id));
+
   const { data: connections, error: connectionsError } = await supabaseAdmin
     .from("social_connections")
     .select("platform,provider_account_id,connected,connection_state")
@@ -59,7 +83,13 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
     );
   }
   const accountByPlatform = new Map(
-    (connections ?? []).map((connection) => [connection.platform, connection]),
+    (connections ?? [])
+      .filter(
+        (connection) =>
+          Boolean(connection.provider_account_id) &&
+          verifiedAccountIds.has(connection.provider_account_id!),
+      )
+      .map((connection) => [connection.platform, connection]),
   );
 
   let assets: Array<{
@@ -79,9 +109,13 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
       .select(
         "id,workspace_id,name,storage_path,mime_type,size_bytes,source_provider,external_file_id,source_web_url",
       )
-      .in("id", item.media_asset_ids);
+      .in("id", item.media_asset_ids)
+      .eq("workspace_id", item.workspace_id);
     if (result.error) throw result.error;
     assets = result.data ?? [];
+    if (assets.length !== new Set(item.media_asset_ids).size) {
+      throw new Error("One or more selected media files do not belong to this client workspace.");
+    }
   }
   const mediaUrls = await Promise.all(assets.map((asset) => resolveMediaAssetUrl(asset)));
   const mediaItems = mediaUrls.map((url, index) => ({
@@ -213,7 +247,13 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
     action: "content_published",
     entity_type: "content_item",
     entity_id: contentId,
-    safe_metadata: { success, failed, pending, provider: "zernio" },
+    safe_metadata: {
+      success,
+      failed,
+      pending,
+      provider: "zernio",
+      provider_profile_verified: true,
+    },
   });
   return { success, failed, pending };
 }

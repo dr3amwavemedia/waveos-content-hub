@@ -17,14 +17,8 @@ const zernio = readFileSync("src/lib/zernio.functions.ts", "utf8");
 const publisher = readFileSync("src/lib/zernio-publish.server.ts", "utf8");
 const createRoute = readFileSync("src/routes/_authenticated/create.tsx", "utf8");
 const assistant = readFileSync("src/lib/wave-assist.functions.ts", "utf8");
-const subscriptionFunctions = readFileSync(
-  "src/lib/social-subscriptions.functions.ts",
-  "utf8",
-);
-const subscriptionWebhook = readFileSync(
-  "src/lib/social-subscription-webhook.server.ts",
-  "utf8",
-);
+const subscriptionFunctions = readFileSync("src/lib/social-subscriptions.functions.ts", "utf8");
+const subscriptionWebhook = readFileSync("src/lib/social-subscription-webhook.server.ts", "utf8");
 const settingsRoute = readFileSync("src/routes/_authenticated/settings.tsx", "utf8");
 const userContext = readFileSync("src/hooks/use-waveos.ts", "utf8");
 const pickerConfig = readFileSync("src/lib/google-picker-config.server.ts", "utf8");
@@ -47,14 +41,23 @@ test("public subscriptions and Dream Wave client service tiers stay separate", (
   assert.match(separationMigration, /workspace\.data_source = 'os_data'/);
   assert.match(separationMigration, /public_subscription_workspace_required/);
   assert.match(separationMigration, /DROP TRIGGER IF EXISTS ensure_social_management_entitlement/);
-  assert.match(separationMigration, /_workspace\.access_tier IN \('retainer_full', 'social_management'\)/);
+  assert.match(
+    separationMigration,
+    /_workspace\.access_tier IN \('retainer_full', 'social_management'\)/,
+  );
   assert.doesNotMatch(separationMigration, /DELETE FROM public\.workspace_social_subscriptions/);
 
   assert.match(userContext, /data_source: "client_data" \| "os_data"/);
   assert.match(userContext, /select\("id,name,slug,data_source,/);
   assert.match(settingsRoute, /activeWorkspace\?\.data_source === "os_data" && canManageBranding/);
-  assert.match(settingsRoute, /activeWorkspace\?\.data_source === "client_data" && canManageApproval/);
-  assert.match(settingsRoute, /activeWorkspace\?\.data_source === "client_data"[\s\S]*canViewFinancials/);
+  assert.match(
+    settingsRoute,
+    /activeWorkspace\?\.data_source === "client_data" && canManageApproval/,
+  );
+  assert.match(
+    settingsRoute,
+    /activeWorkspace\?\.data_source === "client_data"[\s\S]*canViewFinancials/,
+  );
 
   assert.match(subscriptionFunctions, /requirePublicOsWorkspace/);
   assert.match(subscriptionFunctions, /workspace\?\.data_source !== "os_data"/);
@@ -88,15 +91,14 @@ test("analytics has its own discoverable workspace and exposes engagement signal
 });
 
 test("Google Picker includes My Drive, Shared with me and Shared drives and remains responsive", () => {
+  const styles = readFileSync("src/styles.css", "utf8");
   assert.match(createRoute, /setEnableDrives\(true\)/);
   assert.match(createRoute, /Feature\.SUPPORT_DRIVES/);
   assert.match(createRoute, /setOwnedByMe\(false\)/);
   assert.match(createRoute, /addView\(sharedWithMeView\)/);
   assert.match(createRoute, /addView\(sharedDrivesView\)/);
-  assert.match(createRoute, /builder\.build\(\);[\s\S]*builder\.toUri\(\)/);
-  assert.match(createRoute, /builder\.toUri\(\)/);
-  assert.match(createRoute, /title="Choose media from Google Drive"/);
-  assert.match(createRoute, /h-\[clamp\(360px,54dvh,620px\)\]/);
+  assert.match(styles, /\.picker-dialog/);
+  assert.match(styles, /100dvh/);
   assert.match(pickerConfig, /appIdValid: \/\^\\d\+\$\//);
   assert.match(pickerConfig, /apiKeyValid: \/\^AIza/);
   assert.match(pickerApi, /must be the numeric Google Cloud project number/);

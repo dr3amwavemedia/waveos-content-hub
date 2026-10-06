@@ -229,7 +229,8 @@ async function loadWorkspaces(
   });
 }
 
-function useRawCurrentUser() {
+/** Real authenticated identity, even while the UI is previewing a client. */
+export function useActualCurrentUser() {
   return useQuery({
     queryKey: ["waveos", "current-user"],
     queryFn: () => withRequestTimeout(loadContext()),
@@ -239,7 +240,7 @@ function useRawCurrentUser() {
 
 export function useCurrentUser() {
   const impersonate = useImpersonateClient();
-  const query = useRawCurrentUser();
+  const query = useActualCurrentUser();
 
   // Only explicit "View as client" preview masks staff identity. Simply
   // switching the active workspace must NOT strip staff flags — doing so made
@@ -266,7 +267,7 @@ export function useCurrentUser() {
 export function useWorkspaces() {
   // Always load workspaces from the unmasked context so staff keep their
   // workspace pool while previewing a client.
-  const { data: user } = useRawCurrentUser();
+  const { data: user } = useActualCurrentUser();
   const impersonate = useImpersonateClient();
   const canPreviewClients =
     user?.roles.includes("dream_wave_owner") === true ||

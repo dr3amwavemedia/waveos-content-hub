@@ -213,8 +213,8 @@ export const ensureZernioProfile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { workspaceId: string }) => data)
   .handler(async ({ data, context }) => {
-    const { requireSocialWorkspaceAccess, zernioRequest } = await import("./zernio.server");
-    await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
+    const { requireSocialWorkspaceManager, zernioRequest } = await import("./zernio.server");
+    await requireSocialWorkspaceManager(context.supabase, context.userId, data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const existingResult = await supabaseAdmin
       .from("zernio_profiles" as never)
@@ -260,9 +260,9 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { workspaceId: string; platform: SocialPlatform }) => data)
   .handler(async ({ data, context }) => {
-    const { requireSocialWorkspaceAccess, toZernioPlatform, waveOsPublicOrigin, zernioRequest } =
+    const { requireSocialWorkspaceManager, toZernioPlatform, waveOsPublicOrigin, zernioRequest } =
       await import("./zernio.server");
-    await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
+    await requireSocialWorkspaceManager(context.supabase, context.userId, data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     if (data.platform === "snapchat") {
       throw new Error("Snapchat connections are still a closed Zernio beta.");
@@ -320,8 +320,8 @@ export const disconnectZernioAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { workspaceId: string; platform: SocialPlatform }) => data)
   .handler(async ({ data, context }) => {
-    const { requireSocialWorkspaceAccess, zernioRequest } = await import("./zernio.server");
-    await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
+    const { requireSocialWorkspaceManager, zernioRequest } = await import("./zernio.server");
+    await requireSocialWorkspaceManager(context.supabase, context.userId, data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const result = await supabaseAdmin
       .from("social_connections")

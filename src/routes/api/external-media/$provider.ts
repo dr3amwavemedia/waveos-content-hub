@@ -18,6 +18,7 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           pkceChallenge,
           randomHex,
           requireExternalMediaWorkspace,
+          requireExternalMediaWorkspaceManager,
         } = await import("@/lib/external-media.server");
         const provider = params.provider;
         if (provider !== "google_drive" && provider !== "dropbox")
@@ -26,10 +27,14 @@ export const Route = createFileRoute("/api/external-media/$provider")({
         const requestOrigin = externalMediaRequestOrigin(request);
         const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId : "";
         if (!workspaceId) return json({ error: "workspace_required" }, 400);
-        const auth = await requireExternalMediaWorkspace(request, workspaceId);
+        const action = typeof body.action === "string" ? body.action : "";
+        const auth =
+          action === "status"
+            ? await requireExternalMediaWorkspace(request, workspaceId)
+            : await requireExternalMediaWorkspaceManager(request, workspaceId);
         if (!auth) return json({ error: "not_authorized" }, 403);
 
-        if (body.action === "status") {
+        if (action === "status") {
           const connection = await getExternalConnection(workspaceId, provider);
           return json({
             configured:
@@ -48,7 +53,7 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           });
         }
 
-        if (body.action === "disconnect") {
+        if (action === "disconnect") {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
           const { error } = await supabaseAdmin
             .from("external_media_connections" as never)
@@ -59,7 +64,7 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           return json({ connected: false });
         }
 
-        if (body.action !== "connect") return json({ error: "invalid_action" }, 400);
+        if (action !== "connect") return json({ error: "invalid_action" }, 400);
 
         const verifier = randomHex(48);
         const state = randomHex(32);
