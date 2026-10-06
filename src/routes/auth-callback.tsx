@@ -6,12 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
 const POST_AUTH_NEXT_KEY = "waveos.postAuthNext";
+const PUBLIC_SIGNUP_KEY = "waveos.publicSignup";
 
 export const Route = createFileRoute("/auth-callback")({
   component: AuthCallbackPage,
   ssr: false,
-  validateSearch: (s: Record<string, unknown>): { next?: string } =>
-    typeof s.next === "string" ? { next: s.next } : {},
+  validateSearch: (s: Record<string, unknown>): { next?: string; publicSignup?: boolean } => ({
+    ...(typeof s.next === "string" ? { next: s.next } : {}),
+    ...(s.public_signup === "1" ? { publicSignup: true } : {}),
+  }),
   head: () => ({
     meta: [
       { title: "Signing in — WaveOS" },
@@ -40,6 +43,9 @@ function AuthCallbackPage() {
 
   useEffect(() => {
     let cancelled = false;
+    let completion: Promise<void> | null = null;
+    const publicSignup =
+      search.publicSignup || sessionStorage.getItem(PUBLIC_SIGNUP_KEY) === "1";
 
     const resolveTarget = () => {
       const stashed = sessionStorage.getItem(POST_AUTH_NEXT_KEY);
@@ -48,17 +54,38 @@ function AuthCallbackPage() {
       return target;
     };
 
-    const goToTarget = () => {
+    const goToTarget = async () => {
+      if (cancelled) return;
+      if (publicSignup) {
+        const { error } = await (
+          supabase.rpc as unknown as (
+            name: string,
+          ) => Promise<{ data: string | null; error: { message: string } | null }>
+        )("activate_public_os_account");
+        if (
+          error &&
+          !error.message.includes("account_already_assigned") &&
+          !error.message.includes("public_signup_window_closed")
+        ) {
+          console.error("[public signup provisioning]", error.message);
+          setMessage("Your account is ready. We’re finishing your workspace setup…");
+        }
+        sessionStorage.removeItem(PUBLIC_SIGNUP_KEY);
+      }
       if (cancelled) return;
       const target = resolveTarget();
       if (target === "/home") navigate({ to: "/home", replace: true });
       else window.location.replace(target);
     };
+    const completeSignIn = () => {
+      completion ??= goToTarget();
+      return completion;
+    };
 
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if ((event === "SIGNED_IN" || event === "INITIAL_SESSION") && session) {
         // Defer navigation until Supabase has released its internal auth lock.
-        window.setTimeout(goToTarget, 0);
+        window.setTimeout(() => void completeSignIn(), 0);
       }
     });
 
@@ -70,7 +97,7 @@ function AuthCallbackPage() {
       if (code) {
         const { error } = await supabase.auth.exchangeCodeForSession(code);
         if (!error) {
-          goToTarget();
+          await completeSignIn();
           return;
         }
         console.warn("[auth-callback] code exchange failed", error.message);
@@ -88,7 +115,7 @@ function AuthCallbackPage() {
         const { data } = await supabase.auth.getSession();
         if (cancelled) return;
         if (data.session) {
-          goToTarget();
+          await completeSignIn();
           return;
         }
         await new Promise((resolve) => setTimeout(resolve, 300));
@@ -109,7 +136,7 @@ function AuthCallbackPage() {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [navigate, search.next]);
+  }, [navigate, search.next, search.publicSignup]);
 
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
