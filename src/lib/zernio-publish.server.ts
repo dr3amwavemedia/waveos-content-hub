@@ -2,6 +2,7 @@ import type { Json } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveMediaAssetUrl } from "@/lib/external-media.server";
 import { normalizeZernioAccounts, toZernioPlatform, zernioRequest } from "@/lib/zernio.server";
+import { cleanupConfirmedTemporaryMedia } from "@/lib/temporary-media-cleanup.server";
 
 type ZernioTarget = {
   platform?: string;
@@ -255,6 +256,9 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
       provider_profile_verified: true,
     },
   });
+  if (failed === 0 && pending === 0 && success > 0) {
+    await cleanupConfirmedTemporaryMedia(contentId);
+  }
   return { success, failed, pending };
 }
 
@@ -337,4 +341,11 @@ async function reconcileContentStatus(contentItemId: string) {
       ...(status === "published" ? { published_at: new Date().toISOString() } : {}),
     })
     .eq("id", contentItemId);
+  if (
+    status === "published" &&
+    statuses.length > 0 &&
+    statuses.every((value) => value === "success")
+  ) {
+    await cleanupConfirmedTemporaryMedia(contentItemId);
+  }
 }

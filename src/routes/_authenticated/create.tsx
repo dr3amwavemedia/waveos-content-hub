@@ -31,7 +31,12 @@ import { SOCIAL_PLATFORM_GUIDANCE } from "@/lib/social-platform-guidance";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/app/empty-state";
 import { useWorkspace } from "@/components/app/workspace-context";
-import { getMediaPreviewUrl, useMediaAssets, useUploadAsset } from "@/hooks/use-media";
+import {
+  getMediaPreviewUrl,
+  useMediaAssets,
+  useMediaStorageUsage,
+  useUploadAsset,
+} from "@/hooks/use-media";
 import type { MediaAsset } from "@/hooks/use-media";
 import {
   getExternalMediaStatus,
@@ -1059,9 +1064,10 @@ function MediaPicker({
   const [search, setSearch] = useState("");
   const assets = useMediaAssets(workspaceId, { search: search || undefined });
   const [urls, setUrls] = useState<Record<string, string>>({});
-  const [source, setSource] = useState<"waveos" | ExternalMediaProvider | "frameio">("waveos");
+  const [source, setSource] = useState<"waveos" | ExternalMediaProvider>("waveos");
   const deviceInputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadAsset(workspaceId);
+  const storageUsage = useMediaStorageUsage(workspaceId);
   const [deviceUploading, setDeviceUploading] = useState(false);
 
   async function handleDeviceFiles(files: FileList | null) {
@@ -1070,7 +1076,12 @@ function MediaPicker({
     const uploadedIds: string[] = [];
     try {
       for (const file of Array.from(files)) {
-        const asset = await upload.mutateAsync({ file, folderId: null, tags: [] });
+        const asset = await upload.mutateAsync({
+          file,
+          folderId: null,
+          tags: [],
+          temporary: true,
+        });
         uploadedIds.push(asset.id);
       }
       setSelected((current) => Array.from(new Set([...current, ...uploadedIds])));
@@ -1125,7 +1136,6 @@ function MediaPicker({
                 ["waveos", "WaveOS"],
                 ["google_drive", "Google Drive"],
                 ["dropbox", "Dropbox"],
-                ["frameio", "Frame.io"],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -1164,6 +1174,11 @@ function MediaPicker({
               {deviceUploading ? "Adding…" : "Camera roll"}
             </button>
           </div>
+          <div className="mb-3 rounded-lg border border-border bg-elevated/50 px-3 py-2 text-[11px] text-muted-foreground">
+            Temporary media: {formatFileSize(storageUsage.data?.usedBytes ?? 0)} of 500 MB used ·{" "}
+            {formatFileSize(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available.
+            Published camera-roll media is removed after Zernio confirms every destination.
+          </div>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -1172,17 +1187,7 @@ function MediaPicker({
           />
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-4">
-          {source === "frameio" ? (
-            <FrameioProviderPicker
-              workspaceId={workspaceId}
-              query={search}
-              selected={selected}
-              onImported={(ids) => {
-                setSelected((current) => Array.from(new Set([...current, ...ids])));
-                void assets.refetch();
-              }}
-            />
-          ) : source !== "waveos" ? (
+          {source !== "waveos" ? (
             <ExternalProviderPicker
               provider={source}
               workspaceId={workspaceId}

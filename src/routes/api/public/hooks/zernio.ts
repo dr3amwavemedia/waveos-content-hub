@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { claimWebhookEvent } from "@/lib/webhook-claim.server";
 import { fromZernioPlatform } from "@/lib/zernio.server";
+import { cleanupConfirmedTemporaryMedia } from "@/lib/temporary-media-cleanup.server";
 
 export const Route = createFileRoute("/api/public/hooks/zernio")({
   server: {
@@ -124,6 +125,9 @@ export const Route = createFileRoute("/api/public/hooks/zernio")({
               ...(itemStatus === "published" ? { published_at: completedAt } : {}),
             })
             .eq("id", contentId);
+          if (statuses.length > 0 && statuses.every((status) => status === "success")) {
+            await cleanupConfirmedTemporaryMedia(contentId);
+          }
         }
         return new Response("ok");
       },

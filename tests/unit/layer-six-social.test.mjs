@@ -28,13 +28,21 @@ const userContext = readFileSync("src/hooks/use-waveos.ts", "utf8");
 const pickerConfig = readFileSync("src/lib/google-picker-config.server.ts", "utf8");
 const pickerApi = readFileSync("src/routes/api/external-media/$provider.files.ts", "utf8");
 const adminRoute = readFileSync("src/routes/_authenticated/admin.tsx", "utf8");
+const mediaHooks = readFileSync("src/hooks/use-media.ts", "utf8");
+const contentRoute = readFileSync("src/routes/_authenticated/content.tsx", "utf8");
+const mediaCleanup = readFileSync("src/lib/temporary-media-cleanup.server.ts", "utf8");
+const zernioWebhook = readFileSync("src/routes/api/public/hooks/zernio.ts", "utf8");
+const mediaQuotaMigration = readFileSync(
+  "supabase/migrations/20261007215734_temporary_media_storage_limits.sql",
+  "utf8",
+);
 
 test("promo trial and three paid tiers enforce account caps, prices, and annual discounts", () => {
   assert.equal(planExports.SOCIAL_PLANS.trial.accountLimit, 3);
   assert.equal(planExports.SOCIAL_PLANS.standard.accountLimit, 3);
   assert.equal(planExports.SOCIAL_PLANS.standard.monthlyCents, 3999);
   assert.equal(planExports.SOCIAL_PLANS.standard.annualCents, 47988);
-  assert.equal(planExports.SOCIAL_PLANS.full.accountLimit, 3);
+  assert.equal(planExports.SOCIAL_PLANS.full.accountLimit, 4);
   assert.equal(planExports.SOCIAL_PLANS.full.monthlyCents, 6999);
   assert.equal(planExports.SOCIAL_PLANS.full.annualCents, 79789);
   assert.equal(planExports.SOCIAL_PLANS.expanded.accountLimit, 8);
@@ -123,4 +131,39 @@ test("Google Picker includes My Drive, Shared with me and Shared drives and rema
   assert.match(pickerApi, /browser API key beginning with AIza/);
   assert.match(adminRoute, /picker_app_id_valid/);
   assert.match(adminRoute, /picker_api_key_valid/);
+});
+
+test("local media quotas preserve storage headroom and are enforced in both UI and database", () => {
+  assert.match(mediaQuotaMigration, /file_size_limit = 314572800/);
+  assert.match(mediaQuotaMigration, /_workspace_limit constant bigint := 524288000/);
+  assert.match(mediaQuotaMigration, /_global_limit constant bigint := 1610612736/);
+  assert.match(mediaQuotaMigration, /CREATE TRIGGER enforce_media_storage_quotas/);
+  assert.match(mediaHooks, /MEDIA_FILE_LIMIT_BYTES = 300 \* 1024 \* 1024/);
+  assert.match(mediaHooks, /WORKSPACE_MEDIA_LIMIT_BYTES = 500 \* 1024 \* 1024/);
+  assert.match(mediaHooks, /Not enough local storage/);
+  assert.match(mediaHooks, /WaveOS shared storage is temporarily full/);
+  assert.match(contentRoute, /Local storage/);
+  assert.match(contentRoute, /300 MB each/);
+  assert.match(contentRoute, /Local storage is nearly full/);
+});
+
+test("camera-roll media is temporary and removed only after every Zernio destination succeeds", () => {
+  assert.match(createRoute, /temporary: true/);
+  assert.match(mediaHooks, /TEMPORARY_POST_UPLOAD_TAG = "temporary-post-upload"/);
+  assert.match(mediaCleanup, /attempts\.some\(\(attempt\) => attempt\.status !== "success"\)/);
+  assert.match(mediaCleanup, /source_provider !== "waveos"/);
+  assert.match(mediaCleanup, /\.contains\("media_asset_ids", \[asset\.id\]\)/);
+  assert.match(mediaCleanup, /\.remove\(\[asset\.storage_path\]\)/);
+  assert.match(publisher, /cleanupConfirmedTemporaryMedia/);
+  assert.match(zernioWebhook, /cleanupConfirmedTemporaryMedia/);
+});
+
+test("WaveOS folders can mix local, Google Drive, and Dropbox references", () => {
+  assert.match(contentRoute, /label="Local device"/);
+  assert.match(contentRoute, /label="Google Drive"/);
+  assert.match(contentRoute, /label="Dropbox"/);
+  assert.match(contentRoute, /useMediaAssets\(workspaceId, \{[\s\S]*source:/);
+  assert.match(contentRoute, /upload\.mutateAsync\(\{ file, folderId, tags: \[\] \}\)/);
+  assert.match(contentRoute, /Google Drive and Dropbox references do not use/);
+  assert.doesNotMatch(contentRoute, /label="Frame\.io"/);
 });

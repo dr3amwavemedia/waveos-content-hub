@@ -4,6 +4,8 @@ import { useMemo, useRef, useState } from "react";
 import {
   Folder,
   FolderPlus,
+  Cloud,
+  HardDrive,
   Images,
   Loader2,
   Search,
@@ -24,6 +26,7 @@ import {
   useDeleteAsset,
   useMediaAssets,
   useMediaFolders,
+  useMediaStorageUsage,
   useUpdateAssetTags,
   useUploadAsset,
   type MediaAsset,
@@ -50,6 +53,7 @@ function ContentLibrary() {
   const [folderFilter, setFolderFilter] = useState<FolderFilter>("all");
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<"all" | "image" | "video">("all");
+  const [source, setSource] = useState<"all" | "waveos" | "google_drive" | "dropbox">("all");
   const [tag, setTag] = useState<string | null>(null);
   const [selected, setSelected] = useState<MediaAsset | null>(null);
   const [showNewFolder, setShowNewFolder] = useState(false);
@@ -61,9 +65,11 @@ function ContentLibrary() {
     search: search || undefined,
     tag,
     kind,
+    source: source === "all" ? undefined : source,
   });
   const createFolder = useCreateFolder(workspaceId);
   const upload = useUploadAsset(workspaceId);
+  const storageUsage = useMediaStorageUsage(workspaceId);
   const del = useDeleteAsset(workspaceId);
   const updateTags = useUpdateAssetTags(workspaceId);
 
@@ -100,7 +106,7 @@ function ContentLibrary() {
         await upload.mutateAsync({ file, folderId, tags: [] });
         ok++;
       } catch (e) {
-        toast.error(`Failed: ${file.name}`);
+        toast.error(`${file.name}: ${e instanceof Error ? e.message : "Upload failed."}`);
       }
     }
     if (ok) toast.success(`Uploaded ${ok} file${ok === 1 ? "" : "s"}.`);
@@ -143,6 +149,37 @@ function ContentLibrary() {
       <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
         {/* Folder sidebar */}
         <aside className="surface-card p-3">
+          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Sources
+          </p>
+          <FolderRow
+            active={source === "all"}
+            onClick={() => setSource("all")}
+            label="All sources"
+            icon={Images}
+          />
+          <FolderRow
+            active={source === "waveos"}
+            onClick={() => setSource("waveos")}
+            label="Local device"
+            icon={HardDrive}
+          />
+          <FolderRow
+            active={source === "google_drive"}
+            onClick={() => setSource("google_drive")}
+            label="Google Drive"
+            icon={Cloud}
+          />
+          <FolderRow
+            active={source === "dropbox"}
+            onClick={() => setSource("dropbox")}
+            label="Dropbox"
+            icon={Cloud}
+          />
+          <div className="my-2 h-px bg-border" />
+          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            WaveOS folders
+          </p>
           <FolderRow
             active={folderFilter === "all"}
             onClick={() => setFolderFilter("all")}
@@ -155,7 +192,6 @@ function ContentLibrary() {
             label="Uncategorized"
             icon={Folder}
           />
-          <div className="my-2 h-px bg-border" />
           {(foldersQ.data ?? []).map((f) => (
             <FolderRow
               key={f.id}
@@ -174,6 +210,36 @@ function ContentLibrary() {
 
         {/* Main */}
         <div className="space-y-4">
+          <div className="surface-card p-3">
+            <div className="flex items-center justify-between gap-3 text-xs">
+              <span className="font-medium text-foreground">Local storage</span>
+              <span className="text-muted-foreground">
+                {formatBytes(storageUsage.data?.usedBytes ?? 0)} of 500 MB used ·{" "}
+                {formatBytes(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available
+              </span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-elevated">
+              <div
+                className="h-full rounded-full bg-primary transition-[width]"
+                style={{
+                  width: `${Math.min(
+                    100,
+                    ((storageUsage.data?.usedBytes ?? 0) / (500 * 1024 * 1024)) * 100,
+                  )}%`,
+                }}
+              />
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Local files are limited to 300 MB each. Google Drive and Dropbox references do not use
+              this allowance.
+            </p>
+            {(storageUsage.data?.usedBytes ?? 0) >= 400 * 1024 * 1024 && (
+              <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+                Local storage is nearly full. Remove unused uploads or link new media from Google
+                Drive or Dropbox. New uploads will stop at 500 MB.
+              </p>
+            )}
+          </div>
           {/* Filters */}
           <div className="surface-card flex flex-wrap items-center gap-2 p-3">
             <div className="relative flex-1 min-w-[200px]">
@@ -230,7 +296,7 @@ function ContentLibrary() {
                     Drop photos or videos here
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Or use the Upload button above. JPG, PNG, MP4 and MOV only.
+                    Or use Upload for local files up to 300 MB. JPG, PNG, MP4 and MOV only.
                   </p>
                 </div>
               </div>
