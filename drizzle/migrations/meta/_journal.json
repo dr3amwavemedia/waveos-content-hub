@@ -155,6 +155,13 @@
       "when": 1791403530743,
       "tag": "0021_revoke_sandbox_cron_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1791414136657,
+      "tag": "0022_social_operations_hardening",
+      "breakpoints": true
     }
   ]
 }

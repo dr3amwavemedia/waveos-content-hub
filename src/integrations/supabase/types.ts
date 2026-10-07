@@ -3162,6 +3162,41 @@ export type Database = {
           },
         ]
       }
+      publishing_controls: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          paused: boolean
+          reason: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          paused?: boolean
+          reason?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          paused?: boolean
+          reason?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_controls_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_connections: {
         Row: {
           avatar_url: string | null
@@ -3294,6 +3329,56 @@ export type Database = {
             foreignKeyName: "social_strategy_items_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_subscription_lifecycle: {
+        Row: {
+          archive_at: string | null
+          archived_at: string | null
+          disconnect_at: string | null
+          disconnected_at: string | null
+          inactive_since: string | null
+          last_checked_at: string | null
+          last_error: string | null
+          reason: string | null
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          archive_at?: string | null
+          archived_at?: string | null
+          disconnect_at?: string | null
+          disconnected_at?: string | null
+          inactive_since?: string | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          reason?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          archive_at?: string | null
+          archived_at?: string | null
+          disconnect_at?: string | null
+          disconnected_at?: string | null
+          inactive_since?: string | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          reason?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_subscription_lifecycle_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
