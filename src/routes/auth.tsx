@@ -54,6 +54,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [promoCode, setPromoCode] = useState("");
   const [signupPlan, setSignupPlan] = useState<PublicSignupPlan>("standard_monthly");
   const [signupSent, setSignupSent] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -142,6 +143,24 @@ function AuthPage() {
     sessionStorage.setItem(POST_AUTH_NEXT_KEY, "/home");
     sessionStorage.setItem(PUBLIC_SIGNUP_KEY, "1");
     sessionStorage.setItem(PUBLIC_SIGNUP_PLAN_KEY, signupPlan);
+    const normalizedPromo = promoCode.trim().toUpperCase();
+    if (normalizedPromo) {
+      const { data: promo, error: promoError } = await (
+        supabase.rpc as unknown as (
+          name: string,
+          args: Record<string, unknown>,
+        ) => Promise<{
+          data: Array<{ name: string; bonus_trial_days: number }> | null;
+          error: Error | null;
+        }>
+      )("validate_os_promo_code", { _code: normalizedPromo });
+      if (promoError || !promo?.length) {
+        setBusy(false);
+        sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
+        toast.error("That promo code is invalid, paused, expired, or fully redeemed.");
+        return;
+      }
+    }
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -152,6 +171,7 @@ function AuthPage() {
           last_name: lastName.trim(),
           account_source: "os_data",
           signup_source: "public_trial",
+          ...(normalizedPromo ? { promo_code: normalizedPromo } : {}),
         },
       },
     });
@@ -354,6 +374,21 @@ function AuthPage() {
                 placeholder="you@company.com"
               />
             </div>
+            {mode === "signup" && (
+              <div>
+                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
+                  Promo code <span className="font-normal opacity-70">(optional)</span>
+                </label>
+                <input
+                  autoComplete="off"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 font-mono text-sm uppercase tracking-wider text-foreground placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+                  placeholder="Enter a promo code"
+                  maxLength={24}
+                />
+              </div>
+            )}
             {(mode === "signin" || mode === "signup") && (
               <div>
                 <div className="mb-1.5 flex items-center justify-between">

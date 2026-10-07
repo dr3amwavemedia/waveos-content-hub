@@ -26,11 +26,17 @@ test("promo codes are owner-managed OS data with bounded redemptions", async () 
 
 test("a valid signup promo adds bonus days to the OS trial", async () => {
   const auth = await read("src/routes/auth.tsx");
+  const callback = await read("src/routes/auth-callback.tsx");
   const onboarding = await read("src/routes/_authenticated/onboarding.tsx");
   const migration = await read("supabase/migrations/20261003140000_os_promo_codes.sql");
+  const restore = await read("supabase/migrations/20261007193442_restore_promo_code_access.sql");
   assert.match(auth, /promo_code: normalizedPromo/);
   assert.match(auth, /invalid, paused, expired, or fully redeemed/);
+  assert.match(auth, /Promo code/);
+  assert.match(callback, /promoTrialActive/);
   assert.match(onboarding, /_promo_code: user\.promoCode/);
   assert.match(migration, /make_interval\(days => 30 \+ _bonus_days\)/);
   assert.match(migration, /promo_applied/);
+  assert.match(restore, /os_promo_codes/);
+  assert.match(restore, /os_promo_redemptions/);
 });
