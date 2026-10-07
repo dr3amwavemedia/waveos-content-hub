@@ -258,7 +258,9 @@ export const ensureZernioProfile = createServerFn({ method: "POST" })
 
 export const createZernioConnectUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { workspaceId: string; platform: SocialPlatform }) => data)
+  .validator(
+    (data: { workspaceId: string; platform: SocialPlatform; additional?: boolean }) => data,
+  )
   .handler(async ({ data, context }) => {
     const { requireSocialWorkspaceManager, toZernioPlatform, waveOsPublicOrigin, zernioRequest } =
       await import("./zernio.server");
@@ -267,27 +269,41 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
     if (data.platform === "snapchat") {
       throw new Error("Snapchat connections are still a closed Zernio beta.");
     }
-    const [{ data: limit }, { count: connectedAccounts }, existingConnection] = await Promise.all([
-      context.supabase.rpc(
-        "social_account_limit" as never,
-        { _workspace_id: data.workspaceId } as never,
-      ),
-      supabaseAdmin
-        .from("social_connections")
-        .select("id", { count: "exact", head: true })
-        .eq("workspace_id", data.workspaceId)
-        .eq("provider", "zernio")
-        .eq("connected", true),
-      supabaseAdmin
-        .from("social_connections")
-        .select("connected")
-        .eq("workspace_id", data.workspaceId)
-        .eq("provider", "zernio")
-        .eq("platform", data.platform)
-        .maybeSingle(),
-    ]);
+    const [{ data: limit }, { count: connectedAccounts }, existingConnections, subscriptionResult] =
+      await Promise.all([
+        context.supabase.rpc(
+          "social_account_limit" as never,
+          { _workspace_id: data.workspaceId } as never,
+        ),
+        supabaseAdmin
+          .from("social_connections")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", data.workspaceId)
+          .eq("provider", "zernio")
+          .eq("connected", true),
+        supabaseAdmin
+          .from("social_connections")
+          .select("id,connected,raw")
+          .eq("workspace_id", data.workspaceId)
+          .eq("provider", "zernio")
+          .eq("platform", data.platform)
+          .eq("connected", true),
+        supabaseAdmin
+          .from("workspace_social_subscriptions" as never)
+          .select("plan")
+          .eq("workspace_id", data.workspaceId)
+          .maybeSingle(),
+      ]);
+    const existingPlatformAccounts = existingConnections.data ?? [];
+    const plan = (subscriptionResult.data as { plan?: string } | null)?.plan;
+    if (data.additional && plan !== "expanded") {
+      throw new Error("Additional accounts from the same social network are available on Tidal.");
+    }
+    if (!data.additional && existingPlatformAccounts.length > 0) {
+      return { alreadyConnected: true, url: null, accountId: null };
+    }
     if (
-      !(existingConnection.data as { connected?: boolean } | null)?.connected &&
+      (data.additional || existingPlatformAccounts.length === 0) &&
       (connectedAccounts ?? 0) >= Number(limit ?? 0)
     ) {
       throw new Error(
@@ -299,8 +315,58 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
       .select("profile_id")
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
-    const profile = profileResult.data as { profile_id: string } | null;
+    let profile = profileResult.data as { profile_id: string } | null;
     if (!profile) throw new Error("Create this workspace's Zernio profile first.");
+    if (data.additional) {
+      const [{ data: workspace }, { data: existingSlots }] = await Promise.all([
+        supabaseAdmin.from("workspaces").select("name").eq("id", data.workspaceId).single(),
+        supabaseAdmin
+          .from("zernio_workspace_subprofiles" as never)
+          .select("slot,profile_id,profile_name")
+          .eq("workspace_id", data.workspaceId)
+          .eq("platform", data.platform),
+      ]);
+      const slots = (existingSlots ?? []) as Array<{
+        slot: number;
+        profile_id: string;
+        profile_name: string;
+      }>;
+      const connectedProfileIds = new Set(
+        existingPlatformAccounts
+          .map((row) => (row.raw as { profileId?: unknown } | null)?.profileId)
+          .filter((value): value is string => typeof value === "string"),
+      );
+      const reusable = slots.find((row) => !connectedProfileIds.has(row.profile_id));
+      if (reusable) {
+        profile = { profile_id: reusable.profile_id };
+      }
+      const occupied = new Set(slots.map((row) => row.slot));
+      const slot = Array.from({ length: 7 }, (_, index) => index + 2).find(
+        (candidate) => !occupied.has(candidate),
+      );
+      if (!reusable) {
+        if (!slot) throw new Error("No additional Tidal account slot is available.");
+        const profileName = `${workspace?.name ?? "WaveOS"} · ${data.platform} ${slot} · ${data.workspaceId.slice(0, 8)}`;
+        const created = await zernioRequest<{ profile?: { _id?: string; name?: string } }>(
+          "/profiles",
+          {
+            method: "POST",
+            body: JSON.stringify({ name: profileName, description: "WaveOS Tidal account space" }),
+          },
+        );
+        const profileId = created.profile?._id;
+        if (!profileId) throw new Error("Zernio did not return the additional account space.");
+        const saved = await supabaseAdmin.from("zernio_workspace_subprofiles" as never).insert({
+          workspace_id: data.workspaceId,
+          platform: data.platform,
+          slot,
+          profile_id: profileId,
+          profile_name: created.profile?.name ?? profileName,
+        } as never);
+        if (saved.error) throw saved.error;
+        profile = { profile_id: profileId };
+      }
+    }
     const appBaseUrl = waveOsPublicOrigin();
     const params = new URLSearchParams({
       profileId: profile.profile_id,
@@ -318,20 +384,25 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
 
 export const disconnectZernioAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { workspaceId: string; platform: SocialPlatform }) => data)
+  .validator(
+    (data: { workspaceId: string; platform: SocialPlatform; connectionId?: string }) => data,
+  )
   .handler(async ({ data, context }) => {
     const { requireSocialWorkspaceManager, zernioRequest } = await import("./zernio.server");
     await requireSocialWorkspaceManager(context.supabase, context.userId, data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const result = await supabaseAdmin
+    let connectionQuery = supabaseAdmin
       .from("social_connections")
-      .select("provider_account_id")
+      .select("id,provider_account_id")
       .eq("workspace_id", data.workspaceId)
       .eq("platform", data.platform)
-      .eq("provider", "zernio")
-      .maybeSingle();
+      .eq("provider", "zernio");
+    connectionQuery = data.connectionId
+      ? connectionQuery.eq("id", data.connectionId)
+      : connectionQuery.limit(1);
+    const result = await connectionQuery.maybeSingle();
     if (result.error) throw result.error;
-    const connection = result.data as { provider_account_id: string | null } | null;
+    const connection = result.data as { id: string; provider_account_id: string | null } | null;
     if (!connection?.provider_account_id) throw new Error("This social account is not connected.");
 
     try {
@@ -356,7 +427,7 @@ export const disconnectZernioAccount = createServerFn({ method: "POST" })
         last_synced_at: new Date().toISOString(),
       } as never)
       .eq("workspace_id", data.workspaceId)
-      .eq("platform", data.platform)
+      .eq("id", connection.id)
       .eq("provider", "zernio");
     if (update.error) throw update.error;
     return { disconnected: true };
@@ -383,14 +454,24 @@ export const refreshZernioConnections = createServerFn({ method: "POST" })
     if (!profile) return { updated: 0, profileMissing: true };
 
     try {
-      const params = new URLSearchParams({
-        profileId: profile.profile_id,
-        page: "1",
-        limit: "100",
-      });
-      const response = await zernioRequest<Record<string, unknown>>(`/accounts?${params}`);
-      const accounts = normalizeZernioAccounts(response).filter(
-        (account) => !account.profileId || account.profileId === profile.profile_id,
+      const { data: subprofiles } = await supabaseAdmin
+        .from("zernio_workspace_subprofiles" as never)
+        .select("profile_id")
+        .eq("workspace_id", data.workspaceId);
+      const profileIds = [
+        profile.profile_id,
+        ...((subprofiles ?? []) as Array<{ profile_id: string }>).map((row) => row.profile_id),
+      ];
+      const payloads = await Promise.all(
+        profileIds.map((profileId) => {
+          const params = new URLSearchParams({ profileId, page: "1", limit: "100" });
+          return zernioRequest<Record<string, unknown>>(`/accounts?${params}`);
+        }),
+      );
+      const accounts = payloads.flatMap((response, index) =>
+        normalizeZernioAccounts(response).filter(
+          (account) => !account.profileId || account.profileId === profileIds[index],
+        ),
       );
       const healthRows = await Promise.all(
         accounts.map(async (account) => {
@@ -449,9 +530,9 @@ export const refreshZernioConnections = createServerFn({ method: "POST" })
         .update({ connected: false, connection_state: "not_connected" } as never)
         .eq("workspace_id", data.workspaceId);
       if (rows.length) {
-        const upsert = await supabaseAdmin
-          .from("social_connections")
-          .upsert(rows as never, { onConflict: "workspace_id,platform" });
+        const upsert = await supabaseAdmin.from("social_connections").upsert(rows as never, {
+          onConflict: "workspace_id,provider,provider_account_id",
+        });
         if (upsert.error) throw upsert.error;
       }
       await supabaseAdmin

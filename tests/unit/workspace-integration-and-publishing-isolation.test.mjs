@@ -53,9 +53,10 @@ test("client admins and assigned Social Managers manage the same workspace socia
 test("every immediate or scheduled publish is pinned to the content workspace's Zernio profile", () => {
   assert.match(publisher, /from\("zernio_profiles" as never\)/);
   assert.match(publisher, /\.eq\("workspace_id", item\.workspace_id\)/);
-  assert.match(publisher, /profileId: profile\.profile_id/);
-  assert.match(publisher, /verifiedAccountIds\.has\(connection\.provider_account_id!/);
-  assert.match(publisher, /accountId: connection\?\.provider_account_id/);
+  assert.match(publisher, /const profileIds = \[/);
+  assert.match(publisher, /profile\.profile_id/);
+  assert.match(publisher, /verifiedAccountIds\.has\(connection\.provider_account_id\)/);
+  assert.match(publisher, /accountId: connection\.provider_account_id/);
   assert.match(publisher, /selected media files do not belong to this client workspace/);
   assert.match(scheduledPublisher, /publishContentItemWithZernio\(item\.id\)/);
 });

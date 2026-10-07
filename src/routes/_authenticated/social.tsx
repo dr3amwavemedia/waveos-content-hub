@@ -23,6 +23,7 @@ import {
   Megaphone,
   Music2,
   PenSquare,
+  Plus,
   Trash2,
   TrendingUp,
   Send,
@@ -224,17 +225,25 @@ function SocialWorkspace() {
     .filter((item) => item.status === "scheduled" || item.status === "publishing")
     .sort((a, b) => new Date(itemDate(a)).getTime() - new Date(itemDate(b)).getTime());
 
-  const connectionByPlatform = new Map(
-    (connections.data ?? []).map((connection) => [
-      connection.platform as SocialPlatform,
-      connection,
-    ]),
-  );
-  const accountRows = ALL_PLATFORMS.map((socialPlatform) => ({
-    platform: socialPlatform,
-    row: connectionByPlatform.get(socialPlatform),
-    state: accountState(connectionByPlatform.get(socialPlatform)),
-  }));
+  const accountRows = ALL_PLATFORMS.flatMap((socialPlatform) => {
+    const matches = (connections.data ?? []).filter(
+      (connection) =>
+        connection.platform === socialPlatform && accountState(connection) !== "not_connected",
+    );
+    if (!matches.length) {
+      return [
+        { key: `${socialPlatform}:empty`, platform: socialPlatform, state: "not_connected" },
+      ] as AccountRow[];
+    }
+    return matches.map((row, index) => ({
+      key: row.id,
+      platform: socialPlatform,
+      row,
+      state: accountState(row),
+      duplicateIndex: index + 1,
+      duplicateCount: matches.length,
+    }));
+  });
   const connectedCount = accountRows.filter((account) => account.state === "connected").length;
   const attentionCount = accountRows.filter((account) =>
     ["action_required", "expired", "error"].includes(account.state),
@@ -711,7 +720,7 @@ function OverviewView({
           </p>
           <div className="mt-4 space-y-2">
             {accountRows.slice(0, 4).map((account) => (
-              <AccountSummaryRow key={account.platform} account={account} />
+              <AccountSummaryRow key={account.key} account={account} />
             ))}
           </div>
           <button
@@ -1205,17 +1214,19 @@ function AccountsView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isPublicOs, status.data?.configured, status.data?.hasProfile, workspaceId]);
 
-  const connect = async (platform: SocialPlatform) => {
+  const tidal = status.data?.subscription?.plan === "expanded";
+
+  const connect = async (platform: SocialPlatform, additional = false) => {
     const selected = rows.find((row) => row.platform === platform);
-    if (accountLimitReached && selected?.state !== "connected") {
+    if (accountLimitReached && (additional || selected?.state !== "connected")) {
       toast.error(
         "Your plan's social account limit is full. Disconnect an account or upgrade in Settings.",
       );
       return;
     }
-    setBusy(`connect:${platform}`);
+    setBusy(`connect:${platform}:${additional ? "additional" : "primary"}`);
     try {
-      const result = await getConnectUrl({ data: { workspaceId, platform } });
+      const result = await getConnectUrl({ data: { workspaceId, platform, additional } });
       if (result.alreadyConnected || !result.url) {
         await refresh(true);
         toast.success(`${PLATFORM_LABEL[platform]} is already connected.`);
@@ -1230,18 +1241,23 @@ function AccountsView({
     }
   };
 
-  const disconnect = async (platform: SocialPlatform) => {
+  const disconnect = async (account: AccountRow) => {
+    const accountName = account.row?.username
+      ? `@${account.row.username}`
+      : account.row?.display_name || PLATFORM_LABEL[account.platform];
     if (
       !window.confirm(
-        `Disconnect ${PLATFORM_LABEL[platform]} from this workspace? WaveOS will no longer be able to publish to that account until it is connected again.`,
+        `Disconnect ${accountName} from this workspace? WaveOS will no longer be able to publish to that account until it is connected again.`,
       )
     )
       return;
-    setBusy(`disconnect:${platform}`);
+    setBusy(`disconnect:${account.key}`);
     try {
-      await disconnectAccount({ data: { workspaceId, platform } });
+      await disconnectAccount({
+        data: { workspaceId, platform: account.platform, connectionId: account.row?.id },
+      });
       await queryClient.invalidateQueries({ queryKey: ["social-connections", workspaceId] });
-      toast.success(`${PLATFORM_LABEL[platform]} disconnected.`);
+      toast.success(`${accountName} disconnected.`);
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : "Could not disconnect the account.");
     } finally {
@@ -1346,6 +1362,12 @@ function AccountsView({
             Connections
           </p>
           <h2 className="mt-1 text-2xl font-semibold text-foreground">Social accounts</h2>
+          {tidal && (
+            <p className="mt-2 rounded-xl border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-sm text-sky-100">
+              Tidal multi-account spaces are on. Add more than one account from the same network, up
+              to eight connected accounts total.
+            </p>
+          )}
           {accountLimitReached && (
             <p className="mt-2 rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">
               Plan limit reached ({status.data?.connectedAccounts ?? connectedCount}/
@@ -1357,14 +1379,17 @@ function AccountsView({
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((account) => (
             <AccountCard
-              key={account.platform}
+              key={account.key}
               account={account}
               canConnect={Boolean(status.data?.configured && status.data.hasProfile)}
               limitReached={accountLimitReached && account.state !== "connected"}
-              busy={busy === `connect:${account.platform}`}
-              disconnecting={busy === `disconnect:${account.platform}`}
+              busy={busy === `connect:${account.platform}:primary`}
+              adding={busy === `connect:${account.platform}:additional`}
+              disconnecting={busy === `disconnect:${account.key}`}
+              canAddAnother={tidal && account.state === "connected"}
               onConnect={() => void connect(account.platform)}
-              onDisconnect={() => void disconnect(account.platform)}
+              onAddAnother={() => void connect(account.platform, true)}
+              onDisconnect={() => void disconnect(account)}
             />
           ))}
         </div>
@@ -1374,14 +1399,18 @@ function AccountsView({
 }
 
 type AccountRow = {
+  key: string;
   platform: SocialPlatform;
   row?: {
+    id: string;
     username: string | null;
     display_name: string | null;
     last_synced_at: string | null;
     connection_state?: string;
   };
   state: AccountState;
+  duplicateIndex?: number;
+  duplicateCount?: number;
 };
 
 function AccountSummaryRow({ account }: { account: AccountRow }) {
@@ -1405,16 +1434,22 @@ function AccountCard({
   canConnect,
   limitReached,
   busy,
+  adding,
   disconnecting,
+  canAddAnother,
   onConnect,
+  onAddAnother,
   onDisconnect,
 }: {
   account: AccountRow;
   canConnect: boolean;
   limitReached: boolean;
   busy: boolean;
+  adding: boolean;
   disconnecting: boolean;
+  canAddAnother: boolean;
   onConnect: () => void;
+  onAddAnother: () => void;
   onDisconnect: () => void;
 }) {
   const Icon = PLATFORM_ICON[account.platform] ?? Globe;
@@ -1436,7 +1471,10 @@ function AccountCard({
           <Icon className="h-5 w-5 text-foreground" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-foreground">{PLATFORM_LABEL[account.platform]}</p>
+          <p className="font-semibold text-foreground">
+            {PLATFORM_LABEL[account.platform]}
+            {(account.duplicateCount ?? 0) > 1 ? ` account ${account.duplicateIndex}` : ""}
+          </p>
           <p className="mt-0.5 truncate text-xs text-muted-foreground">
             {account.row?.username
               ? `@${account.row.username}`
@@ -1501,6 +1539,23 @@ function AccountCard({
           </button>
         )}
       </div>
+      {canAddAnother && (
+        <button
+          type="button"
+          onClick={onAddAnother}
+          disabled={!canConnect || limitReached || busy || adding || disconnecting}
+          className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-200 hover:border-sky-400/50 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          {adding ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Plus className="h-3.5 w-3.5" />
+          )}
+          {limitReached
+            ? "Eight-account limit reached"
+            : `Add another ${PLATFORM_LABEL[account.platform]}`}
+        </button>
+      )}
     </article>
   );
 }

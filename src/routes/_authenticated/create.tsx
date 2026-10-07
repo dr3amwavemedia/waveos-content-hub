@@ -60,6 +60,7 @@ import {
   useContentItem,
   useCreateContentItem,
   useDeleteContentItem,
+  useSocialConnections,
   useUpdateContentItem,
   useUpdateVariant,
   useSyncPostVariants,
@@ -102,6 +103,7 @@ function CreatePost() {
   const [savedId, setSavedId] = useState<string | null>(search.id ?? null);
   const editingId = search.id ?? savedId ?? null;
   const existing = useContentItem(editingId);
+  const socialConnections = useSocialConnections(workspaceId);
   const create = useCreateContentItem(workspaceId);
   const update = useUpdateContentItem();
   const updateVariant = useUpdateVariant();
@@ -350,6 +352,23 @@ function CreatePost() {
     if (!canSchedule) return toast.error("Scheduling is available on Current and Tidal plans.");
     if (!caption.trim()) return toast.error("Add a caption before scheduling");
     if (!platforms.length) return toast.error("Pick at least one platform");
+    const missingDestination = platforms.find((selectedPlatform) => {
+      const connected = (socialConnections.data ?? []).filter(
+        (connection) =>
+          connection.platform === selectedPlatform &&
+          connection.connected &&
+          connection.connection_state === "connected",
+      );
+      if (connected.length < 2) return false;
+      const variant = existing.data?.variants.find((row) => row.platform === selectedPlatform);
+      const options = (variant?.platform_options ?? {}) as { accountIds?: string[] };
+      return !options.accountIds?.length;
+    });
+    if (missingDestination) {
+      return toast.error(
+        `Save the draft, then choose which ${PLATFORM_LABEL[missingDestination]} account should receive it.`,
+      );
+    }
     if (!scheduledAt) return toast.error("Choose a publish date and time");
     const when = new Date(zonedDateTimeToIso(scheduledAt, workspaceTimeZone));
     if (Number.isNaN(when.getTime()) || when.getTime() < Date.now() + 60_000) {
@@ -377,6 +396,23 @@ function CreatePost() {
     if (!workspaceId) return;
     if (!caption.trim()) return toast.error("Add a caption before publishing");
     if (!platforms.length) return toast.error("Pick at least one platform");
+    const missingDestination = platforms.find((selectedPlatform) => {
+      const connected = (socialConnections.data ?? []).filter(
+        (connection) =>
+          connection.platform === selectedPlatform &&
+          connection.connected &&
+          connection.connection_state === "connected",
+      );
+      if (connected.length < 2) return false;
+      const variant = existing.data?.variants.find((row) => row.platform === selectedPlatform);
+      const options = (variant?.platform_options ?? {}) as { accountIds?: string[] };
+      return !options.accountIds?.length;
+    });
+    if (missingDestination) {
+      return toast.error(
+        `Save the draft, then choose which ${PLATFORM_LABEL[missingDestination]} account should receive it.`,
+      );
+    }
     setPublishing("now");
     try {
       const id = await ensureSaved();
@@ -646,6 +682,10 @@ function CreatePost() {
                 contentId={savedId}
                 variants={existing.data?.variants ?? []}
                 platform={activePlatform}
+                connections={(socialConnections.data ?? []).filter(
+                  (connection) =>
+                    connection.connected && connection.connection_state === "connected",
+                )}
                 primaryCaption={caption}
                 locked={locked}
                 onUpdate={async (id, patch) => {
@@ -884,6 +924,7 @@ function VariantEditor({
   contentId,
   variants,
   platform,
+  connections,
   primaryCaption,
   locked,
   onUpdate,
@@ -891,14 +932,27 @@ function VariantEditor({
   contentId: string | null;
   variants: PostVariant[];
   platform: SocialPlatform;
+  connections: Array<{
+    id: string;
+    platform: SocialPlatform;
+    provider_account_id: string | null;
+    display_name: string | null;
+    username: string | null;
+  }>;
   primaryCaption: string;
   locked: boolean;
   onUpdate: (id: string, patch: Partial<PostVariant>) => Promise<void>;
 }) {
   const variant = variants.find((v) => v.platform === platform);
   const [text, setText] = useState(variant?.caption ?? "");
-  const options = (variant?.platform_options ?? {}) as { contentType?: string };
+  const options = (variant?.platform_options ?? {}) as {
+    contentType?: string;
+    accountIds?: string[];
+  };
   const storySupported = SOCIAL_PLATFORM_GUIDANCE[platform].storySupported;
+  const platformAccounts = connections.filter(
+    (connection) => connection.platform === platform && connection.provider_account_id,
+  );
 
   useEffect(() => {
     setText(variant?.caption ?? "");
@@ -921,6 +975,54 @@ function VariantEditor({
 
   return (
     <div className="space-y-2">
+      {platformAccounts.length > 1 && (
+        <fieldset className="rounded-lg border border-sky-400/30 bg-sky-400/[0.07] p-3">
+          <legend className="px-1 text-xs font-semibold text-foreground">
+            Choose {PLATFORM_LABEL[platform]} destination
+          </legend>
+          <p className="mb-2 text-[11px] text-muted-foreground">
+            Tidal supports multiple accounts on one network. Select exactly where this post should
+            go.
+          </p>
+          <div className="space-y-2">
+            {platformAccounts.map((connection) => {
+              const accountId = connection.provider_account_id!;
+              const selected = options.accountIds?.includes(accountId) ?? false;
+              return (
+                <label
+                  key={connection.id}
+                  className="flex items-center gap-2 text-xs text-foreground"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    disabled={locked}
+                    onChange={(event) => {
+                      const next = event.target.checked
+                        ? [...(options.accountIds ?? []), accountId]
+                        : (options.accountIds ?? []).filter((id) => id !== accountId);
+                      void onUpdate(variant.id, {
+                        platform_options: { ...options, accountIds: next },
+                      });
+                    }}
+                    className="h-4 w-4 rounded border-border accent-primary"
+                  />
+                  <span>
+                    {connection.username
+                      ? `@${connection.username}`
+                      : connection.display_name || `${PLATFORM_LABEL[platform]} account`}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          {!options.accountIds?.length && (
+            <p className="mt-2 text-[11px] font-medium text-amber-200">
+              Select at least one account before publishing.
+            </p>
+          )}
+        </fieldset>
+      )}
       {storySupported && (
         <div className="flex items-center justify-between rounded-lg border border-border bg-elevated/50 px-3 py-2">
           <div>
@@ -935,7 +1037,9 @@ function VariantEditor({
             onChange={(event) =>
               void onUpdate(variant.id, {
                 platform_options:
-                  event.target.value === "story" ? { ...options, contentType: "story" } : {},
+                  event.target.value === "story"
+                    ? { ...options, contentType: "story" }
+                    : { ...options, contentType: undefined },
               })
             }
             className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground"

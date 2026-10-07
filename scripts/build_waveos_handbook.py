@@ -95,7 +95,7 @@ story += section("2. Subscription catalog")
 story.append(table(["Plan", "Monthly", "Annual", "Accounts", "Access"], [
     ["Ripple", "$39.99", "$479.88 (no discount)", "3", "Create/publish, analytics, media library, Post now. No AI Assist or scheduling."],
     ["Current", "$69.99", "$797.89 (5% off $839.88)", "4", "Ripple features + Generative AI Assist + Post later scheduling."],
-    ["Tidal", "$119.99", "$1,295.89 (10% off $1,439.88)", "8", "Current features + higher account capacity for growing teams."],
+    ["Tidal", "$119.99", "$1,295.89 (10% off $1,439.88)", "8", "Current features + multiple accounts from the same network."],
 ], [0.82*inch,0.72*inch,1.25*inch,0.62*inch,3.5*inch]))
 story += [P("Account-limit behavior", "H2x"), P("When the plan cap is full, connected accounts remain green. Every unconnected platform turns rose/red, says “Limit reached,” and its Connect button is disabled. Users are told to disconnect an account or upgrade in Settings. The server independently rechecks the cap, so a browser cannot bypass it."),
           P("Plan names and labels", "H2x"), P("Internal IDs remain <b>standard</b>, <b>full</b>, and <b>expanded</b> for database compatibility. User-facing and OS Data labels are <b>Ripple</b>, <b>Current</b>, and <b>Tidal</b>.")]
@@ -140,6 +140,7 @@ story += [P("Public WaveOS journey", "H2x"), P("A new public user selects a plan
 story.append(PageBreak())
 
 story += section("5. Social publishing workflow")
+story += [P("Tidal multi-account spaces", "H2x"), P("Tidal may connect more than one account from the same network—for example, two Instagram accounts or two LinkedIn accounts—while the workspace remains capped at eight connected accounts total. Each duplicate account is stored in an isolated Zernio sub-profile. When a post uses a network with multiple connected accounts, WaveOS requires the user to choose the exact destination account or accounts before publishing; it never silently chooses one or posts to all of them.")]
 story.append(table(["Step", "What WaveOS does", "Safety rule"], [
     ["Draft", "Saves caption, platforms, media references, and per-platform variants.", "Ripple may draft and Post now but cannot schedule ahead."],
     ["AI Assist", "Proposes Brand Voice caption replacements after confirmation.", "Available only to Current and Tidal; primary/selected captions are not overwritten silently."],
@@ -238,7 +239,7 @@ story.append(table(["File / area", "Responsibility"], [
 story += [P("Verification completed before release", "H2x"), bullets([
     "TypeScript typecheck passed.",
     "Production build passed.",
-    "113/113 unit tests passed.",
+    "114/114 unit tests passed.",
     "Prices and entitlements match across source, Stripe Checkout payload, Settings, OS Data labels, and flyer.",
     "Security and deployment still require a live-domain smoke check after Lovable finishes repository sync/deploy.",
 ])]
@@ -249,7 +250,7 @@ story += [P("These accounts are special-access product testers. Do not share out
 story.append(table(["Tier", "Login", "Password", "Expected access"], [
     ["Ripple", "waveos.ripple.test@dwmsrq.com", "WaveOS-Ripple-7H!29x", "3 accounts; Post now; no AI Assist; no scheduling."],
     ["Current", "waveos.current.test@dwmsrq.com", "WaveOS-Current-4K!83p", "4 accounts; AI Assist; Post now + Post later."],
-    ["Tidal", "waveos.tidal.test@dwmsrq.com", "WaveOS-Tidal-9M!52q", "8 accounts; AI Assist; Post now + Post later."],
+    ["Tidal", "waveos.tidal.test@dwmsrq.com", "WaveOS-Tidal-9M!52q", "8 accounts; duplicate networks; AI Assist; Post now + Post later."],
 ], [0.75*inch,2.15*inch,1.7*inch,2.2*inch]))
 story += [P("Tester checklist", "H2x"), bullets([
     "Sign in on desktop and one phone-sized browser.",

@@ -56,14 +56,25 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
     throw new Error("This client workspace does not have a connected Zernio profile.");
   }
 
-  const accountParams = new URLSearchParams({
-    profileId: profile.profile_id,
-    page: "1",
-    limit: "100",
-  });
-  const providerAccounts = normalizeZernioAccounts(
-    await zernioRequest<Record<string, unknown>>(`/accounts?${accountParams}`),
-  ).filter((account) => !account.profileId || account.profileId === profile.profile_id);
+  const { data: subprofiles } = await supabaseAdmin
+    .from("zernio_workspace_subprofiles" as never)
+    .select("profile_id")
+    .eq("workspace_id", item.workspace_id);
+  const profileIds = [
+    profile.profile_id,
+    ...((subprofiles ?? []) as Array<{ profile_id: string }>).map((row) => row.profile_id),
+  ];
+  const providerAccounts = (
+    await Promise.all(
+      profileIds.map(async (profileId) => {
+        const accountParams = new URLSearchParams({ profileId, page: "1", limit: "100" });
+        const response = await zernioRequest<Record<string, unknown>>(`/accounts?${accountParams}`);
+        return normalizeZernioAccounts(response).filter(
+          (account) => !account.profileId || account.profileId === profileId,
+        );
+      }),
+    )
+  ).flat();
   const verifiedAccountIds = new Set(providerAccounts.map((account) => account.id));
 
   const { data: connections, error: connectionsError } = await supabaseAdmin
@@ -85,15 +96,14 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
       `This workspace has ${connections?.length ?? 0} connected accounts but its plan allows ${accountLimit}. Disconnect the extra accounts or upgrade before publishing.`,
     );
   }
-  const accountByPlatform = new Map(
-    (connections ?? [])
-      .filter(
-        (connection) =>
-          Boolean(connection.provider_account_id) &&
-          verifiedAccountIds.has(connection.provider_account_id!),
-      )
-      .map((connection) => [connection.platform, connection]),
-  );
+  const accountsByPlatform = new Map<string, NonNullable<typeof connections>>();
+  for (const connection of connections ?? []) {
+    if (!connection.provider_account_id || !verifiedAccountIds.has(connection.provider_account_id))
+      continue;
+    const group = accountsByPlatform.get(connection.platform) ?? [];
+    group.push(connection);
+    accountsByPlatform.set(connection.platform, group);
+  }
 
   let assets: Array<{
     id: string;
@@ -132,13 +142,35 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
   let pending = 0;
 
   for (const variant of variants) {
-    const connection = accountByPlatform.get(variant.platform);
+    const platformConnections = accountsByPlatform.get(variant.platform) ?? [];
     const idempotencyKey = `${contentId}:${variant.platform}`;
     const platformOptions =
       variant.platform_options && typeof variant.platform_options === "object"
         ? (variant.platform_options as Record<string, unknown>)
         : {};
     const contentType = platformOptions.contentType === "story" ? "story" : null;
+    const requestedAccountIds = Array.isArray(platformOptions.accountIds)
+      ? platformOptions.accountIds.filter((value): value is string => typeof value === "string")
+      : [];
+    if (platformConnections.length > 1 && requestedAccountIds.length === 0) {
+      throw new Error(
+        `Choose at least one ${variant.platform} account in the post editor before publishing.`,
+      );
+    }
+    const selectedConnections =
+      requestedAccountIds.length > 0
+        ? platformConnections.filter((connection) =>
+            requestedAccountIds.includes(connection.provider_account_id!),
+          )
+        : platformConnections.slice(0, 1);
+    if (
+      requestedAccountIds.length > 0 &&
+      selectedConnections.length !== requestedAccountIds.length
+    ) {
+      throw new Error(
+        `One or more selected ${variant.platform} accounts are no longer connected. Review the post destinations and try again.`,
+      );
+    }
     if (contentType && !["instagram", "facebook"].includes(variant.platform)) {
       throw new Error(`${variant.platform} does not support Story publishing through Zernio.`);
     }
@@ -149,11 +181,11 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
       content: variant.caption || item.primary_caption || "",
       ...(mediaItems.length ? { mediaItems } : {}),
       platforms: [
-        {
+        ...selectedConnections.map((connection) => ({
           platform: toZernioPlatform(variant.platform),
-          accountId: connection?.provider_account_id,
+          accountId: connection.provider_account_id,
           ...(contentType ? { platformSpecificData: { contentType } } : {}),
-        },
+        })),
       ],
       publishNow: true,
     };
@@ -177,22 +209,22 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
           workspace_id: item.workspace_id,
           platform: variant.platform,
           provider: "zernio",
-          status: connection?.provider_account_id ? "sending" : "failed",
+          status: selectedConnections.length ? "sending" : "failed",
           idempotency_key: idempotencyKey,
           request_snapshot: requestBody as unknown as Json,
           attempted_at: new Date().toISOString(),
-          error_code: connection?.provider_account_id ? null : "account_not_connected",
-          error_message: connection?.provider_account_id
+          error_code: selectedConnections.length ? null : "account_not_connected",
+          error_message: selectedConnections.length
             ? null
             : `Connect ${variant.platform} to this client's Zernio profile before publishing.`,
-          completed_at: connection?.provider_account_id ? null : new Date().toISOString(),
+          completed_at: selectedConnections.length ? null : new Date().toISOString(),
         },
         { onConflict: "idempotency_key,platform" },
       )
       .select("id")
       .single();
     if (attemptError) throw attemptError;
-    if (!connection?.provider_account_id) {
+    if (!selectedConnections.length) {
       failed += 1;
       continue;
     }
@@ -301,10 +333,21 @@ export async function refreshZernioPublishAttempt(attemptId: string) {
 }
 
 function zernioPostResult(post: ZernioPost | undefined, platform: string) {
-  const target =
-    post?.platforms?.find((entry) => entry.platform === platform) ?? post?.platforms?.[0];
-  const status = String(target?.status ?? post?.status ?? "publishing").toLowerCase();
-  const error = target?.platformError;
+  const matchingTargets =
+    post?.platforms?.filter((entry) => entry.platform === platform) ?? post?.platforms ?? [];
+  const target = matchingTargets[0];
+  const targetStatuses = matchingTargets.map((entry) =>
+    String(entry.status ?? post?.status ?? "publishing").toLowerCase(),
+  );
+  const status = targetStatuses.includes("failed")
+    ? "failed"
+    : targetStatuses.length > 0 && targetStatuses.every((value) => value === "published")
+      ? "published"
+      : String(post?.status ?? target?.status ?? "publishing").toLowerCase();
+  const failedTarget = matchingTargets.find(
+    (entry) => String(entry.status ?? "").toLowerCase() === "failed",
+  );
+  const error = failedTarget?.platformError ?? target?.platformError;
   return {
     postId: post?._id ?? null,
     status:
@@ -316,11 +359,18 @@ function zernioPostResult(post: ZernioPost | undefined, platform: string) {
     postUrl: target?.platformPostUrl ?? null,
     errorCode:
       status === "failed"
-        ? String(target?.errorCode ?? error?.code ?? target?.errorCategory ?? "zernio_failed")
+        ? String(
+            failedTarget?.errorCode ??
+              error?.code ??
+              failedTarget?.errorCategory ??
+              "zernio_failed",
+          )
         : null,
     errorMessage:
       status === "failed"
-        ? String(target?.errorMessage ?? error?.message ?? "Zernio reported a publishing failure.")
+        ? String(
+            failedTarget?.errorMessage ?? error?.message ?? "Zernio reported a publishing failure.",
+          )
         : null,
   };
 }
