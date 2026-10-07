@@ -1216,7 +1216,11 @@ function AccountsView({
 
   const tidal = status.data?.subscription?.plan === "expanded";
 
-  const connect = async (platform: SocialPlatform, additional = false) => {
+  const connect = async (
+    platform: SocialPlatform,
+    additional = false,
+    instagramLoginMethod?: "instagram_login" | "facebook_login",
+  ) => {
     const selected = rows.find((row) => row.platform === platform);
     if (accountLimitReached && (additional || selected?.state !== "connected")) {
       toast.error(
@@ -1226,10 +1230,19 @@ function AccountsView({
     }
     setBusy(`connect:${platform}:${additional ? "additional" : "primary"}`);
     try {
-      const result = await getConnectUrl({ data: { workspaceId, platform, additional } });
+      const result = await getConnectUrl({
+        data: { workspaceId, platform, additional, instagramLoginMethod },
+      });
       if (result.alreadyConnected || !result.url) {
         await refresh(true);
         toast.success(`${PLATFORM_LABEL[platform]} is already connected.`);
+        return;
+      }
+      const mobileOAuth =
+        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+        window.matchMedia("(pointer: coarse)").matches;
+      if (mobileOAuth) {
+        window.location.assign(result.url);
         return;
       }
       const popup = window.open(result.url, "waveos-zernio-connect", "popup,width=760,height=820");
@@ -1388,6 +1401,11 @@ function AccountsView({
               disconnecting={busy === `disconnect:${account.key}`}
               canAddAnother={tidal && account.state === "connected"}
               onConnect={() => void connect(account.platform)}
+              onConnectInstagramWithFacebook={
+                account.platform === "instagram"
+                  ? () => void connect("instagram", false, "facebook_login")
+                  : undefined
+              }
               onAddAnother={() => void connect(account.platform, true)}
               onDisconnect={() => void disconnect(account)}
             />
@@ -1438,6 +1456,7 @@ function AccountCard({
   disconnecting,
   canAddAnother,
   onConnect,
+  onConnectInstagramWithFacebook,
   onAddAnother,
   onDisconnect,
 }: {
@@ -1449,6 +1468,7 @@ function AccountCard({
   disconnecting: boolean;
   canAddAnother: boolean;
   onConnect: () => void;
+  onConnectInstagramWithFacebook?: () => void;
   onAddAnother: () => void;
   onDisconnect: () => void;
 }) {
@@ -1539,6 +1559,17 @@ function AccountCard({
           </button>
         )}
       </div>
+      {account.platform === "instagram" && onConnectInstagramWithFacebook && (
+        <button
+          type="button"
+          onClick={onConnectInstagramWithFacebook}
+          disabled={!canConnect || limitReached || busy || disconnecting}
+          className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-100 hover:border-sky-400/50 disabled:cursor-not-allowed disabled:opacity-45"
+        >
+          <Facebook className="h-3.5 w-3.5" />
+          Connect Instagram through Facebook Page
+        </button>
+      )}
       {canAddAnother && (
         <button
           type="button"

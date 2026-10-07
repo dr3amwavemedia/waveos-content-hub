@@ -259,7 +259,12 @@ export const ensureZernioProfile = createServerFn({ method: "POST" })
 export const createZernioConnectUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator(
-    (data: { workspaceId: string; platform: SocialPlatform; additional?: boolean }) => data,
+    (data: {
+      workspaceId: string;
+      platform: SocialPlatform;
+      additional?: boolean;
+      instagramLoginMethod?: "instagram_login" | "facebook_login";
+    }) => data,
   )
   .handler(async ({ data, context }) => {
     const { requireSocialWorkspaceManager, toZernioPlatform, waveOsPublicOrigin, zernioRequest } =
@@ -372,6 +377,9 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
       profileId: profile.profile_id,
       redirect_url: `${appBaseUrl}/social-connections/callback?workspaceId=${encodeURIComponent(data.workspaceId)}&provider=zernio`,
     });
+    if (data.platform === "instagram" && data.instagramLoginMethod) {
+      params.set("loginMethod", data.instagramLoginMethod);
+    }
     const response = await zernioRequest<Record<string, unknown>>(
       `/connect/${encodeURIComponent(toZernioPlatform(data.platform))}?${params}`,
     );
