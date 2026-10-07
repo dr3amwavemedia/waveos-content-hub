@@ -12,18 +12,22 @@ ALTER TABLE public.workspace_social_subscriptions
 UPDATE public.workspace_social_subscriptions
 SET account_limit = CASE WHEN plan = 'expanded' THEN 8 ELSE 3 END,
     updated_at = now()
-WHERE account_limit <> CASE WHEN plan = 'expanded' THEN 8 ELSE 3 END;
+FROM public.workspaces
+WHERE workspaces.id = workspace_social_subscriptions.workspace_id
+  AND workspaces.data_source = 'os_data'
+  AND account_limit <> CASE WHEN plan = 'expanded' THEN 8 ELSE 3 END;
 
 ALTER TABLE public.workspace_social_subscriptions
   ADD CONSTRAINT workspace_social_subscriptions_plan_check
   CHECK (plan IN ('trial', 'standard', 'full', 'expanded'));
 ALTER TABLE public.workspace_social_subscriptions
   ADD CONSTRAINT workspace_social_subscriptions_account_limit_check
-  CHECK (account_limit IN (3, 8));
+  CHECK (account_limit IN (2, 3, 6, 8));
 ALTER TABLE public.workspace_social_subscriptions
   ADD CONSTRAINT workspace_social_subscription_plan_limit CHECK (
-    (plan IN ('trial', 'standard', 'full') AND account_limit = 3) OR
-    (plan = 'expanded' AND account_limit = 8)
+    (plan = 'trial' AND account_limit IN (2, 3)) OR
+    (plan IN ('standard', 'full') AND account_limit = 3) OR
+    (plan = 'expanded' AND account_limit IN (6, 8))
   );
 
 CREATE TABLE IF NOT EXISTS public.workspace_social_subscription_invoices (
