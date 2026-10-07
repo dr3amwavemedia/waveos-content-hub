@@ -148,6 +148,13 @@
       "when": 1791403503361,
       "tag": "0020_temp_sandbox_write_cron_settings",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1791403530743,
+      "tag": "0021_revoke_sandbox_cron_settings",
+      "breakpoints": true
     }
   ]
 }
