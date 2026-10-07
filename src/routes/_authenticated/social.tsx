@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
@@ -413,6 +413,7 @@ function SocialWorkspace() {
       {activeView === "accounts" && (
         <AccountsView
           workspaceId={workspaceId!}
+          isPublicOs={activeWorkspace?.data_source === "os_data"}
           rows={accountRows}
           connectedCount={connectedCount}
           attentionCount={attentionCount}
@@ -1108,11 +1109,13 @@ function InsightStat({ label, value, muted }: { label: string; value: string; mu
 
 function AccountsView({
   workspaceId,
+  isPublicOs,
   rows,
   connectedCount,
   attentionCount,
 }: {
   workspaceId: string;
+  isPublicOs: boolean;
   rows: AccountRow[];
   connectedCount: number;
   attentionCount: number;
@@ -1124,6 +1127,7 @@ function AccountsView({
   const getConnectUrl = useServerFn(createZernioConnectUrl);
   const disconnectAccount = useServerFn(disconnectZernioAccount);
   const [busy, setBusy] = useState<string | null>(null);
+  const automaticProfileAttempted = useRef(false);
   const status = useQuery({
     queryKey: ["zernio-status", workspaceId],
     queryFn: () => getStatus({ data: { workspaceId } }),
@@ -1167,13 +1171,36 @@ function AccountsView({
     try {
       await ensureProfile({ data: { workspaceId } });
       await status.refetch();
-      toast.success("This client now has an isolated Zernio profile.");
+      toast.success(
+        isPublicOs
+          ? "Social connections are ready. Choose an account to connect."
+          : "This client now has an isolated Zernio profile.",
+      );
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : "Could not prepare Zernio.");
     } finally {
       setBusy(null);
     }
   };
+
+  useEffect(() => {
+    automaticProfileAttempted.current = false;
+  }, [workspaceId]);
+
+  useEffect(() => {
+    if (
+      !isPublicOs ||
+      !status.data?.configured ||
+      status.data.hasProfile ||
+      automaticProfileAttempted.current
+    )
+      return;
+    automaticProfileAttempted.current = true;
+    void prepare();
+    // prepare is intentionally run once when a public account first reaches
+    // the connection screen; Dream Wave client setup remains manual.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPublicOs, status.data?.configured, status.data?.hasProfile, workspaceId]);
 
   const connect = async (platform: SocialPlatform) => {
     setBusy(`connect:${platform}`);
@@ -1246,8 +1273,12 @@ function AccountsView({
                   : !status.data?.configured
                     ? "Zernio key needs deployment setup"
                     : status.data.hasProfile
-                      ? `Zernio is ready for ${status.data.profileName ?? "this client"}`
-                      : "Prepare this client's publishing profile"}
+                      ? isPublicOs
+                        ? "Your social connections are ready"
+                        : `Zernio is ready for ${status.data.profileName ?? "this client"}`
+                      : isPublicOs
+                        ? "Getting your social connections ready…"
+                        : "Prepare this client's publishing profile"}
             </h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
               {status.isPending
@@ -1261,14 +1292,18 @@ function AccountsView({
                   : !status.data?.configured
                     ? "Add ZERNIO_API_KEY to the deployment secrets. WaveOS will never expose its value in the browser."
                     : status.data.hasProfile
-                      ? "Each client stays isolated in its own Zernio profile. Refresh runs live account-health checks before publishing."
-                      : "One click creates a separate Zernio profile for this workspace; it does not publish anything."}
+                      ? isPublicOs
+                        ? "Choose a network below to securely connect your social account."
+                        : "Each client stays isolated in its own Zernio profile. Refresh runs live account-health checks before publishing."
+                      : isPublicOs
+                        ? "WaveOS is automatically preparing the secure publishing connection for your workspace."
+                        : "One click creates a separate Zernio profile for this workspace; it does not publish anything."}
             </p>
             {status.data?.lastError && (
               <p className="mt-2 text-xs text-rose-300">Last check: {status.data.lastError}</p>
             )}
             <div className="mt-4 flex flex-wrap gap-2">
-              {status.data?.configured && !status.data.hasProfile && (
+              {status.data?.configured && !status.data.hasProfile && !isPublicOs && (
                 <button
                   type="button"
                   onClick={prepare}

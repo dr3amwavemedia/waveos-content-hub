@@ -85,36 +85,20 @@ function AuthCallbackPage() {
         }
         sessionStorage.removeItem(PUBLIC_SIGNUP_KEY);
         if (publicWorkspaceId) {
-          const { data: subscription } = await supabase
-            .from("workspace_social_subscriptions")
-            .select("status,trial_ends_at")
-            .eq("workspace_id", publicWorkspaceId)
-            .maybeSingle();
-          const promoTrialActive =
-            subscription?.status === "trialing" &&
-            Boolean(
-              subscription.trial_ends_at &&
-              new Date(subscription.trial_ends_at).getTime() > Date.now(),
-            );
-          if (promoTrialActive) {
+          setMessage("Opening secure Stripe checkout…");
+          try {
+            const selection = selectedSignupPlan(sessionStorage.getItem(PUBLIC_SIGNUP_PLAN_KEY));
+            const result = await createCheckout({
+              data: { workspaceId: publicWorkspaceId, ...selection },
+            });
             sessionStorage.removeItem(PUBLIC_SIGNUP_PLAN_KEY);
-            setMessage("Your promo access is active. Opening your workspace…");
-          } else {
-            setMessage("Opening secure Stripe checkout…");
-            try {
-              const selection = selectedSignupPlan(sessionStorage.getItem(PUBLIC_SIGNUP_PLAN_KEY));
-              const result = await createCheckout({
-                data: { workspaceId: publicWorkspaceId, ...selection },
-              });
-              sessionStorage.removeItem(PUBLIC_SIGNUP_PLAN_KEY);
-              if (result.url) {
-                window.location.assign(result.url);
-                return;
-              }
-            } catch (checkoutError) {
-              console.error("[public signup checkout]", checkoutError);
-              setMessage("Your account is ready. Choose your plan to unlock WaveOS.");
+            if (result.url) {
+              window.location.assign(result.url);
+              return;
             }
+          } catch (checkoutError) {
+            console.error("[public signup checkout]", checkoutError);
+            setMessage("Your account is ready. Choose your plan to unlock WaveOS.");
           }
         }
       }

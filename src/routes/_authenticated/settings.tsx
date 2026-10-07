@@ -367,7 +367,9 @@ function SocialPlanSettings({
             </strong>
             <p className="mt-1 text-xs leading-5 text-muted-foreground">
               {subscription.service_locked_at
-                ? "Two payment attempts were unsuccessful. Your connections and content are safe; update billing and access will restore after Stripe confirms payment."
+                ? subscription.payment_failure_count >= 2
+                  ? "Two payment attempts were unsuccessful. Your connections and content are safe; update billing and access will restore after Stripe confirms payment."
+                  : "Your promotional trial ended and the first subscription payment was unsuccessful. Your connections and content are safe; update billing to restore access."
                 : "The first payment attempt was unsuccessful. You can keep using WaveOS while Stripe retries, but please update your payment method to avoid a pause."}
             </p>
           </div>

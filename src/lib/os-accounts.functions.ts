@@ -63,9 +63,9 @@ export const createOsPromoCode = createServerFn({ method: "POST" })
     if (
       !Number.isInteger(data.bonusTrialDays) ||
       data.bonusTrialDays < 1 ||
-      data.bonusTrialDays > 90
+      data.bonusTrialDays > 30
     )
-      throw new Error("Bonus trial days must be between 1 and 90.");
+      throw new Error("Promo trial duration must be between 1 and 30 days.");
     if (
       !Number.isInteger(data.maxRedemptions) ||
       data.maxRedemptions < 1 ||
@@ -97,7 +97,7 @@ export const createOsPromoCode = createServerFn({ method: "POST" })
       actor_user_id: context.userId,
       action: "os_promo_code_created",
       entity_type: "os_promo_code",
-      safe_metadata: { code, bonus_trial_days: data.bonusTrialDays },
+      safe_metadata: { code, trial_duration_days: data.bonusTrialDays, account_limit: 3 },
     });
     return { created: true };
   });

@@ -1,5 +1,5 @@
 export const SOCIAL_PLANS = {
-  trial: { name: "30-day trial", accountLimit: 2, monthlyCents: 0, annualCents: 0 },
+  trial: { name: "Promo trial", accountLimit: 3, monthlyCents: 0, annualCents: 0 },
   standard: { name: "Standard", accountLimit: 3, monthlyCents: 3999, annualCents: 47988 },
   expanded: { name: "Expanded", accountLimit: 6, monthlyCents: null, annualCents: 78000 },
 } as const;

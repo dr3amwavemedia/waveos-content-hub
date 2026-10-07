@@ -25,8 +25,8 @@ const pickerConfig = readFileSync("src/lib/google-picker-config.server.ts", "utf
 const pickerApi = readFileSync("src/routes/api/external-media/$provider.files.ts", "utf8");
 const adminRoute = readFileSync("src/routes/_authenticated/admin.tsx", "utf8");
 
-test("trial, Standard and Expanded enforce the requested account caps and prices", () => {
-  assert.equal(planExports.SOCIAL_PLANS.trial.accountLimit, 2);
+test("promo trial, Standard and Expanded enforce the requested account caps and prices", () => {
+  assert.equal(planExports.SOCIAL_PLANS.trial.accountLimit, 3);
   assert.equal(planExports.SOCIAL_PLANS.standard.accountLimit, 3);
   assert.equal(planExports.SOCIAL_PLANS.standard.monthlyCents, 3999);
   assert.equal(planExports.SOCIAL_PLANS.expanded.accountLimit, 6);
