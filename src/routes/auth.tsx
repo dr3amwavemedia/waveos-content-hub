@@ -399,9 +399,9 @@ function AuthPage() {
               workspace.
             </p>
           )}
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            {mode !== "signup" && "New to WaveOS? "}
-            {mode !== "signup" && (
+          {mode !== "signup" && (
+            <p className="mt-6 text-center text-xs text-muted-foreground">
+              New to WaveOS?{" "}
               <button
                 type="button"
                 onClick={() => setMode("signup")}
@@ -409,15 +409,15 @@ function AuthPage() {
               >
                 Start a free trial
               </button>
-            )}
-            {mode !== "signup" && ". "}Technical problem?{" "}
-            <a
-              href="mailto:jean@dwmsrq.com?subject=WaveOS%20technical%20support"
-              className="font-medium text-primary hover:text-primary-glow"
-            >
-              jean@dwmsrq.com
-            </a>
-          </p>
+              . Technical problem?{" "}
+              <a
+                href="mailto:jean@dwmsrq.com?subject=WaveOS%20technical%20support"
+                className="font-medium text-primary hover:text-primary-glow"
+              >
+                jean@dwmsrq.com
+              </a>
+            </p>
+          )}
         </div>
         <p className="mt-6 text-center text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
           A Dream Wave Media platform
