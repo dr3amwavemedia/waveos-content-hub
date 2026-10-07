@@ -99,6 +99,13 @@
       "when": 1791004332583,
       "tag": "0013_second_accounts_can_approve_content",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1791346841305,
+      "tag": "0014_add_subscription_payment_lock",
+      "breakpoints": true
     }
   ]
 }
