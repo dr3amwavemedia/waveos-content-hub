@@ -7,6 +7,11 @@ ALTER TABLE public.workspace_social_subscriptions
 ALTER TABLE public.workspace_social_subscriptions
   DROP CONSTRAINT IF EXISTS workspace_social_subscriptions_plan_account_limit_check;
 
+-- Production inherited this earlier constraint name before the three-tier
+-- migration standardized the account-limit rules.
+ALTER TABLE public.workspace_social_subscriptions
+  DROP CONSTRAINT IF EXISTS workspace_social_subscription_plan_limit;
+
 UPDATE public.workspace_social_subscriptions
 SET account_limit = 4,
     updated_at = now()
