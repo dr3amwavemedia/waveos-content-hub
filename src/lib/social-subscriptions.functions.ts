@@ -11,7 +11,7 @@ import {
 
 type SocialSubscriptionRow = {
   workspace_id: string;
-  plan: "trial" | "standard" | "expanded";
+  plan: "trial" | "standard" | "full" | "expanded";
   status: string;
   billing_interval: SocialBillingInterval | null;
   account_limit: number;
@@ -120,7 +120,7 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
   .validator(
     (data: {
       workspaceId: string;
-      plan: "standard" | "expanded";
+      plan: "standard" | "full" | "expanded";
       interval: SocialBillingInterval;
     }) => data,
   )
@@ -128,7 +128,7 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
     await requirePublicOsWorkspace(data.workspaceId);
     if (!socialPlanAllowsBillingInterval(data.plan, data.interval))
-      throw new Error("Expanded is available with annual billing only.");
+      throw new Error("That billing interval is not available for this plan.");
     const { stripePublicSubscriptionsEnabled, stripeRequest } = await import("@/lib/stripe.server");
     if (!stripePublicSubscriptionsEnabled())
       throw new Error(

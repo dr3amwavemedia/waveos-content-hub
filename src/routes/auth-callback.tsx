@@ -14,6 +14,10 @@ const PUBLIC_SIGNUP_PLAN_KEY = "waveos.publicSignupPlan";
 function selectedSignupPlan(value: string | null) {
   if (value === "standard_annual")
     return { plan: "standard" as const, interval: "annual" as const };
+  if (value === "full_monthly") return { plan: "full" as const, interval: "monthly" as const };
+  if (value === "full_annual") return { plan: "full" as const, interval: "annual" as const };
+  if (value === "expanded_monthly")
+    return { plan: "expanded" as const, interval: "monthly" as const };
   if (value === "expanded_annual")
     return { plan: "expanded" as const, interval: "annual" as const };
   return { plan: "standard" as const, interval: "monthly" as const };

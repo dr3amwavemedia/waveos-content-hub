@@ -90,6 +90,17 @@ import {
   updateOsAccount,
 } from "@/lib/os-accounts.functions";
 
+const OS_PLAN_LABELS: Record<string, string> = {
+  trial: "Promo trial",
+  standard: "Ripple",
+  full: "Current",
+  expanded: "Tidal",
+};
+
+function osPlanLabel(plan: string | null) {
+  return plan ? (OS_PLAN_LABELS[plan] ?? plan) : "";
+}
+
 type ClientAccessTier = Database["public"]["Enums"]["client_access_tier"];
 type AccountStatus = Database["public"]["Enums"]["account_status"];
 type AgreementTerm = Database["public"]["Enums"]["agreement_term"];
@@ -646,7 +657,9 @@ export function OsDataPanel({ search }: { search: string }) {
         "Account created",
         "Last sign-in",
         "Payments enabled",
-        "Plan",
+        "Plan ID",
+        "Tier label",
+        "Tier access",
         "Plan status",
         "Billing interval",
         "Account limit",
@@ -676,6 +689,10 @@ export function OsDataPanel({ search }: { search: string }) {
         account.lastSignInAt,
         account.paymentsEnabled ? "Yes" : "No",
         account.plan,
+        osPlanLabel(account.plan),
+        account.plan === "full" || account.plan === "expanded"
+          ? "AI Assist + scheduling"
+          : "Core tools; AI Assist and scheduling blocked",
         account.planStatus,
         account.billingInterval,
         account.accountLimit,
@@ -768,9 +785,16 @@ export function OsDataPanel({ search }: { search: string }) {
                   </p>
                   <p className="mt-1 text-xs font-medium text-foreground">
                     {account.plan
-                      ? `${account.plan === "expanded" ? "Upgraded" : account.plan} · ${account.connectedAccounts}/${account.accountLimit} used · ${account.remainingAccounts} remaining`
+                      ? `${osPlanLabel(account.plan)} · ${account.connectedAccounts}/${account.accountLimit} used · ${account.remainingAccounts} remaining`
                       : "No social plan yet"}
                   </p>
+                  {account.plan && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {account.plan === "full" || account.plan === "expanded"
+                        ? "AI Assist + scheduling included"
+                        : "Core access · AI Assist + scheduling blocked"}
+                    </p>
+                  )}
                   {account.promoCode && (
                     <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-violet-400/25 bg-violet-500/10 px-2.5 py-1 text-[11px] font-semibold text-violet-200">
                       <Tag className="h-3 w-3" /> {account.promoCode} ·{" "}

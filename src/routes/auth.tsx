@@ -12,7 +12,13 @@ const POST_AUTH_NEXT_KEY = "waveos.postAuthNext";
 const PUBLIC_SIGNUP_KEY = "waveos.publicSignup";
 const PUBLIC_SIGNUP_PLAN_KEY = "waveos.publicSignupPlan";
 
-type PublicSignupPlan = "standard_monthly" | "standard_annual" | "expanded_annual";
+type PublicSignupPlan =
+  | "standard_monthly"
+  | "standard_annual"
+  | "full_monthly"
+  | "full_annual"
+  | "expanded_monthly"
+  | "expanded_annual";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -56,6 +62,7 @@ function AuthPage() {
   const [lastName, setLastName] = useState("");
   const [promoCode, setPromoCode] = useState("");
   const [signupPlan, setSignupPlan] = useState<PublicSignupPlan>("standard_monthly");
+  const [annualBilling, setAnnualBilling] = useState(false);
   const [signupSent, setSignupSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -296,34 +303,76 @@ function AuthPage() {
           >
             {mode === "signup" && (
               <fieldset className="space-y-2">
-                <legend className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Choose your subscription
-                </legend>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <legend className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Choose your subscription
+                  </legend>
+                  <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-foreground">
+                    Monthly
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={annualBilling}
+                      onClick={() => {
+                        const nextAnnual = !annualBilling;
+                        setAnnualBilling(nextAnnual);
+                        const plan = signupPlan.split("_")[0] as "standard" | "full" | "expanded";
+                        setSignupPlan(`${plan}_${nextAnnual ? "annual" : "monthly"}`);
+                      }}
+                      className={`relative h-6 w-11 rounded-full transition ${annualBilling ? "bg-primary" : "bg-border"}`}
+                    >
+                      <span
+                        className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${annualBilling ? "left-6" : "left-1"}`}
+                      />
+                    </button>
+                    Annual
+                  </label>
+                </div>
                 {(
                   [
-                    ["standard_monthly", "Standard monthly", "$39.99 / month"],
-                    ["standard_annual", "Standard annual", "$479.88 / year"],
-                    ["expanded_annual", "Expanded annual", "$780 / year"],
+                    [
+                      "standard",
+                      "Ripple",
+                      annualBilling ? "$479.88 / year" : "$39.99 / month",
+                      "3 accounts · core tools",
+                    ],
+                    [
+                      "full",
+                      "Current",
+                      annualBilling ? "$798 / year · save 5%" : "$70 / month",
+                      "3 accounts · AI Assist + scheduling",
+                    ],
+                    [
+                      "expanded",
+                      "Tidal",
+                      annualBilling ? "$1,296 / year · save 10%" : "$120 / month",
+                      "8 accounts · AI Assist + scheduling",
+                    ],
                   ] as const
-                ).map(([value, label, price]) => (
-                  <label
-                    key={value}
-                    className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-sm transition ${signupPlan === value ? "border-primary bg-primary/10" : "border-border bg-surface/50 hover:border-primary/40"}`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="waveos-plan"
-                        value={value}
-                        checked={signupPlan === value}
-                        onChange={() => setSignupPlan(value)}
-                        className="accent-primary"
-                      />
-                      <span className="font-medium text-foreground">{label}</span>
-                    </span>
-                    <span className="text-xs text-muted-foreground">{price}</span>
-                  </label>
-                ))}
+                ).map(([plan, label, price, detail]) => {
+                  const value =
+                    `${plan}_${annualBilling ? "annual" : "monthly"}` as PublicSignupPlan;
+                  return (
+                    <button
+                      type="button"
+                      key={plan}
+                      onClick={() => setSignupPlan(value)}
+                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-sm transition ${signupPlan === value ? "border-primary bg-primary/10" : "border-border bg-surface/50 hover:border-primary/40"}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span
+                          aria-hidden="true"
+                          className={`h-3.5 w-3.5 rounded-full border ${signupPlan === value ? "border-primary bg-primary ring-2 ring-primary/20" : "border-border"}`}
+                        />
+                        <span>
+                          <span className="block font-medium text-foreground">{label}</span>
+                          <span className="block text-[11px] text-muted-foreground">{detail}</span>
+                        </span>
+                      </span>
+                      <span className="text-xs text-muted-foreground">{price}</span>
+                    </button>
+                  );
+                })}
                 <p className="text-[11px] leading-4 text-muted-foreground">
                   After confirming your email, Stripe will securely collect payment. Workspace tools
                   unlock only after payment succeeds.

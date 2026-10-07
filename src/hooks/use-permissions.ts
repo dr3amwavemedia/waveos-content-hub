@@ -26,6 +26,7 @@ interface WorkspaceAccessRow {
 }
 
 export interface PublicSubscriptionState {
+  plan: "trial" | "standard" | "full" | "expanded";
   status: string;
   trial_ends_at: string | null;
   payment_failure_count: number;
@@ -58,14 +59,17 @@ const PUBLIC_OS_FEATURES = new Set<FeatureKey>([
   "can_view_media_library",
   "can_upload_media",
   "can_create_content",
-  "can_use_ai_tools",
   "can_connect_socials",
-  "can_schedule_content",
   "can_publish_content",
   "can_view_analytics",
   "can_view_activity_log",
   "can_invite_members",
   "can_manage_workspace",
+]);
+
+const PUBLIC_OS_PREMIUM_FEATURES = new Set<FeatureKey>([
+  "can_use_ai_tools",
+  "can_schedule_content",
 ]);
 
 export function publicSubscriptionActive(subscription: PublicSubscriptionState | null) {
@@ -113,7 +117,7 @@ export function usePermissions(): WorkspacePermissions {
       const { data, error } = await supabase
         .from("workspace_social_subscriptions")
         .select(
-          "status,trial_ends_at,payment_failure_count,service_locked_at,stripe_subscription_id",
+          "plan,status,trial_ends_at,payment_failure_count,service_locked_at,stripe_subscription_id",
         )
         .eq("workspace_id", workspaceId!)
         .maybeSingle();
@@ -154,14 +158,18 @@ export function usePermissions(): WorkspacePermissions {
     if (isPublicOs) {
       const subscription = subscriptionQuery.data ?? null;
       const active = publicSubscriptionActive(subscription);
+      const premium = subscription?.plan === "full" || subscription?.plan === "expanded";
+      const allowed = (feature: FeatureKey) =>
+        active &&
+        (PUBLIC_OS_FEATURES.has(feature) || (premium && PUBLIC_OS_PREMIUM_FEATURES.has(feature)));
       return {
         access: clientAccess,
         raw: data ?? null,
         subscription,
         isLoading: isLoading || subscriptionQuery.isLoading,
         isStaff,
-        can: (feature) => active && PUBLIC_OS_FEATURES.has(feature),
-        visibility: (feature) => (active && PUBLIC_OS_FEATURES.has(feature) ? "enabled" : "hidden"),
+        can: allowed,
+        visibility: (feature) => (allowed(feature) ? "enabled" : "hidden"),
       };
     }
 

@@ -38,29 +38,25 @@ export const waveAssist = createServerFn({ method: "POST" })
     let brandContext =
       "No saved Brand Voice profile was found. Keep the writing clear and natural.";
     if (data.workspaceId) {
-      const [{ data: member }, { data: roles }, { data: entitled }, { data: socialEntitled }] =
-        await Promise.all([
-          context.supabase
-            .from("workspace_members")
-            .select("workspace_id")
-            .eq("workspace_id", data.workspaceId)
-            .eq("user_id", context.userId)
-            .maybeSingle(),
-          context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
-          context.supabase.rpc("has_feature", {
-            _workspace_id: data.workspaceId,
-            _feature: "can_use_ai_tools",
-          }),
-          context.supabase.rpc("has_feature", {
-            _workspace_id: data.workspaceId,
-            _feature: "can_create_content",
-          }),
-        ]);
+      const [{ data: member }, { data: roles }, { data: entitled }] = await Promise.all([
+        context.supabase
+          .from("workspace_members")
+          .select("workspace_id")
+          .eq("workspace_id", data.workspaceId)
+          .eq("user_id", context.userId)
+          .maybeSingle(),
+        context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
+        context.supabase.rpc("has_feature", {
+          _workspace_id: data.workspaceId,
+          _feature: "can_use_ai_tools",
+        }),
+      ]);
       const staff = (roles ?? []).some((row) =>
         ["dream_wave_owner", "dream_wave_team"].includes(row.role),
       );
       if (!member && !staff) throw new Error("forbidden");
-      if (!entitled && !socialEntitled) throw new Error("forbidden");
+      if (!staff && !entitled)
+        throw new Error("AI Assist is available on Current and Tidal plans.");
       const { data: profile } = await context.supabase
         .from("brand_profiles")
         .select(

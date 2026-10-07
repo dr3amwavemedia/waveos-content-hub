@@ -66,7 +66,7 @@ export async function applySocialSubscriptionEvent(
   }
   const metadata = { ...objectMetadata, ...(subscription.metadata ?? {}) };
   const workspaceId = metadata.workspace_id;
-  const plan = metadata.social_plan as "standard" | "expanded" | undefined;
+  const plan = metadata.social_plan as "standard" | "full" | "expanded" | undefined;
   const interval = metadata.billing_interval as "monthly" | "annual" | undefined;
   if (!workspaceId || !plan || !SOCIAL_PLANS[plan]) return false;
   const { data: workspace, error: workspaceError } = await supabaseAdmin
