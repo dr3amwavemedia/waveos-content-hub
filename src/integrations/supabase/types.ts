@@ -4097,6 +4097,44 @@ export type Database = {
           },
         ]
       }
+      zernio_workspace_subprofiles: {
+        Row: {
+          created_at: string
+          id: string
+          platform: Database["public"]["Enums"]["social_platform"]
+          profile_id: string
+          profile_name: string
+          slot: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform: Database["public"]["Enums"]["social_platform"]
+          profile_id: string
+          profile_name: string
+          slot: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform?: Database["public"]["Enums"]["social_platform"]
+          profile_id?: string
+          profile_name?: string
+          slot?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zernio_workspace_subprofiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       invites_admin: {
