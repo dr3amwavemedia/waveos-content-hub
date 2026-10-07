@@ -67,8 +67,9 @@ test("public accounts receive an isolated workspace and Overview immediately", a
 });
 
 test("new and legacy-unpaid public accounts require payment while Dream Wave clients stay exempt", async () => {
-  const [migration, permissions, shell, settings] = await Promise.all([
+  const [migration, promoRestore, permissions, shell, settings] = await Promise.all([
     read("supabase/migrations/20261007191323_require_public_subscription_payment.sql"),
+    read("supabase/migrations/20261007193442_restore_promo_code_access.sql"),
     read("src/hooks/use-permissions.ts"),
     read("src/components/app/app-shell.tsx"),
     read("src/routes/_authenticated/settings.tsx"),
@@ -77,7 +78,8 @@ test("new and legacy-unpaid public accounts require payment while Dream Wave cli
   assert.match(migration, /NEW\.status := 'checkout_pending'/);
   assert.match(migration, /subscription\.stripe_subscription_id IS NULL/);
   assert.match(migration, /RAISE EXCEPTION 'payment_required'/);
-  assert.doesNotMatch(permissions, /subscription\.status === "trialing"/);
+  assert.match(permissions, /subscription\.status === "trialing"/);
+  assert.match(promoRestore, /os_promo_redemptions/);
   assert.match(shell, /publicPaymentRequired/);
   assert.match(shell, /navigate\(\{ to: "\/settings", replace: true \}\)/);
   assert.match(settings, /tools remain unavailable until payment succeeds/);

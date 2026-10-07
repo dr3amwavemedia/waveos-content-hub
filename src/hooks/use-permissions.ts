@@ -70,6 +70,11 @@ const PUBLIC_OS_FEATURES = new Set<FeatureKey>([
 
 export function publicSubscriptionActive(subscription: PublicSubscriptionState | null) {
   if (!subscription || subscription.service_locked_at) return false;
+  if (subscription.status === "trialing") {
+    return Boolean(
+      subscription.trial_ends_at && new Date(subscription.trial_ends_at).getTime() > Date.now(),
+    );
+  }
   if (!subscription.stripe_subscription_id) return false;
   if (subscription.status === "active") return true;
   return subscription.status === "past_due" && subscription.payment_failure_count < 2;
