@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Calendar as CalendarIcon,
   CalendarClock,
+  Camera,
   Check,
   ChevronRight,
   Cloud,
@@ -15,9 +16,7 @@ import {
   ImagePlus,
   Loader2,
   Plus,
-  Rocket,
   Send,
-  ShieldCheck,
   Sparkles,
   Trash2,
   X,
@@ -32,7 +31,7 @@ import { SOCIAL_PLATFORM_GUIDANCE } from "@/lib/social-platform-guidance";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/app/empty-state";
 import { useWorkspace } from "@/components/app/workspace-context";
-import { getMediaPreviewUrl, useMediaAssets } from "@/hooks/use-media";
+import { getMediaPreviewUrl, useMediaAssets, useUploadAsset } from "@/hooks/use-media";
 import type { MediaAsset } from "@/hooks/use-media";
 import {
   getExternalMediaStatus,
@@ -59,14 +58,11 @@ import {
   useUpdateContentItem,
   useUpdateVariant,
   useSyncPostVariants,
-  useSubmitForApproval,
-  useStaffContentRelease,
   type PostVariant,
   type SocialPlatform,
 } from "@/hooks/use-content";
 import { PenSquare } from "lucide-react";
 import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
-import { useActualCurrentUser, useCurrentUser } from "@/hooks/use-waveos";
 import { usePermissions } from "@/hooks/use-permissions";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -89,8 +85,6 @@ export const Route = createFileRoute("/_authenticated/create")({
 
 function CreatePost() {
   const { activeWorkspace } = useWorkspace();
-  const { data: user } = useCurrentUser();
-  const { data: actualUser } = useActualCurrentUser();
   const { can } = usePermissions();
   const canUseAiAssist = can("can_use_ai_tools");
   const canSchedule = can("can_schedule_content");
@@ -108,8 +102,6 @@ function CreatePost() {
   const updateVariant = useUpdateVariant();
   const syncVariants = useSyncPostVariants();
   const del = useDeleteContentItem();
-  const submitForApproval = useSubmitForApproval();
-  const staffRelease = useStaffContentRelease();
 
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
@@ -118,7 +110,6 @@ function CreatePost() {
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [activePlatform, setActivePlatform] = useState<SocialPlatform>("instagram");
   const [showLibrary, setShowLibrary] = useState(false);
-  const [releaseMode, setReleaseMode] = useState<"approval" | "direct">("approval");
 
   const draftStorageKey = workspaceId ? `waveos-create-draft-${workspaceId}` : null;
 
@@ -226,16 +217,6 @@ function CreatePost() {
   }, [title, caption, platforms, pickedMedia, scheduledAt]);
   const status = existing.data?.item?.status ?? "draft";
   const locked = status === "published" || status === "publishing" || status === "in_review";
-  const isStaffWorkspace = Boolean(
-    user?.isStaff && activeWorkspace?.id === "11111111-1111-1111-1111-111111111111",
-  );
-  const needsApproval =
-    status !== "approved" && !isStaffWorkspace && activeWorkspace?.approval_required !== false;
-  const canChooseStaffRelease = Boolean(
-    actualUser?.isDreamWaveOwner ||
-    (actualUser?.isStaff && actualUser.staffType === "media_manager"),
-  );
-  const shouldRequestApproval = canChooseStaffRelease ? releaseMode === "approval" : needsApproval;
 
   if (!activeWorkspace) {
     return (
@@ -373,36 +354,6 @@ function CreatePost() {
     try {
       const id = await ensureSaved();
       if (!id) return;
-      if (canChooseStaffRelease) {
-        await staffRelease.mutateAsync({
-          contentId: id,
-          releaseMode,
-          requestedAction: "schedule",
-          scheduledAt: when.toISOString(),
-        });
-        qc.invalidateQueries({ queryKey: ["content-items"] });
-        qc.invalidateQueries({ queryKey: ["content-item", id] });
-        if (releaseMode === "approval") {
-          toast.success("Sent to the client for schedule approval.");
-          navigate({ to: "/approvals" });
-        } else {
-          toast.success(`Scheduled without approval for ${when.toLocaleString()}`);
-          navigate({ to: "/calendar" });
-        }
-        return;
-      }
-      if (needsApproval) {
-        await submitForApproval.mutateAsync({
-          contentId: id,
-          requestedAction: "schedule",
-          scheduledAt: when.toISOString(),
-        });
-        qc.invalidateQueries({ queryKey: ["content-items"] });
-        qc.invalidateQueries({ queryKey: ["content-item", id] });
-        toast.success("Sent to the client for schedule approval. An admin can approve it too.");
-        navigate({ to: "/approvals" });
-        return;
-      }
       await update.mutateAsync({
         id,
         patch: { status: "scheduled", scheduled_at: when.toISOString() },
@@ -425,44 +376,12 @@ function CreatePost() {
     try {
       const id = await ensureSaved();
       if (!id) return;
-      if (canChooseStaffRelease) {
-        if (
-          releaseMode === "direct" &&
-          !confirm("Post without client approval and publish to the selected channels right now?")
-        )
-          return;
-        await staffRelease.mutateAsync({
-          contentId: id,
-          releaseMode,
-          requestedAction: "publish_now",
-        });
-        if (releaseMode === "approval") {
-          qc.invalidateQueries({ queryKey: ["content-items"] });
-          qc.invalidateQueries({ queryKey: ["content-item", id] });
-          toast.success("Sent to the client for publishing approval.");
-          navigate({ to: "/approvals" });
-          return;
-        }
-      } else if (needsApproval) {
-        await submitForApproval.mutateAsync({
-          contentId: id,
-          requestedAction: "publish_now",
-        });
-        qc.invalidateQueries({ queryKey: ["content-items"] });
-        qc.invalidateQueries({ queryKey: ["content-item", id] });
-        toast.success("Sent to the client for publishing approval. An admin can approve it too.");
-        navigate({ to: "/approvals" });
-        return;
-      }
-      if (!canChooseStaffRelease) {
-        if (!confirm("This post is approved. Publish it to the selected channels right now?"))
-          return;
-        // Self-service: mark approved so the publisher accepts it.
-        await update.mutateAsync({
-          id,
-          patch: { status: "approved", scheduled_at: null },
-        });
-      }
+      if (!confirm("Publish this post to the selected channels right now?")) return;
+      // The self-service workflow publishes directly rather than creating an approval request.
+      await update.mutateAsync({
+        id,
+        patch: { status: "approved", scheduled_at: null },
+      });
       const res = await publishFn({ data: { contentId: id } });
       qc.invalidateQueries({ queryKey: ["content-items"] });
       qc.invalidateQueries({ queryKey: ["content-item", id] });
@@ -762,64 +681,13 @@ function CreatePost() {
 
           <div className="surface-card space-y-4 p-5">
             <div>
-              <div className="text-sm font-semibold text-foreground">Publish workflow</div>
+              <div className="text-sm font-semibold text-foreground">Publish</div>
               <p className="mt-1 text-xs text-muted-foreground">
-                {canChooseStaffRelease
-                  ? "Choose whether this post needs client approval. This choice applies only to this post."
-                  : shouldRequestApproval
-                    ? "This workspace requires approval before publishing."
-                    : "This post can be published or scheduled immediately."}
+                {canSchedule
+                  ? "Post immediately or choose a future date and time."
+                  : "Post now is included. Upgrade to Current or Tidal to schedule ahead."}
               </p>
             </div>
-
-            {canChooseStaffRelease && (
-              <div className="grid gap-2" role="radiogroup" aria-label="Post approval choice">
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={releaseMode === "approval"}
-                  onClick={() => setReleaseMode("approval")}
-                  className={cn(
-                    "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
-                    releaseMode === "approval"
-                      ? "border-primary/50 bg-primary/10"
-                      : "border-border bg-elevated/50 hover:bg-elevated",
-                  )}
-                >
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <span>
-                    <span className="block text-sm font-semibold text-foreground">
-                      Send for approval
-                    </span>
-                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                      The client reviews it before it is scheduled or published.
-                    </span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={releaseMode === "direct"}
-                  onClick={() => setReleaseMode("direct")}
-                  className={cn(
-                    "flex items-start gap-3 rounded-xl border p-3 text-left transition-colors",
-                    releaseMode === "direct"
-                      ? "border-primary/50 bg-primary/10"
-                      : "border-border bg-elevated/50 hover:bg-elevated",
-                  )}
-                >
-                  <Rocket className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                  <span>
-                    <span className="block text-sm font-semibold text-foreground">
-                      Post without approval
-                    </span>
-                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
-                      Authorized social staff can publish or schedule immediately.
-                    </span>
-                  </span>
-                </button>
-              </div>
-            )}
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
               <button
@@ -827,6 +695,7 @@ function CreatePost() {
                   locked || publishing !== null || !caption.trim() || !scheduledAt || !canSchedule
                 }
                 onClick={handleScheduleLater}
+                title={canSchedule ? "Schedule this post" : "Upgrade to schedule posts"}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
               >
                 {publishing === "schedule" ? (
@@ -834,11 +703,7 @@ function CreatePost() {
                 ) : (
                   <CalendarClock className="h-4 w-4" />
                 )}
-                {status === "in_review"
-                  ? "Waiting for approval"
-                  : shouldRequestApproval
-                    ? "Send schedule for approval"
-                    : "Schedule without approval"}
+                Post later
               </button>
               <button
                 disabled={locked || publishing !== null || !caption.trim() || !platforms.length}
@@ -850,11 +715,7 @@ function CreatePost() {
                 ) : (
                   <Send className="h-4 w-4" />
                 )}
-                {status === "in_review"
-                  ? "Waiting for approval"
-                  : shouldRequestApproval
-                    ? "Send for approval"
-                    : "Post without approval"}
+                Post now
               </button>
             </div>
           </div>
@@ -1199,6 +1060,36 @@ function MediaPicker({
   const assets = useMediaAssets(workspaceId, { search: search || undefined });
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [source, setSource] = useState<"waveos" | ExternalMediaProvider | "frameio">("waveos");
+  const deviceInputRef = useRef<HTMLInputElement>(null);
+  const upload = useUploadAsset(workspaceId);
+  const [deviceUploading, setDeviceUploading] = useState(false);
+
+  async function handleDeviceFiles(files: FileList | null) {
+    if (!files?.length) return;
+    setDeviceUploading(true);
+    const uploadedIds: string[] = [];
+    try {
+      for (const file of Array.from(files)) {
+        const asset = await upload.mutateAsync({ file, folderId: null, tags: [] });
+        uploadedIds.push(asset.id);
+      }
+      setSelected((current) => Array.from(new Set([...current, ...uploadedIds])));
+      setSource("waveos");
+      await assets.refetch();
+      toast.success(
+        `${uploadedIds.length} item${uploadedIds.length === 1 ? "" : "s"} added from your device.`,
+      );
+    } catch (error) {
+      if (uploadedIds.length) {
+        setSelected((current) => Array.from(new Set([...current, ...uploadedIds])));
+        await assets.refetch();
+      }
+      toast.error(error instanceof Error ? error.message : "Media could not be added.");
+    } finally {
+      setDeviceUploading(false);
+      if (deviceInputRef.current) deviceInputRef.current.value = "";
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -1251,6 +1142,27 @@ function MediaPicker({
                 {label}
               </button>
             ))}
+            <input
+              ref={deviceInputRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime"
+              multiple
+              className="sr-only"
+              onChange={(event) => void handleDeviceFiles(event.target.files)}
+            />
+            <button
+              type="button"
+              disabled={deviceUploading}
+              onClick={() => deviceInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+            >
+              {deviceUploading ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Camera className="h-3.5 w-3.5" />
+              )}
+              {deviceUploading ? "Adding…" : "Camera roll"}
+            </button>
           </div>
           <input
             value={search}
@@ -1287,7 +1199,7 @@ function MediaPicker({
             </div>
           ) : (assets.data ?? []).length === 0 ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
-              No media yet. Upload some in the Content library.
+              No media yet. Choose Camera roll to add a photo or video from this device.
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
