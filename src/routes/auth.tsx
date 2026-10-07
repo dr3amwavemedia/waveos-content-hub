@@ -335,41 +335,69 @@ function AuthPage() {
                       "Ripple",
                       annualBilling ? "$479.88 / year" : "$39.99 / month",
                       "3 accounts · core tools",
+                      [
+                        "3 connected social accounts",
+                        "Create and publish content",
+                        "Analytics and media library",
+                      ],
                     ],
                     [
                       "full",
                       "Current",
                       annualBilling ? "$798 / year · save 5%" : "$70 / month",
                       "3 accounts · AI Assist + scheduling",
+                      ["Everything in Ripple", "Generative AI Assist", "Post scheduling"],
                     ],
                     [
                       "expanded",
                       "Tidal",
                       annualBilling ? "$1,296 / year · save 10%" : "$120 / month",
                       "8 accounts · AI Assist + scheduling",
+                      [
+                        "Everything in Current",
+                        "8 connected social accounts",
+                        "Best for growing teams",
+                      ],
                     ],
                   ] as const
-                ).map(([plan, label, price, detail]) => {
+                ).map(([plan, label, price, detail, features]) => {
                   const value =
                     `${plan}_${annualBilling ? "annual" : "monthly"}` as PublicSignupPlan;
+                  const selected = signupPlan === value;
                   return (
                     <button
                       type="button"
                       key={plan}
                       onClick={() => setSignupPlan(value)}
-                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left text-sm transition ${signupPlan === value ? "border-primary bg-primary/10" : "border-border bg-surface/50 hover:border-primary/40"}`}
+                      aria-pressed={selected}
+                      className={`w-full rounded-xl border px-3 py-3 text-left text-sm transition-all duration-200 active:scale-[0.98] ${selected ? "-translate-y-0.5 border-primary bg-primary/10 shadow-lg shadow-primary/10" : "border-border bg-surface/50 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-elevated"}`}
                     >
-                      <span className="flex items-center gap-2">
-                        <span
-                          aria-hidden="true"
-                          className={`h-3.5 w-3.5 rounded-full border ${signupPlan === value ? "border-primary bg-primary ring-2 ring-primary/20" : "border-border"}`}
-                        />
-                        <span>
-                          <span className="block font-medium text-foreground">{label}</span>
-                          <span className="block text-[11px] text-muted-foreground">{detail}</span>
+                      <span className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            className={`h-3.5 w-3.5 rounded-full border ${selected ? "border-primary bg-primary ring-2 ring-primary/20" : "border-border"}`}
+                          />
+                          <span>
+                            <span className="block font-semibold text-foreground">{label}</span>
+                            <span className="block text-[11px] text-muted-foreground">
+                              {detail}
+                            </span>
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-xs font-semibold text-foreground">
+                          {price}
                         </span>
                       </span>
-                      <span className="text-xs text-muted-foreground">{price}</span>
+                      {selected && (
+                        <span className="mt-3 grid gap-1 border-t border-primary/20 pt-3 text-[11px] text-muted-foreground">
+                          {features.map((feature) => (
+                            <span key={feature} className="flex items-center gap-2">
+                              <span className="text-primary">✓</span> {feature}
+                            </span>
+                          ))}
+                        </span>
+                      )}
                     </button>
                   );
                 })}

@@ -19,6 +19,10 @@ const createRoute = readFileSync("src/routes/_authenticated/create.tsx", "utf8")
 const assistant = readFileSync("src/lib/wave-assist.functions.ts", "utf8");
 const subscriptionFunctions = readFileSync("src/lib/social-subscriptions.functions.ts", "utf8");
 const subscriptionWebhook = readFileSync("src/lib/social-subscription-webhook.server.ts", "utf8");
+const tierMigration = readFileSync(
+  "supabase/migrations/20261007210000_three_waveos_subscription_tiers.sql",
+  "utf8",
+);
 const settingsRoute = readFileSync("src/routes/_authenticated/settings.tsx", "utf8");
 const userContext = readFileSync("src/hooks/use-waveos.ts", "utf8");
 const pickerConfig = readFileSync("src/lib/google-picker-config.server.ts", "utf8");
@@ -40,6 +44,15 @@ test("promo trial and three paid tiers enforce account caps, prices, and annual 
   assert.equal(planExports.socialPlanAllowsBillingInterval("standard", "annual"), true);
   assert.equal(planExports.socialPlanAllowsBillingInterval("expanded", "monthly"), true);
   assert.equal(planExports.socialPlanAllowsBillingInterval("expanded", "annual"), true);
+});
+
+test("Stripe subscription invoices are saved and shown in a collapsed billing history", () => {
+  assert.match(tierMigration, /workspace_social_subscription_invoices/);
+  assert.match(tierMigration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(subscriptionWebhook, /eventType\.startsWith\("invoice\."\)/);
+  assert.match(subscriptionWebhook, /hosted_invoice_url/);
+  assert.match(settingsRoute, /<details[\s\S]*Billing history/);
+  assert.match(settingsRoute, /View invoice/);
 });
 
 test("public subscriptions and Dream Wave client service tiers stay separate", () => {

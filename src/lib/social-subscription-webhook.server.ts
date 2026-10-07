@@ -47,10 +47,7 @@ export async function applySocialSubscriptionEvent(
     );
   } else if (eventType.startsWith("customer.subscription.")) {
     subscription = object as unknown as StripeSubscription;
-  } else if (
-    (eventType === "invoice.paid" || eventType === "invoice.payment_failed") &&
-    subscriptionId
-  ) {
+  } else if (eventType.startsWith("invoice.") && subscriptionId) {
     subscription = await stripeRequest<StripeSubscription>(
       `/subscriptions/${encodeURIComponent(subscriptionId)}`,
       { method: "GET" },
@@ -78,6 +75,40 @@ export async function applySocialSubscriptionEvent(
   // Consume stale social-subscription events for Dream Wave client workspaces
   // without letting them create or update a public WaveOS billing record.
   if (workspace?.data_source !== "os_data") return Boolean(workspace);
+  if (eventType.startsWith("invoice.")) {
+    const invoiceId = String(object.id ?? "");
+    if (invoiceId) {
+      const toIso = (value: unknown) => {
+        const seconds = Number(value ?? 0);
+        return Number.isFinite(seconds) && seconds > 0
+          ? new Date(seconds * 1000).toISOString()
+          : null;
+      };
+      const invoiceResult = await supabaseAdmin
+        .from("workspace_social_subscription_invoices" as never)
+        .upsert(
+          {
+            workspace_id: workspaceId,
+            stripe_invoice_id: invoiceId,
+            stripe_subscription_id: subscription.id,
+            invoice_number: typeof object.number === "string" ? object.number : null,
+            status: String(object.status ?? eventType.replace("invoice.", "")),
+            amount_due_cents: Math.max(0, Number(object.amount_due ?? 0) || 0),
+            amount_paid_cents: Math.max(0, Number(object.amount_paid ?? 0) || 0),
+            currency: String(object.currency ?? "usd").toUpperCase(),
+            hosted_invoice_url:
+              typeof object.hosted_invoice_url === "string" ? object.hosted_invoice_url : null,
+            invoice_pdf_url: typeof object.invoice_pdf === "string" ? object.invoice_pdf : null,
+            billing_period_start: toIso(object.period_start),
+            billing_period_end: toIso(object.period_end),
+            stripe_created_at: toIso(object.created),
+            updated_at: new Date().toISOString(),
+          } as never,
+          { onConflict: "stripe_invoice_id" },
+        );
+      if (invoiceResult.error) throw invoiceResult.error;
+    }
+  }
   const isPaid =
     eventType === "invoice.paid" &&
     subscription.status === "active" &&

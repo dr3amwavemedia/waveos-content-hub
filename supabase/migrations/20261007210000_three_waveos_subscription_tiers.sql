@@ -26,6 +26,42 @@ ALTER TABLE public.workspace_social_subscriptions
     (plan = 'expanded' AND account_limit = 8)
   );
 
+CREATE TABLE IF NOT EXISTS public.workspace_social_subscription_invoices (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  workspace_id uuid NOT NULL REFERENCES public.workspaces(id) ON DELETE CASCADE,
+  stripe_invoice_id text NOT NULL UNIQUE,
+  stripe_subscription_id text,
+  invoice_number text,
+  status text NOT NULL,
+  amount_due_cents bigint NOT NULL DEFAULT 0 CHECK (amount_due_cents >= 0),
+  amount_paid_cents bigint NOT NULL DEFAULT 0 CHECK (amount_paid_cents >= 0),
+  currency text NOT NULL DEFAULT 'USD',
+  hosted_invoice_url text,
+  invoice_pdf_url text,
+  billing_period_start timestamptz,
+  billing_period_end timestamptz,
+  stripe_created_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS workspace_social_subscription_invoices_workspace_created_idx
+  ON public.workspace_social_subscription_invoices(workspace_id, created_at DESC);
+
+ALTER TABLE public.workspace_social_subscription_invoices ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.workspace_social_subscription_invoices FROM PUBLIC, anon;
+GRANT SELECT ON public.workspace_social_subscription_invoices TO authenticated;
+GRANT ALL ON public.workspace_social_subscription_invoices TO service_role;
+
+DROP POLICY IF EXISTS "Members view subscription invoices"
+  ON public.workspace_social_subscription_invoices;
+CREATE POLICY "Members view subscription invoices"
+  ON public.workspace_social_subscription_invoices FOR SELECT TO authenticated
+  USING (
+    public.is_workspace_member((SELECT auth.uid()), workspace_id)
+    OR public.is_dream_wave_staff((SELECT auth.uid()))
+  );
+
 CREATE OR REPLACE FUNCTION public.has_feature(_workspace_id uuid, _feature text)
 RETURNS boolean
 LANGUAGE plpgsql
