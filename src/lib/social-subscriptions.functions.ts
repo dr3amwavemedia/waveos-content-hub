@@ -13,6 +13,7 @@ type SocialSubscriptionRow = {
   workspace_id: string;
   plan: "trial" | "standard" | "full" | "expanded";
   status: string;
+  internal_test_access: boolean;
   billing_interval: SocialBillingInterval | null;
   account_limit: number;
   trial_ends_at: string | null;
@@ -96,7 +97,7 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
     const result = await supabaseAdmin
       .from("workspace_social_subscriptions" as never)
       .select(
-        "workspace_id,plan,status,billing_interval,account_limit,trial_ends_at,current_period_end,cancel_at_period_end,payment_failure_count,last_payment_failed_at,service_locked_at,stripe_customer_id",
+        "workspace_id,plan,status,internal_test_access,billing_interval,account_limit,trial_ends_at,current_period_end,cancel_at_period_end,payment_failure_count,last_payment_failed_at,service_locked_at,stripe_customer_id",
       )
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
@@ -157,6 +158,14 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
   .handler(async ({ data, context }) => {
     await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
     await requirePublicOsWorkspace(data.workspaceId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existingSubscription } = await supabaseAdmin
+      .from("workspace_social_subscriptions" as never)
+      .select("internal_test_access")
+      .eq("workspace_id", data.workspaceId)
+      .maybeSingle();
+    if ((existingSubscription as { internal_test_access?: boolean } | null)?.internal_test_access)
+      throw new Error("Internal test accounts do not use Stripe checkout.");
     if (!socialPlanAllowsBillingInterval(data.plan, data.interval))
       throw new Error("That billing interval is not available for this plan.");
     const { stripePublicSubscriptionsEnabled, stripeRequest } = await import("@/lib/stripe.server");
@@ -164,7 +173,6 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
       throw new Error(
         "Live social subscriptions are not enabled yet. Use Stripe test mode in preview or enable live subscriptions at launch.",
       );
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: workspace } = await supabaseAdmin
       .from("workspaces")
       .select("name,data_source")
@@ -256,12 +264,17 @@ export const createSocialBillingPortal = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const result = await supabaseAdmin
       .from("workspace_social_subscriptions" as never)
-      .select("stripe_customer_id")
+      .select("stripe_customer_id,internal_test_access")
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
     if (result.error) throw result.error;
-    const customerId = (result.data as { stripe_customer_id?: string | null } | null)
-      ?.stripe_customer_id;
+    const subscription = result.data as {
+      stripe_customer_id?: string | null;
+      internal_test_access?: boolean;
+    } | null;
+    if (subscription?.internal_test_access)
+      throw new Error("Internal test accounts do not have Stripe billing.");
+    const customerId = subscription?.stripe_customer_id;
     if (!customerId) throw new Error("No Stripe billing account is connected yet.");
     const { stripeRequest } = await import("@/lib/stripe.server");
     const origin = process.env.WAVEOS_APP_URL || "https://waveos.dreamwavemedia.co";
