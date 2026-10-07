@@ -57,21 +57,6 @@ function YourContentRoute() {
       <header>
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-primary">Your library</p>
         <h1 className="mt-2 text-3xl font-semibold">Your Content</h1>
-        <nav aria-label="Delivery sections" className="mt-4 grid grid-cols-2 gap-2">
-          <a
-            href="#gallery"
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 text-sm font-semibold text-primary"
-          >
-            <ImageIcon className="h-5 w-5" />
-            Photo gallery
-          </a>
-          <a
-            href="#delivery-links"
-            className="inline-flex min-h-12 items-center justify-center rounded-xl border border-border px-4 text-sm"
-          >
-            Project links
-          </a>
-        </nav>
       </header>
       <DeliveryGallery
         key={workspaceId}
