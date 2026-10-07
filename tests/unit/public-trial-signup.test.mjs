@@ -4,11 +4,12 @@ import test from "node:test";
 
 const read = (path) => readFile(new URL(`../../${path}`, import.meta.url), "utf8");
 
-test("homepage exposes the card-free trial signup", async () => {
+test("homepage exposes signup without unverified plan claims", async () => {
   const landing = await read("src/routes/index.tsx");
   assert.match(landing, /Sign up/);
   assert.match(landing, /search=\{\{ mode: "signup" \}\}/);
-  assert.match(landing, /No card required/);
+  assert.doesNotMatch(landing, /No card required/);
+  assert.doesNotMatch(landing, /Connect up to 2 social accounts/);
 });
 
 test("public signup is marked as OS data and returns to its ready Overview", async () => {
@@ -16,6 +17,7 @@ test("public signup is marked as OS data and returns to its ready Overview", asy
   assert.match(auth, /account_source: "os_data"/);
   assert.match(auth, /signup_source: "public_trial"/);
   assert.match(auth, /Sign up/);
+  assert.doesNotMatch(auth, /No card required/);
   assert.match(auth, /\/auth-callback\?next=/);
   assert.match(auth, /mode === "signup" \? "\/home"/);
   assert.doesNotMatch(auth, /sessionStorage\.setItem\(POST_AUTH_NEXT_KEY, "\/onboarding"\)/);

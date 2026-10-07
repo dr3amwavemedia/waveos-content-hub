@@ -122,10 +122,6 @@ function Landing() {
               Sign in to your workspace
             </Link>
           </div>
-          <p className="mt-4 text-xs text-muted-foreground">
-            No card required · Connect up to 2 social accounts · Existing Dream Wave Media clients
-            can sign in normally.
-          </p>
         </div>
 
         <div className="mt-24 grid gap-4 sm:grid-cols-2">
