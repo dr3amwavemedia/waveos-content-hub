@@ -3162,6 +3162,41 @@ export type Database = {
           },
         ]
       }
+      publishing_controls: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          paused: boolean
+          reason: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          paused?: boolean
+          reason?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          paused?: boolean
+          reason?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "publishing_controls_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_connections: {
         Row: {
           avatar_url: string | null
@@ -3294,6 +3329,56 @@ export type Database = {
             foreignKeyName: "social_strategy_items_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_subscription_lifecycle: {
+        Row: {
+          archive_at: string | null
+          archived_at: string | null
+          disconnect_at: string | null
+          disconnected_at: string | null
+          inactive_since: string | null
+          last_checked_at: string | null
+          last_error: string | null
+          reason: string | null
+          state: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          archive_at?: string | null
+          archived_at?: string | null
+          disconnect_at?: string | null
+          disconnected_at?: string | null
+          inactive_since?: string | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          reason?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          archive_at?: string | null
+          archived_at?: string | null
+          disconnect_at?: string | null
+          disconnected_at?: string | null
+          inactive_since?: string | null
+          last_checked_at?: string | null
+          last_error?: string | null
+          reason?: string | null
+          state?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_subscription_lifecycle_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -3697,6 +3782,71 @@ export type Database = {
           },
         ]
       }
+      workspace_social_subscription_invoices: {
+        Row: {
+          amount_due_cents: number
+          amount_paid_cents: number
+          billing_period_end: string | null
+          billing_period_start: string | null
+          created_at: string
+          currency: string
+          hosted_invoice_url: string | null
+          id: string
+          invoice_number: string | null
+          invoice_pdf_url: string | null
+          status: string
+          stripe_created_at: string | null
+          stripe_invoice_id: string
+          stripe_subscription_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_due_cents?: number
+          amount_paid_cents?: number
+          billing_period_end?: string | null
+          billing_period_start?: string | null
+          created_at?: string
+          currency?: string
+          hosted_invoice_url?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_pdf_url?: string | null
+          status: string
+          stripe_created_at?: string | null
+          stripe_invoice_id: string
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount_due_cents?: number
+          amount_paid_cents?: number
+          billing_period_end?: string | null
+          billing_period_start?: string | null
+          created_at?: string
+          currency?: string
+          hosted_invoice_url?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_pdf_url?: string | null
+          status?: string
+          stripe_created_at?: string | null
+          stripe_invoice_id?: string
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_social_subscription_invoices_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_social_subscriptions: {
         Row: {
           account_limit: number
@@ -3942,6 +4092,44 @@ export type Database = {
             foreignKeyName: "zernio_profiles_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      zernio_workspace_subprofiles: {
+        Row: {
+          created_at: string
+          id: string
+          platform: Database["public"]["Enums"]["social_platform"]
+          profile_id: string
+          profile_name: string
+          slot: number
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform: Database["public"]["Enums"]["social_platform"]
+          profile_id: string
+          profile_name: string
+          slot: number
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform?: Database["public"]["Enums"]["social_platform"]
+          profile_id?: string
+          profile_name?: string
+          slot?: number
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zernio_workspace_subprofiles_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
             referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
@@ -4628,6 +4816,14 @@ export type Database = {
           bonus_trial_days: number
           color_theme: string
           name: string
+        }[]
+      }
+      workspace_media_storage_usage: {
+        Args: { _workspace_id: string }
+        Returns: {
+          limit_bytes: number
+          remaining_bytes: number
+          used_bytes: number
         }[]
       }
       workspace_role: {
