@@ -249,13 +249,13 @@ function AuthPage() {
                   ? "Sign up"
                   : "Reset your password"}
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {mode === "signin"
-                ? "Welcome back — sign in to your workspace."
-                : mode === "signup"
-                  ? "30 days, two connected accounts, and no card required."
+            {mode !== "signup" && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                {mode === "signin"
+                  ? "Welcome back — sign in to your workspace."
                   : "We'll email you a secure link to set a new password."}
-            </p>
+              </p>
+            )}
           </div>
           {mode === "signin" && (
             <>
