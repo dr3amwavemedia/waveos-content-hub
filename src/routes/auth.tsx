@@ -344,14 +344,14 @@ function AuthPage() {
                     [
                       "full",
                       "Current",
-                      annualBilling ? "$798 / year · save 5%" : "$70 / month",
+                      annualBilling ? "$797.89 / year · save 5%" : "$69.99 / month",
                       "3 accounts · AI Assist + scheduling",
                       ["Everything in Ripple", "Generative AI Assist", "Post scheduling"],
                     ],
                     [
                       "expanded",
                       "Tidal",
-                      annualBilling ? "$1,296 / year · save 10%" : "$120 / month",
+                      annualBilling ? "$1,295.89 / year · save 10%" : "$119.99 / month",
                       "8 accounts · AI Assist + scheduling",
                       [
                         "Everything in Current",
