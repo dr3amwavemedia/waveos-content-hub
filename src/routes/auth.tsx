@@ -400,7 +400,7 @@ function AuthPage() {
             </p>
           )}
           <p className="mt-6 text-center text-xs text-muted-foreground">
-            {mode === "signup" ? "No card required. " : "New to WaveOS? "}
+            {mode !== "signup" && "New to WaveOS? "}
             {mode !== "signup" && (
               <button
                 type="button"
