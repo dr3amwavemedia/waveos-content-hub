@@ -27,12 +27,10 @@ export const Route = createFileRoute("/api/public/hooks/publish-due")({
           .lte("scheduled_at", new Date().toISOString())
           .limit(20);
         if (error) return Response.json({ error: error.message }, { status: 500 });
-        if (!due?.length) return Response.json({ processed: 0, failed: 0 });
-
         const { publishContentItemWithZernio } = await import("@/lib/zernio-publish.server");
         let processed = 0;
         let failed = 0;
-        for (const item of due) {
+        for (const item of due ?? []) {
           try {
             await publishContentItemWithZernio(item.id);
             processed += 1;
@@ -44,7 +42,21 @@ export const Route = createFileRoute("/api/public/hooks/publish-due")({
             });
           }
         }
-        return Response.json({ processed, failed });
+        let maintenance: unknown = null;
+        try {
+          const maintenanceUrl = new URL(
+            "/api/public/hooks/maintain-social-operations",
+            request.url,
+          );
+          const response = await fetch(maintenanceUrl, {
+            method: "POST",
+            headers: { "x-cron-secret": cronSecret },
+          });
+          maintenance = response.ok ? await response.json() : { error: `HTTP ${response.status}` };
+        } catch (error) {
+          maintenance = { error: error instanceof Error ? error.message : "maintenance_failed" };
+        }
+        return Response.json({ processed, failed, maintenance });
       },
     },
   },

@@ -15,6 +15,71 @@ async function requireOwner(userId: string) {
 
 export type OsPromoColor = "ocean" | "violet" | "emerald" | "sunset";
 
+export const getOsOperationsStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: Record<string, never>) => data)
+  .handler(async ({ context }) => {
+    const admin = await requireOwner(context.userId);
+    const staleBefore = new Date(Date.now() - 30 * 60_000).toISOString();
+    const [control, lifecycle, stale] = await Promise.all([
+      admin
+        .from("publishing_controls" as never)
+        .select("paused,reason,changed_at")
+        .is("workspace_id", null)
+        .maybeSingle(),
+      admin.from("social_subscription_lifecycle" as never).select("state"),
+      admin
+        .from("publish_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "sending")
+        .lte("attempted_at", staleBefore),
+    ]);
+    if (control.error) throw control.error;
+    if (lifecycle.error) throw lifecycle.error;
+    if (stale.error) throw stale.error;
+    const states = ((lifecycle.data ?? []) as Array<{ state: string }>).reduce<
+      Record<string, number>
+    >((result, row) => ({ ...result, [row.state]: (result[row.state] ?? 0) + 1 }), {});
+    return {
+      globalPause:
+        (control.data as {
+          paused?: boolean;
+          reason?: string | null;
+          changed_at?: string;
+        } | null) ?? null,
+      lifecycle: states,
+      stalePublishingAttempts: stale.count ?? 0,
+    };
+  });
+
+export const setGlobalPublishingPause = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { paused: boolean; reason?: string }) => data)
+  .handler(async ({ data, context }) => {
+    const admin = await requireOwner(context.userId);
+    const result = await admin.from("publishing_controls" as never).upsert(
+      {
+        workspace_id: null,
+        paused: data.paused,
+        reason: data.paused
+          ? data.reason?.trim() ||
+            "Publishing is temporarily paused while Dream Wave checks the service."
+          : null,
+        changed_by: context.userId,
+        changed_at: new Date().toISOString(),
+      } as never,
+      { onConflict: "workspace_id" },
+    );
+    if (result.error) throw result.error;
+    await admin.from("activity_logs").insert({
+      actor_user_id: context.userId,
+      action: data.paused ? "global_publishing_paused" : "global_publishing_resumed",
+      entity_type: "publishing_control",
+      safe_metadata: { reason: data.reason?.trim() || null },
+    });
+    return { paused: data.paused };
+  });
+
 export const listOsPromoCodes = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: Record<string, never>) => data)

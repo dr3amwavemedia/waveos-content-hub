@@ -73,6 +73,7 @@ import { Route as ApiExternalMediaProviderFilesRouteImport } from './routes/api/
 import { Route as ApiPublicExternalMediaAssetIdRouteImport } from './routes/api/public/external-media/$assetId'
 import { Route as ApiPublicHooksAyrshareRouteImport } from './routes/api/public/hooks/ayrshare'
 import { Route as ApiPublicHooksChargeAutopayDueRouteImport } from './routes/api/public/hooks/charge-autopay-due'
+import { Route as ApiPublicHooksMaintainSocialOperationsRouteImport } from './routes/api/public/hooks/maintain-social-operations'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 import { Route as ApiPublicHooksSignwellRouteImport } from './routes/api/public/hooks/signwell'
 import { Route as ApiPublicHooksStripeRouteImport } from './routes/api/public/hooks/stripe'
@@ -412,6 +413,12 @@ const ApiPublicHooksChargeAutopayDueRoute =
     path: '/api/public/hooks/charge-autopay-due',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksMaintainSocialOperationsRoute =
+  ApiPublicHooksMaintainSocialOperationsRouteImport.update({
+    id: '/api/public/hooks/maintain-social-operations',
+    path: '/api/public/hooks/maintain-social-operations',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksPublishDueRoute =
   ApiPublicHooksPublishDueRouteImport.update({
     id: '/api/public/hooks/publish-due',
@@ -498,6 +505,7 @@ export interface FileRoutesByFullPath {
   '/api/public/external-media/$assetId': typeof ApiPublicExternalMediaAssetIdRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/charge-autopay-due': typeof ApiPublicHooksChargeAutopayDueRoute
+  '/api/public/hooks/maintain-social-operations': typeof ApiPublicHooksMaintainSocialOperationsRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
@@ -567,6 +575,7 @@ export interface FileRoutesByTo {
   '/api/public/external-media/$assetId': typeof ApiPublicExternalMediaAssetIdRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/charge-autopay-due': typeof ApiPublicHooksChargeAutopayDueRoute
+  '/api/public/hooks/maintain-social-operations': typeof ApiPublicHooksMaintainSocialOperationsRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
@@ -638,6 +647,7 @@ export interface FileRoutesById {
   '/api/public/external-media/$assetId': typeof ApiPublicExternalMediaAssetIdRoute
   '/api/public/hooks/ayrshare': typeof ApiPublicHooksAyrshareRoute
   '/api/public/hooks/charge-autopay-due': typeof ApiPublicHooksChargeAutopayDueRoute
+  '/api/public/hooks/maintain-social-operations': typeof ApiPublicHooksMaintainSocialOperationsRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
   '/api/public/hooks/signwell': typeof ApiPublicHooksSignwellRoute
   '/api/public/hooks/stripe': typeof ApiPublicHooksStripeRoute
@@ -709,6 +719,7 @@ export interface FileRouteTypes {
     | '/api/public/external-media/$assetId'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/charge-autopay-due'
+    | '/api/public/hooks/maintain-social-operations'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/signwell'
     | '/api/public/hooks/stripe'
@@ -778,6 +789,7 @@ export interface FileRouteTypes {
     | '/api/public/external-media/$assetId'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/charge-autopay-due'
+    | '/api/public/hooks/maintain-social-operations'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/signwell'
     | '/api/public/hooks/stripe'
@@ -848,6 +860,7 @@ export interface FileRouteTypes {
     | '/api/public/external-media/$assetId'
     | '/api/public/hooks/ayrshare'
     | '/api/public/hooks/charge-autopay-due'
+    | '/api/public/hooks/maintain-social-operations'
     | '/api/public/hooks/publish-due'
     | '/api/public/hooks/signwell'
     | '/api/public/hooks/stripe'
@@ -882,6 +895,7 @@ export interface RootRouteChildren {
   ApiPublicExternalMediaAssetIdRoute: typeof ApiPublicExternalMediaAssetIdRoute
   ApiPublicHooksAyrshareRoute: typeof ApiPublicHooksAyrshareRoute
   ApiPublicHooksChargeAutopayDueRoute: typeof ApiPublicHooksChargeAutopayDueRoute
+  ApiPublicHooksMaintainSocialOperationsRoute: typeof ApiPublicHooksMaintainSocialOperationsRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
   ApiPublicHooksSignwellRoute: typeof ApiPublicHooksSignwellRoute
   ApiPublicHooksStripeRoute: typeof ApiPublicHooksStripeRoute
@@ -1338,6 +1352,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksChargeAutopayDueRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/maintain-social-operations': {
+      id: '/api/public/hooks/maintain-social-operations'
+      path: '/api/public/hooks/maintain-social-operations'
+      fullPath: '/api/public/hooks/maintain-social-operations'
+      preLoaderRoute: typeof ApiPublicHooksMaintainSocialOperationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/publish-due': {
       id: '/api/public/hooks/publish-due'
       path: '/api/public/hooks/publish-due'
@@ -1516,6 +1537,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicExternalMediaAssetIdRoute: ApiPublicExternalMediaAssetIdRoute,
   ApiPublicHooksAyrshareRoute: ApiPublicHooksAyrshareRoute,
   ApiPublicHooksChargeAutopayDueRoute: ApiPublicHooksChargeAutopayDueRoute,
+  ApiPublicHooksMaintainSocialOperationsRoute:
+    ApiPublicHooksMaintainSocialOperationsRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
   ApiPublicHooksSignwellRoute: ApiPublicHooksSignwellRoute,
   ApiPublicHooksStripeRoute: ApiPublicHooksStripeRoute,

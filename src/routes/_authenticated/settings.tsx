@@ -76,6 +76,8 @@ function SettingsPage() {
     activeWorkspace?.role === "owner" ||
     activeWorkspace?.role === "admin";
   const canManageTeam = canManageBranding;
+  const oneTimeClient =
+    activeWorkspace?.data_source === "client_data" && activeWorkspace.agreement_term === "one_time";
   const canManageConnections = Boolean(
     activeWorkspace?.role === "owner" ||
     activeWorkspace?.role === "admin" ||
@@ -236,14 +238,17 @@ function SettingsPage() {
       )}
 
       {activeWorkspace && (
-        <TeamSettings workspaceId={activeWorkspace.id} canManage={canManageTeam} />
+        <TeamSettings
+          workspaceId={activeWorkspace.id}
+          canManage={canManageTeam && !oneTimeClient}
+        />
       )}
 
       {user?.isDreamWaveOwner && <FrameioServiceConnectionCard />}
 
       {user?.isDreamWaveOwner && <EmailAutomationSettings />}
 
-      {activeWorkspace && (
+      {activeWorkspace && !oneTimeClient && (
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold text-foreground">Connected media storage</h2>
@@ -422,7 +427,7 @@ function SocialPlanSettings({
                 {
                   plan: "full",
                   name: "Current",
-                  detail: "3 accounts · AI Assist + scheduling",
+                  detail: "4 accounts · AI Assist + scheduling",
                   monthly: "$69.99 / month",
                   annual: "$797.89 / year · save 5%",
                   features: ["Everything in Ripple", "Generative AI Assist", "Post scheduling"],

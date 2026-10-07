@@ -36,6 +36,10 @@ const mediaQuotaMigration = readFileSync(
   "supabase/migrations/20261007215734_temporary_media_storage_limits.sql",
   "utf8",
 );
+const duplicateAccountMigration = readFileSync(
+  "supabase/migrations/20261007235500_tidal_duplicate_platform_accounts.sql",
+  "utf8",
+);
 
 test("promo trial and three paid tiers enforce account caps, prices, and annual discounts", () => {
   assert.equal(planExports.SOCIAL_PLANS.trial.accountLimit, 3);
@@ -74,7 +78,7 @@ test("public subscriptions and Dream Wave client service tiers stay separate", (
   assert.doesNotMatch(separationMigration, /DELETE FROM public\.workspace_social_subscriptions/);
 
   assert.match(userContext, /data_source: "client_data" \| "os_data"/);
-  assert.match(userContext, /select\("id,name,slug,data_source,/);
+  assert.match(userContext, /select\([\s\S]{0,40}"id,name,slug,data_source,/);
   assert.match(settingsRoute, /activeWorkspace\?\.data_source === "os_data" && canManageBranding/);
   assert.match(
     settingsRoute,
@@ -94,6 +98,24 @@ test("connection limits are enforced server-side and Snapchat remains closed bet
   assert.match(zernio, /connectedAccounts.*>= Number\(limit/);
   assert.match(zernio, /Snapchat connections are still a closed Zernio beta/);
   assert.match(publisher, /Disconnect the extra accounts or upgrade before publishing/);
+});
+
+test("Tidal supports duplicate-network accounts without losing the eight-account cap", () => {
+  const social = readFileSync("src/routes/_authenticated/social.tsx", "utf8");
+  assert.match(
+    duplicateAccountMigration,
+    /DROP CONSTRAINT IF EXISTS social_connections_workspace_id_platform_key/,
+  );
+  assert.match(duplicateAccountMigration, /UNIQUE \(workspace_id, provider, provider_account_id\)/);
+  assert.match(duplicateAccountMigration, /zernio_workspace_subprofiles/);
+  assert.match(zernio, /plan !== "expanded"/);
+  assert.match(zernio, /Additional accounts from the same social network are available on Tidal/);
+  assert.match(social, /Add another/);
+  assert.match(social, /up\s+to eight connected accounts total/);
+  assert.match(createRoute, /Choose .* destination/);
+  assert.match(createRoute, /accountIds/);
+  assert.match(publisher, /Choose at least one .* account in the post editor/);
+  assert.match(publisher, /selectedConnections\.map/);
 });
 
 test("caption suite uses Brand Voice and Story selection is explicit", () => {
