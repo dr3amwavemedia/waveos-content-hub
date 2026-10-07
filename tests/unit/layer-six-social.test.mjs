@@ -42,7 +42,7 @@ test("promo trial and three paid tiers enforce account caps, prices, and annual 
   assert.equal(planExports.SOCIAL_PLANS.standard.accountLimit, 3);
   assert.equal(planExports.SOCIAL_PLANS.standard.monthlyCents, 3999);
   assert.equal(planExports.SOCIAL_PLANS.standard.annualCents, 47988);
-  assert.equal(planExports.SOCIAL_PLANS.full.accountLimit, 3);
+  assert.equal(planExports.SOCIAL_PLANS.full.accountLimit, 4);
   assert.equal(planExports.SOCIAL_PLANS.full.monthlyCents, 6999);
   assert.equal(planExports.SOCIAL_PLANS.full.annualCents, 79789);
   assert.equal(planExports.SOCIAL_PLANS.expanded.accountLimit, 8);
