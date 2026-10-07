@@ -4283,6 +4283,7 @@ export type Database = {
         Args: { _project_id: string }
         Returns: number
       }
+      expire_os_promo_trials: { Args: never; Returns: number }
       get_access_audit_users: {
         Args: never
         Returns: {
