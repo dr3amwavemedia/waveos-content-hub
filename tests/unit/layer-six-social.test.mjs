@@ -74,7 +74,7 @@ test("public subscriptions and Dream Wave client service tiers stay separate", (
   assert.doesNotMatch(separationMigration, /DELETE FROM public\.workspace_social_subscriptions/);
 
   assert.match(userContext, /data_source: "client_data" \| "os_data"/);
-  assert.match(userContext, /select\("id,name,slug,data_source,/);
+  assert.match(userContext, /select\([\s\S]{0,40}"id,name,slug,data_source,/);
   assert.match(settingsRoute, /activeWorkspace\?\.data_source === "os_data" && canManageBranding/);
   assert.match(
     settingsRoute,

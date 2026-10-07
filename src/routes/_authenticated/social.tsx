@@ -1136,6 +1136,9 @@ function AccountsView({
   });
   const statusErrorForbidden =
     status.error instanceof Error && status.error.message === "forbidden";
+  const accountLimitReached =
+    Boolean(status.data?.accountLimit) &&
+    (status.data?.connectedAccounts ?? connectedCount) >= (status.data?.accountLimit ?? 0);
 
   const refresh = async (quiet = false) => {
     setBusy("refresh");
@@ -1203,6 +1206,13 @@ function AccountsView({
   }, [isPublicOs, status.data?.configured, status.data?.hasProfile, workspaceId]);
 
   const connect = async (platform: SocialPlatform) => {
+    const selected = rows.find((row) => row.platform === platform);
+    if (accountLimitReached && selected?.state !== "connected") {
+      toast.error(
+        "Your plan's social account limit is full. Disconnect an account or upgrade in Settings.",
+      );
+      return;
+    }
     setBusy(`connect:${platform}`);
     try {
       const result = await getConnectUrl({ data: { workspaceId, platform } });
@@ -1336,6 +1346,13 @@ function AccountsView({
             Connections
           </p>
           <h2 className="mt-1 text-2xl font-semibold text-foreground">Social accounts</h2>
+          {accountLimitReached && (
+            <p className="mt-2 rounded-xl border border-rose-400/30 bg-rose-400/10 px-3 py-2 text-sm text-rose-200">
+              Plan limit reached ({status.data?.connectedAccounts ?? connectedCount}/
+              {status.data?.accountLimit}). Disconnect an account or upgrade in Settings before
+              connecting another.
+            </p>
+          )}
         </div>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((account) => (
@@ -1343,6 +1360,7 @@ function AccountsView({
               key={account.platform}
               account={account}
               canConnect={Boolean(status.data?.configured && status.data.hasProfile)}
+              limitReached={accountLimitReached && account.state !== "connected"}
               busy={busy === `connect:${account.platform}`}
               disconnecting={busy === `disconnect:${account.platform}`}
               onConnect={() => void connect(account.platform)}
@@ -1385,6 +1403,7 @@ function AccountSummaryRow({ account }: { account: AccountRow }) {
 function AccountCard({
   account,
   canConnect,
+  limitReached,
   busy,
   disconnecting,
   onConnect,
@@ -1392,6 +1411,7 @@ function AccountCard({
 }: {
   account: AccountRow;
   canConnect: boolean;
+  limitReached: boolean;
   busy: boolean;
   disconnecting: boolean;
   onConnect: () => void;
@@ -1401,7 +1421,16 @@ function AccountCard({
   const state = ACCOUNT_STATE[account.state];
   const StateIcon = state.icon;
   return (
-    <article className="rounded-2xl border border-border bg-surface/55 p-4 transition hover:border-primary/25">
+    <article
+      className={cn(
+        "rounded-2xl border p-4 transition",
+        account.state === "connected"
+          ? "border-emerald-400/30 bg-emerald-400/[0.07] hover:border-emerald-400/50"
+          : limitReached
+            ? "border-rose-400/35 bg-rose-400/[0.08]"
+            : "border-border bg-surface/55 hover:border-primary/25",
+      )}
+    >
       <div className="flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-elevated">
           <Icon className="h-5 w-5 text-foreground" />
@@ -1434,11 +1463,25 @@ function AccountCard({
         <button
           type="button"
           onClick={onConnect}
-          disabled={!canConnect || busy || disconnecting}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-border bg-background/35 px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/35 disabled:cursor-not-allowed disabled:opacity-45"
+          disabled={!canConnect || limitReached || busy || disconnecting}
+          title={
+            limitReached
+              ? "Plan limit reached. Disconnect an account or upgrade in Settings."
+              : undefined
+          }
+          className={cn(
+            "inline-flex flex-1 items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold disabled:cursor-not-allowed",
+            limitReached
+              ? "border-rose-400/30 bg-rose-400/10 text-rose-200 opacity-100"
+              : "border-border bg-background/35 text-foreground hover:border-primary/35 disabled:opacity-45",
+          )}
         >
           {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-          {account.state === "connected" ? "Reconnect" : "Connect"}{" "}
+          {limitReached
+            ? "Limit reached"
+            : account.state === "connected"
+              ? "Reconnect"
+              : "Connect"}{" "}
           {PLATFORM_LABEL[account.platform]}
         </button>
         {account.state === "connected" && (

@@ -194,6 +194,43 @@ export async function applySocialSubscriptionEvent(
     { onConflict: "workspace_id" },
   );
   if (result.error) throw result.error;
+  if (isPaid || (!locked && ["active", "trialing"].includes(String(subscription.status ?? "")))) {
+    const lifecycle = await supabaseAdmin.from("social_subscription_lifecycle" as never).upsert(
+      {
+        workspace_id: workspaceId,
+        state: "active",
+        reason: null,
+        inactive_since: null,
+        disconnect_at: null,
+        disconnected_at: null,
+        archive_at: null,
+        archived_at: null,
+        last_checked_at: now,
+        last_error: null,
+        updated_at: now,
+      } as never,
+      { onConflict: "workspace_id" },
+    );
+    if (lifecycle.error) throw lifecycle.error;
+  } else if (locked) {
+    const inactiveSince = previous?.service_locked_at ?? now;
+    const inactiveMs = new Date(inactiveSince).getTime();
+    const lifecycle = await supabaseAdmin.from("social_subscription_lifecycle" as never).upsert(
+      {
+        workspace_id: workspaceId,
+        state: "grace",
+        reason: terminal ? String(subscription.status ?? "canceled") : "payment_unresolved",
+        inactive_since: inactiveSince,
+        disconnect_at: new Date(inactiveMs + 7 * 86_400_000).toISOString(),
+        archive_at: new Date(inactiveMs + 183 * 86_400_000).toISOString(),
+        last_checked_at: now,
+        last_error: null,
+        updated_at: now,
+      } as never,
+      { onConflict: "workspace_id" },
+    );
+    if (lifecycle.error) throw lifecycle.error;
+  }
   if (isPaid || isFailed) {
     try {
       const { sendSocialSubscriptionEmail } =

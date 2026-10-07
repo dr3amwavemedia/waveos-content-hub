@@ -15,6 +15,7 @@ export interface WorkspaceSummary {
   access_tier:
     "project_client" | "growth_90" | "retainer_full" | "social_management" | "wedding_client";
   approval_required: boolean;
+  agreement_term: "one_time" | "90_day" | "6_month" | "12_month" | null;
   businessNameOnly?: boolean;
   role: "owner" | "admin" | "editor" | "approver" | "viewer" | "staff";
 }
@@ -141,7 +142,9 @@ async function loadWorkspaces(
 
   let workspacesQuery = supabase
     .from("workspaces")
-    .select("id,name,slug,data_source,industry,timezone,is_demo,access_tier,feature_overrides")
+    .select(
+      "id,name,slug,data_source,industry,timezone,is_demo,access_tier,agreement_term,feature_overrides",
+    )
     .eq("is_archived", false)
     .order("name", { ascending: true });
 
@@ -220,6 +223,7 @@ async function loadWorkspaces(
         featureOverrides.social_management_access === true ? "social_management" : w.access_tier,
       businessNameOnly: featureOverrides.business_name_only === true,
       approval_required: featureOverrides.automatic_content_approval !== true,
+      agreement_term: w.agreement_term,
       role: (previewWorkspaceId
         ? previewRole
         : w.id === STAFF_WORKSPACE_ID && ctx.isStaff

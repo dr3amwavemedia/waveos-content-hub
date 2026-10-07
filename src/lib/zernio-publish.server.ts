@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { resolveMediaAssetUrl } from "@/lib/external-media.server";
 import { normalizeZernioAccounts, toZernioPlatform, zernioRequest } from "@/lib/zernio.server";
 import { cleanupConfirmedTemporaryMedia } from "@/lib/temporary-media-cleanup.server";
+import { assertPublishingEnabled } from "@/lib/publishing-controls.server";
 
 type ZernioTarget = {
   platform?: string;
@@ -28,6 +29,7 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
     .maybeSingle();
   if (error) throw error;
   if (!item) throw new Error("Post not found.");
+  await assertPublishingEnabled(item.workspace_id);
   if (item.status !== "approved" && item.status !== "scheduled") {
     throw new Error("Item must be approved before publishing.");
   }
