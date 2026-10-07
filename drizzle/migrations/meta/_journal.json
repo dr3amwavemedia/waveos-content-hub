@@ -134,6 +134,13 @@
       "when": 1791403429877,
       "tag": "0018_promo_trial_guardrails",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791403478094,
+      "tag": "0019_private_cron_settings",
+      "breakpoints": true
     }
   ]
 }
