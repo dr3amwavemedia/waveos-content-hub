@@ -1,12 +1,23 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
+import { createSocialSubscriptionCheckout } from "@/lib/social-subscriptions.functions";
 
 const POST_AUTH_NEXT_KEY = "waveos.postAuthNext";
 const PUBLIC_SIGNUP_KEY = "waveos.publicSignup";
+const PUBLIC_SIGNUP_PLAN_KEY = "waveos.publicSignupPlan";
+
+function selectedSignupPlan(value: string | null) {
+  if (value === "standard_annual")
+    return { plan: "standard" as const, interval: "annual" as const };
+  if (value === "expanded_annual")
+    return { plan: "expanded" as const, interval: "annual" as const };
+  return { plan: "standard" as const, interval: "monthly" as const };
+}
 
 export const Route = createFileRoute("/auth-callback")({
   component: AuthCallbackPage,
@@ -38,14 +49,14 @@ function safeNext(next: string | undefined): string {
 
 function AuthCallbackPage() {
   const navigate = useNavigate();
+  const createCheckout = useServerFn(createSocialSubscriptionCheckout);
   const search = Route.useSearch();
   const [message, setMessage] = useState("Completing sign in…");
 
   useEffect(() => {
     let cancelled = false;
     let completion: Promise<void> | null = null;
-    const publicSignup =
-      search.publicSignup || sessionStorage.getItem(PUBLIC_SIGNUP_KEY) === "1";
+    const publicSignup = search.publicSignup || sessionStorage.getItem(PUBLIC_SIGNUP_KEY) === "1";
 
     const resolveTarget = () => {
       const stashed = sessionStorage.getItem(POST_AUTH_NEXT_KEY);
@@ -56,12 +67,14 @@ function AuthCallbackPage() {
 
     const goToTarget = async () => {
       if (cancelled) return;
+      let publicWorkspaceId: string | null = null;
       if (publicSignup) {
-        const { error } = await (
+        const { data, error } = await (
           supabase.rpc as unknown as (
             name: string,
           ) => Promise<{ data: string | null; error: { message: string } | null }>
         )("activate_public_os_account");
+        publicWorkspaceId = data;
         if (
           error &&
           !error.message.includes("account_already_assigned") &&
@@ -71,6 +84,23 @@ function AuthCallbackPage() {
           setMessage("Your account is ready. We’re finishing your workspace setup…");
         }
         sessionStorage.removeItem(PUBLIC_SIGNUP_KEY);
+        if (publicWorkspaceId) {
+          setMessage("Opening secure Stripe checkout…");
+          try {
+            const selection = selectedSignupPlan(sessionStorage.getItem(PUBLIC_SIGNUP_PLAN_KEY));
+            const result = await createCheckout({
+              data: { workspaceId: publicWorkspaceId, ...selection },
+            });
+            sessionStorage.removeItem(PUBLIC_SIGNUP_PLAN_KEY);
+            if (result.url) {
+              window.location.assign(result.url);
+              return;
+            }
+          } catch (checkoutError) {
+            console.error("[public signup checkout]", checkoutError);
+            setMessage("Your account is ready. Choose your plan to unlock WaveOS.");
+          }
+        }
       }
       if (cancelled) return;
       const target = resolveTarget();
@@ -136,7 +166,7 @@ function AuthCallbackPage() {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [navigate, search.next, search.publicSignup]);
+  }, [createCheckout, navigate, search.next, search.publicSignup]);
 
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
@@ -149,7 +179,9 @@ function AuthCallbackPage() {
         </div>
         <div className="surface-card p-8">
           <Loader2 className="mx-auto h-6 w-6 animate-spin text-primary" />
-          <h1 className="mt-4 text-xl font-semibold tracking-tight text-foreground">Signing you in</h1>
+          <h1 className="mt-4 text-xl font-semibold tracking-tight text-foreground">
+            Signing you in
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">{message}</p>
         </div>
       </div>

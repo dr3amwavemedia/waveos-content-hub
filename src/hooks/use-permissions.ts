@@ -30,6 +30,7 @@ export interface PublicSubscriptionState {
   trial_ends_at: string | null;
   payment_failure_count: number;
   service_locked_at: string | null;
+  stripe_subscription_id: string | null;
 }
 
 export interface WorkspacePermissions {
@@ -67,14 +68,10 @@ const PUBLIC_OS_FEATURES = new Set<FeatureKey>([
   "can_manage_workspace",
 ]);
 
-function publicSubscriptionActive(subscription: PublicSubscriptionState | null) {
+export function publicSubscriptionActive(subscription: PublicSubscriptionState | null) {
   if (!subscription || subscription.service_locked_at) return false;
+  if (!subscription.stripe_subscription_id) return false;
   if (subscription.status === "active") return true;
-  if (subscription.status === "trialing") {
-    return Boolean(
-      subscription.trial_ends_at && new Date(subscription.trial_ends_at).getTime() > Date.now(),
-    );
-  }
   return subscription.status === "past_due" && subscription.payment_failure_count < 2;
 }
 
@@ -108,7 +105,9 @@ export function usePermissions(): WorkspacePermissions {
     queryFn: async (): Promise<PublicSubscriptionState | null> => {
       const { data, error } = await supabase
         .from("workspace_social_subscriptions")
-        .select("status,trial_ends_at,payment_failure_count,service_locked_at")
+        .select(
+          "status,trial_ends_at,payment_failure_count,service_locked_at,stripe_subscription_id",
+        )
         .eq("workspace_id", workspaceId!)
         .maybeSingle();
       if (error) throw error;

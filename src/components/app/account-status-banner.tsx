@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, Clock3, PauseCircle } from "lucide-react";
 
-import { usePermissions } from "@/hooks/use-permissions";
+import { publicSubscriptionActive, usePermissions } from "@/hooks/use-permissions";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { daysUntil } from "@/lib/permissions";
 
@@ -12,6 +12,22 @@ export function AccountStatusBanner() {
 
   const remaining = daysUntil(access.expiresAt);
   const common = "flex flex-wrap items-center justify-center gap-2 border-b px-3 py-2 text-xs";
+
+  if (user?.accountSource === "os_data" && !publicSubscriptionActive(subscription)) {
+    const failedTwice =
+      Boolean(subscription?.service_locked_at) || (subscription?.payment_failure_count ?? 0) >= 2;
+    return (
+      <div className={`${common} border-warning/30 bg-warning/10 text-foreground`}>
+        <PauseCircle className="h-4 w-4 text-warning" />
+        {failedTwice
+          ? "WaveOS tools are paused after two unsuccessful payment attempts."
+          : "Complete your WaveOS subscription payment to unlock your workspace."}
+        <Link to="/settings" className="font-semibold text-primary underline underline-offset-2">
+          {failedTwice ? "Update billing" : "Choose a plan"}
+        </Link>
+      </div>
+    );
+  }
 
   if (subscription?.service_locked_at || (subscription?.payment_failure_count ?? 0) >= 2) {
     return (

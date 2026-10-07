@@ -10,6 +10,9 @@ import { WaveLogo } from "@/components/branding/wave-logo";
 
 const POST_AUTH_NEXT_KEY = "waveos.postAuthNext";
 const PUBLIC_SIGNUP_KEY = "waveos.publicSignup";
+const PUBLIC_SIGNUP_PLAN_KEY = "waveos.publicSignupPlan";
+
+type PublicSignupPlan = "standard_monthly" | "standard_annual" | "expanded_annual";
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -51,7 +54,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [promoCode, setPromoCode] = useState("");
+  const [signupPlan, setSignupPlan] = useState<PublicSignupPlan>("standard_monthly");
   const [signupSent, setSignupSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -70,6 +73,10 @@ function AuthPage() {
     const goToTarget = () => {
       if (cancelled || navigated) return;
       navigated = true;
+      if (sessionStorage.getItem(PUBLIC_SIGNUP_KEY) === "1") {
+        window.location.replace("/auth-callback?public_signup=1&next=%2Fhome");
+        return;
+      }
       const target = resolveNext();
       if (target !== "/home") window.location.replace(target);
       else navigate({ to: "/home", replace: true });
@@ -133,35 +140,18 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     sessionStorage.setItem(POST_AUTH_NEXT_KEY, "/home");
-    const normalizedPromo = promoCode.trim().toUpperCase();
-    if (normalizedPromo) {
-      const { data: promo, error: promoError } = await (
-        supabase.rpc as unknown as (
-          name: string,
-          args: Record<string, unknown>,
-        ) => Promise<{
-          data: Array<{ name: string; bonus_trial_days: number }> | null;
-          error: Error | null;
-        }>
-      )("validate_os_promo_code", { _code: normalizedPromo });
-      if (promoError || !promo?.length) {
-        setBusy(false);
-        sessionStorage.removeItem(POST_AUTH_NEXT_KEY);
-        toast.error("That promo code is invalid, paused, expired, or fully redeemed.");
-        return;
-      }
-    }
+    sessionStorage.setItem(PUBLIC_SIGNUP_KEY, "1");
+    sessionStorage.setItem(PUBLIC_SIGNUP_PLAN_KEY, signupPlan);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth-callback?next=${encodeURIComponent("/home")}`,
+        emailRedirectTo: `${window.location.origin}/auth-callback?public_signup=1&next=${encodeURIComponent("/home")}`,
         data: {
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           account_source: "os_data",
           signup_source: "public_trial",
-          ...(normalizedPromo ? { promo_code: normalizedPromo } : {}),
         },
       },
     });
@@ -172,7 +162,7 @@ function AuthPage() {
       return;
     }
     if (data.session) {
-      navigate({ to: "/home", replace: true });
+      window.location.assign("/auth-callback?public_signup=1&next=%2Fhome");
       return;
     }
     setSignupSent(true);
@@ -285,6 +275,42 @@ function AuthPage() {
             className="space-y-4"
           >
             {mode === "signup" && (
+              <fieldset className="space-y-2">
+                <legend className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Choose your subscription
+                </legend>
+                {(
+                  [
+                    ["standard_monthly", "Standard monthly", "$39.99 / month"],
+                    ["standard_annual", "Standard annual", "$479.88 / year"],
+                    ["expanded_annual", "Expanded annual", "$780 / year"],
+                  ] as const
+                ).map(([value, label, price]) => (
+                  <label
+                    key={value}
+                    className={`flex cursor-pointer items-center justify-between rounded-xl border px-3 py-2.5 text-sm transition ${signupPlan === value ? "border-primary bg-primary/10" : "border-border bg-surface/50 hover:border-primary/40"}`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="waveos-plan"
+                        value={value}
+                        checked={signupPlan === value}
+                        onChange={() => setSignupPlan(value)}
+                        className="accent-primary"
+                      />
+                      <span className="font-medium text-foreground">{label}</span>
+                    </span>
+                    <span className="text-xs text-muted-foreground">{price}</span>
+                  </label>
+                ))}
+                <p className="text-[11px] leading-4 text-muted-foreground">
+                  After confirming your email, Stripe will securely collect payment. Workspace tools
+                  unlock only after payment succeeds.
+                </p>
+              </fieldset>
+            )}
+            {mode === "signup" && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
@@ -328,21 +354,6 @@ function AuthPage() {
                 placeholder="you@company.com"
               />
             </div>
-            {mode === "signup" && (
-              <div>
-                <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
-                  Promo code <span className="font-normal opacity-70">(optional)</span>
-                </label>
-                <input
-                  autoComplete="off"
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                  className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 font-mono text-sm uppercase tracking-wider text-foreground placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
-                  placeholder="Enter a promo code"
-                  maxLength={24}
-                />
-              </div>
-            )}
             {(mode === "signin" || mode === "signup") && (
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
@@ -377,7 +388,7 @@ function AuthPage() {
               {mode === "signin"
                 ? "Sign in"
                 : mode === "signup"
-                  ? "Sign up"
+                  ? "Create account & continue to payment"
                   : "Send reset link"}
             </button>
             {(mode === "reset" || mode === "signup") && (

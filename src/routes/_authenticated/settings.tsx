@@ -50,8 +50,8 @@ import {
   createSocialBillingPortal,
   createSocialSubscriptionCheckout,
   getSocialSubscription,
-  startSocialTrial,
 } from "@/lib/social-subscriptions.functions";
+import { publicSubscriptionActive, usePermissions } from "@/hooks/use-permissions";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,6 +67,7 @@ function SettingsPage() {
   const { data: user } = useCurrentUser();
   const { data: actualUser } = useActualCurrentUser();
   const { activeWorkspace } = useWorkspace();
+  const { subscription, isLoading: permissionsLoading, isStaff } = usePermissions();
   const qc = useQueryClient();
   const canManageApproval =
     !user?.isStaff && (activeWorkspace?.role === "owner" || activeWorkspace?.role === "admin");
@@ -104,6 +105,32 @@ function SettingsPage() {
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Could not update approval settings."),
   });
+
+  const paymentRequired =
+    !isStaff &&
+    activeWorkspace?.data_source === "os_data" &&
+    !permissionsLoading &&
+    !publicSubscriptionActive(subscription);
+
+  if (paymentRequired && activeWorkspace) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-6">
+        <header className="text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            Subscription required
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+            Choose your WaveOS plan
+          </h1>
+          <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+            Complete secure payment with Stripe to unlock your workspace. Your account and workspace
+            are saved, but WaveOS tools remain unavailable until payment succeeds.
+          </p>
+        </header>
+        <SocialPlanSettings workspaceId={activeWorkspace.id} canManage />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -289,21 +316,11 @@ function SocialPlanSettings({
   canManage: boolean;
 }) {
   const getPlan = useServerFn(getSocialSubscription);
-  const startTrial = useServerFn(startSocialTrial);
   const checkout = useServerFn(createSocialSubscriptionCheckout);
   const billingPortal = useServerFn(createSocialBillingPortal);
   const query = useQuery({
     queryKey: ["social-subscription", workspaceId],
     queryFn: () => getPlan({ data: { workspaceId } }),
-  });
-  const trial = useMutation({
-    mutationFn: () => startTrial({ data: { workspaceId } }),
-    onSuccess: async () => {
-      await query.refetch();
-      toast.success("Your 30-day social trial is active with two connected accounts.");
-    },
-    onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Could not start trial."),
   });
   const subscribe = useMutation({
     mutationFn: (input: { plan: "standard" | "expanded"; interval: "monthly" | "annual" }) =>
@@ -367,19 +384,6 @@ function SocialPlanSettings({
       )}
       {canManage && (
         <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          {!subscription && (
-            <button
-              type="button"
-              disabled={trial.isPending}
-              onClick={() => trial.mutate()}
-              className="rounded-xl border border-primary/30 bg-primary/10 p-4 text-left hover:bg-primary/15 disabled:opacity-50"
-            >
-              <strong className="text-sm text-foreground">Start 30-day trial</strong>
-              <span className="mt-1 block text-xs text-muted-foreground">
-                No card · up to 2 accounts
-              </span>
-            </button>
-          )}
           <div className="rounded-xl border border-border bg-elevated p-4">
             <strong className="text-sm text-foreground">Standard</strong>
             <span className="mt-1 block text-xs text-muted-foreground">
