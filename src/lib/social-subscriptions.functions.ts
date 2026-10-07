@@ -11,7 +11,7 @@ import {
 
 type SocialSubscriptionRow = {
   workspace_id: string;
-  plan: "trial" | "standard" | "expanded";
+  plan: "trial" | "standard" | "full" | "expanded";
   status: string;
   billing_interval: SocialBillingInterval | null;
   account_limit: number;
@@ -22,6 +22,20 @@ type SocialSubscriptionRow = {
   last_payment_failed_at: string | null;
   service_locked_at: string | null;
   stripe_customer_id: string | null;
+};
+
+type SocialSubscriptionInvoiceRow = {
+  stripe_invoice_id: string;
+  invoice_number: string | null;
+  status: string;
+  amount_due_cents: number;
+  amount_paid_cents: number;
+  currency: string;
+  hosted_invoice_url: string | null;
+  invoice_pdf_url: string | null;
+  billing_period_start: string | null;
+  billing_period_end: string | null;
+  created_at: string;
 };
 
 async function requireWorkspaceAdmin(
@@ -88,13 +102,29 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
       .maybeSingle();
     if (result.error) throw result.error;
     const subscription = result.data as SocialSubscriptionRow | null;
-    const { count } = await supabaseAdmin
-      .from("social_connections")
-      .select("id", { count: "exact", head: true })
-      .eq("workspace_id", data.workspaceId)
-      .eq("provider", "zernio")
-      .eq("connected", true);
-    return { subscription, connectedAccounts: count ?? 0, plans: SOCIAL_PLANS };
+    const [{ count }, invoiceResult] = await Promise.all([
+      supabaseAdmin
+        .from("social_connections")
+        .select("id", { count: "exact", head: true })
+        .eq("workspace_id", data.workspaceId)
+        .eq("provider", "zernio")
+        .eq("connected", true),
+      supabaseAdmin
+        .from("workspace_social_subscription_invoices" as never)
+        .select(
+          "stripe_invoice_id,invoice_number,status,amount_due_cents,amount_paid_cents,currency,hosted_invoice_url,invoice_pdf_url,billing_period_start,billing_period_end,created_at",
+        )
+        .eq("workspace_id", data.workspaceId)
+        .order("created_at", { ascending: false })
+        .limit(24),
+    ]);
+    if (invoiceResult.error) throw invoiceResult.error;
+    return {
+      subscription,
+      connectedAccounts: count ?? 0,
+      plans: SOCIAL_PLANS,
+      invoices: (invoiceResult.data ?? []) as SocialSubscriptionInvoiceRow[],
+    };
   });
 
 export const startSocialTrial = createServerFn({ method: "POST" })
@@ -120,7 +150,7 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
   .validator(
     (data: {
       workspaceId: string;
-      plan: "standard" | "expanded";
+      plan: "standard" | "full" | "expanded";
       interval: SocialBillingInterval;
     }) => data,
   )
@@ -128,7 +158,7 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
     await requirePublicOsWorkspace(data.workspaceId);
     if (!socialPlanAllowsBillingInterval(data.plan, data.interval))
-      throw new Error("Expanded is available with annual billing only.");
+      throw new Error("That billing interval is not available for this plan.");
     const { stripePublicSubscriptionsEnabled, stripeRequest } = await import("@/lib/stripe.server");
     if (!stripePublicSubscriptionsEnabled())
       throw new Error(

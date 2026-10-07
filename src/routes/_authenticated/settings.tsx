@@ -315,6 +315,7 @@ function SocialPlanSettings({
   workspaceId: string;
   canManage: boolean;
 }) {
+  const [annualBilling, setAnnualBilling] = useState(false);
   const getPlan = useServerFn(getSocialSubscription);
   const checkout = useServerFn(createSocialSubscriptionCheckout);
   const billingPortal = useServerFn(createSocialBillingPortal);
@@ -323,8 +324,10 @@ function SocialPlanSettings({
     queryFn: () => getPlan({ data: { workspaceId } }),
   });
   const subscribe = useMutation({
-    mutationFn: (input: { plan: "standard" | "expanded"; interval: "monthly" | "annual" }) =>
-      checkout({ data: { workspaceId, ...input } }),
+    mutationFn: (input: {
+      plan: "standard" | "full" | "expanded";
+      interval: "monthly" | "annual";
+    }) => checkout({ data: { workspaceId, ...input } }),
     onSuccess: (result) => {
       if (result.url) window.location.assign(result.url);
       else toast.error("Stripe did not return a checkout link.");
@@ -353,7 +356,7 @@ function SocialPlanSettings({
         </div>
         <span className="rounded-full border border-border bg-elevated px-3 py-1 text-xs font-semibold text-foreground">
           {subscription
-            ? `${subscription.plan} · ${query.data?.connectedAccounts ?? 0}/${subscription.account_limit} accounts`
+            ? `${query.data?.plans[subscription.plan as keyof typeof query.data.plans]?.name ?? subscription.plan} · ${query.data?.connectedAccounts ?? 0}/${subscription.account_limit} accounts`
             : "Not started"}
         </span>
       </div>
@@ -385,51 +388,147 @@ function SocialPlanSettings({
         </button>
       )}
       {canManage && (
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-border bg-elevated p-4">
-            <strong className="text-sm text-foreground">Standard</strong>
-            <span className="mt-1 block text-xs text-muted-foreground">
-              Up to 3 connected accounts
-            </span>
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              <button
-                type="button"
-                disabled={subscribe.isPending}
-                onClick={() => subscribe.mutate({ plan: "standard", interval: "monthly" })}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/40 disabled:opacity-50"
-              >
-                $39.99 monthly
-              </button>
-              <button
-                type="button"
-                disabled={subscribe.isPending}
-                onClick={() => subscribe.mutate({ plan: "standard", interval: "annual" })}
-                className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground hover:border-primary/40 disabled:opacity-50"
-              >
-                $479.88 annually
-              </button>
-            </div>
-          </div>
-          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
-            <strong className="text-sm text-foreground">Expanded</strong>
-            <span className="mt-1 block text-xs text-muted-foreground">
-              Up to 6 connected accounts · annual only
-            </span>
+        <div className="mt-5">
+          <div className="mb-4 flex items-center justify-end gap-2 text-xs font-semibold text-foreground">
+            Monthly
             <button
               type="button"
-              disabled={subscribe.isPending}
-              onClick={() => subscribe.mutate({ plan: "expanded", interval: "annual" })}
-              className="mt-4 w-full rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              role="switch"
+              aria-checked={annualBilling}
+              onClick={() => setAnnualBilling((value) => !value)}
+              className={`relative h-6 w-11 rounded-full transition ${annualBilling ? "bg-primary" : "bg-border"}`}
             >
-              $780 annually
+              <span
+                className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${annualBilling ? "left-6" : "left-1"}`}
+              />
             </button>
+            Annual
+          </div>
+          <div className="grid gap-3 lg:grid-cols-3">
+            {(
+              [
+                {
+                  plan: "standard",
+                  name: "Ripple",
+                  detail: "3 accounts · core tools",
+                  monthly: "$39.99 / month",
+                  annual: "$479.88 / year",
+                  features: [
+                    "Create and publish content",
+                    "Analytics and media library",
+                    "3 social accounts",
+                  ],
+                },
+                {
+                  plan: "full",
+                  name: "Current",
+                  detail: "3 accounts · AI Assist + scheduling",
+                  monthly: "$70 / month",
+                  annual: "$798 / year · save 5%",
+                  features: ["Everything in Ripple", "Generative AI Assist", "Post scheduling"],
+                },
+                {
+                  plan: "expanded",
+                  name: "Tidal",
+                  detail: "8 accounts · AI Assist + scheduling",
+                  monthly: "$120 / month",
+                  annual: "$1,296 / year · save 10%",
+                  features: [
+                    "Everything in Current",
+                    "8 social accounts",
+                    "Built for growing teams",
+                  ],
+                },
+              ] as const
+            ).map((tier) => (
+              <div
+                key={tier.plan}
+                className={`rounded-xl border p-4 ${tier.plan === "full" ? "border-primary/40 bg-primary/5" : "border-border bg-elevated"}`}
+              >
+                <strong className="text-sm text-foreground">{tier.name}</strong>
+                <span className="mt-1 block min-h-8 text-xs text-muted-foreground">
+                  {tier.detail}
+                </span>
+                <ul className="mt-3 grid gap-1.5 text-[11px] text-muted-foreground">
+                  {tier.features.map((feature) => (
+                    <li key={feature} className="flex items-center gap-2">
+                      <span className="text-primary">✓</span> {feature}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  disabled={subscribe.isPending}
+                  onClick={() =>
+                    subscribe.mutate({
+                      plan: tier.plan,
+                      interval: annualBilling ? "annual" : "monthly",
+                    })
+                  }
+                  className="mt-4 w-full rounded-lg bg-primary px-3 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md active:translate-y-0 active:scale-[0.98] disabled:opacity-50"
+                >
+                  {annualBilling ? tier.annual : tier.monthly}
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
       <p className="mt-3 text-[11px] text-muted-foreground">
-        Standard is available monthly or annually. Expanded is annual only. Payments and billing
-        details are securely managed by Stripe.
+        Annual billing keeps Ripple at $479.88, saves 5% on Current, and saves 10% on Tidal.
+        Payments, subscription invoices, and billing details are securely managed by Stripe.
       </p>
+      <details className="mt-5 rounded-xl border border-border bg-elevated/50">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-foreground">
+          <span>Billing history</span>
+          <span className="text-xs font-normal text-muted-foreground">
+            {query.data?.invoices.length ?? 0} invoice
+            {(query.data?.invoices.length ?? 0) === 1 ? "" : "s"} ▾
+          </span>
+        </summary>
+        <div className="border-t border-border px-4 py-2">
+          {query.data?.invoices.length ? (
+            <div className="divide-y divide-border">
+              {query.data.invoices.map((invoice) => {
+                const amount = new Intl.NumberFormat("en-US", {
+                  style: "currency",
+                  currency: invoice.currency,
+                }).format((invoice.amount_paid_cents || invoice.amount_due_cents) / 100);
+                const invoiceUrl = invoice.hosted_invoice_url ?? invoice.invoice_pdf_url;
+                return (
+                  <div
+                    key={invoice.stripe_invoice_id}
+                    className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs"
+                  >
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {invoice.invoice_number ?? "Subscription invoice"} · {amount}
+                      </p>
+                      <p className="mt-0.5 text-muted-foreground">
+                        {new Date(invoice.created_at).toLocaleDateString()} · {invoice.status}
+                      </p>
+                    </div>
+                    {invoiceUrl && (
+                      <a
+                        href={invoiceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-lg border border-border bg-background px-3 py-2 font-semibold text-foreground hover:border-primary/40"
+                      >
+                        View invoice
+                      </a>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="py-4 text-xs text-muted-foreground">
+              Stripe invoices will appear here after the first subscription charge.
+            </p>
+          )}
+        </div>
+      </details>
     </section>
   );
 }

@@ -67,6 +67,7 @@ import {
 import { PenSquare } from "lucide-react";
 import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 import { useActualCurrentUser, useCurrentUser } from "@/hooks/use-waveos";
+import { usePermissions } from "@/hooks/use-permissions";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/create")({
@@ -90,6 +91,9 @@ function CreatePost() {
   const { activeWorkspace } = useWorkspace();
   const { data: user } = useCurrentUser();
   const { data: actualUser } = useActualCurrentUser();
+  const { can } = usePermissions();
+  const canUseAiAssist = can("can_use_ai_tools");
+  const canSchedule = can("can_schedule_content");
   const navigate = useNavigate();
   const search = Route.useSearch();
   const qc = useQueryClient();
@@ -319,13 +323,9 @@ function CreatePost() {
 
   async function handleCaptionAssist() {
     if (!workspaceId) return;
+    if (!canUseAiAssist) return toast.error("AI Assist is available on Current and Tidal plans.");
     const brief = caption.trim() || title.trim();
     if (!brief) return toast.error("Add a short post idea or internal title first.");
-    if (
-      caption.trim() &&
-      !confirm("Replace the primary and selected platform captions with new Brand Voice drafts?")
-    )
-      return;
     setAssisting(true);
     try {
       const result = await assist({
@@ -361,6 +361,7 @@ function CreatePost() {
 
   async function handleScheduleLater() {
     if (!workspaceId) return;
+    if (!canSchedule) return toast.error("Scheduling is available on Current and Tidal plans.");
     if (!caption.trim()) return toast.error("Add a caption before scheduling");
     if (!platforms.length) return toast.error("Pick at least one platform");
     if (!scheduledAt) return toast.error("Choose a publish date and time");
@@ -640,7 +641,7 @@ function CreatePost() {
               <span>{caption.length} chars</span>
               <button
                 type="button"
-                disabled={locked || assisting || !platforms.length}
+                disabled={locked || assisting || !platforms.length || !canUseAiAssist}
                 onClick={() => void handleCaptionAssist()}
                 className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1.5 font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
               >
@@ -747,12 +748,15 @@ function CreatePost() {
               <input
                 type="datetime-local"
                 value={scheduledAt}
+                disabled={!canSchedule}
                 onChange={(e) => setScheduledAt(e.target.value)}
                 className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60"
               />
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Leave empty when you want to publish immediately.
+              {canSchedule
+                ? "Leave empty when you want to publish immediately."
+                : "Upgrade to Current or Tidal to schedule posts."}
             </p>
           </div>
 
@@ -819,7 +823,9 @@ function CreatePost() {
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
               <button
-                disabled={locked || publishing !== null || !caption.trim() || !scheduledAt}
+                disabled={
+                  locked || publishing !== null || !caption.trim() || !scheduledAt || !canSchedule
+                }
                 onClick={handleScheduleLater}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
               >

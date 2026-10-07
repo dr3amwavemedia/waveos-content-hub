@@ -20,9 +20,11 @@ test("public signup chooses a paid plan before account creation and opens Stripe
   assert.match(auth, /account_source: "os_data"/);
   assert.match(auth, /signup_source: "public_trial"/);
   assert.match(auth, /Choose your subscription/);
-  assert.match(auth, /Standard monthly/);
-  assert.match(auth, /Standard annual/);
-  assert.match(auth, /Expanded annual/);
+  assert.match(auth, /Ripple/);
+  assert.match(auth, /Current/);
+  assert.match(auth, /Tidal/);
+  assert.match(auth, /save 5%/);
+  assert.match(auth, /save 10%/);
   assert.match(auth, /Create account & continue to payment/);
   assert.match(auth, /waveos\.publicSignupPlan/);
   assert.doesNotMatch(auth, /No card required/);
