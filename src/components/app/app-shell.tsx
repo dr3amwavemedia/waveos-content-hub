@@ -49,7 +49,7 @@ import { AccountStatusBanner } from "./account-status-banner";
 import { ProductionHealthBanner } from "./production-health-banner";
 
 import type { FeatureKey } from "@/lib/permissions";
-import { usePermissions } from "@/hooks/use-permissions";
+import { publicSubscriptionActive, usePermissions } from "@/hooks/use-permissions";
 import { useWorkspaceBranding, workspaceThemeStyle } from "@/hooks/use-workspace-branding";
 import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
 
@@ -196,7 +196,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  const { can, visibility, isLoading: permsLoading, access, isStaff } = usePermissions();
+  const {
+    can,
+    visibility,
+    isLoading: permsLoading,
+    access,
+    isStaff,
+    subscription,
+  } = usePermissions();
   const { data: user, error: userError, refetch: retryUser } = useCurrentUser();
   const { activeWorkspace, error: workspaceError, retry: retryWorkspace } = useWorkspace();
   const branding = useWorkspaceBranding(activeWorkspace?.id);
@@ -225,12 +232,20 @@ function Shell({ children }: { children: ReactNode }) {
   const isLayer1 = !isStaff && access?.tier === "project_client";
   const isWeddingClient = !isStaff && access?.tier === "wedding_client";
   const isPublicOs = !isStaff && activeWorkspace?.data_source === "os_data";
+  const publicPaymentRequired =
+    isPublicOs && !permsLoading && !publicSubscriptionActive(subscription);
 
   useEffect(() => {
     if (isWeddingClient && !WEDDING_ALLOWED_PATHS.includes(pathname)) {
       void navigate({ to: "/home", replace: true });
     }
   }, [isWeddingClient, navigate, pathname]);
+
+  useEffect(() => {
+    if (publicPaymentRequired && pathname !== "/settings") {
+      void navigate({ to: "/settings", replace: true });
+    }
+  }, [navigate, pathname, publicPaymentRequired]);
 
   const baseClientNav = isCrew
     ? CLIENT_NAV.filter(
@@ -404,6 +419,10 @@ function Shell({ children }: { children: ReactNode }) {
               >
                 Try again
               </button>
+            </div>
+          ) : publicPaymentRequired && pathname !== "/settings" ? (
+            <div className="surface-card p-8 text-center text-sm text-muted-foreground">
+              Opening secure subscription setup…
             </div>
           ) : isWeddingClient && !WEDDING_ALLOWED_PATHS.includes(pathname) ? (
             <div className="surface-card p-8 text-center text-sm text-muted-foreground">

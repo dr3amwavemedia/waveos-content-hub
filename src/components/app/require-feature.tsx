@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Loader2, Lock } from "lucide-react";
 import type { ReactNode } from "react";
-import { usePermissions } from "@/hooks/use-permissions";
+import { publicSubscriptionActive, usePermissions } from "@/hooks/use-permissions";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import type { FeatureKey } from "@/lib/permissions";
@@ -52,8 +52,9 @@ export function RequireFeature({ feature, title, description, children }: Requir
   if (can(feature)) return <>{children}</>;
 
   const publicPaymentLock =
-    activeWorkspace.data_source === "os_data" &&
-    (Boolean(subscription?.service_locked_at) || (subscription?.payment_failure_count ?? 0) >= 2);
+    activeWorkspace.data_source === "os_data" && !publicSubscriptionActive(subscription);
+  const failedTwice =
+    Boolean(subscription?.service_locked_at) || (subscription?.payment_failure_count ?? 0) >= 2;
 
   // Staff should always be able to reach this (retainer_full by default), so
   // hitting this branch means staff is impersonating a client tier without the
@@ -63,12 +64,18 @@ export function RequireFeature({ feature, title, description, children }: Requir
       <LockedPreview
         title={
           title ??
-          (publicPaymentLock ? "Subscription payment needs attention" : "Not included in your plan")
+          (publicPaymentLock
+            ? failedTwice
+              ? "Subscription payment needs attention"
+              : "Subscription required"
+            : "Not included in your plan")
         }
         description={
           description ??
           (publicPaymentLock
-            ? "Two payment attempts were unsuccessful. Update billing to restore WaveOS social tools. Your connected accounts and content remain safely stored."
+            ? failedTwice
+              ? "Two payment attempts were unsuccessful. Update billing to restore WaveOS social tools. Your connected accounts and content remain safely stored."
+              : "Choose a WaveOS plan and complete secure payment to unlock this workspace."
             : access?.status === "expired"
               ? "Your Dream Wave Media agreement has expired. Contact your account manager to renew and restore access to this tool."
               : "This workspace tool is included with 6- and 12-month Dream Wave Media retainers. Contact your account manager to upgrade.")

@@ -12,15 +12,25 @@ test("homepage exposes signup without unverified plan claims", async () => {
   assert.doesNotMatch(landing, /Connect up to 2 social accounts/);
 });
 
-test("public signup is marked as OS data and returns to its ready Overview", async () => {
-  const auth = await read("src/routes/auth.tsx");
+test("public signup chooses a paid plan before account creation and opens Stripe after confirmation", async () => {
+  const [auth, callback] = await Promise.all([
+    read("src/routes/auth.tsx"),
+    read("src/routes/auth-callback.tsx"),
+  ]);
   assert.match(auth, /account_source: "os_data"/);
   assert.match(auth, /signup_source: "public_trial"/);
-  assert.match(auth, /Sign up/);
+  assert.match(auth, /Choose your subscription/);
+  assert.match(auth, /Standard monthly/);
+  assert.match(auth, /Standard annual/);
+  assert.match(auth, /Expanded annual/);
+  assert.match(auth, /Create account & continue to payment/);
+  assert.match(auth, /waveos\.publicSignupPlan/);
   assert.doesNotMatch(auth, /No card required/);
   assert.doesNotMatch(auth, /30 days, two connected accounts/);
   assert.match(auth, /\{mode !== "signup" && \([\s\S]*Technical problem\?/);
-  assert.match(auth, /\/auth-callback\?next=/);
+  assert.match(auth, /auth-callback\?public_signup=1/);
+  assert.match(callback, /createSocialSubscriptionCheckout/);
+  assert.match(callback, /Opening secure Stripe checkout/);
   assert.match(auth, /mode === "signup" \? "\/home"/);
   assert.doesNotMatch(auth, /sessionStorage\.setItem\(POST_AUTH_NEXT_KEY, "\/onboarding"\)/);
 });
@@ -54,4 +64,22 @@ test("public accounts receive an isolated workspace and Overview immediately", a
   assert.match(callback, /activate_public_os_account/);
   assert.match(callback, /waveos\.publicSignup/);
   assert.match(userContext, /profile\?\.account_source === "os_data"/);
+});
+
+test("new and legacy-unpaid public accounts require payment while Dream Wave clients stay exempt", async () => {
+  const [migration, permissions, shell, settings] = await Promise.all([
+    read("supabase/migrations/20261007191323_require_public_subscription_payment.sql"),
+    read("src/hooks/use-permissions.ts"),
+    read("src/components/app/app-shell.tsx"),
+    read("src/routes/_authenticated/settings.tsx"),
+  ]);
+  assert.match(migration, /workspace\.data_source = 'os_data'/);
+  assert.match(migration, /NEW\.status := 'checkout_pending'/);
+  assert.match(migration, /subscription\.stripe_subscription_id IS NULL/);
+  assert.match(migration, /RAISE EXCEPTION 'payment_required'/);
+  assert.doesNotMatch(permissions, /subscription\.status === "trialing"/);
+  assert.match(shell, /publicPaymentRequired/);
+  assert.match(shell, /navigate\(\{ to: "\/settings", replace: true \}\)/);
+  assert.match(settings, /tools remain unavailable until payment succeeds/);
+  assert.doesNotMatch(settings, /Start 30-day trial/);
 });
