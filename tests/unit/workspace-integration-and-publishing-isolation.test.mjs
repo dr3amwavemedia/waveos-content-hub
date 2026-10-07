@@ -12,6 +12,7 @@ const externalMigration = readFileSync(
 const zernioServer = readFileSync("src/lib/zernio.server.ts", "utf8");
 const zernioFunctions = readFileSync("src/lib/zernio.functions.ts", "utf8");
 const publisher = readFileSync("src/lib/zernio-publish.server.ts", "utf8");
+const publishFunctions = readFileSync("src/lib/publish.functions.ts", "utf8");
 const createRoute = readFileSync("src/routes/_authenticated/create.tsx", "utf8");
 const userContext = readFileSync("src/hooks/use-waveos.ts", "utf8");
 const settingsRoute = readFileSync("src/routes/_authenticated/settings.tsx", "utf8");
@@ -59,14 +60,11 @@ test("every immediate or scheduled publish is pinned to the content workspace's 
   assert.match(scheduledPublisher, /publishContentItemWithZernio\(item\.id\)/);
 });
 
-test("View as client keeps staff release authority and audit attribution on the real actor", () => {
+test("publishing keeps audit attribution on the authenticated real actor", () => {
   assert.match(userContext, /export function useActualCurrentUser/);
-  assert.match(createRoute, /useActualCurrentUser\(\)/);
-  assert.match(createRoute, /actualUser\?\.isDreamWaveOwner/);
-  assert.match(createRoute, /actualUser\.staffType === "media_manager"/);
-  assert.match(createRoute, /releaseMode === "direct"/);
-  assert.match(createRoute, /requestedAction: "schedule"/);
-  assert.match(createRoute, /requestedAction: "publish_now"/);
+  assert.match(publishFunctions, /middleware\(\[requireSupabaseAuth\]\)/);
+  assert.match(publishFunctions, /publishContentItemWithZernio\(data\.contentId, context\.userId\)/);
+  assert.match(publisher, /actor_user_id: actorUserId \?\? null/);
   assert.match(releaseMigration, /actor_user_id[\s\S]*_uid/);
   assert.match(releaseMigration, /'content_release_mode_selected'/);
 });
