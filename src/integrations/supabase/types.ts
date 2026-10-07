@@ -4512,7 +4512,10 @@ export type Database = {
           cancel_at_period_end: boolean
           created_at: string
           current_period_end: string | null
+          last_payment_failed_at: string | null
+          payment_failure_count: number
           plan: string
+          service_locked_at: string | null
           status: string
           stripe_checkout_session_id: string | null
           stripe_customer_id: string | null
