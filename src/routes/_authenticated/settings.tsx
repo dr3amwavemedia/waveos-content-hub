@@ -382,7 +382,16 @@ function SocialPlanSettings({
             </p>
           </div>
         )}
-      {canManage && subscription?.stripe_customer_id && (
+      {subscription?.internal_test_access && (
+        <div className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm text-foreground">
+          <strong>Internal test access</strong>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            This workspace has full {query.data?.plans[subscription.plan]?.name ?? subscription.plan}
+            {" "}plan access for product testing. No Stripe subscription or payment is attached.
+          </p>
+        </div>
+      )}
+      {canManage && !subscription?.internal_test_access && subscription?.stripe_customer_id && (
         <button
           type="button"
           disabled={manageBilling.isPending}
@@ -392,7 +401,7 @@ function SocialPlanSettings({
           {manageBilling.isPending ? "Opening Stripe…" : "Manage payment method"}
         </button>
       )}
-      {canManage && (
+      {canManage && !subscription?.internal_test_access && (
         <div className="mt-5">
           <div className="mb-4 flex items-center justify-end gap-2 text-xs font-semibold text-foreground">
             Monthly

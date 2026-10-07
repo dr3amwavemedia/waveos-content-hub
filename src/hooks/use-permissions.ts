@@ -28,6 +28,7 @@ interface WorkspaceAccessRow {
 export interface PublicSubscriptionState {
   plan: "trial" | "standard" | "full" | "expanded";
   status: string;
+  internal_test_access: boolean;
   trial_ends_at: string | null;
   payment_failure_count: number;
   service_locked_at: string | null;
@@ -73,7 +74,9 @@ const PUBLIC_OS_PREMIUM_FEATURES = new Set<FeatureKey>([
 ]);
 
 export function publicSubscriptionActive(subscription: PublicSubscriptionState | null) {
-  if (!subscription || subscription.service_locked_at) return false;
+  if (!subscription) return false;
+  if (subscription.internal_test_access) return true;
+  if (subscription.service_locked_at) return false;
   if (subscription.status === "trialing") {
     return Boolean(
       subscription.stripe_subscription_id &&
@@ -117,7 +120,7 @@ export function usePermissions(): WorkspacePermissions {
       const { data, error } = await supabase
         .from("workspace_social_subscriptions")
         .select(
-          "plan,status,trial_ends_at,payment_failure_count,service_locked_at,stripe_subscription_id",
+          "plan,status,internal_test_access,trial_ends_at,payment_failure_count,service_locked_at,stripe_subscription_id",
         )
         .eq("workspace_id", workspaceId!)
         .maybeSingle();

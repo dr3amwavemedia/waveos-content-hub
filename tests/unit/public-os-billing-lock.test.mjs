@@ -57,6 +57,25 @@ test("locked subscribers can open Stripe billing without exposing credentials", 
   assert.match(settings, /Manage payment method/);
 });
 
+test("internal test users receive plan access without a billable Stripe subscription", async () => {
+  const [migration, permissions, functions, settings] = await Promise.all([
+    read("supabase/migrations/20261008000000_internal_test_subscription_access.sql"),
+    read("src/hooks/use-permissions.ts"),
+    read("src/lib/social-subscriptions.functions.ts"),
+    read("src/routes/_authenticated/settings.tsx"),
+  ]);
+  assert.match(migration, /internal_test_access boolean NOT NULL DEFAULT false/);
+  assert.match(migration, /subscription\.internal_test_access/);
+  assert.match(migration, /stripe_subscription_id = NULL/);
+  assert.match(migration, /waveos\.ripple\.test@dwmsrq\.com/);
+  assert.match(migration, /waveos\.current\.test@dwmsrq\.com/);
+  assert.match(migration, /waveos\.tidal\.test@dwmsrq\.com/);
+  assert.match(permissions, /if \(subscription\.internal_test_access\) return true/);
+  assert.match(functions, /Internal test accounts do not use Stripe checkout/);
+  assert.match(settings, /Internal test access/);
+  assert.match(settings, /No Stripe subscription or payment is attached/);
+});
+
 test("promo checkout still requires a card and limits access until the selected plan starts", async () => {
   const [functions, webhook, permissions] = await Promise.all([
     read("src/lib/social-subscriptions.functions.ts"),
