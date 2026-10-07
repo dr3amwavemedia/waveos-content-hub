@@ -7,6 +7,8 @@ type StripeSubscription = {
   customer?: string | null;
   status?: string;
   current_period_end?: number;
+  trial_start?: number;
+  trial_end?: number;
   cancel_at_period_end?: boolean;
   metadata?: Record<string, string>;
 };
@@ -53,7 +55,12 @@ export async function applySocialSubscriptionEvent(
       `/subscriptions/${encodeURIComponent(subscriptionId)}`,
       { method: "GET" },
     );
-    forcedStatus = eventType === "invoice.paid" ? "active" : "past_due";
+    forcedStatus =
+      eventType === "invoice.paid" && subscription.status === "active"
+        ? "active"
+        : eventType === "invoice.payment_failed"
+          ? "past_due"
+          : null;
   } else {
     return false;
   }
@@ -71,16 +78,26 @@ export async function applySocialSubscriptionEvent(
   // Consume stale social-subscription events for Dream Wave client workspaces
   // without letting them create or update a public WaveOS billing record.
   if (workspace?.data_source !== "os_data") return Boolean(workspace);
-  const isPaid = eventType === "invoice.paid";
+  const isPaid =
+    eventType === "invoice.paid" &&
+    subscription.status === "active" &&
+    Number(object.amount_paid ?? 0) > 0;
   const isFailed = eventType === "invoice.payment_failed";
   // A delayed failed-invoice event must never re-lock a subscription that is
   // already active in Stripe after a successful retry.
   if (isFailed && subscription.status === "active") return true;
-  const { data: existing } = await supabaseAdmin
-    .from("workspace_social_subscriptions" as never)
-    .select("payment_failure_count,service_locked_at")
-    .eq("workspace_id", workspaceId)
-    .maybeSingle();
+  const [{ data: existing }, { data: promoRedemption }] = await Promise.all([
+    supabaseAdmin
+      .from("workspace_social_subscriptions" as never)
+      .select("payment_failure_count,service_locked_at")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("os_promo_redemptions" as never)
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle(),
+  ]);
   const previous = existing as {
     payment_failure_count?: number;
     service_locked_at?: string | null;
@@ -91,22 +108,39 @@ export async function applySocialSubscriptionEvent(
   const terminal = ["canceled", "unpaid", "incomplete_expired"].includes(
     String(subscription.status ?? ""),
   );
+  const promoInitialPaymentFailed = Boolean(
+    isFailed &&
+    promoRedemption &&
+    subscription.trial_end &&
+    subscription.current_period_end &&
+    subscription.current_period_end <= subscription.trial_end + 86_400,
+  );
   const locked =
-    (isFailed && (attemptCount >= 2 || Boolean(previous?.service_locked_at))) || terminal;
+    (isFailed &&
+      (promoInitialPaymentFailed || attemptCount >= 2 || Boolean(previous?.service_locked_at))) ||
+    terminal;
   const now = new Date().toISOString();
+  const promoTrialing = subscription.status === "trialing" && Boolean(metadata.promo_trial_days);
+  const effectivePlan = promoTrialing ? "standard" : plan;
   const result = await supabaseAdmin.from("workspace_social_subscriptions" as never).upsert(
     {
       workspace_id: workspaceId,
-      plan,
+      plan: effectivePlan,
       status: forcedStatus ?? localStatus(subscription.status),
       billing_interval: interval ?? null,
-      account_limit: SOCIAL_PLANS[plan].accountLimit,
+      account_limit: promoTrialing ? 3 : SOCIAL_PLANS[plan].accountLimit,
       stripe_customer_id: subscription.customer ?? (String(object.customer ?? "") || null),
       stripe_subscription_id: subscription.id,
       stripe_checkout_session_id:
         eventType === "checkout.session.completed" ? String(object.id ?? "") : undefined,
       current_period_end: subscription.current_period_end
         ? new Date(subscription.current_period_end * 1000).toISOString()
+        : null,
+      trial_started_at: subscription.trial_start
+        ? new Date(subscription.trial_start * 1000).toISOString()
+        : null,
+      trial_ends_at: subscription.trial_end
+        ? new Date(subscription.trial_end * 1000).toISOString()
         : null,
       cancel_at_period_end: subscription.cancel_at_period_end ?? false,
       ...(isPaid

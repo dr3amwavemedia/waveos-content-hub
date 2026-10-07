@@ -72,7 +72,9 @@ export function publicSubscriptionActive(subscription: PublicSubscriptionState |
   if (!subscription || subscription.service_locked_at) return false;
   if (subscription.status === "trialing") {
     return Boolean(
-      subscription.trial_ends_at && new Date(subscription.trial_ends_at).getTime() > Date.now(),
+      subscription.stripe_subscription_id &&
+      subscription.trial_ends_at &&
+      new Date(subscription.trial_ends_at).getTime() > Date.now(),
     );
   }
   if (!subscription.stripe_subscription_id) return false;

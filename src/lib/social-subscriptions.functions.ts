@@ -143,13 +143,36 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     if (workspace?.data_source !== "os_data")
       throw new Error("public_subscription_workspace_required");
     const amount = socialPlanPrice(data.plan, data.interval);
+    const { data: promoRedemption, error: promoError } = await supabaseAdmin
+      .from("os_promo_redemptions" as never)
+      .select("bonus_trial_days")
+      .eq("workspace_id", data.workspaceId)
+      .maybeSingle();
+    if (promoError) throw promoError;
+    const promoTrialDays = Math.min(
+      30,
+      Math.max(
+        0,
+        Number((promoRedemption as { bonus_trial_days?: number } | null)?.bonus_trial_days ?? 0),
+      ),
+    );
     const origin = process.env.WAVEOS_APP_URL || "https://waveos.dreamwavemedia.co";
     const session = await stripeRequest<{ id: string; url?: string | null }>("/checkout/sessions", {
       body: {
         mode: "subscription",
         client_reference_id: data.workspaceId,
-        success_url: `${origin}/settings?social_checkout=success`,
+        success_url: `${origin}/social?view=accounts&subscription=started`,
         cancel_url: `${origin}/settings?social_checkout=cancelled`,
+        payment_method_collection: "always",
+        ...(promoTrialDays
+          ? {
+              custom_text: {
+                submit: {
+                  message: `Your ${promoTrialDays}-day WaveOS promo makes today's total $0. A card is required and your selected plan begins automatically after the trial unless you cancel.`,
+                },
+              },
+            }
+          : {}),
         line_items: [
           {
             quantity: 1,
@@ -166,12 +189,15 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
           social_plan: data.plan,
           billing_interval: data.interval,
           workspace_name: workspace?.name ?? "WaveOS workspace",
+          promo_trial_days: promoTrialDays || "",
         },
         subscription_data: {
+          ...(promoTrialDays ? { trial_period_days: promoTrialDays } : {}),
           metadata: {
             workspace_id: data.workspaceId,
             social_plan: data.plan,
             billing_interval: data.interval,
+            promo_trial_days: promoTrialDays || "",
           },
         },
       },
@@ -179,10 +205,10 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     await supabaseAdmin.from("workspace_social_subscriptions" as never).upsert(
       {
         workspace_id: data.workspaceId,
-        plan: data.plan,
+        plan: promoTrialDays ? "standard" : data.plan,
         status: "checkout_pending",
         billing_interval: data.interval,
-        account_limit: SOCIAL_PLANS[data.plan].accountLimit,
+        account_limit: promoTrialDays ? 3 : SOCIAL_PLANS[data.plan].accountLimit,
         stripe_checkout_session_id: session.id,
         updated_at: new Date().toISOString(),
       } as never,

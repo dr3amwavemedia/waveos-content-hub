@@ -144,7 +144,7 @@ function OnboardingPage() {
       setStep("done");
       toast.success(
         user?.accountSource === "os_data"
-          ? "Your workspace and 30-day trial are ready."
+          ? "Your workspace and promotional trial are ready."
           : "Workspace created.",
       );
     } catch (err: unknown) {

@@ -56,3 +56,18 @@ test("locked subscribers can open Stripe billing without exposing credentials", 
   assert.match(functions, /requireWorkspaceAdmin/);
   assert.match(settings, /Manage payment method/);
 });
+
+test("promo checkout still requires a card and limits access until the selected plan starts", async () => {
+  const [functions, webhook, permissions] = await Promise.all([
+    read("src/lib/social-subscriptions.functions.ts"),
+    read("src/lib/social-subscription-webhook.server.ts"),
+    read("src/hooks/use-permissions.ts"),
+  ]);
+  assert.match(functions, /payment_method_collection: "always"/);
+  assert.match(functions, /trial_period_days: promoTrialDays/);
+  assert.match(functions, /today's total \$0/);
+  assert.match(functions, /plan: promoTrialDays \? "standard" : data\.plan/);
+  assert.match(webhook, /promoTrialing \? 3 : SOCIAL_PLANS\[plan\]\.accountLimit/);
+  assert.match(webhook, /promoInitialPaymentFailed/);
+  assert.match(permissions, /subscription\.stripe_subscription_id &&/);
+});
