@@ -53,7 +53,7 @@ for billing history, but it remains associated with the existing workspace and S
 
 ## Retention and deletion
 
-Recommended policy: retain an inactive workspace for 12 months unless the customer requests earlier
+Recommended policy: retain an inactive workspace for 6 months unless the customer requests earlier
 deletion or applicable law requires another period. Send reminders before permanent deletion. When
 the retention period ends, delete or anonymize customer content according to the published retention
 policy while retaining only legally required financial records.
