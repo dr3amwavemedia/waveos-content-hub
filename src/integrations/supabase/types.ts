@@ -1534,6 +1534,86 @@ export type Database = {
         }
         Relationships: []
       }
+      email_automation_deliveries: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          error_message: string | null
+          id: string
+          provider_message_id: string | null
+          recipient_email: string
+          reminder_day: number
+          status: string
+          workspace_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          error_message?: string | null
+          id?: string
+          provider_message_id?: string | null
+          recipient_email: string
+          reminder_day: number
+          status: string
+          workspace_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          error_message?: string | null
+          id?: string
+          provider_message_id?: string | null
+          recipient_email?: string
+          reminder_day?: number
+          status?: string
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_automation_deliveries_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_automation_settings: {
+        Row: {
+          client_notifications_enabled: boolean
+          id: boolean
+          invoice_reminders_enabled: boolean
+          project_reminders_enabled: boolean
+          staff_notifications_enabled: boolean
+          updated_at: string
+          updated_by: string | null
+          upload_notifications_enabled: boolean
+        }
+        Insert: {
+          client_notifications_enabled?: boolean
+          id?: boolean
+          invoice_reminders_enabled?: boolean
+          project_reminders_enabled?: boolean
+          staff_notifications_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          upload_notifications_enabled?: boolean
+        }
+        Update: {
+          client_notifications_enabled?: boolean
+          id?: boolean
+          invoice_reminders_enabled?: boolean
+          project_reminders_enabled?: boolean
+          staff_notifications_enabled?: boolean
+          updated_at?: string
+          updated_by?: string | null
+          upload_notifications_enabled?: boolean
+        }
+        Relationships: []
+      }
       expense_receipts: {
         Row: {
           amount_cents: number
