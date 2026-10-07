@@ -3697,6 +3697,71 @@ export type Database = {
           },
         ]
       }
+      workspace_social_subscription_invoices: {
+        Row: {
+          amount_due_cents: number
+          amount_paid_cents: number
+          billing_period_end: string | null
+          billing_period_start: string | null
+          created_at: string
+          currency: string
+          hosted_invoice_url: string | null
+          id: string
+          invoice_number: string | null
+          invoice_pdf_url: string | null
+          status: string
+          stripe_created_at: string | null
+          stripe_invoice_id: string
+          stripe_subscription_id: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          amount_due_cents?: number
+          amount_paid_cents?: number
+          billing_period_end?: string | null
+          billing_period_start?: string | null
+          created_at?: string
+          currency?: string
+          hosted_invoice_url?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_pdf_url?: string | null
+          status: string
+          stripe_created_at?: string | null
+          stripe_invoice_id: string
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          amount_due_cents?: number
+          amount_paid_cents?: number
+          billing_period_end?: string | null
+          billing_period_start?: string | null
+          created_at?: string
+          currency?: string
+          hosted_invoice_url?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoice_pdf_url?: string | null
+          status?: string
+          stripe_created_at?: string | null
+          stripe_invoice_id?: string
+          stripe_subscription_id?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_social_subscription_invoices_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workspace_social_subscriptions: {
         Row: {
           account_limit: number
@@ -4628,6 +4693,14 @@ export type Database = {
           bonus_trial_days: number
           color_theme: string
           name: string
+        }[]
+      }
+      workspace_media_storage_usage: {
+        Args: { _workspace_id: string }
+        Returns: {
+          limit_bytes: number
+          remaining_bytes: number
+          used_bytes: number
         }[]
       }
       workspace_role: {
