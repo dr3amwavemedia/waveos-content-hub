@@ -18,6 +18,7 @@ test("public signup is marked as OS data and returns to its ready Overview", asy
   assert.match(auth, /signup_source: "public_trial"/);
   assert.match(auth, /Sign up/);
   assert.doesNotMatch(auth, /No card required/);
+  assert.match(auth, /\{mode !== "signup" && \([\s\S]*Technical problem\?/);
   assert.match(auth, /\/auth-callback\?next=/);
   assert.match(auth, /mode === "signup" \? "\/home"/);
   assert.doesNotMatch(auth, /sessionStorage\.setItem\(POST_AUTH_NEXT_KEY, "\/onboarding"\)/);
