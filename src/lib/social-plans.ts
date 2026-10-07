@@ -1,8 +1,8 @@
 export const SOCIAL_PLANS = {
   trial: { name: "Promo trial", accountLimit: 3, monthlyCents: 0, annualCents: 0 },
   standard: { name: "Ripple", accountLimit: 3, monthlyCents: 3999, annualCents: 47988 },
-  full: { name: "Current", accountLimit: 3, monthlyCents: 7000, annualCents: 79800 },
-  expanded: { name: "Tidal", accountLimit: 8, monthlyCents: 12000, annualCents: 129600 },
+  full: { name: "Current", accountLimit: 3, monthlyCents: 6999, annualCents: 79789 },
+  expanded: { name: "Tidal", accountLimit: 8, monthlyCents: 11999, annualCents: 129589 },
 } as const;
 
 export type SocialPlan = keyof typeof SOCIAL_PLANS;
