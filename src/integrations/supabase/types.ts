@@ -4784,6 +4784,7 @@ export type Database = {
           cancel_at_period_end: boolean
           created_at: string
           current_period_end: string | null
+          internal_test_access: boolean
           last_payment_failed_at: string | null
           payment_failure_count: number
           plan: string

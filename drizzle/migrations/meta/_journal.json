@@ -169,6 +169,13 @@
       "when": 1791414150862,
       "tag": "0023_tidal_duplicate_platform_accounts",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791420821967,
+      "tag": "0024_tidal_team_access",
+      "breakpoints": true
     }
   ]
 }
