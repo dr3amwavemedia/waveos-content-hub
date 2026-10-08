@@ -1948,6 +1948,24 @@ function GoogleDrivePicker({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const autoOpened = useRef(false);
+  const pickerRef = useRef<GooglePickerInstance | null>(null);
+
+  function closePicker() {
+    pickerRef.current?.setVisible(false);
+    pickerRef.current = null;
+    setPickerOpen(false);
+  }
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closePicker();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [pickerOpen]);
+
+  useEffect(() => () => pickerRef.current?.setVisible(false), []);
 
   async function openPicker() {
     setOpening(true);
@@ -1989,11 +2007,11 @@ function GoogleDrivePicker({
         .addView(sharedDrivesView)
         .setCallback(async (data: GooglePickerResult) => {
           if (data.action === googleApi.picker.Action.CANCEL) {
-            setPickerOpen(false);
+            closePicker();
             return;
           }
           if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
-          setPickerOpen(false);
+          closePicker();
           try {
             const supportedDocs = data.docs.filter(isGoogleDriveMedia);
             if (!supportedDocs.length) {
@@ -2028,6 +2046,7 @@ function GoogleDrivePicker({
           }
         })
         .build();
+      pickerRef.current = picker;
       picker.setVisible(true);
       setPickerOpen(true);
     } catch (reason) {
@@ -2047,6 +2066,18 @@ function GoogleDrivePicker({
 
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+      {pickerOpen && (
+        <button
+          type="button"
+          onClick={closePicker}
+          aria-label="Exit Google Drive"
+          className="fixed right-4 z-[2147483647] inline-flex min-h-11 items-center gap-2 rounded-full border border-white/30 bg-slate-950/95 px-4 py-2 text-sm font-semibold text-white shadow-2xl backdrop-blur"
+          style={{ top: "max(1rem, env(safe-area-inset-top))" }}
+        >
+          <X className="h-4 w-4" />
+          Exit Google Drive
+        </button>
+      )}
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
         <Cloud className="h-6 w-6" />
       </div>
@@ -2117,6 +2148,8 @@ type GooglePickerResult = {
   }>;
 };
 
+type GooglePickerInstance = { setVisible: (visible: boolean) => void };
+
 type GooglePickerBuilder = {
   enableFeature: (feature: string) => GooglePickerBuilder;
   setDeveloperKey: (value: string) => GooglePickerBuilder;
@@ -2125,7 +2158,7 @@ type GooglePickerBuilder = {
   setOrigin: (value: string) => GooglePickerBuilder;
   addView: (value: unknown) => GooglePickerBuilder;
   setCallback: (value: (data: GooglePickerResult) => void) => GooglePickerBuilder;
-  build: () => { setVisible: (visible: boolean) => void };
+  build: () => GooglePickerInstance;
 };
 
 type GooglePickerGlobal = {
