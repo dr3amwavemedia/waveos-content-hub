@@ -1,6 +1,7 @@
 import { RequireFeature } from "@/components/app/require-feature";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
@@ -2059,18 +2060,20 @@ function GoogleDrivePicker({
 
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
-      {pickerOpen && (
-        <button
-          type="button"
-          onClick={closePicker}
-          aria-label="Exit Google Drive"
-          className="fixed right-4 z-[2147483647] inline-flex min-h-11 items-center gap-2 rounded-full border border-white/30 bg-slate-950/95 px-4 py-2 text-sm font-semibold text-white shadow-2xl backdrop-blur"
-          style={{ top: "max(1rem, env(safe-area-inset-top))" }}
-        >
-          <X className="h-4 w-4" />
-          Exit Google Drive
-        </button>
-      )}
+      {pickerOpen &&
+        createPortal(
+          <button
+            type="button"
+            onClick={closePicker}
+            aria-label="Exit Google Drive"
+            className="fixed right-3 z-[2147483647] inline-flex min-h-12 touch-manipulation items-center gap-2 rounded-full border-2 border-white bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-2xl"
+            style={{ top: "max(0.75rem, env(safe-area-inset-top))", pointerEvents: "auto" }}
+          >
+            <X className="h-5 w-5" />
+            Exit Google Drive
+          </button>,
+          document.body,
+        )}
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
         <Cloud className="h-6 w-6" />
       </div>

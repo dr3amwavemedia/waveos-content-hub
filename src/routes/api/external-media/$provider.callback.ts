@@ -1,5 +1,34 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+function oauthResult(
+  appUrl: string,
+  provider: string,
+  result: { connected?: boolean; error?: string },
+) {
+  const destination = new URL("/settings", appUrl);
+  if (result.connected) destination.searchParams.set("storage_connected", provider);
+  if (result.error) destination.searchParams.set("storage_error", result.error);
+  const message = JSON.stringify({
+    type: "waveos:external-media-oauth",
+    provider,
+    ...result,
+  }).replaceAll("<", "\\u003c");
+  const destinationJson = JSON.stringify(destination.toString()).replaceAll("<", "\\u003c");
+  const originJson = JSON.stringify(new URL(appUrl).origin);
+  return new Response(
+    `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Returning to WaveOS</title></head><body><p>Returning to WaveOS…</p><script>(function(){var message=${message};var destination=${destinationJson};var origin=${originJson};if(window.opener&&!window.opener.closed){window.opener.postMessage(message,origin);window.close();setTimeout(function(){location.replace(destination)},500)}else{location.replace(destination)}})();</script></body></html>`,
+    {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "Content-Security-Policy":
+          "default-src 'none'; script-src 'unsafe-inline'; style-src 'none'",
+      },
+    },
+  );
+}
+
 export const Route = createFileRoute("/api/external-media/$provider/callback")({
   server: {
     handlers: {
@@ -14,7 +43,7 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
         } = await import("@/lib/external-media.server");
         const appUrl = externalMediaRequestOrigin(request);
         if (provider !== "google_drive" && provider !== "dropbox")
-          return Response.redirect(`${appUrl}/settings?storage_error=unsupported_provider`, 302);
+          return oauthResult(appUrl, provider, { error: "unsupported_provider" });
         const url = new URL(request.url);
         const state = url.searchParams.get("state") ?? "";
         const code = url.searchParams.get("code") ?? "";
@@ -31,8 +60,7 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
           user_id: string;
           code_verifier: string;
         } | null;
-        if (!oauthState || !code)
-          return Response.redirect(`${appUrl}/settings?storage_error=invalid_state`, 302);
+        if (!oauthState || !code) return oauthResult(appUrl, provider, { error: "invalid_state" });
 
         let tokenResponse: Response;
         if (provider === "google_drive") {
@@ -67,7 +95,7 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
         }
         const tokens = (await tokenResponse.json()) as Record<string, unknown>;
         if (!tokenResponse.ok || typeof tokens.access_token !== "string") {
-          return Response.redirect(`${appUrl}/settings?storage_error=token_exchange`, 302);
+          return oauthResult(appUrl, provider, { error: "token_exchange" });
         }
 
         if (
@@ -83,7 +111,7 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
             .from("external_media_oauth_states" as never)
             .delete()
             .eq("state", state);
-          return Response.redirect(`${appUrl}/settings?storage_error=google_scope_required`, 302);
+          return oauthResult(appUrl, provider, { error: "google_scope_required" });
         }
 
         let externalAccountId = "";
@@ -94,7 +122,7 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
           });
           const profile = (await profileResponse.json()) as Record<string, unknown>;
           if (!profileResponse.ok || typeof profile.sub !== "string")
-            return Response.redirect(`${appUrl}/settings?storage_error=profile`, 302);
+            return oauthResult(appUrl, provider, { error: "profile" });
           externalAccountId = profile.sub;
           accountEmail = typeof profile.email === "string" ? profile.email : null;
         } else {
@@ -107,7 +135,7 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
           );
           const profile = (await profileResponse.json()) as Record<string, unknown>;
           if (!profileResponse.ok || typeof profile.account_id !== "string")
-            return Response.redirect(`${appUrl}/settings?storage_error=profile`, 302);
+            return oauthResult(appUrl, provider, { error: "profile" });
           externalAccountId = profile.account_id;
           accountEmail = typeof profile.email === "string" ? profile.email : null;
         }
@@ -147,9 +175,8 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
           .from("external_media_oauth_states" as never)
           .delete()
           .eq("state", state);
-        if (saveError)
-          return Response.redirect(`${appUrl}/settings?storage_error=connection_save`, 302);
-        return Response.redirect(`${appUrl}/settings?storage_connected=${provider}`, 302);
+        if (saveError) return oauthResult(appUrl, provider, { error: "connection_save" });
+        return oauthResult(appUrl, provider, { connected: true });
       },
     },
   },

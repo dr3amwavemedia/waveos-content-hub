@@ -70,30 +70,45 @@ function SettingsPage() {
   const { subscription, isLoading: permissionsLoading, isStaff } = usePermissions();
   const qc = useQueryClient();
   useEffect(() => {
+    const showStorageResult = (connected: string | null, error: string | null) => {
+      if (connected === "google_drive") {
+        toast.success("Google Drive connected with file access.");
+        void qc.invalidateQueries({ queryKey: ["external-media-status"] });
+      } else if (connected === "dropbox") {
+        toast.success("Dropbox connected.");
+        void qc.invalidateQueries({ queryKey: ["external-media-status"] });
+      } else if (error) {
+        const messages: Record<string, string> = {
+          google_scope_required:
+            "Google Drive permission was not accepted. Reconnect and allow Drive access when Google asks.",
+          invalid_state: "The storage sign-in expired or was cancelled. Please reconnect.",
+          token_exchange: "Google could not finish the connection. Please reconnect and try again.",
+          profile: "Google connected, but WaveOS could not read the selected account.",
+          connection_save: "WaveOS could not securely save the storage connection.",
+        };
+        toast.error(messages[error] ?? "Storage could not be connected. Please try again.");
+      }
+    };
     const url = new URL(window.location.href);
     const error = url.searchParams.get("storage_error");
     const connected = url.searchParams.get("storage_connected");
-    if (!error && !connected) return;
-    if (connected === "google_drive") {
-      toast.success("Google Drive connected with file access.");
-      void qc.invalidateQueries({ queryKey: ["external-media-status"] });
-    } else if (connected === "dropbox") {
-      toast.success("Dropbox connected.");
-      void qc.invalidateQueries({ queryKey: ["external-media-status"] });
-    } else {
-      const messages: Record<string, string> = {
-        google_scope_required:
-          "Google Drive permission was not accepted. Reconnect and allow Drive access when Google asks.",
-        invalid_state: "The storage sign-in expired or was cancelled. Please reconnect.",
-        token_exchange: "Google could not finish the connection. Please reconnect and try again.",
-        profile: "Google connected, but WaveOS could not read the selected account.",
-        connection_save: "WaveOS could not securely save the storage connection.",
-      };
-      toast.error(messages[error ?? ""] ?? "Storage could not be connected. Please try again.");
+    if (error || connected) {
+      showStorageResult(connected, error);
+      url.searchParams.delete("storage_error");
+      url.searchParams.delete("storage_connected");
+      window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
     }
-    url.searchParams.delete("storage_error");
-    url.searchParams.delete("storage_connected");
-    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      const data = event.data as Record<string, unknown> | null;
+      if (data?.type !== "waveos:external-media-oauth") return;
+      showStorageResult(
+        data.connected === true && typeof data.provider === "string" ? data.provider : null,
+        typeof data.error === "string" ? data.error : null,
+      );
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   }, [qc]);
   const canManageApproval =
     !user?.isStaff && (activeWorkspace?.role === "owner" || activeWorkspace?.role === "admin");
@@ -886,11 +901,16 @@ function StorageConnectionCard({
     queryFn: () => getExternalMediaStatus(provider, workspaceId),
   });
   const connect = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ popup }: { popup: Window | null }) => {
+      if (reconnectRequired) await disconnectExternalMedia(provider, workspaceId);
       const result = await startExternalMediaConnection(provider, workspaceId);
-      window.location.assign(result.url);
+      if (popup) popup.location.href = result.url;
+      else window.location.assign(result.url);
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "Connection failed."),
+    onError: (error, { popup }) => {
+      popup?.close();
+      toast.error(error instanceof Error ? error.message : "Connection failed.");
+    },
   });
   const disconnect = useMutation({
     mutationFn: () => disconnectExternalMedia(provider, workspaceId),
@@ -953,7 +973,19 @@ function StorageConnectionCard({
       ) : (
         <button
           type="button"
-          onClick={() => connect.mutate()}
+          onClick={() => {
+            const useSameWindow = window.matchMedia(
+              "(max-width: 767px), (pointer: coarse)",
+            ).matches;
+            const popup = useSameWindow
+              ? null
+              : window.open(
+                  "about:blank",
+                  `waveos-${provider}-connect`,
+                  "popup,width=560,height=720",
+                );
+            connect.mutate({ popup });
+          }}
           disabled={!configured || status.isLoading || connect.isPending}
           className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
         >
@@ -962,7 +994,7 @@ function StorageConnectionCard({
           ) : (
             <ExternalLink className="h-4 w-4" />
           )}
-          Connect
+          {reconnectRequired ? "Reconnect" : "Connect"}
         </button>
       )}
     </div>
