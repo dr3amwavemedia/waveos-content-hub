@@ -179,6 +179,8 @@ test("Google Picker includes My Drive, Shared with me and Shared drives and rema
   assert.match(createRoute, /aria-label="Exit Google Drive"/);
   assert.match(createRoute, /pickerRef\.current\?\.setVisible\(false\)/);
   assert.match(createRoute, /event\.key === "Escape"/);
+  assert.doesNotMatch(createRoute, /autoOpened/);
+  assert.match(createRoute, /Browse Google Drive/);
   assert.match(styles, /\.picker-dialog/);
   assert.match(styles, /100dvh/);
   assert.match(pickerConfig, /appIdValid: \/\^\\d\+\$\//);

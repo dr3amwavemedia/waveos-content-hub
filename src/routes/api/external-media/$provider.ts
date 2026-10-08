@@ -15,8 +15,10 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           externalMediaRequestOrigin,
           externalMediaRedirectUri,
           getExternalConnection,
+          GOOGLE_DRIVE_SCOPE,
           pkceChallenge,
           randomHex,
+          revokeExternalConnection,
           requireExternalMediaWorkspace,
           requireExternalMediaWorkspaceManager,
         } = await import("@/lib/external-media.server");
@@ -43,7 +45,14 @@ export const Route = createFileRoute("/api/external-media/$provider")({
                     process.env.GOOGLE_DRIVE_CLIENT_ID && process.env.GOOGLE_DRIVE_CLIENT_SECRET,
                   )
                 : Boolean(process.env.DROPBOX_APP_KEY && process.env.DROPBOX_APP_SECRET),
-            connected: Boolean(connection),
+            connected:
+              Boolean(connection) &&
+              (provider !== "google_drive" ||
+                connection?.scopes.split(/\s+/).includes(GOOGLE_DRIVE_SCOPE)),
+            reconnectRequired:
+              provider === "google_drive" &&
+              Boolean(connection) &&
+              !connection?.scopes.split(/\s+/).includes(GOOGLE_DRIVE_SCOPE),
             account: connection
               ? {
                   email: connection.account_email,
@@ -55,13 +64,17 @@ export const Route = createFileRoute("/api/external-media/$provider")({
 
         if (action === "disconnect") {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+          const connection = await getExternalConnection(workspaceId, provider);
+          const revoked = connection
+            ? await revokeExternalConnection(connection).catch(() => false)
+            : true;
           const { error } = await supabaseAdmin
             .from("external_media_connections" as never)
             .delete()
             .eq("workspace_id", workspaceId)
             .eq("provider", provider);
           if (error) return json({ error: "disconnect_failed" }, 500);
-          return json({ connected: false });
+          return json({ connected: false, revoked });
         }
 
         if (action !== "connect") return json({ error: "invalid_action" }, 400);
@@ -94,9 +107,9 @@ export const Route = createFileRoute("/api/external-media/$provider")({
             client_id: externalMediaEnv("GOOGLE_DRIVE_CLIENT_ID"),
             redirect_uri: externalMediaRedirectUri(provider, requestOrigin),
             response_type: "code",
-            scope: "openid email profile https://www.googleapis.com/auth/drive.file",
+            scope: `openid email profile ${GOOGLE_DRIVE_SCOPE}`,
             access_type: "offline",
-            include_granted_scopes: "true",
+            include_granted_scopes: "false",
             prompt: "consent select_account",
             state,
             code_challenge: challenge,

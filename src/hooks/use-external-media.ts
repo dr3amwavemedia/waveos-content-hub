@@ -49,6 +49,7 @@ export function getExternalMediaStatus(provider: ExternalMediaProvider, workspac
   return providerRequest<{
     configured: boolean;
     connected: boolean;
+    reconnectRequired: boolean;
     account: { email: string | null; updatedAt: string | null } | null;
   }>(provider, "", { action: "status", workspaceId });
 }
@@ -58,7 +59,10 @@ export function startExternalMediaConnection(provider: ExternalMediaProvider, wo
 }
 
 export function disconnectExternalMedia(provider: ExternalMediaProvider, workspaceId: string) {
-  return providerRequest<{ connected: false }>(provider, "", { action: "disconnect", workspaceId });
+  return providerRequest<{ connected: false; revoked: boolean }>(provider, "", {
+    action: "disconnect",
+    workspaceId,
+  });
 }
 
 export function listExternalMedia(

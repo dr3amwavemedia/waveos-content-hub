@@ -5,6 +5,10 @@ import test from "node:test";
 const externalServer = readFileSync("src/lib/external-media.server.ts", "utf8");
 const externalRoute = readFileSync("src/routes/api/external-media/$provider.ts", "utf8");
 const externalFilesRoute = readFileSync("src/routes/api/external-media/$provider.files.ts", "utf8");
+const externalCallback = readFileSync(
+  "src/routes/api/external-media/$provider.callback.ts",
+  "utf8",
+);
 const externalMigration = readFileSync(
   "supabase/migrations/20260811220000_external_media_connections.sql",
   "utf8",
@@ -40,6 +44,17 @@ test("Google Drive and Dropbox are shared by workspace but only managers replace
   assert.match(settingsRoute, /Shared access/);
 });
 
+test("Google Drive rejects partial consent and resets remembered authorization on disconnect", () => {
+  assert.match(externalServer, /GOOGLE_DRIVE_SCOPE/);
+  assert.match(externalServer, /oauth2\.googleapis\.com\/revoke/);
+  assert.match(externalRoute, /include_granted_scopes: "false"/);
+  assert.match(externalRoute, /revokeExternalConnection/);
+  assert.match(externalCallback, /google_scope_required/);
+  assert.match(externalCallback, /hasGoogleDriveScope/);
+  assert.match(externalFilesRoute, /drive\/v3\/about\?fields=user/);
+  assert.match(settingsRoute, /Reconnect required — Drive permission is missing/);
+});
+
 test("client admins and assigned Social Managers manage the same workspace social profile", () => {
   assert.match(zernioServer, /select\("workspace_id,role"\)/);
   assert.match(zernioServer, /can_staff_manage_workspace/);
@@ -64,7 +79,10 @@ test("every immediate or scheduled publish is pinned to the content workspace's 
 test("publishing keeps audit attribution on the authenticated real actor", () => {
   assert.match(userContext, /export function useActualCurrentUser/);
   assert.match(publishFunctions, /middleware\(\[requireSupabaseAuth\]\)/);
-  assert.match(publishFunctions, /publishContentItemWithZernio\(data\.contentId, context\.userId\)/);
+  assert.match(
+    publishFunctions,
+    /publishContentItemWithZernio\(data\.contentId, context\.userId\)/,
+  );
   assert.match(publisher, /actor_user_id: actorUserId \?\? null/);
   assert.match(releaseMigration, /actor_user_id[\s\S]*_uid/);
   assert.match(releaseMigration, /'content_release_mode_selected'/);
