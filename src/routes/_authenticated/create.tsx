@@ -116,6 +116,9 @@ function CreatePost() {
   const [pickedMedia, setPickedMedia] = useState<string[]>([]);
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [activePlatform, setActivePlatform] = useState<SocialPlatform>("instagram");
+  const [draftPlatformOptions, setDraftPlatformOptions] = useState<
+    Partial<Record<SocialPlatform, { contentType?: "story" }>>
+  >({});
   const [showLibrary, setShowLibrary] = useState(false);
 
   const draftStorageKey = workspaceId ? `waveos-create-draft-${workspaceId}` : null;
@@ -161,6 +164,19 @@ function CreatePost() {
       if (typeof parsed.scheduledAt === "string") {
         setScheduledAt(parsed.scheduledAt);
       }
+
+      if (parsed.platformOptions && typeof parsed.platformOptions === "object") {
+        const restored = Object.fromEntries(
+          Object.entries(parsed.platformOptions).filter(
+            ([platform, options]) =>
+              ALL_PLATFORMS.includes(platform as SocialPlatform) &&
+              options &&
+              typeof options === "object" &&
+              (options as { contentType?: unknown }).contentType === "story",
+          ),
+        ) as Partial<Record<SocialPlatform, { contentType?: "story" }>>;
+        setDraftPlatformOptions(restored);
+      }
     } catch {
       window.localStorage.removeItem(draftStorageKey);
     }
@@ -188,12 +204,22 @@ function CreatePost() {
           platforms,
           pickedMedia,
           scheduledAt,
+          platformOptions: draftPlatformOptions,
         }),
       );
     }, 600);
 
     return () => window.clearTimeout(timeout);
-  }, [draftStorageKey, savedId, title, caption, platforms, pickedMedia, scheduledAt]);
+  }, [
+    draftStorageKey,
+    savedId,
+    title,
+    caption,
+    platforms,
+    pickedMedia,
+    scheduledAt,
+    draftPlatformOptions,
+  ]);
   useEffect(() => {
     if (!existing.data?.item) return;
     const it = existing.data.item;
@@ -260,6 +286,7 @@ function CreatePost() {
       primary_caption: primaryCaption,
       media_asset_ids: pickedMedia,
       platforms,
+      platform_options: draftPlatformOptions,
       scheduled_at: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
     });
     setSavedId(item.id);
@@ -497,6 +524,7 @@ function CreatePost() {
     setPickedMedia([]);
     setScheduledAt("");
     setActivePlatform("instagram");
+    setDraftPlatformOptions({});
     setShowLibrary(false);
     setSaveStatus("idle");
     navigate({ to: "/create", search: {}, replace: true });
@@ -688,6 +716,13 @@ function CreatePost() {
                 )}
                 primaryCaption={caption}
                 locked={locked}
+                draftOptions={draftPlatformOptions[activePlatform] ?? {}}
+                onDraftOptionsChange={(options) =>
+                  setDraftPlatformOptions((current) => ({
+                    ...current,
+                    [activePlatform]: options,
+                  }))
+                }
                 onUpdate={async (id, patch) => {
                   await updateVariant.mutateAsync({ id, patch });
                 }}
@@ -927,6 +962,8 @@ function VariantEditor({
   connections,
   primaryCaption,
   locked,
+  draftOptions,
+  onDraftOptionsChange,
   onUpdate,
 }: {
   contentId: string | null;
@@ -941,6 +978,8 @@ function VariantEditor({
   }>;
   primaryCaption: string;
   locked: boolean;
+  draftOptions: { contentType?: "story" };
+  onDraftOptionsChange: (options: { contentType?: "story" }) => void;
   onUpdate: (id: string, patch: Partial<PostVariant>) => Promise<void>;
 }) {
   const variant = variants.find((v) => v.platform === platform);
@@ -960,12 +999,23 @@ function VariantEditor({
 
   if (!contentId) {
     return (
-      <textarea
-        disabled
-        placeholder={`${PLATFORM_LABEL[platform]} caption — save draft to edit`}
-        className="w-full rounded-lg border border-border bg-elevated/30 px-3 py-2 text-sm text-muted-foreground"
-        rows={5}
-      />
+      <div className="space-y-2">
+        {storySupported && (
+          <PublishFormatPicker
+            value={draftOptions.contentType === "story" ? "story" : "feed"}
+            disabled={locked}
+            onChange={(value) =>
+              onDraftOptionsChange(value === "story" ? { contentType: "story" } : {})
+            }
+          />
+        )}
+        <textarea
+          disabled
+          placeholder={`${PLATFORM_LABEL[platform]} caption — save draft to edit`}
+          className="w-full rounded-lg border border-border bg-elevated/30 px-3 py-2 text-sm text-muted-foreground"
+          rows={5}
+        />
+      </div>
     );
   }
 
@@ -1024,30 +1074,18 @@ function VariantEditor({
         </fieldset>
       )}
       {storySupported && (
-        <div className="flex items-center justify-between rounded-lg border border-border bg-elevated/50 px-3 py-2">
-          <div>
-            <p className="text-xs font-semibold text-foreground">Publish format</p>
-            <p className="text-[11px] text-muted-foreground">
-              Stories require one supported media item and disappear after 24 hours.
-            </p>
-          </div>
-          <select
-            value={options.contentType === "story" ? "story" : "feed"}
-            disabled={locked}
-            onChange={(event) =>
-              void onUpdate(variant.id, {
-                platform_options:
-                  event.target.value === "story"
-                    ? { ...options, contentType: "story" }
-                    : { ...options, contentType: undefined },
-              })
-            }
-            className="rounded-lg border border-border bg-background px-2 py-1.5 text-xs text-foreground"
-          >
-            <option value="feed">Feed</option>
-            <option value="story">Story</option>
-          </select>
-        </div>
+        <PublishFormatPicker
+          value={options.contentType === "story" ? "story" : "feed"}
+          disabled={locked}
+          onChange={(value) =>
+            void onUpdate(variant.id, {
+              platform_options:
+                value === "story"
+                  ? { ...options, contentType: "story" }
+                  : { ...options, contentType: undefined },
+            })
+          }
+        />
       )}
       <textarea
         value={text}
@@ -1087,6 +1125,46 @@ function VariantEditor({
         </div>
       </div>
     </div>
+  );
+}
+
+function PublishFormatPicker({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: "feed" | "story";
+  disabled: boolean;
+  onChange: (value: "feed" | "story") => void;
+}) {
+  return (
+    <fieldset className="rounded-xl border border-border bg-elevated/50 p-3">
+      <legend className="px-1 text-xs font-semibold text-foreground">Publish format</legend>
+      <p className="mb-3 text-[11px] leading-5 text-muted-foreground">
+        Choose Feed or Story before saving or publishing. Stories require exactly one supported
+        media item and disappear after 24 hours.
+      </p>
+      <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Publish format">
+        {(["feed", "story"] as const).map((format) => (
+          <button
+            key={format}
+            type="button"
+            role="radio"
+            aria-checked={value === format}
+            disabled={disabled}
+            onClick={() => onChange(format)}
+            className={cn(
+              "min-h-11 rounded-lg border px-4 py-2 text-sm font-semibold capitalize transition-all disabled:cursor-not-allowed disabled:opacity-50",
+              value === format
+                ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground",
+            )}
+          >
+            {format}
+          </button>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
