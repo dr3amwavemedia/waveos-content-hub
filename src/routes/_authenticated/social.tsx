@@ -975,8 +975,8 @@ function AnalyticsAndComments({
         </div>
         {mode === "paid" && !analytics.data?.paidAvailable && (
           <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
-            Paid metrics will appear after an eligible Zernio ads connection is available. Organic
-            data remains separate.
+            Paid metrics will appear after an eligible ads connection is available. Organic data
+            remains separate.
           </p>
         )}
         {positive && (
@@ -1088,8 +1088,8 @@ function AnalyticsAndComments({
           ))}
           {!comments.isPending && !(comments.data?.comments ?? []).length && (
             <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
-              No supported comments are available yet. Reconnect older accounts if Zernio requests
-              new comment permissions.
+              No supported comments are available yet. Reconnect older accounts if the social
+              network requests new comment permissions.
             </p>
           )}
         </div>
@@ -1162,7 +1162,7 @@ function AccountsView({
           `Checked ${result.updated} connected account${result.updated === 1 ? "" : "s"}.`,
         );
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : "Could not refresh Zernio accounts.");
+      toast.error(reason instanceof Error ? reason.message : "Could not refresh social accounts.");
     } finally {
       setBusy(null);
     }
@@ -1172,6 +1172,7 @@ function AccountsView({
     const handleConnected = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.data?.type !== "waveos:zernio-connected")
         return;
+      if (event.data?.success === false) return;
       void refresh(true);
     };
     window.addEventListener("message", handleConnected);
@@ -1186,10 +1187,12 @@ function AccountsView({
       toast.success(
         isPublicOs
           ? "Social connections are ready. Choose an account to connect."
-          : "This client now has an isolated Zernio profile.",
+          : "This client now has an isolated publishing profile.",
       );
     } catch (reason) {
-      toast.error(reason instanceof Error ? reason.message : "Could not prepare Zernio.");
+      toast.error(
+        reason instanceof Error ? reason.message : "Could not prepare social publishing.",
+      );
     } finally {
       setBusy(null);
     }
@@ -1310,11 +1313,11 @@ function AccountsView({
                     ? "Social publishing isn't included in this client's plan"
                     : "Couldn't check publishing setup"
                   : !status.data?.configured
-                    ? "Zernio key needs deployment setup"
+                    ? "Publishing connection needs deployment setup"
                     : status.data.hasProfile
                       ? isPublicOs
                         ? "Your social connections are ready"
-                        : `Zernio is ready for ${status.data.profileName ?? "this client"}`
+                        : `Publishing is ready for ${status.data.profileName ?? "this client"}`
                       : isPublicOs
                         ? "Getting your social connections ready…"
                         : "Prepare this client's publishing profile"}
@@ -1329,14 +1332,14 @@ function AccountsView({
                       ? status.error.message
                       : "Please try again in a moment."
                   : !status.data?.configured
-                    ? "Add ZERNIO_API_KEY to the deployment secrets. WaveOS will never expose its value in the browser."
+                    ? "Add the publishing service key to the deployment secrets. WaveOS will never expose its value in the browser."
                     : status.data.hasProfile
                       ? isPublicOs
                         ? "Choose a network below to securely connect your social account."
-                        : "Each client stays isolated in its own Zernio profile. Refresh runs live account-health checks before publishing."
+                        : "Each client stays isolated in its own publishing profile. Refresh runs live account-health checks before publishing."
                       : isPublicOs
                         ? "WaveOS is automatically preparing the secure publishing connection for your workspace."
-                        : "One click creates a separate Zernio profile for this workspace; it does not publish anything."}
+                        : "One click creates a separate publishing profile for this workspace; it does not publish anything."}
             </p>
             {status.data?.lastError && (
               <p className="mt-2 text-xs text-rose-300">Last check: {status.data.lastError}</p>
@@ -1350,7 +1353,7 @@ function AccountsView({
                   className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
                 >
                   {busy === "profile" && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Prepare
-                  Zernio profile
+                  publishing profile
                 </button>
               )}
               {status.data?.hasProfile && (
@@ -1569,6 +1572,18 @@ function AccountCard({
           <Facebook className="h-3.5 w-3.5" />
           Connect Instagram through Facebook Page
         </button>
+      )}
+      {account.platform === "threads" && account.state !== "connected" && (
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          Use the browser sign-in with a professional Instagram account that already has Threads.
+          Complete the browser steps and return to WaveOS; you do not need to open the Threads app.
+        </p>
+      )}
+      {account.platform === "gmb" && account.state !== "connected" && (
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          Sign in with the Google account that manages your verified Business Profile, then choose
+          the location you want to publish to.
+        </p>
       )}
       {canAddAnother && (
         <button

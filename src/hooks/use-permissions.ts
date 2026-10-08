@@ -64,7 +64,6 @@ const PUBLIC_OS_FEATURES = new Set<FeatureKey>([
   "can_publish_content",
   "can_view_analytics",
   "can_view_activity_log",
-  "can_invite_members",
   "can_manage_workspace",
 ]);
 
@@ -162,9 +161,12 @@ export function usePermissions(): WorkspacePermissions {
       const subscription = subscriptionQuery.data ?? null;
       const active = publicSubscriptionActive(subscription);
       const premium = subscription?.plan === "full" || subscription?.plan === "expanded";
+      const tidal = subscription?.plan === "expanded";
       const allowed = (feature: FeatureKey) =>
         active &&
-        (PUBLIC_OS_FEATURES.has(feature) || (premium && PUBLIC_OS_PREMIUM_FEATURES.has(feature)));
+        (PUBLIC_OS_FEATURES.has(feature) ||
+          (premium && PUBLIC_OS_PREMIUM_FEATURES.has(feature)) ||
+          (tidal && feature === "can_invite_members"));
       return {
         access: clientAccess,
         raw: data ?? null,
