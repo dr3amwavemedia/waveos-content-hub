@@ -53,6 +53,11 @@ test("Google Drive rejects partial consent and resets remembered authorization o
   assert.match(externalCallback, /hasGoogleDriveScope/);
   assert.match(externalFilesRoute, /drive\/v3\/about\?fields=user/);
   assert.match(settingsRoute, /Reconnect required — Drive permission is missing/);
+  assert.match(settingsRoute, /waveos:external-media-oauth/);
+  assert.match(settingsRoute, /max-width: 767px/);
+  assert.match(settingsRoute, /reconnectRequired[\s\S]*disconnectExternalMedia/);
+  assert.match(externalCallback, /window\.opener\.postMessage/);
+  assert.match(externalCallback, /window\.close\(\)/);
 });
 
 test("client admins and assigned Social Managers manage the same workspace social profile", () => {
