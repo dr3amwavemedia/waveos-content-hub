@@ -75,7 +75,9 @@ function SettingsPage() {
     Boolean(user?.isStaff) ||
     activeWorkspace?.role === "owner" ||
     activeWorkspace?.role === "admin";
-  const canManageTeam = canManageBranding;
+  const canManageTeam =
+    canManageBranding &&
+    (activeWorkspace?.data_source !== "os_data" || subscription?.plan === "expanded");
   const oneTimeClient =
     activeWorkspace?.data_source === "client_data" && activeWorkspace.agreement_term === "one_time";
   const canManageConnections = Boolean(
@@ -237,12 +239,13 @@ function SettingsPage() {
         />
       )}
 
-      {activeWorkspace && (
-        <TeamSettings
-          workspaceId={activeWorkspace.id}
-          canManage={canManageTeam && !oneTimeClient}
-        />
-      )}
+      {activeWorkspace &&
+        (activeWorkspace.data_source !== "os_data" || subscription?.plan === "expanded") && (
+          <TeamSettings
+            workspaceId={activeWorkspace.id}
+            canManage={canManageTeam && !oneTimeClient}
+          />
+        )}
 
       {user?.isDreamWaveOwner && <FrameioServiceConnectionCard />}
 
@@ -386,8 +389,9 @@ function SocialPlanSettings({
         <div className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm text-foreground">
           <strong>Internal test access</strong>
           <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            This workspace has full {query.data?.plans[subscription.plan]?.name ?? subscription.plan}
-            {" "}plan access for product testing. No Stripe subscription or payment is attached.
+            This workspace has full{" "}
+            {query.data?.plans[subscription.plan]?.name ?? subscription.plan} plan access for
+            product testing. No Stripe subscription or payment is attached.
           </p>
         </div>
       )}

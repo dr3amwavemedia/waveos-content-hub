@@ -271,8 +271,8 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
       await import("./zernio.server");
     await requireSocialWorkspaceManager(context.supabase, context.userId, data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    if (data.platform === "snapchat") {
-      throw new Error("Snapchat connections are still a closed Zernio beta.");
+    if (data.platform === "snapchat" || data.platform === "bluesky") {
+      throw new Error("This network is not currently available in WaveOS.");
     }
     const [{ data: limit }, { count: connectedAccounts }, existingConnections, subscriptionResult] =
       await Promise.all([
@@ -321,7 +321,7 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
     let profile = profileResult.data as { profile_id: string } | null;
-    if (!profile) throw new Error("Create this workspace's Zernio profile first.");
+    if (!profile) throw new Error("Prepare this workspace's secure social connection first.");
     if (data.additional) {
       const [{ data: workspace }, { data: existingSlots }] = await Promise.all([
         supabaseAdmin.from("workspaces").select("name").eq("id", data.workspaceId).single(),
@@ -360,7 +360,7 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
           },
         );
         const profileId = created.profile?._id;
-        if (!profileId) throw new Error("Zernio did not return the additional account space.");
+        if (!profileId) throw new Error("The publishing service did not return an account space.");
         const saved = await supabaseAdmin.from("zernio_workspace_subprofiles" as never).insert({
           workspace_id: data.workspaceId,
           platform: data.platform,
@@ -375,7 +375,7 @@ export const createZernioConnectUrl = createServerFn({ method: "POST" })
     const appBaseUrl = waveOsPublicOrigin();
     const params = new URLSearchParams({
       profileId: profile.profile_id,
-      redirect_url: `${appBaseUrl}/social-connections/callback?workspaceId=${encodeURIComponent(data.workspaceId)}&provider=zernio`,
+      redirect_url: `${appBaseUrl}/social-connections/callback?workspaceId=${encodeURIComponent(data.workspaceId)}&provider=zernio&platform=${encodeURIComponent(data.platform)}`,
     });
     if (data.platform === "instagram" && data.instagramLoginMethod) {
       params.set("loginMethod", data.instagramLoginMethod);
@@ -549,7 +549,7 @@ export const refreshZernioConnections = createServerFn({ method: "POST" })
         .eq("workspace_id", data.workspaceId);
       return { updated: rows.length, profileMissing: false };
     } catch (reason) {
-      const message = reason instanceof Error ? reason.message : "Zernio sync failed.";
+      const message = reason instanceof Error ? reason.message : "Social account sync failed.";
       await supabaseAdmin
         .from("zernio_profiles" as never)
         .update({ last_error: message } as never)

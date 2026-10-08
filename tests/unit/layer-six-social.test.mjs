@@ -40,6 +40,13 @@ const duplicateAccountMigration = readFileSync(
   "supabase/migrations/20261007235500_tidal_duplicate_platform_accounts.sql",
   "utf8",
 );
+const tidalTeamMigration = readFileSync(
+  "supabase/migrations/20261008004514_tidal_team_access.sql",
+  "utf8",
+);
+const contentHooks = readFileSync("src/hooks/use-content.ts", "utf8");
+const permissions = readFileSync("src/hooks/use-permissions.ts", "utf8");
+const socialCallback = readFileSync("src/routes/social-connections.callback.tsx", "utf8");
 
 test("promo trial and three paid tiers enforce account caps, prices, and annual discounts", () => {
   assert.equal(planExports.SOCIAL_PLANS.trial.accountLimit, 3);
@@ -94,10 +101,30 @@ test("public subscriptions and Dream Wave client service tiers stay separate", (
   assert.match(subscriptionWebhook, /workspace\?\.data_source !== "os_data"/);
 });
 
-test("connection limits are enforced server-side and Snapchat remains closed beta", () => {
+test("connection limits are enforced server-side and unavailable networks stay hidden", () => {
   assert.match(zernio, /connectedAccounts.*>= Number\(limit/);
-  assert.match(zernio, /Snapchat connections are still a closed Zernio beta/);
+  assert.match(zernio, /data\.platform === "snapchat" \|\| data\.platform === "bluesky"/);
+  assert.match(zernio, /This network is not currently available in WaveOS/);
+  const availablePlatforms =
+    contentHooks.match(/export const ALL_PLATFORMS[\s\S]*?\n\];/)?.[0] ?? "";
+  assert.doesNotMatch(availablePlatforms, /bluesky|snapchat/);
   assert.match(publisher, /Disconnect the extra accounts or upgrade before publishing/);
+});
+
+test("team invitations are Tidal-only for public WaveOS accounts", () => {
+  assert.match(settingsRoute, /data_source !== "os_data" \|\| subscription\?\.plan === "expanded"/);
+  assert.match(permissions, /tidal && feature === "can_invite_members"/);
+  assert.match(tidalTeamMigration, /_feature = 'can_invite_members'/);
+  assert.match(tidalTeamMigration, /RETURN _social_plan = 'expanded'/);
+  assert.match(tidalTeamMigration, /RAISE EXCEPTION 'tidal_plan_required'/);
+});
+
+test("mobile social callbacks acknowledge success and recover cleanly from provider errors", () => {
+  assert.match(socialCallback, /"finishing" \| "success" \| "error"/);
+  assert.match(socialCallback, /Connection wasn’t completed/);
+  assert.match(socialCallback, /Return to Social Media/);
+  assert.match(socialCallback, /success: successful/);
+  assert.match(zernio, /provider=zernio&platform=/);
 });
 
 test("Tidal supports duplicate-network accounts without losing the eight-account cap", () => {

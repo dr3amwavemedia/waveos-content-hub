@@ -1281,7 +1281,7 @@ function MediaPicker({
           <div className="mb-3 rounded-lg border border-border bg-elevated/50 px-3 py-2 text-[11px] text-muted-foreground">
             Temporary media: {formatFileSize(storageUsage.data?.usedBytes ?? 0)} of 500 MB used ·{" "}
             {formatFileSize(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available.
-            Published camera-roll media is removed after Zernio confirms every destination.
+            Published camera-roll media is removed after every destination confirms the post.
           </div>
           <input
             value={search}

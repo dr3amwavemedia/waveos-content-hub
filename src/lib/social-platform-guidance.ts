@@ -13,7 +13,7 @@ export type SocialPlatformGuidance = {
 
 /**
  * Provider-facing publishing limits shown in the composer. Keep these aligned
- * with Zernio's platform documentation rather than generic design advice.
+ * with the publishing provider's platform documentation rather than generic design advice.
  */
 export const SOCIAL_PLATFORM_GUIDANCE: Record<SocialPlatform, SocialPlatformGuidance> = {
   instagram: {
@@ -41,7 +41,7 @@ export const SOCIAL_PLATFORM_GUIDANCE: Record<SocialPlatform, SocialPlatformGuid
     caption: "2,200 video caption · photo title 90 · photo description 4,000",
     image: "JPEG/PNG/WebP · 20 MB · up to 35 photos · portrait recommended",
     video: "MP4/MOV/WebM · 4 GB · 3 sec–10 min · 1080×1920 recommended",
-    note: "TikTok does not expose a separate Story publishing target through Zernio.",
+    note: "TikTok does not expose a separate Story publishing target through this connection.",
     storySupported: false,
     available: true,
     accent: "border-cyan-400/30 bg-cyan-400/10",
@@ -70,7 +70,7 @@ export const SOCIAL_PLATFORM_GUIDANCE: Record<SocialPlatform, SocialPlatformGuid
     caption: "280 standard · up to 25,000 with Premium",
     image: "Up to 4 images or 1 GIF",
     video: "1 video · MP4/MOV recommended",
-    note: "Zernio requires provider billing/card setup for X passthrough costs.",
+    note: "X may require separate provider billing for publishing access.",
     storySupported: false,
     available: true,
     accent: "border-slate-400/30 bg-slate-400/10",
@@ -80,7 +80,7 @@ export const SOCIAL_PLATFORM_GUIDANCE: Record<SocialPlatform, SocialPlatformGuid
     caption: "Title 100 · description 800",
     image: "JPEG/PNG/WebP/GIF · 32 MB · one image · 1000×1500 recommended",
     video: "MP4/MOV · 2 GB · 4 sec–15 min",
-    note: "A board must be selected. Pinterest does not expose comments through Zernio.",
+    note: "A board must be selected. Pinterest does not expose comments through this connection.",
     storySupported: false,
     available: true,
     accent: "border-rose-400/30 bg-rose-400/10",
@@ -132,5 +132,4 @@ export const COMMENT_ASSISTANT_PLATFORMS: SocialPlatform[] = [
   "linkedin",
   "threads",
   "x",
-  "bluesky",
 ];

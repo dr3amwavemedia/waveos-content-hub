@@ -37,8 +37,6 @@ export const ALL_PLATFORMS: SocialPlatform[] = [
   "x",
   "pinterest",
   "threads",
-  "bluesky",
-  "snapchat",
 ];
 
 export function useContentItems(workspaceId: string | null, status?: ContentStatus[]) {
