@@ -1173,10 +1173,35 @@ function AccountsView({
       if (event.origin !== window.location.origin || event.data?.type !== "waveos:zernio-connected")
         return;
       if (event.data?.success === false) return;
+      window.localStorage.removeItem("waveos:pending-social-oauth");
       void refresh(true);
     };
     window.addEventListener("message", handleConnected);
     return () => window.removeEventListener("message", handleConnected);
+  });
+
+  useEffect(() => {
+    const refreshPendingConnection = () => {
+      const pending = window.localStorage.getItem("waveos:pending-social-oauth");
+      if (!pending) return;
+      try {
+        const attempt = JSON.parse(pending) as { workspaceId?: string; startedAt?: number };
+        if (attempt.workspaceId !== workspaceId) return;
+        if (!attempt.startedAt || Date.now() - attempt.startedAt > 15 * 60 * 1000) {
+          window.localStorage.removeItem("waveos:pending-social-oauth");
+          return;
+        }
+        void refresh(true);
+      } catch {
+        window.localStorage.removeItem("waveos:pending-social-oauth");
+      }
+    };
+    window.addEventListener("focus", refreshPendingConnection);
+    window.addEventListener("pageshow", refreshPendingConnection);
+    return () => {
+      window.removeEventListener("focus", refreshPendingConnection);
+      window.removeEventListener("pageshow", refreshPendingConnection);
+    };
   });
 
   const prepare = async () => {
@@ -1231,26 +1256,33 @@ function AccountsView({
       );
       return;
     }
+    const mobileOAuth =
+      /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      window.matchMedia("(pointer: coarse)").matches;
+    const oauthWindow = window.open(
+      "",
+      "waveos-zernio-connect",
+      mobileOAuth ? undefined : "popup,width=760,height=820",
+    );
     setBusy(`connect:${platform}:${additional ? "additional" : "primary"}`);
     try {
       const result = await getConnectUrl({
         data: { workspaceId, platform, additional, instagramLoginMethod },
       });
       if (result.alreadyConnected || !result.url) {
+        oauthWindow?.close();
         await refresh(true);
         toast.success(`${PLATFORM_LABEL[platform]} is already connected.`);
         return;
       }
-      const mobileOAuth =
-        /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
-        window.matchMedia("(pointer: coarse)").matches;
-      if (mobileOAuth) {
-        window.location.assign(result.url);
-        return;
-      }
-      const popup = window.open(result.url, "waveos-zernio-connect", "popup,width=760,height=820");
-      if (!popup) window.location.assign(result.url);
+      window.localStorage.setItem(
+        "waveos:pending-social-oauth",
+        JSON.stringify({ workspaceId, platform, startedAt: Date.now() }),
+      );
+      if (oauthWindow) oauthWindow.location.replace(result.url);
+      else window.location.assign(result.url);
     } catch (reason) {
+      oauthWindow?.close();
       toast.error(reason instanceof Error ? reason.message : "Could not start the connection.");
     } finally {
       setBusy(null);
@@ -1403,10 +1435,16 @@ function AccountsView({
               adding={busy === `connect:${account.platform}:additional`}
               disconnecting={busy === `disconnect:${account.key}`}
               canAddAnother={tidal && account.state === "connected"}
-              onConnect={() => void connect(account.platform)}
-              onConnectInstagramWithFacebook={
+              onConnect={() =>
+                void connect(
+                  account.platform,
+                  false,
+                  account.platform === "instagram" ? "facebook_login" : undefined,
+                )
+              }
+              onConnectInstagramDirect={
                 account.platform === "instagram"
-                  ? () => void connect("instagram", false, "facebook_login")
+                  ? () => void connect("instagram", false, "instagram_login")
                   : undefined
               }
               onAddAnother={() => void connect(account.platform, true)}
@@ -1459,7 +1497,7 @@ function AccountCard({
   disconnecting,
   canAddAnother,
   onConnect,
-  onConnectInstagramWithFacebook,
+  onConnectInstagramDirect,
   onAddAnother,
   onDisconnect,
 }: {
@@ -1471,7 +1509,7 @@ function AccountCard({
   disconnecting: boolean;
   canAddAnother: boolean;
   onConnect: () => void;
-  onConnectInstagramWithFacebook?: () => void;
+  onConnectInstagramDirect?: () => void;
   onAddAnother: () => void;
   onDisconnect: () => void;
 }) {
@@ -1562,16 +1600,22 @@ function AccountCard({
           </button>
         )}
       </div>
-      {account.platform === "instagram" && onConnectInstagramWithFacebook && (
+      {account.platform === "instagram" && onConnectInstagramDirect && (
         <button
           type="button"
-          onClick={onConnectInstagramWithFacebook}
+          onClick={onConnectInstagramDirect}
           disabled={!canConnect || limitReached || busy || disconnecting}
           className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-sky-400/30 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-100 hover:border-sky-400/50 disabled:cursor-not-allowed disabled:opacity-45"
         >
-          <Facebook className="h-3.5 w-3.5" />
-          Connect Instagram through Facebook Page
+          <Instagram className="h-3.5 w-3.5" />
+          Use direct Instagram login instead
         </button>
+      )}
+      {account.platform === "instagram" && account.state !== "connected" && (
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          Recommended: connect through the Facebook Page linked to your professional Instagram
+          account. This avoids the Instagram app handoff that can stall on some phones.
+        </p>
       )}
       {account.platform === "threads" && account.state !== "connected" && (
         <p className="mt-2 text-xs leading-5 text-muted-foreground">
