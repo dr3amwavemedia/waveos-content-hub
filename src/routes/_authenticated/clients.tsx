@@ -149,6 +149,7 @@ type InvoiceListItem = Pick<
   | "discount_value"
   | "service_fee_percent"
   | "service_fee_cents"
+  | "processing_fee_at_checkout"
   | "delivery_lock_enabled"
 >;
 type CrmAccountRow = Database["public"]["Tables"]["crm_accounts"]["Row"];
@@ -3253,7 +3254,7 @@ function InvoicesTab({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
       const invoiceColumns =
-        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,service_fee_percent,service_fee_cents,checkout_payment_type,checkout_payment_cents,delivery_lock_enabled";
+        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,service_fee_percent,service_fee_cents,processing_fee_at_checkout,checkout_payment_type,checkout_payment_cents,delivery_lock_enabled";
       const { data, error } = await supabase
         .from("client_invoices")
         .select(`${invoiceColumns},line_items`)
@@ -3614,7 +3615,12 @@ function InvoiceForm({
         value: Number(discountValue || 0),
       });
       const serviceFeeCents = serviceFeeEnabled ? invoiceServiceFeeCents(discount.totalCents) : 0;
-      const cents = discount.totalCents + serviceFeeCents;
+      // New manual-pay invoices show the agreed amount in WaveOS and add the
+      // fee only in Stripe Checkout. Existing invoices retain their recorded
+      // model; automatic charges retain the legacy inclusive total.
+      const processingFeeAtCheckout =
+        serviceFeeEnabled && (invoice?.processing_fee_at_checkout ?? !autopayEnabled);
+      const cents = discount.totalCents + (processingFeeAtCheckout ? 0 : serviceFeeCents);
       if (cents <= 0)
         throw new Error("The discount must leave an invoice total greater than zero.");
       let autopayChargeAt: string | null = null;
@@ -3662,6 +3668,7 @@ function InvoiceForm({
         discount_value: discount.discountValue,
         service_fee_percent: serviceFeeEnabled ? DEFAULT_SERVICE_FEE_BASIS_POINTS : 0,
         service_fee_cents: serviceFeeCents,
+        processing_fee_at_checkout: processingFeeAtCheckout,
         line_items: items as never,
         amount_paid_cents: received ?? 0,
         payment_plan: paymentPlan,
@@ -3754,8 +3761,9 @@ function InvoiceForm({
           charge_at: autopayChargeAt!,
           timezone: "America/New_York",
           amount_cents: autopayAmountCents,
-          service_fee_percent: serviceFeeEnabled ? DEFAULT_SERVICE_FEE_BASIS_POINTS : 0,
-          service_fee_cents: serviceFeeCents,
+          service_fee_percent:
+            serviceFeeEnabled && !processingFeeAtCheckout ? DEFAULT_SERVICE_FEE_BASIS_POINTS : 0,
+          service_fee_cents: serviceFeeEnabled && !processingFeeAtCheckout ? serviceFeeCents : 0,
           currency: currency.trim().toUpperCase(),
           description: description.trim() || invoiceNumber || "Dream Wave Media service",
           status:
@@ -3820,7 +3828,11 @@ function InvoiceForm({
   const previewServiceFeeCents = serviceFeeEnabled
     ? invoiceServiceFeeCents(previewDiscount.totalCents)
     : 0;
-  const effectiveAmount = ((previewDiscount.totalCents + previewServiceFeeCents) / 100).toFixed(2);
+  const previewProcessingFeeAtCheckout =
+    serviceFeeEnabled && (invoice?.processing_fee_at_checkout ?? !autopayEnabled);
+  const previewInvoiceCents =
+    previewDiscount.totalCents + (previewProcessingFeeAtCheckout ? 0 : previewServiceFeeCents);
+  const effectiveAmount = (previewInvoiceCents / 100).toFixed(2);
   const checkoutPaymentType =
     paymentPlan === "deposit_balance"
       ? "deposit"
@@ -3887,11 +3899,13 @@ function InvoiceForm({
             </span>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Add 2.9% to this invoice. It is on automatically for every new invoice.
+            Add 2.9% at Stripe Checkout. The invoice keeps the agreed base amount.
           </p>
           {serviceFeeEnabled && (
             <p className="mt-1 text-xs font-medium text-primary">
-              Current fee: {currency.toUpperCase()} {(previewServiceFeeCents / 100).toFixed(2)}
+              Checkout fee: {currency.toUpperCase()} {(previewServiceFeeCents / 100).toFixed(2)} ·
+              card total {currency.toUpperCase()}{" "}
+              {((previewDiscount.totalCents + previewServiceFeeCents) / 100).toFixed(2)}
             </p>
           )}
         </div>
@@ -3988,13 +4002,15 @@ function InvoiceForm({
           </p>
           {serviceFeeEnabled && (
             <p className="mt-1 text-xs text-muted-foreground">
-              Includes {currency.toUpperCase()} {(previewServiceFeeCents / 100).toFixed(2)} service
-              fee.
+              {previewProcessingFeeAtCheckout
+                ? `Stripe adds ${currency.toUpperCase()} ${(previewServiceFeeCents / 100).toFixed(2)} when the client clicks Pay.`
+                : `Includes ${currency.toUpperCase()} ${(previewServiceFeeCents / 100).toFixed(2)} service fee for this existing or automatic-payment invoice.`}
             </p>
           )}
         </div>
         <p className="text-xs text-muted-foreground sm:col-span-2">
-          The service fee is part of the invoice price and applies regardless of payment method.
+          Manual Stripe payments show the processing fee as a separate checkout line. Existing
+          issued invoices and automatic charges keep their original recorded totals.
         </p>
       </div>
       <CatalogItemPicker

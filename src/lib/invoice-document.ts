@@ -19,6 +19,7 @@ export interface InvoiceDocument {
   discountValue?: number | null;
   serviceFeePercent?: number | null;
   serviceFeeCents?: number | null;
+  processingFeeAtCheckout?: boolean;
   amountPaidCents: number;
   status: string;
   issuedAt: string;
@@ -65,12 +66,13 @@ export function invoiceTotalsFor(invoice: InvoiceDocument) {
   const subtotal =
     invoice.subtotalCents ?? (invoice.lineItems?.length ? lineSubtotal : invoice.amountCents);
   const total = invoice.amountCents ?? subtotal;
-  const serviceFee = Math.max(0, invoice.serviceFeeCents ?? 0);
+  const recordedServiceFee = Math.max(0, invoice.serviceFeeCents ?? 0);
+  const serviceFee = invoice.processingFeeAtCheckout ? 0 : recordedServiceFee;
   const discount =
     subtotal == null || total == null ? 0 : Math.max(0, subtotal - (total - serviceFee));
   const paid = invoice.amountPaidCents ?? 0;
   const balance = total == null ? null : Math.max(0, total - paid);
-  return { subtotal, discount, serviceFee, total, paid, balance };
+  return { subtotal, discount, serviceFee, recordedServiceFee, total, paid, balance };
 }
 
 const planLabels: Record<string, string> = {
@@ -149,6 +151,12 @@ export function invoiceDocumentHtml(
         `<tr class="${label === "Balance due" ? "total" : ""}"><th>${esc(label)}</th><td class="num">${esc(value)}</td></tr>`,
     )
     .join("");
+  const checkoutFeeNote =
+    invoice.processingFeeAtCheckout && (invoice.serviceFeeCents ?? 0) > 0
+      ? `<div class="pay"><strong>Online card processing:</strong> A ${esc(
+          ((invoice.serviceFeePercent ?? 0) / 100).toFixed(2).replace(/\.00$/, ""),
+        )}% processing fee is calculated on the amount paid and shown separately in Stripe Checkout. It is not included in this invoice total.</div>`
+      : "";
 
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(
     `Invoice ${invoice.number ?? invoice.id.slice(0, 8)} · ${profile.name}`,
@@ -199,6 +207,7 @@ ${invoice.paidAt ? `<div><span>Paid on</span>${esc(formatDate(invoice.paidAt))}<
 </div>
 <table><thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead><tbody>${rows}</tbody></table>
 <table class="totals"><tbody>${summary}</tbody></table>
+${checkoutFeeNote}
 ${invoice.notes ? `<div class="notes">${esc(invoice.notes)}</div>` : ""}
 ${
   options.portalUrl && !invoice.isDraft

@@ -1,5 +1,6 @@
 import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
 import { stripeModeMatches, type StripeCheckoutSession } from "@/lib/stripe.server";
+import { invoiceCheckoutAmounts } from "@/lib/invoice-service-fee";
 
 type AdminClient = (typeof import("@/integrations/supabase/client.server"))["supabaseAdmin"];
 
@@ -15,6 +16,8 @@ export type StripeInvoice = {
   payment_plan: string | null;
   checkout_payment_type: string | null;
   checkout_payment_cents: number | null;
+  service_fee_percent: number;
+  processing_fee_at_checkout: boolean;
 };
 
 export type StripeInvoicePaymentResult = {
@@ -43,7 +46,7 @@ export async function applyStripeCheckoutPayment(
 ): Promise<StripeInvoicePaymentResult> {
   const total = invoice.amount_cents ?? 0;
   const alreadyPaid = invoice.amount_paid_cents ?? 0;
-  const received = Number(session.amount_total ?? 0);
+  const chargedTotal = Number(session.amount_total ?? 0);
   const paymentId = String(session.payment_intent ?? session.id ?? "");
   const expectedDue = nextInvoicePaymentCents({
     amountCents: invoice.amount_cents,
@@ -58,10 +61,18 @@ export async function applyStripeCheckoutPayment(
   // amount it was created for, require an exact match with that too.
   const balance = Math.max(total - alreadyPaid, 0);
   const declaredAmount = Number(session.metadata?.payment_amount_cents ?? NaN);
+  const declaredFee = Number(session.metadata?.processing_fee_cents ?? 0);
+  const appliedPayment = Number.isSafeInteger(declaredAmount) ? declaredAmount : chargedTotal;
+  const checkoutAmounts = invoiceCheckoutAmounts(
+    appliedPayment,
+    invoice.service_fee_percent,
+    invoice.processing_fee_at_checkout,
+  );
   const amountMatches =
-    received >= expectedDue &&
-    received <= balance &&
-    (Number.isSafeInteger(declaredAmount) ? received === declaredAmount : true);
+    appliedPayment >= expectedDue &&
+    appliedPayment <= balance &&
+    declaredFee === checkoutAmounts.processingFeeCents &&
+    chargedTotal === checkoutAmounts.checkoutTotalCents;
   const matchesInvoice =
     session.payment_status === "paid" &&
     stripeModeMatches(session.livemode) &&
@@ -71,7 +82,7 @@ export async function applyStripeCheckoutPayment(
     String(session.currency ?? "").toUpperCase() === invoice.currency.toUpperCase() &&
     amountMatches;
 
-  if (!paymentId || !Number.isSafeInteger(received) || received <= 0) {
+  if (!paymentId || !Number.isSafeInteger(chargedTotal) || chargedTotal <= 0) {
     return { kind: "invalid", paidNow: alreadyPaid, settled: false };
   }
 
@@ -82,10 +93,14 @@ export async function applyStripeCheckoutPayment(
     invoice_id: invoice.id,
     workspace_id: invoice.workspace_id,
     kind: "payment",
-    amount_cents: received,
+    amount_cents: appliedPayment,
+    processing_fee_cents: checkoutAmounts.processingFeeCents,
     currency: String(session.currency ?? "usd").toUpperCase(),
     occurred_at: occurredAt,
-    description: `Stripe payment for invoice ${invoice.id}`,
+    description:
+      checkoutAmounts.processingFeeCents > 0
+        ? `Stripe payment for invoice ${invoice.id}; processing fee ${checkoutAmounts.processingFeeCents} cents`
+        : `Stripe payment for invoice ${invoice.id}`,
     status: matchesInvoice ? "posted" : "unmatched",
   });
 
@@ -124,7 +139,10 @@ export async function applyStripeCheckoutPayment(
     return { kind: "review", paidNow: alreadyPaid, settled: false };
   }
 
-  const paidNow = Math.min(alreadyPaid + received, Math.max(total, 0) || Number.MAX_SAFE_INTEGER);
+  const paidNow = Math.min(
+    alreadyPaid + appliedPayment,
+    Math.max(total, 0) || Number.MAX_SAFE_INTEGER,
+  );
   const settled = total > 0 && paidNow >= total;
   const { data: updated, error: invoiceError } = await supabaseAdmin
     .from("client_invoices")
@@ -159,7 +177,9 @@ export async function applyStripeCheckoutPayment(
       invoice.workspace_id,
       {
         invoiceNumber: invoice.number || `Invoice ${invoice.id.slice(0, 8).toUpperCase()}`,
-        receivedCents: received,
+        receivedCents: appliedPayment,
+        processingFeeCents: checkoutAmounts.processingFeeCents,
+        chargedCents: chargedTotal,
         totalPaidCents: paidNow,
         balanceCents: Math.max(0, total - paidNow),
         currency: invoice.currency,

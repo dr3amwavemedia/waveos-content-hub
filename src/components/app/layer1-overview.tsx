@@ -1005,10 +1005,11 @@ export function InvoiceCard({
     checkoutPaymentCents: invoice.checkout_payment_cents,
   });
   const serviceFeeCents = Math.max(0, invoice.service_fee_cents ?? 0);
+  const processingFeeAtCheckout = invoice.processing_fee_at_checkout;
   const discountCents = Math.max(
     0,
     (invoice.subtotal_cents ?? invoice.amount_cents ?? 0) -
-      ((invoice.amount_cents ?? 0) - serviceFeeCents),
+      ((invoice.amount_cents ?? 0) - (processingFeeAtCheckout ? 0 : serviceFeeCents)),
   );
 
   return (
@@ -1110,11 +1111,19 @@ export function InvoiceCard({
         </div>
       )}
       {!isPaid && nextPaymentCents > 0 && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm">
-          <span className="text-muted-foreground">Due with next payment</span>
-          <strong className="text-foreground">
-            {formatMoney(nextPaymentCents, invoice.currency)}
-          </strong>
+        <div className="rounded-xl border border-primary/25 bg-primary/5 px-4 py-3 text-sm">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-muted-foreground">Due with next payment</span>
+            <strong className="text-foreground">
+              {formatMoney(nextPaymentCents, invoice.currency)}
+            </strong>
+          </div>
+          {processingFeeAtCheckout && serviceFeeCents > 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              A {serviceFeePercentLabel(invoice.service_fee_percent)}% processing fee is shown and
+              added when you open Stripe Checkout.
+            </p>
+          )}
         </div>
       )}
       {discountCents > 0 && (
@@ -1128,10 +1137,13 @@ export function InvoiceCard({
       {serviceFeeCents > 0 && (
         <div className="flex items-center justify-between rounded-lg border border-border/60 px-3 py-2 text-sm">
           <span className="text-muted-foreground">
-            Service fee ({serviceFeePercentLabel(invoice.service_fee_percent)}%)
+            {processingFeeAtCheckout ? "Checkout processing fee" : "Service fee"} (
+            {serviceFeePercentLabel(invoice.service_fee_percent)}%)
           </span>
           <strong className="text-foreground">
-            {formatMoney(serviceFeeCents, invoice.currency)}
+            {processingFeeAtCheckout
+              ? "Added when paying online"
+              : formatMoney(serviceFeeCents, invoice.currency)}
           </strong>
         </div>
       )}

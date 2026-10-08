@@ -13,6 +13,7 @@ import {
   nextInvoicePaymentLabel,
 } from "@/lib/invoice-payment-schedule";
 import { applyStripeCheckoutPayment } from "@/lib/stripe-invoice-payment.server";
+import { invoiceCheckoutAmounts } from "@/lib/invoice-service-fee";
 
 /**
  * Create a Stripe Checkout session for one invoice.
@@ -32,7 +33,7 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
     const { data: invoice, error } = await supabase
       .from("client_invoices")
       .select(
-        "id,workspace_id,number,description,amount_cents,amount_paid_cents,currency,status,published_at,provider_session_id,payment_plan,checkout_payment_type,checkout_payment_cents",
+        "id,workspace_id,number,description,amount_cents,amount_paid_cents,currency,status,published_at,provider_session_id,payment_plan,checkout_payment_type,checkout_payment_cents,service_fee_percent,processing_fee_at_checkout",
       )
       .eq("id", data.invoiceId)
       .maybeSingle();
@@ -110,6 +111,11 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
         : paymentType === "fixed"
           ? `Installment toward a ${money(total)} invoice. ${money(remainingAfterPayment)} remains after this payment.`
           : invoice.description;
+    const checkoutAmounts = invoiceCheckoutAmounts(
+      dueNow,
+      invoice.service_fee_percent,
+      invoice.processing_fee_at_checkout,
+    );
     // Validate the public return address BEFORE touching any Stripe session, so
     // a misconfigured setting can never expire a client's existing checkout.
     const origin = publicReturnOrigin();
@@ -152,6 +158,8 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
           invoice_number: invoice.number ?? "",
           payment_type: paymentType,
           payment_amount_cents: String(dueNow),
+          processing_fee_cents: String(checkoutAmounts.processingFeeCents),
+          checkout_total_cents: String(checkoutAmounts.checkoutTotalCents),
         },
         payment_intent_data: {
           metadata: {
@@ -172,6 +180,21 @@ export const createInvoiceCheckout = createServerFn({ method: "POST" })
               },
             },
           },
+          ...(checkoutAmounts.processingFeeCents > 0
+            ? [
+                {
+                  quantity: 1,
+                  price_data: {
+                    currency: (invoice.currency ?? "usd").toLowerCase(),
+                    unit_amount: checkoutAmounts.processingFeeCents,
+                    product_data: {
+                      name: `Processing fee (${invoice.service_fee_percent / 100}%)`,
+                      description: "Online payment processing fee",
+                    },
+                  },
+                },
+              ]
+            : []),
         ],
       },
       // Unique per attempt, so Stripe never returns an expired session from a
@@ -214,7 +237,7 @@ export const getInvoicePaymentState = createServerFn({ method: "POST" })
   .validator((d: { invoiceId: string; sessionId?: string }) => d)
   .handler(async ({ data, context }) => {
     const invoiceColumns =
-      "id,workspace_id,number,status,amount_cents,amount_paid_cents,currency,paid_at,published_at,provider_session_id,payment_plan,checkout_payment_type,checkout_payment_cents";
+      "id,workspace_id,number,status,amount_cents,amount_paid_cents,currency,paid_at,published_at,provider_session_id,payment_plan,checkout_payment_type,checkout_payment_cents,service_fee_percent,processing_fee_at_checkout";
     const { data: initialInvoice, error } = await context.supabase
       .from("client_invoices")
       .select(invoiceColumns)

@@ -229,7 +229,7 @@ export const Route = createFileRoute("/api/public/hooks/stripe")({
         const { data: invoice } = await supabaseAdmin
           .from("client_invoices")
           .select(
-            "id,workspace_id,number,amount_cents,amount_paid_cents,currency,status,provider_session_id,payment_plan,checkout_payment_type,checkout_payment_cents",
+            "id,workspace_id,number,amount_cents,amount_paid_cents,currency,status,provider_session_id,payment_plan,checkout_payment_type,checkout_payment_cents,service_fee_percent,processing_fee_at_checkout",
           )
           .eq("id", invoiceId)
           .maybeSingle();
