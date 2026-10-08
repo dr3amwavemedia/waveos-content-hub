@@ -22,6 +22,9 @@ test("public signup chooses a paid plan before account creation and opens Stripe
   assert.match(auth, /Choose your subscription/);
   assert.match(auth, /Ripple/);
   assert.match(auth, /Current/);
+  assert.match(auth, /4 accounts · AI Assist \+ scheduling/);
+  assert.match(auth, /4 connected social accounts/);
+  assert.doesNotMatch(auth, /Current[\s\S]{0,200}3 accounts/);
   assert.match(auth, /Tidal/);
   assert.match(auth, /save 5%/);
   assert.match(auth, /save 10%/);

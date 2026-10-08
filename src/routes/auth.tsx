@@ -345,8 +345,13 @@ function AuthPage() {
                       "full",
                       "Current",
                       annualBilling ? "$797.89 / year · save 5%" : "$69.99 / month",
-                      "3 accounts · AI Assist + scheduling",
-                      ["Everything in Ripple", "Generative AI Assist", "Post scheduling"],
+                      "4 accounts · AI Assist + scheduling",
+                      [
+                        "Everything in Ripple",
+                        "4 connected social accounts",
+                        "Generative AI Assist",
+                        "Post scheduling",
+                      ],
                     ],
                     [
                       "expanded",

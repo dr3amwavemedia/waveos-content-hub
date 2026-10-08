@@ -443,7 +443,12 @@ function SocialPlanSettings({
                   detail: "4 accounts · AI Assist + scheduling",
                   monthly: "$69.99 / month",
                   annual: "$797.89 / year · save 5%",
-                  features: ["Everything in Ripple", "Generative AI Assist", "Post scheduling"],
+                  features: [
+                    "Everything in Ripple",
+                    "4 connected social accounts",
+                    "Generative AI Assist",
+                    "Post scheduling",
+                  ],
                 },
                 {
                   plan: "expanded",
