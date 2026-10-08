@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
 export type ExternalMediaProvider = "google_drive" | "dropbox";
+export const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 type ExternalConnection = {
   id: string;
@@ -165,6 +166,22 @@ export async function getExternalConnection(workspaceId: string, provider: Exter
   return data as unknown as ExternalConnection | null;
 }
 
+export function hasGoogleDriveScope(scopes: string | null | undefined) {
+  return (scopes ?? "").split(/\s+/).includes(GOOGLE_DRIVE_SCOPE);
+}
+
+export async function revokeExternalConnection(connection: ExternalConnection) {
+  if (connection.provider !== "google_drive") return true;
+  const encryptedToken = connection.refresh_token_encrypted ?? connection.access_token_encrypted;
+  const token = await decryptExternalToken(encryptedToken);
+  const response = await fetch("https://oauth2.googleapis.com/revoke", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ token }),
+  });
+  return response.ok;
+}
+
 async function updateExternalConnection(id: string, patch: Record<string, unknown>) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { error } = await supabaseAdmin
@@ -175,6 +192,9 @@ async function updateExternalConnection(id: string, patch: Record<string, unknow
 }
 
 export async function externalAccessToken(connection: ExternalConnection) {
+  if (connection.provider === "google_drive" && !hasGoogleDriveScope(connection.scopes)) {
+    throw new Error("google_drive_reconnect_required");
+  }
   const current = await decryptExternalToken(connection.access_token_encrypted);
   if (
     !connection.token_expires_at ||

@@ -69,6 +69,32 @@ function SettingsPage() {
   const { activeWorkspace } = useWorkspace();
   const { subscription, isLoading: permissionsLoading, isStaff } = usePermissions();
   const qc = useQueryClient();
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const error = url.searchParams.get("storage_error");
+    const connected = url.searchParams.get("storage_connected");
+    if (!error && !connected) return;
+    if (connected === "google_drive") {
+      toast.success("Google Drive connected with file access.");
+      void qc.invalidateQueries({ queryKey: ["external-media-status"] });
+    } else if (connected === "dropbox") {
+      toast.success("Dropbox connected.");
+      void qc.invalidateQueries({ queryKey: ["external-media-status"] });
+    } else {
+      const messages: Record<string, string> = {
+        google_scope_required:
+          "Google Drive permission was not accepted. Reconnect and allow Drive access when Google asks.",
+        invalid_state: "The storage sign-in expired or was cancelled. Please reconnect.",
+        token_exchange: "Google could not finish the connection. Please reconnect and try again.",
+        profile: "Google connected, but WaveOS could not read the selected account.",
+        connection_save: "WaveOS could not securely save the storage connection.",
+      };
+      toast.error(messages[error ?? ""] ?? "Storage could not be connected. Please try again.");
+    }
+    url.searchParams.delete("storage_error");
+    url.searchParams.delete("storage_connected");
+    window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [qc]);
   const canManageApproval =
     !user?.isStaff && (activeWorkspace?.role === "owner" || activeWorkspace?.role === "admin");
   const canManageBranding =
@@ -868,13 +894,18 @@ function StorageConnectionCard({
   });
   const disconnect = useMutation({
     mutationFn: () => disconnectExternalMedia(provider, workspaceId),
-    onSuccess: async () => {
+    onSuccess: async ({ revoked }) => {
       await qc.invalidateQueries({ queryKey: ["external-media-status", workspaceId, provider] });
-      toast.success(`${label} disconnected.`);
+      toast.success(
+        provider === "google_drive" && revoked
+          ? "Google Drive disconnected and its WaveOS authorization was reset."
+          : `${label} disconnected.`,
+      );
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "Disconnect failed."),
   });
   const connected = status.data?.connected === true;
+  const reconnectRequired = status.data?.reconnectRequired === true;
   const configured = status.data?.configured !== false;
 
   return (
@@ -891,11 +922,13 @@ function StorageConnectionCard({
           <p className="truncate text-xs text-muted-foreground">
             {status.isLoading
               ? "Checking connection…"
-              : connected
-                ? status.data?.account?.email || "Connected"
-                : configured
-                  ? "Not connected"
-                  : "Developer credentials needed"}
+              : reconnectRequired
+                ? "Reconnect required — Drive permission is missing"
+                : connected
+                  ? status.data?.account?.email || "Connected"
+                  : configured
+                    ? "Not connected"
+                    : "Developer credentials needed"}
           </p>
         </div>
       </div>

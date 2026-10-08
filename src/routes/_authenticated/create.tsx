@@ -1947,7 +1947,6 @@ function GoogleDrivePicker({
   const [opening, setOpening] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
-  const autoOpened = useRef(false);
   const pickerRef = useRef<GooglePickerInstance | null>(null);
 
   function closePicker() {
@@ -2058,12 +2057,6 @@ function GoogleDrivePicker({
     }
   }
 
-  useEffect(() => {
-    if (autoOpened.current) return;
-    autoOpened.current = true;
-    void openPicker();
-  }, [workspaceId]);
-
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
       {pickerOpen && (
@@ -2089,7 +2082,7 @@ function GoogleDrivePicker({
               ? "Google Drive is open"
               : openError
                 ? "Google Drive could not open"
-                : "Google Drive picker closed"}
+                : "Choose files from Google Drive"}
         </p>
         <p className="mt-1 max-w-md text-xs text-muted-foreground">
           Browse My Drive, folders shared with you and Shared drives without leaving WaveOS. WaveOS
@@ -2105,7 +2098,7 @@ function GoogleDrivePicker({
           onClick={openPicker}
           className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
         >
-          Browse Google Drive again
+          {openError ? "Try Google Drive again" : "Browse Google Drive"}
         </button>
       ) : null}
     </div>

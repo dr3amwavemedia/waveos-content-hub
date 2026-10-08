@@ -10,6 +10,7 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
           externalMediaEnv,
           externalMediaRequestOrigin,
           externalMediaRedirectUri,
+          hasGoogleDriveScope,
         } = await import("@/lib/external-media.server");
         const appUrl = externalMediaRequestOrigin(request);
         if (provider !== "google_drive" && provider !== "dropbox")
@@ -67,6 +68,22 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
         const tokens = (await tokenResponse.json()) as Record<string, unknown>;
         if (!tokenResponse.ok || typeof tokens.access_token !== "string") {
           return Response.redirect(`${appUrl}/settings?storage_error=token_exchange`, 302);
+        }
+
+        if (
+          provider === "google_drive" &&
+          !hasGoogleDriveScope(typeof tokens.scope === "string" ? tokens.scope : "")
+        ) {
+          await fetch("https://oauth2.googleapis.com/revoke", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({ token: tokens.access_token as string }),
+          }).catch(() => undefined);
+          await supabaseAdmin
+            .from("external_media_oauth_states" as never)
+            .delete()
+            .eq("state", state);
+          return Response.redirect(`${appUrl}/settings?storage_error=google_scope_required`, 302);
         }
 
         let externalAccountId = "";

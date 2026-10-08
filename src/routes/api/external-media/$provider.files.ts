@@ -34,8 +34,12 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
   server: {
     handlers: {
       POST: async ({ request, params }) => {
-        const { externalAccessToken, getExternalConnection, requireExternalMediaWorkspace } =
-          await import("@/lib/external-media.server");
+        const {
+          externalAccessToken,
+          getExternalConnection,
+          hasGoogleDriveScope,
+          requireExternalMediaWorkspace,
+        } = await import("@/lib/external-media.server");
         const provider = params.provider;
         if (provider !== "google_drive" && provider !== "dropbox")
           return json({ error: "unsupported_provider" }, 404);
@@ -46,6 +50,17 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
         if (!auth) return json({ error: "not_authorized" }, 403);
         const connection = await getExternalConnection(workspaceId, provider);
         if (!connection) return json({ error: "not_connected" }, 409);
+        if (provider === "google_drive" && !hasGoogleDriveScope(connection.scopes)) {
+          return json(
+            {
+              error:
+                "Google Drive permission was not granted. Disconnect Google Drive in Settings, then reconnect and allow Drive access.",
+              code: "reconnect_required",
+              provider,
+            },
+            409,
+          );
+        }
         let accessToken: string;
         try {
           accessToken = await externalAccessToken(connection);
@@ -98,6 +113,20 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
               },
               503,
             );
+          const driveCheck = await fetch("https://www.googleapis.com/drive/v3/about?fields=user", {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (!driveCheck.ok) {
+            return json(
+              {
+                error:
+                  "Google Drive access is unavailable. Disconnect Google Drive in Settings, then reconnect and allow Drive access.",
+                code: "reconnect_required",
+                provider,
+              },
+              409,
+            );
+          }
           return json({ accessToken, clientId, appId, apiKey });
         }
 
