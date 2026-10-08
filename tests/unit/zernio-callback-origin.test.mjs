@@ -23,13 +23,15 @@ test("Zernio callbacks prefer the public WaveOS URL and strip stale paths", () =
   assert.doesNotMatch(functionsSource, /const appBaseUrl = \(process\.env\.APP_BASE_URL/);
 });
 
-test("Instagram offers a Facebook Page fallback and mobile OAuth stays in one page", () => {
+test("Instagram prefers Facebook Page login and mobile OAuth preserves the WaveOS page", () => {
   assert.match(functionsSource, /params\.set\("loginMethod", data\.instagramLoginMethod\)/);
   assert.match(functionsSource, /"instagram_login" \| "facebook_login"/);
   assert.match(socialSource, /Android\|iPhone\|iPad\|iPod/);
-  assert.match(socialSource, /mobileOAuth[\s\S]*window\.location\.assign\(result\.url\)/);
-  assert.match(socialSource, /Connect Instagram through Facebook Page/);
-  assert.match(socialSource, /connect\("instagram", false, "facebook_login"\)/);
+  assert.match(socialSource, /waveos-zernio-connect/);
+  assert.match(socialSource, /oauthWindow\.location\.replace\(result\.url\)/);
+  assert.match(socialSource, /waveos:pending-social-oauth/);
+  assert.match(socialSource, /Use direct Instagram login instead/);
+  assert.match(socialSource, /account\.platform === "instagram" \? "facebook_login" : undefined/);
 });
 
 test("workspace branding exposes coordinated dashboard palette variables", () => {
