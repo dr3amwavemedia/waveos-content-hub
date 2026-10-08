@@ -15,6 +15,7 @@ export type ExportInvoice = {
   discount_value?: number | null;
   service_fee_percent?: number | null;
   service_fee_cents?: number | null;
+  processing_fee_at_checkout?: boolean;
   payment_plan?: string | null;
   checkout_payment_type?: string | null;
   checkout_payment_cents?: number | null;

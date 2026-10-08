@@ -755,6 +755,7 @@ export type Database = {
           provider_payment_id: string | null
           provider_session_id: string | null
           published_at: string | null
+          processing_fee_at_checkout: boolean
           refund_flagged_at: string | null
           service_fee_cents: number
           service_fee_percent: number
@@ -789,6 +790,7 @@ export type Database = {
           provider_payment_id?: string | null
           provider_session_id?: string | null
           published_at?: string | null
+          processing_fee_at_checkout?: boolean
           refund_flagged_at?: string | null
           service_fee_cents?: number
           service_fee_percent?: number
@@ -823,6 +825,7 @@ export type Database = {
           provider_payment_id?: string | null
           provider_session_id?: string | null
           published_at?: string | null
+          processing_fee_at_checkout?: boolean
           refund_flagged_at?: string | null
           service_fee_cents?: number
           service_fee_percent?: number
@@ -2487,6 +2490,7 @@ export type Database = {
           invoice_id: string | null
           kind: string
           occurred_at: string
+          processing_fee_cents: number
           source: string
           status: string
           workspace_id: string | null
@@ -2503,6 +2507,7 @@ export type Database = {
           invoice_id?: string | null
           kind: string
           occurred_at: string
+          processing_fee_cents?: number
           source: string
           status?: string
           workspace_id?: string | null
@@ -2519,6 +2524,7 @@ export type Database = {
           invoice_id?: string | null
           kind?: string
           occurred_at?: string
+          processing_fee_cents?: number
           source?: string
           status?: string
           workspace_id?: string | null

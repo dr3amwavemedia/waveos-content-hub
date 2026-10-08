@@ -12,3 +12,19 @@ export function invoiceServiceFeeCents(
 export function serviceFeePercentLabel(basisPoints: number | null | undefined) {
   return ((basisPoints ?? 0) / 100).toFixed(2).replace(/\.00$/, "");
 }
+
+export function invoiceCheckoutAmounts(
+  invoicePaymentCents: number,
+  basisPoints = DEFAULT_SERVICE_FEE_BASIS_POINTS,
+  processingFeeAtCheckout = true,
+) {
+  const paymentCents = Math.max(0, Math.round(invoicePaymentCents));
+  const processingFeeCents = processingFeeAtCheckout
+    ? invoiceServiceFeeCents(paymentCents, basisPoints)
+    : 0;
+  return {
+    invoicePaymentCents: paymentCents,
+    processingFeeCents,
+    checkoutTotalCents: paymentCents + processingFeeCents,
+  };
+}

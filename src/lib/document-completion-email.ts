@@ -4,6 +4,8 @@ export type PaymentReceiptEmailInput = {
   totalPaidCents: number;
   balanceCents: number;
   currency: string;
+  processingFeeCents?: number;
+  chargedCents?: number;
 };
 
 export type SignedContractEmailInput = {
@@ -20,11 +22,16 @@ export function paymentReceiptEmail(input: PaymentReceiptEmailInput) {
   const received = money(input.receivedCents, input.currency);
   const paid = money(input.totalPaidCents, input.currency);
   const balance = money(input.balanceCents, input.currency);
+  const fee = money(input.processingFeeCents ?? 0, input.currency);
+  const charged = money(input.chargedCents ?? input.receivedCents, input.currency);
+  const paymentSentence = input.processingFeeCents
+    ? `We received ${received} for ${input.invoiceNumber}, plus a ${fee} processing fee (${charged} charged total).`
+    : `We received ${received} for ${input.invoiceNumber}.`;
   return {
     eventType: "payment_receipt",
     subject: `Payment receipt: ${input.invoiceNumber}`,
     heading: "Your payment receipt",
-    message: `We received ${received} for ${input.invoiceNumber}. Total paid: ${paid}. Remaining balance: ${balance}.`,
+    message: `${paymentSentence} Total paid toward the invoice: ${paid}. Remaining balance: ${balance}.`,
     buttonLabel: "View or print receipt",
     portalHash: "invoices",
   } as const;
