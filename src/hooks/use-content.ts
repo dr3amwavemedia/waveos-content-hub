@@ -78,6 +78,7 @@ export function useCreateContentItem(workspaceId: string | null) {
       primary_caption?: string;
       media_asset_ids?: string[];
       platforms: SocialPlatform[];
+      platform_options?: Partial<Record<SocialPlatform, PostVariant["platform_options"]>>;
       scheduled_at?: string | null;
     }) => {
       if (!workspaceId) throw new Error("No workspace");
@@ -103,6 +104,7 @@ export function useCreateContentItem(workspaceId: string | null) {
           workspace_id: workspaceId,
           platform: p,
           caption: input.primary_caption ?? "",
+          platform_options: input.platform_options?.[p] ?? {},
         }));
         const { error: ve } = await supabase.from("post_variants").insert(rows);
         if (ve) throw ve;
