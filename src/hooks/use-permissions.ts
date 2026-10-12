@@ -160,7 +160,10 @@ export function usePermissions(): WorkspacePermissions {
     if (isPublicOs) {
       const subscription = subscriptionQuery.data ?? null;
       const active = publicSubscriptionActive(subscription);
-      const premium = subscription?.plan === "full" || subscription?.plan === "expanded";
+      const premium =
+        subscription?.status === "trialing" ||
+        subscription?.plan === "full" ||
+        subscription?.plan === "expanded";
       const tidal = subscription?.plan === "expanded";
       const allowed = (feature: FeatureKey) =>
         active &&
