@@ -93,6 +93,8 @@ export async function stripeRequest<T = Record<string, unknown>>(
 export type StripeCheckoutSession = {
   id: string;
   url?: string | null;
+  mode?: "payment" | "setup" | "subscription" | null;
+  subscription?: string | null;
   client_reference_id?: string | null;
   payment_intent: string | null;
   amount_total: number | null;

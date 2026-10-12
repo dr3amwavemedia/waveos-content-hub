@@ -43,7 +43,31 @@ test("subscription webhooks send branded success and failure emails", async () =
   assert.match(email, /social_subscription_payment_succeeded/);
   assert.match(email, /social_subscription_payment_failed/);
   assert.match(email, /social_subscription_payment_failed_locked/);
+  assert.match(email, /social_subscription_trial_started/);
+  assert.match(email, /social_subscription_started/);
+  assert.match(email, /Sign in to WaveOS/);
   assert.match(email, /RESEND_API_KEY/);
+});
+
+test("Stripe checkout return confirms the subscription before offering another checkout", async () => {
+  const [functions, settings] = await Promise.all([
+    read("src/lib/social-subscriptions.functions.ts"),
+    read("src/routes/_authenticated/settings.tsx"),
+  ]);
+  assert.match(functions, /session_id=\{CHECKOUT_SESSION_ID\}/);
+  assert.match(functions, /confirmSocialSubscriptionCheckout/);
+  assert.match(functions, /session\.status !== "complete"/);
+  assert.match(functions, /session\.client_reference_id !== data\.workspaceId/);
+  assert.match(functions, /sendCheckoutWelcome: true/);
+  assert.match(functions, /already has a Stripe subscription/);
+  assert.match(settings, /Confirming your subscription/);
+  assert.match(settings, /please do\s+not start another checkout/);
+  assert.match(settings, /checkoutConfirmation !== "confirming"/);
+  assert.match(settings, /!subscriptionReady/);
+  assert.match(settings, /workspace-social-subscription-access/);
+  const email = await read("src/lib/social-subscription-email.server.ts");
+  assert.match(email, /event_type", copy\.eventType/);
+  assert.match(email, /\.eq\("status", "sent"\)/);
 });
 
 test("locked subscribers can open Stripe billing without exposing credentials", async () => {

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -47,6 +47,7 @@ import {
   clientAccountAccess,
 } from "@/lib/client-account-access";
 import {
+  confirmSocialSubscriptionCheckout,
   createSocialBillingPortal,
   createSocialSubscriptionCheckout,
   getSocialSubscription,
@@ -365,13 +366,52 @@ function SocialPlanSettings({
   canManage: boolean;
 }) {
   const [annualBilling, setAnnualBilling] = useState(false);
+  const [checkoutConfirmation, setCheckoutConfirmation] = useState<
+    "idle" | "confirming" | "confirmed" | "error"
+  >("idle");
+  const checkoutConfirmationStarted = useRef(false);
+  const qc = useQueryClient();
   const getPlan = useServerFn(getSocialSubscription);
   const checkout = useServerFn(createSocialSubscriptionCheckout);
+  const confirmCheckout = useServerFn(confirmSocialSubscriptionCheckout);
   const billingPortal = useServerFn(createSocialBillingPortal);
   const query = useQuery({
     queryKey: ["social-subscription", workspaceId],
     queryFn: () => getPlan({ data: { workspaceId } }),
   });
+  useEffect(() => {
+    if (checkoutConfirmationStarted.current) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("subscription") !== "started") return;
+    const sessionId = url.searchParams.get("session_id");
+    if (!sessionId) {
+      setCheckoutConfirmation("error");
+      return;
+    }
+    checkoutConfirmationStarted.current = true;
+    setCheckoutConfirmation("confirming");
+    void (async () => {
+      try {
+        await confirmCheckout({ data: { workspaceId, sessionId } });
+        await Promise.all([
+          query.refetch(),
+          qc.invalidateQueries({ queryKey: ["workspace-social-subscription-access", workspaceId] }),
+        ]);
+        setCheckoutConfirmation("confirmed");
+        toast.success("Your WaveOS subscription is ready.");
+        url.searchParams.delete("subscription");
+        url.searchParams.delete("session_id");
+        window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      } catch (error) {
+        setCheckoutConfirmation("error");
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "We could not confirm the subscription yet. Please refresh shortly.",
+        );
+      }
+    })();
+  }, [confirmCheckout, qc, query, workspaceId]);
   const subscribe = useMutation({
     mutationFn: (input: {
       plan: "standard" | "full" | "expanded";
@@ -391,6 +431,8 @@ function SocialPlanSettings({
       toast.error(error instanceof Error ? error.message : "Could not open billing settings."),
   });
   const subscription = query.data?.subscription;
+  const subscriptionReady =
+    subscription?.status === "active" || subscription?.status === "trialing";
   return (
     <section className="surface-card p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -409,6 +451,25 @@ function SocialPlanSettings({
             : "Not started"}
         </span>
       </div>
+      {checkoutConfirmation === "confirming" && (
+        <div className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm text-foreground">
+          <strong className="inline-flex items-center gap-2">
+            <Loader2 className="h-4 w-4 animate-spin" /> Confirming your subscription…
+          </strong>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Stripe confirmed your checkout. WaveOS is securely activating your account; please do
+            not start another checkout.
+          </p>
+        </div>
+      )}
+      {checkoutConfirmation === "confirmed" && (
+        <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-foreground">
+          <strong>Your subscription is active.</strong>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Your WaveOS tools are ready. A welcome email has been sent to your account email.
+          </p>
+        </div>
+      )}
       {subscription &&
         (subscription.payment_failure_count > 0 || subscription.service_locked_at) && (
           <div className="mt-4 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-foreground">
@@ -446,98 +507,101 @@ function SocialPlanSettings({
           {manageBilling.isPending ? "Opening Stripe…" : "Manage payment method"}
         </button>
       )}
-      {canManage && !subscription?.internal_test_access && (
-        <div className="mt-5">
-          <div className="mb-4 flex items-center justify-end gap-2 text-xs font-semibold text-foreground">
-            Monthly
-            <button
-              type="button"
-              role="switch"
-              aria-checked={annualBilling}
-              onClick={() => setAnnualBilling((value) => !value)}
-              className={`relative h-6 w-11 rounded-full transition ${annualBilling ? "bg-primary" : "bg-border"}`}
-            >
-              <span
-                className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${annualBilling ? "left-6" : "left-1"}`}
-              />
-            </button>
-            Annual
-          </div>
-          <div className="grid gap-3 lg:grid-cols-3">
-            {(
-              [
-                {
-                  plan: "standard",
-                  name: "Ripple",
-                  detail: "3 accounts · core tools",
-                  monthly: "$39.99 / month",
-                  annual: "$479.88 / year",
-                  features: [
-                    "Create and publish content",
-                    "Analytics and media library",
-                    "3 social accounts",
-                  ],
-                },
-                {
-                  plan: "full",
-                  name: "Current",
-                  detail: "4 accounts · AI Assist + scheduling",
-                  monthly: "$69.99 / month",
-                  annual: "$797.89 / year · save 5%",
-                  features: [
-                    "Everything in Ripple",
-                    "4 connected social accounts",
-                    "Generative AI Assist",
-                    "Post scheduling",
-                  ],
-                },
-                {
-                  plan: "expanded",
-                  name: "Tidal",
-                  detail: "8 accounts · AI Assist + scheduling",
-                  monthly: "$119.99 / month",
-                  annual: "$1,295.89 / year · save 10%",
-                  features: [
-                    "Everything in Current",
-                    "8 social accounts",
-                    "Built for growing teams",
-                  ],
-                },
-              ] as const
-            ).map((tier) => (
-              <div
-                key={tier.plan}
-                className={`rounded-xl border p-4 ${tier.plan === "full" ? "border-primary/40 bg-primary/5" : "border-border bg-elevated"}`}
+      {canManage &&
+        !subscription?.internal_test_access &&
+        !subscriptionReady &&
+        checkoutConfirmation !== "confirming" && (
+          <div className="mt-5">
+            <div className="mb-4 flex items-center justify-end gap-2 text-xs font-semibold text-foreground">
+              Monthly
+              <button
+                type="button"
+                role="switch"
+                aria-checked={annualBilling}
+                onClick={() => setAnnualBilling((value) => !value)}
+                className={`relative h-6 w-11 rounded-full transition ${annualBilling ? "bg-primary" : "bg-border"}`}
               >
-                <strong className="text-sm text-foreground">{tier.name}</strong>
-                <span className="mt-1 block min-h-8 text-xs text-muted-foreground">
-                  {tier.detail}
-                </span>
-                <ul className="mt-3 grid gap-1.5 text-[11px] text-muted-foreground">
-                  {tier.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <span className="text-primary">✓</span> {feature}
-                    </li>
-                  ))}
-                </ul>
-                <button
-                  type="button"
-                  disabled={subscribe.isPending}
-                  onClick={() =>
-                    subscribe.mutate({
-                      plan: tier.plan,
-                      interval: annualBilling ? "annual" : "monthly",
-                    })
-                  }
-                  className="mt-4 w-full rounded-lg bg-primary px-3 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md active:translate-y-0 active:scale-[0.98] disabled:opacity-50"
+                <span
+                  className={`absolute top-1 h-4 w-4 rounded-full bg-white transition-all ${annualBilling ? "left-6" : "left-1"}`}
+                />
+              </button>
+              Annual
+            </div>
+            <div className="grid gap-3 lg:grid-cols-3">
+              {(
+                [
+                  {
+                    plan: "standard",
+                    name: "Ripple",
+                    detail: "3 accounts · core tools",
+                    monthly: "$39.99 / month",
+                    annual: "$479.88 / year",
+                    features: [
+                      "Create and publish content",
+                      "Analytics and media library",
+                      "3 social accounts",
+                    ],
+                  },
+                  {
+                    plan: "full",
+                    name: "Current",
+                    detail: "4 accounts · AI Assist + scheduling",
+                    monthly: "$69.99 / month",
+                    annual: "$797.89 / year · save 5%",
+                    features: [
+                      "Everything in Ripple",
+                      "4 connected social accounts",
+                      "Generative AI Assist",
+                      "Post scheduling",
+                    ],
+                  },
+                  {
+                    plan: "expanded",
+                    name: "Tidal",
+                    detail: "8 accounts · AI Assist + scheduling",
+                    monthly: "$119.99 / month",
+                    annual: "$1,295.89 / year · save 10%",
+                    features: [
+                      "Everything in Current",
+                      "8 social accounts",
+                      "Built for growing teams",
+                    ],
+                  },
+                ] as const
+              ).map((tier) => (
+                <div
+                  key={tier.plan}
+                  className={`rounded-xl border p-4 ${tier.plan === "full" ? "border-primary/40 bg-primary/5" : "border-border bg-elevated"}`}
                 >
-                  {annualBilling ? tier.annual : tier.monthly}
-                </button>
-              </div>
-            ))}
+                  <strong className="text-sm text-foreground">{tier.name}</strong>
+                  <span className="mt-1 block min-h-8 text-xs text-muted-foreground">
+                    {tier.detail}
+                  </span>
+                  <ul className="mt-3 grid gap-1.5 text-[11px] text-muted-foreground">
+                    {tier.features.map((feature) => (
+                      <li key={feature} className="flex items-center gap-2">
+                        <span className="text-primary">✓</span> {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    disabled={subscribe.isPending}
+                    onClick={() =>
+                      subscribe.mutate({
+                        plan: tier.plan,
+                        interval: annualBilling ? "annual" : "monthly",
+                      })
+                    }
+                    className="mt-4 w-full rounded-lg bg-primary px-3 py-2.5 text-xs font-semibold text-primary-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 hover:shadow-md active:translate-y-0 active:scale-[0.98] disabled:opacity-50"
+                  >
+                    {annualBilling ? tier.annual : tier.monthly}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       <p className="mt-3 text-[11px] text-muted-foreground">
         Annual billing keeps Ripple at $479.88, saves 5% on Current, and saves 10% on Tidal.
         Payments, subscription invoices, and billing details are securely managed by Stripe.

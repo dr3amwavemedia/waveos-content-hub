@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { Database } from "@/integrations/supabase/types";
+import type { StripeCheckoutSession } from "@/lib/stripe.server";
 import {
   SOCIAL_PLANS,
   socialPlanAllowsBillingInterval,
@@ -161,11 +162,22 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existingSubscription } = await supabaseAdmin
       .from("workspace_social_subscriptions" as never)
-      .select("internal_test_access")
+      .select("internal_test_access,status,stripe_subscription_id")
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
-    if ((existingSubscription as { internal_test_access?: boolean } | null)?.internal_test_access)
+    const existing = existingSubscription as {
+      internal_test_access?: boolean;
+      status?: string;
+      stripe_subscription_id?: string | null;
+    } | null;
+    if (existing?.internal_test_access)
       throw new Error("Internal test accounts do not use Stripe checkout.");
+    if (
+      existing?.stripe_subscription_id &&
+      ["active", "trialing", "past_due"].includes(existing.status ?? "")
+    ) {
+      throw new Error("This workspace already has a Stripe subscription. Manage billing instead.");
+    }
     if (!socialPlanAllowsBillingInterval(data.plan, data.interval))
       throw new Error("That billing interval is not available for this plan.");
     const { stripePublicSubscriptionsEnabled, stripeRequest } = await import("@/lib/stripe.server");
@@ -199,7 +211,7 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
       body: {
         mode: "subscription",
         client_reference_id: data.workspaceId,
-        success_url: `${origin}/social?view=accounts&subscription=started`,
+        success_url: `${origin}/settings?subscription=started&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${origin}/settings?social_checkout=cancelled`,
         payment_method_collection: "always",
         ...(promoTrialDays
@@ -253,6 +265,38 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
       { onConflict: "workspace_id" },
     );
     return { url: session.url ?? null };
+  });
+
+export const confirmSocialSubscriptionCheckout = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { workspaceId: string; sessionId: string }) => data)
+  .handler(async ({ data, context }) => {
+    await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
+    await requirePublicOsWorkspace(data.workspaceId);
+    const { stripeModeMatches, stripeRequest } = await import("@/lib/stripe.server");
+    const session = await stripeRequest<StripeCheckoutSession>(
+      `/checkout/sessions/${encodeURIComponent(data.sessionId)}`,
+      { method: "GET" },
+    );
+    if (
+      session.status !== "complete" ||
+      session.mode !== "subscription" ||
+      !stripeModeMatches(session.livemode) ||
+      session.client_reference_id !== data.workspaceId ||
+      session.metadata?.workspace_id !== data.workspaceId ||
+      !session.subscription
+    ) {
+      throw new Error("Stripe has not confirmed this subscription checkout.");
+    }
+    const { applySocialSubscriptionEvent } =
+      await import("@/lib/social-subscription-webhook.server");
+    const applied = await applySocialSubscriptionEvent(
+      "checkout.session.completed",
+      session as unknown as Record<string, unknown>,
+      { sendCheckoutWelcome: true },
+    );
+    if (!applied) throw new Error("Subscription confirmation could not be applied.");
+    return { confirmed: true };
   });
 
 export const createSocialBillingPortal = createServerFn({ method: "POST" })

@@ -68,6 +68,13 @@ test("webhooks trigger completion email delivery only after verified provider ev
   assert.match(signwell, /if \(!contract\) return retryableFailure\("contract_not_found"\)/);
 });
 
+test("DWM invoice payments notify both designated administrators", () => {
+  const email = readFileSync("src/lib/document-completion-email.server.ts", "utf8");
+  assert.match(email, /jessehayes@dwmsrq\.com,jean@dwmsrq\.com/);
+  assert.match(email, /WAVEOS_ADMIN_NOTIFICATION_EMAILS/);
+  assert.match(email, /\[payerEmail, \.\.\.invoicePaymentAdmins\(\)\]/);
+});
+
 test("Stripe return confirmation records deposits immediately and refreshes portal invoices", () => {
   const paymentServer = readFileSync("src/lib/payments.functions.ts", "utf8");
   const paymentReturn = readFileSync("src/routes/_authenticated/payment-return.tsx", "utf8");
