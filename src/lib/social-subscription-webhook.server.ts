@@ -32,6 +32,7 @@ function localStatus(status: string | undefined) {
 export async function applySocialSubscriptionEvent(
   eventType: string,
   object: Record<string, unknown>,
+  options: { sendCheckoutWelcome?: boolean } = {},
 ) {
   const objectMetadata = (object.metadata ?? {}) as Record<string, string>;
   const socialPlan = objectMetadata.social_plan;
@@ -231,6 +232,32 @@ export async function applySocialSubscriptionEvent(
     );
     if (lifecycle.error) throw lifecycle.error;
   }
+  const customerEmail =
+    typeof object.customer_email === "string"
+      ? object.customer_email
+      : typeof (object.customer_details as { email?: unknown } | undefined)?.email === "string"
+        ? String((object.customer_details as { email: string }).email)
+        : null;
+  if (
+    eventType === "checkout.session.completed" &&
+    options.sendCheckoutWelcome !== false &&
+    ["active", "trialing"].includes(String(subscription.status ?? ""))
+  ) {
+    try {
+      const { sendSocialSubscriptionEmail } =
+        await import("@/lib/social-subscription-email.server");
+      await sendSocialSubscriptionEmail({
+        kind: promoTrialing ? "started_trial" : "started_paid",
+        workspaceId,
+        customerEmail,
+        trialEndsAt: subscription.trial_end
+          ? new Date(subscription.trial_end * 1000).toISOString()
+          : null,
+      });
+    } catch (error) {
+      console.error("[social subscription email] welcome delivery failed", error);
+    }
+  }
   if (isPaid || isFailed) {
     try {
       const { sendSocialSubscriptionEmail } =
@@ -238,7 +265,7 @@ export async function applySocialSubscriptionEvent(
       await sendSocialSubscriptionEmail({
         kind: isPaid ? "paid" : "failed",
         workspaceId,
-        customerEmail: typeof object.customer_email === "string" ? object.customer_email : null,
+        customerEmail,
         amountPaid: isPaid ? Number(object.amount_paid ?? 0) : null,
         currency: typeof object.currency === "string" ? object.currency : null,
         attemptCount,

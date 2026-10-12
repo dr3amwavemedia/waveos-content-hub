@@ -36,6 +36,7 @@ test("public signup chooses a paid plan before account creation and opens Stripe
   assert.match(auth, /auth-callback\?public_signup=1/);
   assert.match(callback, /createSocialSubscriptionCheckout/);
   assert.match(callback, /Opening secure Stripe checkout/);
+  assert.match(callback, /createSocialSubscriptionCheckout/);
   assert.match(auth, /mode === "signup" \? "\/home"/);
   assert.doesNotMatch(auth, /sessionStorage\.setItem\(POST_AUTH_NEXT_KEY, "\/onboarding"\)/);
 });
