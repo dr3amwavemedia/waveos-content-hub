@@ -89,4 +89,6 @@ test("promo checkout still requires a card and limits access until the selected 
   assert.match(webhook, /promoTrialing \? 3 : SOCIAL_PLANS\[plan\]\.accountLimit/);
   assert.match(webhook, /promoInitialPaymentFailed/);
   assert.match(permissions, /subscription\.stripe_subscription_id &&/);
+  assert.match(permissions, /subscription\?\.status === "trialing"/);
+  assert.match(permissions, /premium && PUBLIC_OS_PREMIUM_FEATURES\.has\(feature\)/);
 });
