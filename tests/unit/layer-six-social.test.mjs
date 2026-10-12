@@ -111,6 +111,14 @@ test("connection limits are enforced server-side and unavailable networks stay h
   assert.match(publisher, /Disconnect the extra accounts or upgrade before publishing/);
 });
 
+test("social comment replies can only use a connected account owned by the workspace", () => {
+  assert.match(zernio, /The replying social account must belong to this workspace/);
+  assert.match(zernio, /\.eq\("workspace_id", data\.workspaceId\)/);
+  assert.match(zernio, /\.eq\("provider_account_id", data\.accountId\)/);
+  assert.match(zernio, /\.eq\("connected", true\)/);
+  assert.match(zernio, /if \(!owned\) throw new Error\("forbidden"\)/);
+});
+
 test("team invitations are Tidal-only for public WaveOS accounts", () => {
   assert.match(settingsRoute, /data_source !== "os_data" \|\| subscription\?\.plan === "expanded"/);
   assert.match(permissions, /tidal && feature === "can_invite_members"/);

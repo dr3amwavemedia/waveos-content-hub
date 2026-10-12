@@ -12,7 +12,7 @@ export const frameioEnv = (name: "FRAMEIO_CLIENT_ID" | "FRAMEIO_CLIENT_SECRET") 
 
 export const frameioRedirectUri = () =>
   process.env.FRAMEIO_REDIRECT_URI ??
-  `${externalMediaEnv("WAVEOS_APP_URL").replace(/\/$/, "")}/api/frameio/callback`;
+  `${new URL(externalMediaEnv("WAVEOS_APP_URL")).origin}/api/frameio/callback`;
 
 function bearer(request: Request) {
   const value = request.headers.get("Authorization");

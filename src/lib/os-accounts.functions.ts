@@ -428,7 +428,7 @@ export const sendOsAccountPasswordReset = createServerFn({ method: "POST" })
       throw new Error("os_account_not_found");
     const origin = process.env.WAVEOS_APP_URL ?? "https://waveos.dreamwavemedia.co";
     const result = await admin.auth.resetPasswordForEmail(userResult.data.user.email, {
-      redirectTo: `${origin}/reset-password`,
+      redirectTo: new URL("/reset-password", origin).toString(),
     });
     if (result.error) throw result.error;
     await admin.from("activity_logs").insert({

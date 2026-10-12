@@ -40,6 +40,18 @@ type SocialSubscriptionInvoiceRow = {
   created_at: string;
 };
 
+function safeStripeCheckoutUrl(value: string | null | undefined) {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && url.hostname === "checkout.stripe.com"
+      ? url.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 async function requireWorkspaceAdmin(
   supabase: SupabaseClient<Database>,
   userId: string,
@@ -93,8 +105,7 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
       ["dream_wave_owner", "dream_wave_team"].includes(row.role),
     );
     if (!member && !staff) throw new Error("forbidden");
-    const canSeeBilling =
-      staff || member?.role === "owner" || member?.role === "admin";
+    const canSeeBilling = staff || member?.role === "owner" || member?.role === "admin";
     await requirePublicOsWorkspace(data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const result = await supabaseAdmin
@@ -113,20 +124,23 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
         .eq("workspace_id", data.workspaceId)
         .eq("provider", "zernio")
         .eq("connected", true),
-      supabaseAdmin
-        .from("workspace_social_subscription_invoices" as never)
-        .select(
-          "stripe_invoice_id,invoice_number,status,amount_due_cents,amount_paid_cents,currency,hosted_invoice_url,invoice_pdf_url,billing_period_start,billing_period_end,created_at",
-        )
-        .eq("workspace_id", data.workspaceId)
-        .order("created_at", { ascending: false })
-        .limit(24),
+      canSeeBilling
+        ? supabaseAdmin
+            .from("workspace_social_subscription_invoices" as never)
+            .select(
+              "stripe_invoice_id,invoice_number,status,amount_due_cents,amount_paid_cents,currency,hosted_invoice_url,invoice_pdf_url,billing_period_start,billing_period_end,created_at",
+            )
+            .eq("workspace_id", data.workspaceId)
+            .order("created_at", { ascending: false })
+            .limit(24)
+        : Promise.resolve({ data: [], error: null }),
     ]);
     if (invoiceResult.error) throw invoiceResult.error;
     return {
-      subscription: subscription && !canSeeBilling
-        ? ({ ...subscription, stripe_customer_id: null } as SocialSubscriptionRow)
-        : subscription,
+      subscription:
+        subscription && !canSeeBilling
+          ? ({ ...subscription, stripe_customer_id: null } as SocialSubscriptionRow)
+          : subscription,
       connectedAccounts: count ?? 0,
       plans: SOCIAL_PLANS,
       invoices: canSeeBilling ? ((invoiceResult.data ?? []) as SocialSubscriptionInvoiceRow[]) : [],
@@ -164,15 +178,17 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
     await requirePublicOsWorkspace(data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: existingSubscription } = await supabaseAdmin
+    const { data: existingSubscription, error: existingSubscriptionError } = await supabaseAdmin
       .from("workspace_social_subscriptions" as never)
-      .select("internal_test_access,status,stripe_subscription_id")
+      .select("internal_test_access,status,stripe_subscription_id,stripe_checkout_session_id")
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
+    if (existingSubscriptionError) throw existingSubscriptionError;
     const existing = existingSubscription as {
       internal_test_access?: boolean;
       status?: string;
       stripe_subscription_id?: string | null;
+      stripe_checkout_session_id?: string | null;
     } | null;
     if (existing?.internal_test_access)
       throw new Error("Internal test accounts do not use Stripe checkout.");
@@ -184,11 +200,78 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     }
     if (!socialPlanAllowsBillingInterval(data.plan, data.interval))
       throw new Error("That billing interval is not available for this plan.");
-    const { stripePublicSubscriptionsEnabled, stripeRequest } = await import("@/lib/stripe.server");
+    const { stripeModeMatches, stripePublicSubscriptionsEnabled, stripeRequest } =
+      await import("@/lib/stripe.server");
     if (!stripePublicSubscriptionsEnabled())
       throw new Error(
         "Live social subscriptions are not enabled yet. Use Stripe test mode in preview or enable live subscriptions at launch.",
       );
+
+    // Reuse an unfinished Checkout Session instead of creating a second one.
+    // If Stripe completed the stored session before its webhook reached WaveOS,
+    // reconcile it here and stop: a customer must never be able to buy the same
+    // subscription twice just because the return screen loaded first.
+    if (existing?.stripe_checkout_session_id) {
+      let priorSession: StripeCheckoutSession | null = null;
+      try {
+        priorSession = await stripeRequest<StripeCheckoutSession>(
+          `/checkout/sessions/${encodeURIComponent(existing.stripe_checkout_session_id)}`,
+          { method: "GET" },
+        );
+      } catch {
+        throw new Error(
+          "WaveOS could not verify your existing checkout. Please wait a moment and try again; do not pay twice.",
+        );
+      }
+      const belongsToWorkspace = Boolean(
+        priorSession &&
+        priorSession.mode === "subscription" &&
+        stripeModeMatches(priorSession.livemode) &&
+        priorSession.client_reference_id === data.workspaceId &&
+        priorSession.metadata?.workspace_id === data.workspaceId,
+      );
+      if (priorSession && !belongsToWorkspace) {
+        throw new Error(
+          "WaveOS could not verify your existing checkout. Please contact support before trying again.",
+        );
+      }
+      if (priorSession && belongsToWorkspace && priorSession.status === "complete") {
+        if (!priorSession.subscription) {
+          throw new Error(
+            "Stripe is still finishing this checkout. Refresh shortly; do not submit another payment.",
+          );
+        }
+        const { applySocialSubscriptionEvent } =
+          await import("@/lib/social-subscription-webhook.server");
+        const applied = await applySocialSubscriptionEvent(
+          "checkout.session.completed",
+          priorSession as unknown as Record<string, unknown>,
+          { sendCheckoutWelcome: true },
+        );
+        if (!applied) {
+          throw new Error(
+            "Stripe confirmed this checkout, but WaveOS is still activating it. Refresh shortly; do not pay again.",
+          );
+        }
+        throw new Error(
+          "This workspace already has a Stripe subscription. Manage billing instead.",
+        );
+      }
+      if (priorSession && belongsToWorkspace && priorSession.status === "open") {
+        const sameSelection =
+          priorSession.metadata?.social_plan === data.plan &&
+          priorSession.metadata?.billing_interval === data.interval;
+        const priorUrl = safeStripeCheckoutUrl(priorSession.url);
+        if (sameSelection && priorUrl) return { url: priorUrl };
+        try {
+          await stripeRequest(`/checkout/sessions/${encodeURIComponent(priorSession.id)}/expire`);
+        } catch {
+          throw new Error(
+            "Your existing checkout is still open. Reopen it or wait a moment before changing plans.",
+          );
+        }
+      }
+    }
     const { data: workspace } = await supabaseAdmin
       .from("workspaces")
       .select("name,data_source")
@@ -210,8 +293,8 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
         Number((promoRedemption as { bonus_trial_days?: number } | null)?.bonus_trial_days ?? 0),
       ),
     );
-    const origin = process.env.WAVEOS_APP_URL || "https://waveos.dreamwavemedia.co";
-    const session = await stripeRequest<{ id: string; url?: string | null }>("/checkout/sessions", {
+    const origin = new URL(process.env.WAVEOS_APP_URL || "https://waveos.dreamwavemedia.co").origin;
+    const session = await stripeRequest<StripeCheckoutSession>("/checkout/sessions", {
       body: {
         mode: "subscription",
         client_reference_id: data.workspaceId,
@@ -256,19 +339,46 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
         },
       },
     });
-    await supabaseAdmin.from("workspace_social_subscriptions" as never).upsert(
-      {
-        workspace_id: data.workspaceId,
-        plan: promoTrialDays ? "standard" : data.plan,
-        status: "checkout_pending",
-        billing_interval: data.interval,
-        account_limit: promoTrialDays ? 3 : SOCIAL_PLANS[data.plan].accountLimit,
-        stripe_checkout_session_id: session.id,
-        updated_at: new Date().toISOString(),
-      } as never,
-      { onConflict: "workspace_id" },
-    );
-    return { url: session.url ?? null };
+    if (
+      !session.url ||
+      session.status !== "open" ||
+      !stripeModeMatches(session.livemode) ||
+      !safeStripeCheckoutUrl(session.url)
+    ) {
+      throw new Error("Stripe did not return a valid subscription checkout link.");
+    }
+    const pendingSubscription = {
+      workspace_id: data.workspaceId,
+      plan: promoTrialDays ? "standard" : data.plan,
+      status: "checkout_pending",
+      billing_interval: data.interval,
+      account_limit: promoTrialDays ? 3 : SOCIAL_PLANS[data.plan].accountLimit,
+      stripe_checkout_session_id: session.id,
+      updated_at: new Date().toISOString(),
+    };
+    let claimResult: { data: Array<{ workspace_id: string }> | null; error: unknown };
+    if (existing) {
+      let claim = supabaseAdmin
+        .from("workspace_social_subscriptions" as never)
+        .update(pendingSubscription as never)
+        .eq("workspace_id", data.workspaceId);
+      claim = existing.stripe_checkout_session_id
+        ? claim.eq("stripe_checkout_session_id", existing.stripe_checkout_session_id)
+        : claim.is("stripe_checkout_session_id", null);
+      claimResult = (await claim.select("workspace_id")) as unknown as typeof claimResult;
+    } else {
+      claimResult = (await supabaseAdmin
+        .from("workspace_social_subscriptions" as never)
+        .insert(pendingSubscription as never)
+        .select("workspace_id")) as unknown as typeof claimResult;
+    }
+    if (claimResult.error || !claimResult.data?.length) {
+      await stripeRequest(`/checkout/sessions/${encodeURIComponent(session.id)}/expire`).catch(
+        () => undefined,
+      );
+      throw new Error("Checkout changed while loading. Refresh and use the existing checkout.");
+    }
+    return { url: session.url };
   });
 
 export const confirmSocialSubscriptionCheckout = createServerFn({ method: "POST" })
@@ -325,7 +435,7 @@ export const createSocialBillingPortal = createServerFn({ method: "POST" })
     const customerId = subscription?.stripe_customer_id;
     if (!customerId) throw new Error("No Stripe billing account is connected yet.");
     const { stripeRequest } = await import("@/lib/stripe.server");
-    const origin = process.env.WAVEOS_APP_URL || "https://waveos.dreamwavemedia.co";
+    const origin = new URL(process.env.WAVEOS_APP_URL || "https://waveos.dreamwavemedia.co").origin;
     const portal = await stripeRequest<{ url?: string | null }>("/billing_portal/sessions", {
       body: { customer: customerId, return_url: `${origin}/settings?billing=updated` },
     });

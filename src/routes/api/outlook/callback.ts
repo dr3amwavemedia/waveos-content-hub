@@ -7,7 +7,7 @@ export const Route = createFileRoute("/api/outlook/callback")({
         const { encryptOutlook, outlookEnv, outlookPublicDb, outlookRedirectUri } =
           await import("@/lib/outlook.server");
         const db = outlookPublicDb();
-        const appUrl = outlookEnv("WAVEOS_APP_URL").replace(/\/$/, "");
+        const appUrl = new URL(outlookEnv("WAVEOS_APP_URL")).origin;
         const url = new URL(request.url);
         const state = url.searchParams.get("state") ?? "";
         const code = url.searchParams.get("code") ?? "";

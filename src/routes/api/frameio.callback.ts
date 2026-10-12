@@ -4,9 +4,10 @@ export const Route = createFileRoute("/api/frameio/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { encryptExternalToken, externalMediaEnv } = await import("@/lib/external-media.server");
+        const { encryptExternalToken, externalMediaEnv } =
+          await import("@/lib/external-media.server");
         const { frameioEnv, frameioRedirectUri } = await import("@/lib/frameio.server");
-        const appUrl = externalMediaEnv("WAVEOS_APP_URL").replace(/\/$/, "");
+        const appUrl = new URL(externalMediaEnv("WAVEOS_APP_URL")).origin;
         const url = new URL(request.url);
         const state = url.searchParams.get("state") ?? "";
         const code = url.searchParams.get("code") ?? "";
@@ -54,20 +55,26 @@ export const Route = createFileRoute("/api/frameio/callback")({
         if (!profileResponse.ok || !externalUserId)
           return Response.redirect(`${appUrl}/settings?frameio_error=profile`, 302);
 
-        const { error } = await supabaseAdmin
-          .from("frameio_service_connections" as never)
-          .upsert({
+        const { error } = await supabaseAdmin.from("frameio_service_connections" as never).upsert(
+          {
             id: true,
             external_user_id: externalUserId,
             account_email: typeof profile.email === "string" ? profile.email : null,
             access_token_encrypted: await encryptExternalToken(tokens.access_token),
             refresh_token_encrypted: await encryptExternalToken(tokens.refresh_token),
-            token_expires_at: new Date(Date.now() + Number(tokens.expires_in ?? 3600) * 1000).toISOString(),
+            token_expires_at: new Date(
+              Date.now() + Number(tokens.expires_in ?? 3600) * 1000,
+            ).toISOString(),
             scopes: typeof tokens.scope === "string" ? tokens.scope : "",
             connected_by: oauthState.user_id,
             updated_at: new Date().toISOString(),
-          } as never, { onConflict: "id" });
-        await supabaseAdmin.from("frameio_oauth_states" as never).delete().eq("state", state);
+          } as never,
+          { onConflict: "id" },
+        );
+        await supabaseAdmin
+          .from("frameio_oauth_states" as never)
+          .delete()
+          .eq("state", state);
         if (error)
           return Response.redirect(`${appUrl}/settings?frameio_error=connection_save`, 302);
         return Response.redirect(`${appUrl}/settings?frameio_connected=true`, 302);
