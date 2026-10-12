@@ -24,6 +24,25 @@ test("promo codes are owner-managed OS data with bounded redemptions", async () 
   assert.match(migration, /REVOKE ALL ON public\.os_promo_codes FROM PUBLIC, anon, authenticated/);
 });
 
+test("owners can delete unused promo codes without removing redemption history", async () => {
+  const [clients, accounts, migration] = await Promise.all([
+    read("src/routes/_authenticated/clients.tsx"),
+    read("src/lib/os-accounts.functions.ts"),
+    read("supabase/migrations/20261003140000_os_promo_codes.sql"),
+  ]);
+  assert.match(clients, /deleteOsPromoCode/);
+  assert.match(clients, /Delete promo code/);
+  assert.match(clients, /promo\.redemption_count > 0/);
+  assert.match(accounts, /export const deleteOsPromoCode/);
+  assert.match(accounts, /\.eq\("redemption_count", 0\)/);
+  assert.match(accounts, /Redeemed promo codes cannot be deleted/);
+  assert.match(accounts, /os_promo_code_deleted/);
+  assert.match(
+    migration,
+    /promo_code_id uuid NOT NULL REFERENCES public\.os_promo_codes\(id\) ON DELETE RESTRICT/,
+  );
+});
+
 test("a valid signup promo grants the owner-configured OS trial", async () => {
   const auth = await read("src/routes/auth.tsx");
   const callback = await read("src/routes/auth-callback.tsx");

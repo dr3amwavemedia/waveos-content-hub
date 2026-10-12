@@ -80,6 +80,7 @@ import {
 } from "@/lib/client-account-access";
 import {
   deleteOsAccount,
+  deleteOsPromoCode,
   createOsPromoCode,
   listOsPromoCodes,
   listOsAccounts,
@@ -973,6 +974,7 @@ function generatePromoCode() {
 function OsPromoCodesPanel() {
   const list = useServerFn(listOsPromoCodes);
   const createPromo = useServerFn(createOsPromoCode);
+  const deletePromo = useServerFn(deleteOsPromoCode);
   const setActive = useServerFn(setOsPromoCodeActive);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -985,6 +987,15 @@ function OsPromoCodesPanel() {
   const promos = useQuery({
     queryKey: ["os-promo-codes"],
     queryFn: () => list({ data: {} }),
+  });
+  const removePromo = useMutation({
+    mutationFn: (promoId: string) => deletePromo({ data: { promoId } }),
+    onSuccess: async () => {
+      await promos.refetch();
+      toast.success("Promo code deleted.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Promo code could not be deleted."),
   });
 
   async function handleCreate() {
@@ -1230,17 +1241,36 @@ function OsPromoCodesPanel() {
                       ? `Expires ${new Date(promo.expires_at).toLocaleDateString()}`
                       : "No expiration"}
                   </span>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      await setActive({ data: { promoId: promo.id, active: !promo.is_active } });
-                      await promos.refetch();
-                      toast.success(promo.is_active ? "Promo paused." : "Promo activated.");
-                    }}
-                    className="rounded-lg border border-current/25 bg-black/10 px-3 py-2 font-semibold"
-                  >
-                    {promo.is_active ? "Pause code" : "Activate code"}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await setActive({ data: { promoId: promo.id, active: !promo.is_active } });
+                        await promos.refetch();
+                        toast.success(promo.is_active ? "Promo paused." : "Promo activated.");
+                      }}
+                      className="rounded-lg border border-current/25 bg-black/10 px-3 py-2 font-semibold"
+                    >
+                      {promo.is_active ? "Pause code" : "Activate code"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={promo.redemption_count > 0 || removePromo.isPending}
+                      title={
+                        promo.redemption_count > 0
+                          ? "Redeemed codes are retained for trial history. Pause this code instead."
+                          : "Delete this unused promo code"
+                      }
+                      onClick={() => {
+                        if (confirm(`Delete promo code ${promo.code}? This cannot be undone.`)) {
+                          removePromo.mutate(promo.id);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-rose-400/35 bg-rose-500/10 px-3 py-2 font-semibold text-rose-200 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Delete
+                    </button>
+                  </div>
                 </div>
               </article>
             );

@@ -187,6 +187,51 @@ export const setOsPromoCodeActive = createServerFn({ method: "POST" })
     return { updated: true };
   });
 
+export const deleteOsPromoCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { promoId: string }) => data)
+  .handler(async ({ data, context }) => {
+    const admin = await requireOwner(context.userId);
+    const { data: rawPromo, error: lookupError } = await admin
+      .from("os_promo_codes" as never)
+      .select("id,code,name,redemption_count")
+      .eq("id", data.promoId)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    const promo = rawPromo as {
+      id: string;
+      code: string;
+      name: string;
+      redemption_count: number;
+    } | null;
+    if (!promo) throw new Error("Promo code not found.");
+    if (promo.redemption_count > 0) {
+      throw new Error("Redeemed promo codes cannot be deleted. Pause the code instead.");
+    }
+    const result = await admin
+      .from("os_promo_codes" as never)
+      .delete()
+      .eq("id", data.promoId)
+      .eq("redemption_count", 0)
+      .select("id")
+      .maybeSingle();
+    if (result.error) {
+      if (result.error.code === "23503") {
+        throw new Error("Redeemed promo codes cannot be deleted. Pause the code instead.");
+      }
+      throw result.error;
+    }
+    if (!result.data) throw new Error("Promo code was redeemed before it could be deleted.");
+    await admin.from("activity_logs").insert({
+      actor_user_id: context.userId,
+      action: "os_promo_code_deleted",
+      entity_type: "os_promo_code",
+      entity_id: data.promoId,
+      safe_metadata: { code: promo.code, name: promo.name },
+    });
+    return { deleted: true };
+  });
+
 export const listOsAccounts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { search?: string; page?: number; pageSize?: number }) => data)
