@@ -752,10 +752,10 @@ export type Database = {
           paid_at: string | null
           payment_plan: string
           payment_provider: string
+          processing_fee_at_checkout: boolean
           provider_payment_id: string | null
           provider_session_id: string | null
           published_at: string | null
-          processing_fee_at_checkout: boolean
           refund_flagged_at: string | null
           service_fee_cents: number
           service_fee_percent: number
@@ -787,10 +787,10 @@ export type Database = {
           paid_at?: string | null
           payment_plan?: string
           payment_provider?: string
+          processing_fee_at_checkout?: boolean
           provider_payment_id?: string | null
           provider_session_id?: string | null
           published_at?: string | null
-          processing_fee_at_checkout?: boolean
           refund_flagged_at?: string | null
           service_fee_cents?: number
           service_fee_percent?: number
@@ -822,10 +822,10 @@ export type Database = {
           paid_at?: string | null
           payment_plan?: string
           payment_provider?: string
+          processing_fee_at_checkout?: boolean
           provider_payment_id?: string | null
           provider_session_id?: string | null
           published_at?: string | null
-          processing_fee_at_checkout?: boolean
           refund_flagged_at?: string | null
           service_fee_cents?: number
           service_fee_percent?: number

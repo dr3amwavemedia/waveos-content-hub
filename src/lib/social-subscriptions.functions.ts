@@ -93,7 +93,7 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: member } = await context.supabase
       .from("workspace_members")
-      .select("workspace_id")
+      .select("workspace_id,role")
       .eq("workspace_id", data.workspaceId)
       .eq("user_id", context.userId)
       .maybeSingle();
@@ -105,6 +105,8 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
       ["dream_wave_owner", "dream_wave_team"].includes(row.role),
     );
     if (!member && !staff) throw new Error("forbidden");
+    const canSeeBilling =
+      staff || member?.role === "owner" || member?.role === "admin";
     await requirePublicOsWorkspace(data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const result = await supabaseAdmin
@@ -134,10 +136,12 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
     ]);
     if (invoiceResult.error) throw invoiceResult.error;
     return {
-      subscription,
+      subscription: subscription && !canSeeBilling
+        ? ({ ...subscription, stripe_customer_id: null } as SocialSubscriptionRow)
+        : subscription,
       connectedAccounts: count ?? 0,
       plans: SOCIAL_PLANS,
-      invoices: (invoiceResult.data ?? []) as SocialSubscriptionInvoiceRow[],
+      invoices: canSeeBilling ? ((invoiceResult.data ?? []) as SocialSubscriptionInvoiceRow[]) : [],
     };
   });
 
