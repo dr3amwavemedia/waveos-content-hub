@@ -96,6 +96,22 @@ test("locked subscribers can open Stripe billing without exposing credentials", 
   assert.match(settings, /Manage payment method/);
 });
 
+test("billing identifiers and invoices are limited to workspace billing administrators", async () => {
+  const functions = await read("src/lib/social-subscriptions.functions.ts");
+  assert.match(functions, /select\("workspace_id,role"\)/);
+  assert.match(functions, /staff \|\| member\?\.role === "owner" \|\| member\?\.role === "admin"/);
+  assert.match(functions, /canSeeBilling\s+\? supabaseAdmin/);
+  assert.match(functions, /stripe_customer_id: null/);
+  assert.match(functions, /invoices: canSeeBilling/);
+});
+
+test("transactional email buttons only accept links back to the configured WaveOS origin", async () => {
+  const email = await read("supabase/functions/transactional-email/index.ts");
+  assert.match(email, /const safeAppUrl =/);
+  assert.match(email, /new URL\(candidate\)\.origin === new URL\(app\)\.origin/);
+  assert.match(email, /safeAppUrl\(body\.url\)/);
+});
+
 test("internal test users receive plan access without a billable Stripe subscription", async () => {
   const [migration, permissions, functions, settings] = await Promise.all([
     read("supabase/migrations/20261008000000_internal_test_subscription_access.sql"),

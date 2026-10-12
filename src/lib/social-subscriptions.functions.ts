@@ -105,8 +105,7 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
       ["dream_wave_owner", "dream_wave_team"].includes(row.role),
     );
     if (!member && !staff) throw new Error("forbidden");
-    const canSeeBilling =
-      staff || member?.role === "owner" || member?.role === "admin";
+    const canSeeBilling = staff || member?.role === "owner" || member?.role === "admin";
     await requirePublicOsWorkspace(data.workspaceId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const result = await supabaseAdmin
@@ -125,20 +124,23 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
         .eq("workspace_id", data.workspaceId)
         .eq("provider", "zernio")
         .eq("connected", true),
-      supabaseAdmin
-        .from("workspace_social_subscription_invoices" as never)
-        .select(
-          "stripe_invoice_id,invoice_number,status,amount_due_cents,amount_paid_cents,currency,hosted_invoice_url,invoice_pdf_url,billing_period_start,billing_period_end,created_at",
-        )
-        .eq("workspace_id", data.workspaceId)
-        .order("created_at", { ascending: false })
-        .limit(24),
+      canSeeBilling
+        ? supabaseAdmin
+            .from("workspace_social_subscription_invoices" as never)
+            .select(
+              "stripe_invoice_id,invoice_number,status,amount_due_cents,amount_paid_cents,currency,hosted_invoice_url,invoice_pdf_url,billing_period_start,billing_period_end,created_at",
+            )
+            .eq("workspace_id", data.workspaceId)
+            .order("created_at", { ascending: false })
+            .limit(24)
+        : Promise.resolve({ data: [], error: null }),
     ]);
     if (invoiceResult.error) throw invoiceResult.error;
     return {
-      subscription: subscription && !canSeeBilling
-        ? ({ ...subscription, stripe_customer_id: null } as SocialSubscriptionRow)
-        : subscription,
+      subscription:
+        subscription && !canSeeBilling
+          ? ({ ...subscription, stripe_customer_id: null } as SocialSubscriptionRow)
+          : subscription,
       connectedAccounts: count ?? 0,
       plans: SOCIAL_PLANS,
       invoices: canSeeBilling ? ((invoiceResult.data ?? []) as SocialSubscriptionInvoiceRow[]) : [],

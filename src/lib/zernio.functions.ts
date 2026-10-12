@@ -143,7 +143,8 @@ export const replyToZernioComment = createServerFn({ method: "POST" })
     const { requireSocialWorkspaceAccess, zernioRequest } = await import("./zernio.server");
     await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
     if (!data.message.trim()) throw new Error("Reply cannot be empty.");
-    if (!data.accountId || !data.postId || !data.commentId) throw new Error("Missing reply target.");
+    if (!data.accountId || !data.postId || !data.commentId)
+      throw new Error("Missing reply target.");
     // The replying social account must belong to this workspace.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: owned } = await supabaseAdmin
