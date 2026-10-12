@@ -24,6 +24,14 @@ const safeHttpsUrl = (value: unknown) => {
   }
 };
 
+/** Only links that point back to WaveOS itself may be placed in client emails. */
+const safeAppUrl = (value: unknown) => {
+  const candidate = safeHttpsUrl(value);
+  const app = safeHttpsUrl(Deno.env.get("WAVEOS_APP_URL"));
+  if (!candidate || !app) return null;
+  return new URL(candidate).origin === new URL(app).origin ? candidate : null;
+};
+
 const emailLogoUrl = () => {
   const configuredLogo = safeHttpsUrl(Deno.env.get("TRANSACTIONAL_EMAIL_LOGO_URL"));
   if (configuredLogo) return configuredLogo;
@@ -323,7 +331,7 @@ Deno.serve(async (request) => {
       recipients = [...new Set([...clientRecipients, ...staffRecipients])];
       const item = cleanText(body.title, "An item");
       const status = cleanText(body.status, "updated", 60).replaceAll("_", " ");
-      const url = safeHttpsUrl(body.url) ?? safeHttpsUrl(Deno.env.get("WAVEOS_APP_URL"));
+      const url = safeAppUrl(body.url) ?? safeHttpsUrl(Deno.env.get("WAVEOS_APP_URL"));
       const copy: Record<
         EmailEvent,
         { subject: string; heading: string; message: string; label: string }
