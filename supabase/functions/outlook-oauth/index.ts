@@ -9,7 +9,7 @@ import {
   redirectUri,
 } from "../_shared/outlook.ts";
 
-const appUrl = () => env("WAVEOS_APP_URL").replace(/\/$/, "");
+const appUrl = () => new URL(env("WAVEOS_APP_URL")).origin;
 const randomValue = (length = 32) => {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   return btoa(String.fromCharCode(...bytes))

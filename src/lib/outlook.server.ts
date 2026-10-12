@@ -23,7 +23,7 @@ export function outlookEnv(name: string) {
 }
 
 export const outlookRedirectUri = () =>
-  `${outlookEnv("WAVEOS_APP_URL").replace(/\/$/, "")}/api/outlook/callback`;
+  `${new URL(outlookEnv("WAVEOS_APP_URL")).origin}/api/outlook/callback`;
 
 const key = async () => {
   const raw = Buffer.from(outlookEnv("OUTLOOK_TOKEN_ENCRYPTION_KEY"), "base64");

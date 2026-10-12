@@ -368,7 +368,12 @@ function SocialPlanSettings({
   const [annualBilling, setAnnualBilling] = useState(false);
   const [checkoutConfirmation, setCheckoutConfirmation] = useState<
     "idle" | "confirming" | "confirmed" | "error"
-  >("idle");
+  >(() => {
+    if (typeof window === "undefined") return "idle";
+    return new URL(window.location.href).searchParams.get("subscription") === "started"
+      ? "confirming"
+      : "idle";
+  });
   const checkoutConfirmationStarted = useRef(false);
   const qc = useQueryClient();
   const getPlan = useServerFn(getSocialSubscription);

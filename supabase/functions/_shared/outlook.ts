@@ -96,8 +96,7 @@ export async function decrypt(value: string) {
 }
 
 /** Keeps the redirect URI already registered with Microsoft (the app callback route). */
-export const redirectUri = () =>
-  `${env("WAVEOS_APP_URL").replace(/\/$/, "")}/api/outlook/callback`;
+export const redirectUri = () => `${new URL(env("WAVEOS_APP_URL")).origin}/api/outlook/callback`;
 
 export async function graphToken(userId: string) {
   const admin = adminClient();
@@ -174,7 +173,9 @@ export async function graphFetch(
   if (!response.ok) {
     const message =
       result?.error?.message ??
-      (raw.trim() ? raw.trim().slice(0, 500) : `Microsoft Graph request failed (${response.status})`);
+      (raw.trim()
+        ? raw.trim().slice(0, 500)
+        : `Microsoft Graph request failed (${response.status})`);
     throw new Error(message);
   }
   return result;
