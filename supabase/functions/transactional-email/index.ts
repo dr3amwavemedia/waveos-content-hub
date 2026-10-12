@@ -331,7 +331,7 @@ Deno.serve(async (request) => {
       recipients = [...new Set([...clientRecipients, ...staffRecipients])];
       const item = cleanText(body.title, "An item");
       const status = cleanText(body.status, "updated", 60).replaceAll("_", " ");
-      const url = safeHttpsUrl(body.url) ?? safeHttpsUrl(Deno.env.get("WAVEOS_APP_URL"));
+      const url = safeAppUrl(body.url) ?? safeHttpsUrl(Deno.env.get("WAVEOS_APP_URL"));
       const copy: Record<
         EmailEvent,
         { subject: string; heading: string; message: string; label: string }
