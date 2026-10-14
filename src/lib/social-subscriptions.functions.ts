@@ -211,7 +211,9 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     // If Stripe completed the stored session before its webhook reached WaveOS,
     // reconcile it here and stop: a customer must never be able to buy the same
     // subscription twice just because the return screen loaded first.
-    if (existing?.stripe_checkout_session_id) {
+    // A canceled/expired subscription's stored session is history, not a pending
+    // checkout — returning customers must be able to start a fresh one.
+    if (existing?.stripe_checkout_session_id && existing.status !== "canceled") {
       let priorSession: StripeCheckoutSession | null = null;
       try {
         priorSession = await stripeRequest<StripeCheckoutSession>(
