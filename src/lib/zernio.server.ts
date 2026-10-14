@@ -144,6 +144,15 @@ export async function requireSocialWorkspaceAccess(
   userId: string,
   workspaceId: string,
 ) {
+  return requireWorkspaceFeatureAccess(supabase, userId, workspaceId, "can_connect_socials");
+}
+
+export async function requireWorkspaceFeatureAccess(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  workspaceId: string,
+  feature: string,
+) {
   const [{ data: member }, { data: manageable }, { data: entitled }] = await Promise.all([
     supabase
       .from("workspace_members")
@@ -155,10 +164,11 @@ export async function requireSocialWorkspaceAccess(
       "can_staff_manage_workspace" as never,
       { _user_id: userId, _workspace_id: workspaceId } as never,
     ),
-    supabase.rpc("has_feature", { _workspace_id: workspaceId, _feature: "can_connect_socials" }),
+    supabase.rpc("has_feature", { _workspace_id: workspaceId, _feature: feature }),
   ]);
   const canStaffManage = manageable as unknown as boolean | null;
-  if ((!member && canStaffManage !== true) || !entitled) throw new Error("forbidden");
+  if (!member && canStaffManage !== true) throw new Error("forbidden");
+  if (canStaffManage !== true && !entitled) throw new Error("forbidden");
   return { memberRole: member?.role ?? null, canStaffManage: canStaffManage === true };
 }
 
@@ -171,6 +181,40 @@ export async function requireSocialWorkspaceManager(
   const isWorkspaceManager = access.memberRole === "owner" || access.memberRole === "admin";
   if (!isWorkspaceManager && !access.canStaffManage) throw new Error("forbidden");
   return access;
+}
+
+export async function requireSocialWorkspaceWriter(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  workspaceId: string,
+) {
+  const [{ data: member }, { data: manageable }, { data: canConnect }, { data: canPublish }] =
+    await Promise.all([
+      supabase
+        .from("workspace_members")
+        .select("workspace_id,role")
+        .eq("user_id", userId)
+        .eq("workspace_id", workspaceId)
+        .maybeSingle(),
+      supabase.rpc(
+        "can_staff_manage_workspace" as never,
+        { _user_id: userId, _workspace_id: workspaceId } as never,
+      ),
+      supabase.rpc("has_feature", {
+        _workspace_id: workspaceId,
+        _feature: "can_connect_socials",
+      }),
+      supabase.rpc("has_feature", {
+        _workspace_id: workspaceId,
+        _feature: "can_publish_content",
+      }),
+    ]);
+  const canStaffManage = manageable as unknown as boolean | null;
+  const canWrite = ["owner", "admin", "editor", "approver"].includes(member?.role ?? "");
+  if (canStaffManage !== true && (!canWrite || (!canConnect && !canPublish))) {
+    throw new Error("forbidden");
+  }
+  return { memberRole: member?.role ?? null, canStaffManage: canStaffManage === true };
 }
 
 function stringOrNull(value: unknown) {

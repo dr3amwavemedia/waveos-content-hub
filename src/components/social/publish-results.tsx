@@ -32,9 +32,15 @@ export function PublishResults({ attempts }: { attempts: PublishAttempt[] }) {
       await queryClient.invalidateQueries({ queryKey: ["publish-attempts"] });
       setSelected(null);
       if (result.status === "failed") {
-        toast.error(result.errorMessage || "The provider still has not supplied a detailed reason.");
+        toast.error(
+          result.errorMessage || "The provider still has not supplied a detailed reason.",
+        );
       } else {
-        toast.success(result.status === "success" ? "Provider now reports this post as published." : "Provider reports that this post is still processing.");
+        toast.success(
+          result.status === "success"
+            ? "Provider now reports this post as published."
+            : "Provider reports that this post is still processing.",
+        );
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not refresh provider details.");
@@ -50,7 +56,13 @@ export function PublishResults({ attempts }: { attempts: PublishAttempt[] }) {
           const label = PLATFORM_LABEL[attempt.platform as SocialPlatform] ?? attempt.platform;
           const content = (
             <>
-              {attempt.status === "success" ? <CheckCircle2 className="h-3.5 w-3.5" /> : attempt.status === "failed" ? <AlertCircle className="h-3.5 w-3.5" /> : <CalendarClock className="h-3.5 w-3.5" />}
+              {attempt.status === "success" ? (
+                <CheckCircle2 className="h-3.5 w-3.5" />
+              ) : attempt.status === "failed" ? (
+                <AlertCircle className="h-3.5 w-3.5" />
+              ) : (
+                <CalendarClock className="h-3.5 w-3.5" />
+              )}
               {label}: {attempt.status}
             </>
           );
@@ -73,7 +85,9 @@ export function PublishResults({ attempts }: { attempts: PublishAttempt[] }) {
               {content}
             </button>
           ) : (
-            <span key={attempt.id} className={classes}>{content}</span>
+            <span key={attempt.id} className={classes}>
+              {content}
+            </span>
           );
         })}
       </div>
@@ -118,29 +132,50 @@ function FailureDetails({
       <div className="surface-card w-full max-w-lg p-5 sm:p-6">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Publishing failed</p>
-            <h2 id="publish-error-title" className="mt-1 text-xl font-semibold text-foreground">{platform}</h2>
+            <p className="text-xs font-semibold uppercase tracking-wider text-destructive">
+              Publishing failed
+            </p>
+            <h2 id="publish-error-title" className="mt-1 text-xl font-semibold text-foreground">
+              {platform}
+            </h2>
           </div>
-          <button type="button" onClick={onClose} className="rounded-lg p-2 text-muted-foreground hover:bg-elevated hover:text-foreground" aria-label="Close publishing error">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-muted-foreground hover:bg-elevated hover:text-foreground"
+            aria-label="Close publishing error"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
         <div className="mt-4 rounded-xl border border-destructive/25 bg-destructive/10 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wider text-destructive">Provider response</p>
-          <p className="mt-2 break-words text-sm leading-6 text-foreground">
-            {attempt.error_message || "The publishing provider did not return a detailed error message."}
+          <p className="text-xs font-semibold uppercase tracking-wider text-destructive">
+            Provider response
           </p>
-          {attempt.error_code && <p className="mt-2 text-xs text-muted-foreground">Error code: {attempt.error_code}</p>}
+          <p className="mt-2 break-words text-sm leading-6 text-foreground">
+            {attempt.error_message ||
+              "The publishing provider did not return a detailed error message."}
+          </p>
+          {attempt.error_code && (
+            <p className="mt-2 text-xs text-muted-foreground">Error code: {attempt.error_code}</p>
+          )}
         </div>
         <div className="mt-4">
           <p className="text-sm font-semibold text-foreground">What to check</p>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">{guidance}</p>
         </div>
         <p className="mt-4 text-xs text-muted-foreground">
-          Attempted {formatInTimeZone(attempt.attempted_at, timeZone, { dateStyle: "medium", timeStyle: "short" })} {timeZone}
+          Attempted{" "}
+          {formatInTimeZone(attempt.attempted_at, timeZone, {
+            dateStyle: "medium",
+            timeStyle: "short",
+          })}{" "}
+          {timeZone}
         </p>
-        {attempt.ayrshare_post_id && (
-          <p className="mt-1 break-all text-xs text-muted-foreground">Provider reference: {attempt.ayrshare_post_id}</p>
+        {(attempt.provider_post_id ?? attempt.ayrshare_post_id) && (
+          <p className="mt-1 break-all text-xs text-muted-foreground">
+            Provider reference: {attempt.provider_post_id ?? attempt.ayrshare_post_id}
+          </p>
         )}
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <button
@@ -149,11 +184,27 @@ function FailureDetails({
             disabled={isRefreshing}
             className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isRefreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {isRefreshing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <RefreshCw className="h-4 w-4" />
+            )}
             Refresh provider details
           </button>
-          <Link to="/social" search={{ view: "accounts" }} className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-elevated">Check social account</Link>
-          <Link to="/create" search={{ id: attempt.content_item_id }} className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Open and retry post</Link>
+          <Link
+            to="/social"
+            search={{ view: "accounts" }}
+            className="rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-elevated"
+          >
+            Check social account
+          </Link>
+          <Link
+            to="/create"
+            search={{ id: attempt.content_item_id }}
+            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+          >
+            Open and retry post
+          </Link>
         </div>
       </div>
     </div>

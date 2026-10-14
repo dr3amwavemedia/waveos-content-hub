@@ -5,7 +5,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppShell } from "@/components/app/app-shell";
 import { getActingStaff } from "@/hooks/use-acting-staff";
 
-const TEAM_ALLOWED_ROUTES = ["/home", "/deliveries", "/crm", "/approvals", "/vision-studio"];
+const TEAM_ALLOWED_ROUTES = [
+  "/home",
+  "/updates",
+  "/deliveries",
+  "/crm",
+  "/approvals",
+  "/vision-studio",
+];
 const OUTLOOK_INTEGRATIONS_ENABLED = false;
 const CREW_ALLOWED_ROUTES = [
   "/videographer",
@@ -21,6 +28,9 @@ const MEDIA_MANAGER_ALLOWED_ROUTES = [
   "/calendar",
   "/create",
   "/analytics",
+  "/creative-studio",
+  "/campaigns",
+  "/competitive-intelligence",
   "/social-accounts",
   "/brand-voice",
 ];

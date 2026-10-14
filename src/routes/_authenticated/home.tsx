@@ -3,14 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import type { CSSProperties } from "react";
 import {
   ArrowRight,
+  BarChart3,
   CalendarDays,
   CheckCircle2,
-  Cloud,
-  FileText,
   ImagePlus,
   Mail,
+  Megaphone,
+  Palette,
   PenSquare,
-  Share2,
   Sparkles,
   TrendingUp,
   Users,
@@ -29,9 +29,15 @@ import { UpcomingShootPanel } from "@/components/app/upcoming-shoot";
 import { WorkspaceBrandmark } from "@/components/branding/workspace-brandmark";
 import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
 import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
+import { ProductReleaseProvider, WhatsNewCard } from "@/components/app/product-releases";
+import { formatInTimeZone } from "@/lib/date-time";
 
 export const Route = createFileRoute("/_authenticated/home")({
-  component: HomeRoute,
+  component: () => (
+    <ProductReleaseProvider>
+      <HomeRoute />
+    </ProductReleaseProvider>
+  ),
   head: () => ({ meta: [{ title: "Home — WaveOS" }] }),
 });
 
@@ -84,6 +90,7 @@ function HomeRoute() {
 function HomeDashboard() {
   const { data: user } = useCurrentUser();
   const { activeWorkspace } = useWorkspace();
+  const { can } = usePermissions();
   const wsId = activeWorkspace?.id;
   const isPublicOs = activeWorkspace?.data_source === "os_data";
   const branding = useWorkspaceBranding(wsId);
@@ -92,18 +99,14 @@ function HomeDashboard() {
 
   const statsQ = useQuery({
     queryKey: ["home-stats", wsId],
-    enabled: !!wsId && !isPublicOs,
+    enabled: !!wsId,
     queryFn: async () => {
-      const [assets, folders, members, brand, scheduled, awaiting, published] = await Promise.all([
+      const [assets, members, brand, scheduled, awaiting, published, upcoming] = await Promise.all([
         supabase
           .from("media_assets")
-          .select("id,created_at", { count: "exact", head: false })
+          .select("id", { count: "exact", head: true })
           .eq("workspace_id", wsId!)
           .is("archived_at", null),
-        supabase
-          .from("media_folders")
-          .select("id", { count: "exact", head: true })
-          .eq("workspace_id", wsId!),
         supabase
           .from("workspace_members")
           .select("user_id", { count: "exact", head: true })
@@ -128,15 +131,33 @@ function HomeDashboard() {
           .select("id", { count: "exact", head: true })
           .eq("workspace_id", wsId!)
           .eq("status", "published"),
+        supabase
+          .from("content_items")
+          .select("id,title,scheduled_at,status")
+          .eq("workspace_id", wsId!)
+          .in("status", ["scheduled", "approved"])
+          .not("scheduled_at", "is", null)
+          .gte("scheduled_at", new Date().toISOString())
+          .order("scheduled_at", { ascending: true })
+          .limit(3),
       ]);
+      const failed = [assets, members, brand, scheduled, awaiting, published, upcoming].find(
+        (result) => result.error,
+      );
+      if (failed?.error) throw failed.error;
       return {
-        mediaCount: assets.count ?? assets.data?.length ?? 0,
-        folderCount: folders.count ?? 0,
+        mediaCount: assets.count ?? 0,
         memberCount: members.count ?? 0,
         brandComplete: brand.data?.onboarding_status === "complete",
         scheduledCount: scheduled.count ?? 0,
         awaitingCount: awaiting.count ?? 0,
         publishedCount: published.count ?? 0,
+        upcoming: (upcoming.data ?? []) as Array<{
+          id: string;
+          title: string | null;
+          scheduled_at: string;
+          status: string;
+        }>,
       };
     },
   });
@@ -151,12 +172,50 @@ function HomeDashboard() {
       return status.connected ? listFrameioWorkspaceMedia(wsId!, "") : null;
     },
   });
-  const isDemo = activeWorkspace?.is_demo ?? false;
-  const isEmpty = !stats || (stats.mediaCount === 0 && stats.memberCount <= 1);
+  const metricValue = (value: number | undefined) =>
+    statsQ.isPending ? "…" : statsQ.isError ? "—" : (value ?? "—");
+  const attentionItems = stats
+    ? [
+        stats.awaitingCount > 0 ? "approvals" : null,
+        !stats.brandComplete ? "brand" : null,
+        stats.mediaCount === 0 ? "media" : null,
+      ].filter(Boolean)
+    : [];
+  const recommendation = stats
+    ? stats.awaitingCount > 0
+      ? {
+          title: `${stats.awaitingCount} ${stats.awaitingCount === 1 ? "post needs" : "posts need"} review`,
+          body: "Review requested changes or approve the next posts in your workflow.",
+          to: isPublicOs ? "/social" : "/approvals",
+          label: "Review posts",
+        }
+      : stats.publishedCount === 0 && can("can_create_content")
+        ? {
+            title: "Publish your first post",
+            body: "Start a draft so performance insights have real activity to measure.",
+            to: "/create",
+            label: "Create a post",
+          }
+        : stats.scheduledCount === 0 && can("can_view_calendar_preview")
+          ? {
+              title: "Plan the next post",
+              body: "Your calendar has no scheduled content yet. Add a date to keep momentum visible.",
+              to: "/calendar",
+              label: "Open calendar",
+            }
+          : can("can_view_analytics_checkup")
+            ? {
+                title: "Check your recent performance",
+                body: "Review the latest verified social data and its source coverage.",
+                to: "/analytics",
+                label: "Open analytics",
+              }
+            : null
+    : null;
 
   return (
     <div className="space-y-8">
-      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-4 sm:flex sm:flex-wrap sm:justify-between">
+      <header className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div className="flex min-w-0 items-center gap-4">
           <WorkspaceBrandmark
             logoUrl={branding.data?.logoUrl}
@@ -174,14 +233,27 @@ function HomeDashboard() {
             </p>
           </div>
         </div>
-        <Link
-          to="/create"
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
-        >
-          <PenSquare className="h-4 w-4" />
-          Create post
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            to="/updates"
+            className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full border border-border bg-surface/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-elevated"
+          >
+            <Sparkles className="h-4 w-4 text-primary" />
+            What&apos;s new
+          </Link>
+          {can("can_create_content") && (
+            <Link
+              to="/create"
+              className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
+            >
+              <PenSquare className="h-4 w-4" />
+              Create post
+            </Link>
+          )}
+        </div>
       </header>
+
+      <WhatsNewCard />
 
       {!isPublicOs && <UpcomingShootPanel />}
 
@@ -243,43 +315,43 @@ function HomeDashboard() {
               </p>
             </div>
 
-            <Link
-              to="/social"
-              search={{ view: "analytics" }}
-              className="inline-flex w-fit items-center gap-2 rounded-full border border-border bg-background/70 px-4 py-2 text-sm font-semibold text-foreground backdrop-blur transition-all hover:border-primary/40 hover:bg-primary/10"
-            >
-              View full analytics
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+            {can("can_view_analytics_checkup") && (
+              <Link
+                to="/analytics"
+                className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full border border-border bg-background/70 px-4 py-2 text-sm font-semibold text-foreground backdrop-blur transition-all hover:border-primary/40 hover:bg-primary/10"
+              >
+                View analytics checkup
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            )}
           </div>
 
           <div className="relative mt-6 grid grid-cols-3 gap-2 sm:gap-3">
             <DashboardMetric
-              to="/social"
-              search={{ view: "analytics" }}
+              to={can("can_view_analytics_checkup") ? "/analytics" : "/social"}
               label="Published"
-              value={stats?.publishedCount ?? "—"}
+              value={metricValue(stats?.publishedCount)}
               tone="success"
             />
             <DashboardMetric
               to="/social"
               search={{ view: "posts" }}
               label="Scheduled"
-              value={stats?.scheduledCount ?? "—"}
+              value={metricValue(stats?.scheduledCount)}
               tone="tertiary"
             />
             {isPublicOs ? (
               <DashboardMetric
-                to="/create"
+                to="/content"
                 label="Media ready"
-                value={stats?.mediaCount ?? 0}
+                value={metricValue(stats?.mediaCount)}
                 tone="highlight"
               />
             ) : (
               <DashboardMetric
                 to="/approvals"
                 label="To review"
-                value={stats?.awaitingCount ?? "—"}
+                value={metricValue(stats?.awaitingCount)}
                 tone="highlight"
               />
             )}
@@ -291,40 +363,110 @@ function HomeDashboard() {
             to="/content"
             icon={FolderOpen}
             label="Media assets"
-            value={String(stats?.mediaCount ?? "—")}
+            value={metricValue(stats?.mediaCount)}
             tone="secondary"
           />
           <DashboardMetric
             to="/settings"
             icon={Users}
             label="Team members"
-            value={String(stats?.memberCount ?? "—")}
+            value={metricValue(stats?.memberCount)}
             tone="tertiary"
           />
         </div>
       </section>
 
       <Section title="Upcoming content" subtitle="The next few posts scheduled for your brand.">
-        <EmptyState
-          icon={CalendarDays}
-          title="No posts have been created yet."
-          body={
-            isPublicOs
-              ? "Create or schedule your first post and it will appear here."
-              : "Your Dream Wave Media team is preparing your content. Once scheduled, it will appear here."
-          }
-          action={{ label: "Open calendar", to: "/calendar" }}
-          tone="var(--workspace-tone-tertiary)"
-        />
+        {statsQ.isPending ? (
+          <div className="grid gap-3 sm:grid-cols-3" aria-label="Loading upcoming content">
+            {[0, 1, 2].map((item) => (
+              <div
+                key={item}
+                className="h-24 animate-pulse rounded-2xl border border-border bg-elevated/50"
+              />
+            ))}
+          </div>
+        ) : statsQ.isError ? (
+          <div role="alert" className="surface-card p-5">
+            <p className="font-semibold text-foreground">Upcoming content could not be loaded.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              No values were replaced with zeros. Try the workspace query again.
+            </p>
+            <button
+              type="button"
+              onClick={() => void statsQ.refetch()}
+              className="mt-4 min-h-11 rounded-xl border border-border px-4 text-sm font-semibold text-foreground hover:bg-elevated"
+            >
+              Try again
+            </button>
+          </div>
+        ) : stats?.upcoming.length ? (
+          <div className="grid gap-3 sm:grid-cols-3">
+            {stats.upcoming.map((item) => (
+              <Link
+                key={item.id}
+                to="/calendar"
+                className="surface-card min-h-24 p-4 transition hover:-translate-y-0.5 hover:border-primary/40"
+              >
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                  {formatInTimeZone(item.scheduled_at, activeWorkspace?.timezone ?? "UTC", {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                </p>
+                <p className="mt-2 line-clamp-2 text-sm font-semibold text-foreground">
+                  {item.title || "Untitled post"}
+                </p>
+                <p className="mt-1 text-xs capitalize text-muted-foreground">{item.status}</p>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={CalendarDays}
+            title="Nothing is scheduled yet."
+            body={
+              isPublicOs
+                ? "Schedule your first post and it will appear here."
+                : "Your Dream Wave Media team is preparing your content. Once scheduled, it will appear here."
+            }
+            action={
+              can("can_view_calendar_preview")
+                ? { label: "Open calendar", to: "/calendar" }
+                : undefined
+            }
+            tone="var(--workspace-tone-tertiary)"
+          />
+        )}
       </Section>
 
       <Section
         title="Needs your attention"
         subtitle="Approvals, account connections, and brand setup."
       >
-        {isEmpty && !isDemo ? (
+        {statsQ.isPending ? (
+          <div className="h-24 animate-pulse rounded-2xl border border-border bg-elevated/50" />
+        ) : statsQ.isError ? (
+          <p
+            role="alert"
+            className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-foreground"
+          >
+            Attention items are unavailable until the workspace query succeeds.
+          </p>
+        ) : attentionItems.length > 0 ? (
           <div className="grid gap-3 sm:grid-cols-2">
-            {!stats?.brandComplete && (
+            {(stats?.awaitingCount ?? 0) > 0 && (
+              <NudgeCard
+                icon={CheckCircle2}
+                title={`${stats!.awaitingCount} ${stats!.awaitingCount === 1 ? "post needs" : "posts need"} review`}
+                body="Open the review queue to approve or request changes."
+                to={isPublicOs ? "/social" : "/approvals"}
+                tone="success"
+              />
+            )}
+            {!stats?.brandComplete && can("can_manage_brand_voice") && (
               <NudgeCard
                 icon={Sparkles}
                 title="Complete your brand profile"
@@ -334,7 +476,7 @@ function HomeDashboard() {
               />
             )}
 
-            {stats?.mediaCount === 0 && (
+            {stats?.mediaCount === 0 && can("can_upload_media") && (
               <NudgeCard
                 icon={ImagePlus}
                 title="Upload your first media"
@@ -354,59 +496,107 @@ function HomeDashboard() {
         )}
       </Section>
 
-      <Section title="Recent performance" subtitle="A quick pulse on how your content is doing.">
-        <EmptyState
-          icon={TrendingUp}
-          title="No data yet."
-          body="Analytics will appear after publishing begins."
-          tone="var(--workspace-tone-primary)"
-        />
+      <Section
+        title="Recommended for you"
+        subtitle="A next step based on this workspace's current counts."
+      >
+        {statsQ.isPending ? (
+          <div className="h-28 animate-pulse rounded-2xl border border-border bg-elevated/50" />
+        ) : statsQ.isError ? (
+          <p
+            role="alert"
+            className="rounded-2xl border border-border bg-surface/55 p-4 text-sm text-muted-foreground"
+          >
+            A recommendation will appear after workspace activity loads successfully.
+          </p>
+        ) : recommendation ? (
+          <div className="surface-card p-5">
+            <h3 className="font-semibold text-foreground">{recommendation.title}</h3>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">{recommendation.body}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Link
+                to={recommendation.to}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground"
+              >
+                {recommendation.label} <ArrowRight className="h-4 w-4" />
+              </Link>
+              <details className="text-xs text-muted-foreground">
+                <summary className="min-h-11 cursor-pointer content-center font-medium text-foreground">
+                  Why am I seeing this?
+                </summary>
+                <p className="max-w-xl pb-2">
+                  WaveOS uses the published, scheduled, and review counts shown above. It does not
+                  invent performance data when connected-source data is unavailable.
+                </p>
+              </details>
+            </div>
+          </div>
+        ) : (
+          <EmptyState
+            icon={CheckCircle2}
+            title="You're on track."
+            body="There isn't a higher-priority workspace action right now."
+            tone="var(--workspace-tone-success)"
+          />
+        )}
       </Section>
 
       <Section title="Quick actions" subtitle="Common things you can do right now.">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <QuickAction
-            to="/content"
-            label="Upload content"
-            icon={ImagePlus}
-            description="Add photos or videos to your library."
-            tone="secondary"
-          />
-          <QuickAction
-            to="/create"
-            label="Create a post"
-            icon={PenSquare}
-            description="Build a post with per‑platform captions."
-            tone="primary"
-          />
-          <QuickAction
-            to="/social"
-            label="View saved posts"
-            icon={FileText}
-            description="Reopen drafts and check publishing results."
-            tone="tertiary"
-          />
-          <QuickAction
-            to="/calendar"
-            label="View calendar"
-            icon={CalendarDays}
-            description="See what's coming up next."
-            tone="highlight"
-          />
-          <QuickAction
-            to="/social"
-            label="Connect account"
-            icon={Share2}
-            description="Link Instagram, Facebook, and more."
-            tone="success"
-          />
-          <QuickAction
-            to="/brand-voice"
-            label="Refine brand voice"
-            icon={Sparkles}
-            description="Teach WaveOS how your brand sounds."
-            tone="secondary"
-          />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {can("can_create_content") && (
+            <QuickAction
+              to="/create"
+              label="Create a post"
+              icon={PenSquare}
+              description="Build a post with per-platform captions."
+              tone="primary"
+            />
+          )}
+          {can("can_use_campaign_manager") && (
+            <QuickAction
+              to="/campaigns"
+              label="Build a campaign"
+              icon={Megaphone}
+              description="Plan a focused multi-post campaign."
+              tone="tertiary"
+            />
+          )}
+          {can("can_use_creative_studio") && (
+            <QuickAction
+              to="/creative-studio"
+              label="Create a graphic"
+              icon={Palette}
+              description="Start a reusable social design."
+              tone="highlight"
+            />
+          )}
+          {can("can_view_analytics_checkup") && (
+            <QuickAction
+              to="/analytics"
+              label="See how I'm doing"
+              icon={BarChart3}
+              description="Review verified performance and coverage."
+              tone="success"
+            />
+          )}
+          {can("can_view_media_library") && (
+            <QuickAction
+              to="/content"
+              label="Media library"
+              icon={ImagePlus}
+              description="Add or choose photos and videos."
+              tone="secondary"
+            />
+          )}
+          {can("can_view_calendar_preview") && (
+            <QuickAction
+              to="/calendar"
+              label="View calendar"
+              icon={CalendarDays}
+              description="See what's coming up next."
+              tone="highlight"
+            />
+          )}
         </div>
       </Section>
     </div>

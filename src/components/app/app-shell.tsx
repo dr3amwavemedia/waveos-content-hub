@@ -29,6 +29,9 @@ import {
   FolderKanban,
   Tag,
   Database,
+  Megaphone,
+  Palette,
+  Radar,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clearAuthenticatedBrowserState } from "@/lib/auth-session-state";
@@ -71,6 +74,30 @@ const CLIENT_NAV: NavItem[] = [
   { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
   { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
+  {
+    to: "/analytics",
+    label: "Analytics Checkup",
+    icon: BarChart3,
+    feature: "can_view_analytics_checkup",
+  },
+  {
+    to: "/creative-studio",
+    label: "Creative Studio",
+    icon: Palette,
+    feature: "can_use_creative_studio",
+  },
+  {
+    to: "/campaigns",
+    label: "Campaign Manager",
+    icon: Megaphone,
+    feature: "can_use_campaign_manager",
+  },
+  {
+    to: "/competitive-intelligence",
+    label: "Competitive Intel",
+    icon: Radar,
+    feature: "can_use_competitive_intelligence",
+  },
   { to: "/content", label: "Media Library", icon: Images, feature: "can_view_media_library" },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/brand-voice", label: "Brand Voice", icon: Sparkles, feature: "can_manage_brand_voice" },
@@ -81,6 +108,7 @@ const CLIENT_NAV: NavItem[] = [
     icon: MessageSquare,
     feature: "can_contact_support",
   },
+  { to: "/updates", label: "What's New", icon: Sparkles },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -88,9 +116,34 @@ const PUBLIC_OS_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
   { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
   { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
+  {
+    to: "/analytics",
+    label: "Analytics Checkup",
+    icon: BarChart3,
+    feature: "can_view_analytics_checkup",
+  },
+  {
+    to: "/creative-studio",
+    label: "Creative Studio",
+    icon: Palette,
+    feature: "can_use_creative_studio",
+  },
+  {
+    to: "/campaigns",
+    label: "Campaign Manager",
+    icon: Megaphone,
+    feature: "can_use_campaign_manager",
+  },
+  {
+    to: "/competitive-intelligence",
+    label: "Competitive Intel",
+    icon: Radar,
+    feature: "can_use_competitive_intelligence",
+  },
   { to: "/content", label: "Media Library", icon: Images, feature: "can_view_media_library" },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/brand-voice", label: "Brand Voice", icon: Sparkles, feature: "can_manage_brand_voice" },
+  { to: "/updates", label: "What's New", icon: Sparkles },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -121,6 +174,7 @@ const STAFF_NAV: NavItem[] = [
 
 const TEAM_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
+  { to: "/updates", label: "What's New", icon: Sparkles },
   { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
@@ -153,34 +207,60 @@ const PUBLIC_OS_MOBILE_NAV: NavItem[] = [
 // scroll to the corresponding section of the Overview.
 const LAYER1_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
+  {
+    to: "/analytics",
+    label: "Analytics Checkup",
+    icon: BarChart3,
+    feature: "can_view_analytics_checkup",
+  },
   { to: "/approvals", label: "Approvals", icon: CheckSquare },
   { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
+  { to: "/updates", label: "What's New", icon: Sparkles },
   { to: "/settings", label: "Your Information", icon: User },
   { to: "/feedback", label: "Request Something", icon: MessageSquare },
 ];
 
 const LAYER1_MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Home", icon: Home },
+  {
+    to: "/analytics",
+    label: "Analytics",
+    icon: BarChart3,
+    feature: "can_view_analytics_checkup",
+  },
   { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/approvals", label: "Approvals", icon: CheckSquare },
   { to: "/home", hash: "invoices", label: "Invoices", icon: FileText },
   { to: "/settings", label: "More", icon: Menu },
 ];
 
-const WEDDING_ALLOWED_PATHS = ["/home", "/wedding-content", "/settings"];
+const WEDDING_ALLOWED_PATHS = ["/home", "/wedding-content", "/analytics", "/updates", "/settings"];
 
 const WEDDING_NAV: NavItem[] = [
   { to: "/home", label: "Wedding Overview", icon: Heart },
   { to: "/wedding-content", label: "Deliveries", icon: Images },
+  {
+    to: "/analytics",
+    label: "Analytics Checkup",
+    icon: BarChart3,
+    feature: "can_view_analytics_checkup",
+  },
   { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
   { to: "/home", hash: "wedding-invoices", label: "Payments", icon: FileText },
+  { to: "/updates", label: "What's New", icon: Sparkles },
   { to: "/settings", label: "Records & Settings", icon: Settings },
   { to: "/home", hash: "wedding-contact", label: "Contact Dream Wave", icon: MessageSquare },
 ];
 
 const WEDDING_MOBILE_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Heart },
+  {
+    to: "/analytics",
+    label: "Analytics",
+    icon: BarChart3,
+    feature: "can_view_analytics_checkup",
+  },
   { to: "/wedding-content", label: "Deliveries", icon: Images },
   { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
   { to: "/home", hash: "wedding-invoices", label: "Payments", icon: FileText },

@@ -63,6 +63,7 @@ const PUBLIC_OS_FEATURES = new Set<FeatureKey>([
   "can_connect_socials",
   "can_publish_content",
   "can_view_analytics",
+  "can_view_analytics_checkup",
   "can_view_activity_log",
   "can_manage_workspace",
 ]);
@@ -70,6 +71,12 @@ const PUBLIC_OS_FEATURES = new Set<FeatureKey>([
 const PUBLIC_OS_PREMIUM_FEATURES = new Set<FeatureKey>([
   "can_use_ai_tools",
   "can_schedule_content",
+]);
+
+const PUBLIC_OS_CURRENT_FEATURES = new Set<FeatureKey>([
+  "can_use_creative_studio",
+  "can_use_campaign_manager",
+  "can_use_competitive_intelligence",
 ]);
 
 export function publicSubscriptionActive(subscription: PublicSubscriptionState | null) {
@@ -164,11 +171,13 @@ export function usePermissions(): WorkspacePermissions {
         subscription?.status === "trialing" ||
         subscription?.plan === "full" ||
         subscription?.plan === "expanded";
+      const currentOrTidal = subscription?.plan === "full" || subscription?.plan === "expanded";
       const tidal = subscription?.plan === "expanded";
       const allowed = (feature: FeatureKey) =>
         active &&
         (PUBLIC_OS_FEATURES.has(feature) ||
           (premium && PUBLIC_OS_PREMIUM_FEATURES.has(feature)) ||
+          (currentOrTidal && PUBLIC_OS_CURRENT_FEATURES.has(feature)) ||
           (tidal && feature === "can_invite_members"));
       return {
         access: clientAccess,

@@ -62,6 +62,7 @@ import {
   useCreateContentItem,
   useDeleteContentItem,
   useSocialConnections,
+  useSubmitForApproval,
   useUpdateContentItem,
   useUpdateVariant,
   useSyncPostVariants,
@@ -83,8 +84,10 @@ export const Route = createFileRoute("/_authenticated/create")({
       <CreatePost />
     </RequireFeature>
   ),
-  validateSearch: (s: Record<string, unknown>): { id?: string } =>
-    typeof s.id === "string" ? { id: s.id } : {},
+  validateSearch: (s: Record<string, unknown>): { id?: string; media?: string } => ({
+    ...(typeof s.id === "string" ? { id: s.id } : {}),
+    ...(typeof s.media === "string" ? { media: s.media } : {}),
+  }),
   head: () => ({
     meta: [{ title: "Create Post — WaveOS" }, { name: "robots", content: "noindex" }],
   }),
@@ -110,6 +113,7 @@ function CreatePost() {
   const updateVariant = useUpdateVariant();
   const syncVariants = useSyncPostVariants();
   const del = useDeleteContentItem();
+  const submitForApproval = useSubmitForApproval();
 
   const [title, setTitle] = useState("");
   const [caption, setCaption] = useState("");
@@ -121,6 +125,12 @@ function CreatePost() {
     Partial<Record<SocialPlatform, { contentType?: "story" }>>
   >({});
   const [showLibrary, setShowLibrary] = useState(false);
+
+  useEffect(() => {
+    if (!search.media || editingId || pickedMedia.length) return;
+    setPickedMedia([search.media]);
+    toast.success("Creative Studio image added to this post draft.");
+  }, [editingId, pickedMedia.length, search.media]);
 
   const draftStorageKey = workspaceId ? `waveos-create-draft-${workspaceId}` : null;
 
@@ -406,13 +416,19 @@ function CreatePost() {
     try {
       const id = await ensureSaved();
       if (!id) return;
-      await update.mutateAsync({
-        id,
-        patch: { status: "scheduled", scheduled_at: when.toISOString() },
+      const nextStatus = await submitForApproval.mutateAsync({
+        contentId: id,
+        requestedAction: "schedule",
+        scheduledAt: when.toISOString(),
       });
       qc.invalidateQueries({ queryKey: ["content-items"] });
-      toast.success(`Scheduled for ${when.toLocaleString()}`);
-      navigate({ to: "/calendar" });
+      if (nextStatus === "in_review") {
+        toast.success(`Submitted for approval to schedule ${when.toLocaleString()}`);
+        navigate({ to: "/approvals" });
+      } else {
+        toast.success(`Scheduled for ${when.toLocaleString()}`);
+        navigate({ to: "/calendar" });
+      }
     } catch (e) {
       toast.error((e as Error).message);
     } finally {
@@ -446,11 +462,16 @@ function CreatePost() {
       const id = await ensureSaved();
       if (!id) return;
       if (!confirm("Publish this post to the selected channels right now?")) return;
-      // The self-service workflow publishes directly rather than creating an approval request.
-      await update.mutateAsync({
-        id,
-        patch: { status: "approved", scheduled_at: null },
+      const nextStatus = await submitForApproval.mutateAsync({
+        contentId: id,
+        requestedAction: "publish_now",
+        scheduledAt: null,
       });
+      if (nextStatus === "in_review") {
+        toast.success("Submitted for approval. It will publish after an approver releases it.");
+        navigate({ to: "/approvals" });
+        return;
+      }
       const res = await publishFn({ data: { contentId: id } });
       qc.invalidateQueries({ queryKey: ["content-items"] });
       qc.invalidateQueries({ queryKey: ["content-item", id] });

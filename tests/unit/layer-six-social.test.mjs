@@ -170,11 +170,14 @@ test("caption suite uses Brand Voice and Story selection is explicit", () => {
 test("analytics has its own discoverable workspace and exposes engagement signals", () => {
   const social = readFileSync("src/routes/_authenticated/social.tsx", "utf8");
   const analyticsRoute = readFileSync("src/routes/_authenticated/analytics.tsx", "utf8");
+  const analyticsCheckup = readFileSync("src/components/social/analytics-checkup.tsx", "utf8");
   assert.match(social, /"overview" \| "posts" \| "analytics" \| "accounts"/);
-  assert.match(social, /label="Likes"/);
-  assert.match(social, /label="Reach"/);
-  assert.match(social, /label="Impressions"/);
-  assert.match(analyticsRoute, /view: "analytics"/);
+  assert.match(analyticsCheckup, /key: "likes", label: "Likes"/);
+  assert.match(analyticsCheckup, /key: "reach", label: "Reach"/);
+  assert.match(analyticsCheckup, /key: "impressions", label: "Impressions"/);
+  assert.match(analyticsCheckup, /Missing or failed sources remain unavailable/);
+  assert.match(analyticsRoute, /feature="can_view_analytics_checkup"/);
+  assert.doesNotMatch(analyticsRoute, /redirect/);
 });
 
 test("Google Picker includes My Drive, Shared with me and Shared drives and remains responsive", () => {

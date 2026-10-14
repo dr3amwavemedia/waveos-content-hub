@@ -121,6 +121,16 @@ function CalendarPage() {
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d));
   while (cells.length % 7 !== 0) cells.push(null);
+  const mobileAgenda = cells.flatMap((date) => {
+    if (!date) return [];
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const dayItems = byDate.get(key) ?? [];
+    const dayProductions = productionsByDate.get(key) ?? [];
+    const dayStrategies = strategiesByDate.get(key) ?? [];
+    return dayItems.length || dayProductions.length || dayStrategies.length
+      ? [{ date, key, dayItems, dayProductions, dayStrategies }]
+      : [];
+  });
 
   return (
     <div className="space-y-6">
@@ -140,7 +150,7 @@ function CalendarPage() {
               type="button"
               onClick={() => setMode("calendar")}
               className={cn(
-                "inline-flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium",
+                "inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium",
                 mode === "calendar"
                   ? "bg-primary/15 text-foreground ring-1 ring-primary/30"
                   : "text-muted-foreground hover:text-foreground",
@@ -153,7 +163,7 @@ function CalendarPage() {
                 type="button"
                 onClick={() => setMode("strategy")}
                 className={cn(
-                  "inline-flex min-h-9 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium",
+                  "inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium",
                   mode === "strategy"
                     ? "bg-violet-400/15 text-foreground ring-1 ring-violet-400/30"
                     : "text-muted-foreground hover:text-foreground",
@@ -192,7 +202,7 @@ function CalendarPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setCursor(new Date(year, month - 1, 1))}
-            className="rounded-lg border border-border bg-elevated p-2 text-muted-foreground hover:text-foreground"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-elevated text-muted-foreground hover:text-foreground"
             aria-label="Previous month"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -202,7 +212,7 @@ function CalendarPage() {
           </div>
           <button
             onClick={() => setCursor(new Date(year, month + 1, 1))}
-            className="rounded-lg border border-border bg-elevated p-2 text-muted-foreground hover:text-foreground"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-lg border border-border bg-elevated text-muted-foreground hover:text-foreground"
             aria-label="Next month"
           >
             <ChevronRight className="h-4 w-4" />
@@ -214,7 +224,75 @@ function CalendarPage() {
         <SocialStrategyPlanner workspaceId={activeWorkspace.id} month={cursor} />
       ) : (
         <>
-          <div className="surface-card overflow-hidden p-0">
+          <div className="space-y-3 sm:hidden" aria-label={`${monthName} agenda`}>
+            {mobileAgenda.length ? (
+              mobileAgenda.map(({ date, key, dayItems, dayProductions, dayStrategies }) => (
+                <section key={key} className="surface-card p-4">
+                  <time dateTime={key} className="text-sm font-semibold text-foreground">
+                    {date.toLocaleDateString(undefined, {
+                      weekday: "long",
+                      month: "long",
+                      day: "numeric",
+                    })}
+                  </time>
+                  <div className="mt-3 space-y-2">
+                    {dayItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setSelected(item)}
+                        className="block min-h-11 w-full rounded-lg border-l-2 px-3 py-2 text-left text-sm font-medium text-foreground"
+                        style={eventColorStyle(category("content").effective_color)}
+                      >
+                        <span className="sr-only">{category("content").name}: </span>
+                        {formatInTimeZone(item.scheduled_at!, timeZone, {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}{" "}
+                        · {item.title || "Untitled"}
+                      </button>
+                    ))}
+                    {dayProductions.map((production) => (
+                      <button
+                        key={`mobile-production-${production.id}`}
+                        type="button"
+                        onClick={() => setSelectedProduction(production)}
+                        className="block min-h-11 w-full rounded-lg border-l-2 px-3 py-2 text-left text-sm font-medium text-foreground"
+                        style={eventColorStyle(category("production").effective_color)}
+                      >
+                        <span className="sr-only">{category("production").name}: </span>
+                        {formatInTimeZone(production.scheduled_at, timeZone, {
+                          hour: "numeric",
+                          minute: "2-digit",
+                        })}{" "}
+                        · {production.title}
+                      </button>
+                    ))}
+                    {dayStrategies.map((strategy) => (
+                      <button
+                        key={`mobile-strategy-${strategy.id}`}
+                        type="button"
+                        onClick={() => setMode("strategy")}
+                        className="block min-h-11 w-full rounded-lg border-l-2 px-3 py-2 text-left text-sm font-medium text-foreground"
+                        style={eventColorStyle(category("strategy").effective_color)}
+                      >
+                        <span className="sr-only">{category("strategy").name}: </span>
+                        Idea · {strategy.title}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              ))
+            ) : (
+              <EmptyState
+                icon={CalendarIcon}
+                title={`No plans in ${monthName}`}
+                body="Scheduled posts, production dates, and strategy ideas will appear here."
+              />
+            )}
+          </div>
+
+          <div className="surface-card hidden overflow-hidden p-0 sm:block">
             <div className="grid grid-cols-7 border-b border-border bg-elevated/50 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
                 <div key={d} className="px-2 py-2 text-center">
@@ -305,7 +383,7 @@ function CalendarPage() {
             <div className="flex justify-end">
               <Link
                 to="/create"
-                className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
               >
                 <PenSquare className="h-4 w-4" /> Create post
               </Link>
@@ -340,7 +418,7 @@ function CalendarPage() {
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className="rounded-lg p-2 text-muted-foreground hover:bg-elevated hover:text-foreground"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-elevated hover:text-foreground"
                 aria-label="Close details"
               >
                 <X className="h-4 w-4" />
@@ -365,14 +443,14 @@ function CalendarPage() {
               <button
                 type="button"
                 onClick={() => setSelected(null)}
-                className="rounded-full border border-border px-4 py-2 text-sm font-medium"
+                className="min-h-11 rounded-full border border-border px-4 py-2 text-sm font-medium"
               >
                 Close
               </button>
               <Link
                 to="/create"
                 search={{ id: selected.id }}
-                className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                className="inline-flex min-h-11 items-center rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
               >
                 Open post
               </Link>
@@ -401,7 +479,7 @@ function CalendarPage() {
               <button
                 type="button"
                 onClick={() => setSelectedProduction(null)}
-                className="rounded-lg p-2 text-muted-foreground hover:bg-elevated hover:text-foreground"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-elevated hover:text-foreground"
                 aria-label="Close details"
               >
                 <X className="h-4 w-4" />
@@ -429,7 +507,7 @@ function CalendarPage() {
               <button
                 type="button"
                 onClick={() => setSelectedProduction(null)}
-                className="rounded-full border border-border px-4 py-2 text-sm font-medium"
+                className="min-h-11 rounded-full border border-border px-4 py-2 text-sm font-medium"
               >
                 Close
               </button>

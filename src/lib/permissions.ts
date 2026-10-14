@@ -29,6 +29,10 @@ export type FeatureKey =
   | "can_schedule_content"
   | "can_publish_content"
   | "can_view_analytics"
+  | "can_view_analytics_checkup"
+  | "can_use_creative_studio"
+  | "can_use_campaign_manager"
+  | "can_use_competitive_intelligence"
   | "can_view_activity_log"
   | "can_invite_members"
   | "can_manage_workspace";
@@ -57,6 +61,7 @@ const GROWTH_90_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   "can_view_media_library",
   "can_upload_media",
   "can_use_ai_tools",
+  "can_view_analytics_checkup",
   "can_view_activity_log",
   "can_invite_members",
   "can_manage_workspace",
@@ -82,6 +87,10 @@ export function hasFeature(access: WorkspaceAccess, feature: FeatureKey): boolea
   if (access.status === "expired" || dateExpired) {
     return PROJECT_CLIENT_FEATURES.has(feature);
   }
+
+  // Phase 1 makes the transparent analytics checkup available to every active
+  // DWM client tier without changing access to full social analytics.
+  if (feature === "can_view_analytics_checkup") return access.status === "active";
 
   switch (access.tier) {
     case "wedding_client":
@@ -110,6 +119,10 @@ const SOCIAL_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
   "can_schedule_content",
   "can_publish_content",
   "can_view_analytics",
+  "can_view_analytics_checkup",
+  "can_use_creative_studio",
+  "can_use_campaign_manager",
+  "can_use_competitive_intelligence",
 ]);
 export function featureVisibility(
   access: WorkspaceAccess,

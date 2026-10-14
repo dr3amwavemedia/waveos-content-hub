@@ -247,12 +247,13 @@ export function useSubmitForApproval() {
       requestedAction: "publish_now" | "schedule";
       scheduledAt?: string | null;
     }) => {
-      const { error } = await supabase.rpc("submit_content_for_approval", {
+      const { data, error } = await supabase.rpc("submit_content_for_approval", {
         _content_id: input.contentId,
         _requested_action: input.requestedAction,
         _scheduled_at: input.scheduledAt ?? undefined,
       });
       if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["content-items"] });

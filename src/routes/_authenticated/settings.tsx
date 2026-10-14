@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useRef, useState } from "react";
@@ -53,6 +53,7 @@ import {
   getSocialSubscription,
 } from "@/lib/social-subscriptions.functions";
 import { publicSubscriptionActive, usePermissions } from "@/hooks/use-permissions";
+import { subscriptionDisplayState } from "@/lib/subscription-display";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -342,6 +343,25 @@ function SettingsPage() {
         </section>
       )}
 
+      <Link
+        to="/updates"
+        className="surface-card flex items-start gap-4 p-6 transition hover:border-primary/40 hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+        aria-label="Open What's New updates"
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
+          <BookOpen className="h-5 w-5" />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-base font-semibold text-foreground">What&apos;s New</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review WaveOS releases, improvements, and important product notes.
+          </p>
+          <span className="mt-3 inline-block text-xs font-semibold text-primary">
+            View updates →
+          </span>
+        </div>
+      </Link>
+
       <div className="surface-card flex items-start gap-4 p-6">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
           <SettingsIcon className="h-5 w-5" />
@@ -436,6 +456,29 @@ function SocialPlanSettings({
       toast.error(error instanceof Error ? error.message : "Could not open billing settings."),
   });
   const subscription = query.data?.subscription;
+  const billingState =
+    query.isPending || query.isError
+      ? null
+      : subscriptionDisplayState(
+          subscription
+            ? {
+                status: subscription.status,
+                cancelAtPeriodEnd: subscription.cancel_at_period_end,
+                currentPeriodEnd: subscription.current_period_end,
+                trialEndsAt: subscription.trial_ends_at,
+                internalTestAccess: subscription.internal_test_access,
+              }
+            : null,
+        );
+  const billingTone = billingState
+    ? {
+        positive: "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+        warning: "border-amber-400/30 bg-amber-400/10 text-amber-200",
+        danger: "border-rose-400/30 bg-rose-400/10 text-rose-200",
+        neutral: "border-border bg-elevated text-muted-foreground",
+        info: "border-primary/30 bg-primary/10 text-primary",
+      }[billingState.tone]
+    : "border-border bg-elevated text-muted-foreground";
   const subscriptionReady =
     subscription?.status === "active" || subscription?.status === "trialing";
   return (
@@ -450,12 +493,27 @@ function SocialPlanSettings({
             Manage your social account limit, renewal, and payment method in one place.
           </p>
         </div>
-        <span className="rounded-full border border-border bg-elevated px-3 py-1 text-xs font-semibold text-foreground">
-          {subscription
-            ? `${query.data?.plans[subscription.plan as keyof typeof query.data.plans]?.name ?? subscription.plan} · ${query.data?.connectedAccounts ?? 0}/${subscription.account_limit} accounts`
-            : "Not started"}
-        </span>
+        <div className="flex flex-col items-end gap-2">
+          <span className="rounded-full border border-border bg-elevated px-3 py-1 text-xs font-semibold text-foreground">
+            {subscription
+              ? `${query.data?.plans[subscription.plan as keyof typeof query.data.plans]?.name ?? subscription.plan} · ${query.data?.connectedAccounts ?? 0}/${subscription.account_limit} accounts`
+              : "Not started"}
+          </span>
+          <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${billingTone}`}>
+            {query.isPending
+              ? "Stripe status: loading…"
+              : query.isError
+                ? "Stripe status: unavailable"
+                : `Stripe status: ${billingState?.label ?? "Unavailable"}`}
+          </span>
+        </div>
       </div>
+      {billingState && (
+        <div className="mt-4 rounded-xl border border-border bg-elevated/50 p-4 text-sm text-foreground">
+          <strong>Subscription lifecycle: {billingState.label}</strong>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">{billingState.detail}</p>
+        </div>
+      )}
       {checkoutConfirmation === "confirming" && (
         <div className="mt-4 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm text-foreground">
           <strong className="inline-flex items-center gap-2">

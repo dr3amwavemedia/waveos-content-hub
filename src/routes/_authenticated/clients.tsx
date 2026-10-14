@@ -70,6 +70,7 @@ import { invitationContact } from "@/lib/invitation-contact";
 import { accountDisplayName, visibleAccountEmail } from "@/lib/identity-display";
 import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 import { nextInvoicePaymentCents } from "@/lib/invoice-payment-schedule";
+import { subscriptionDisplayState } from "@/lib/subscription-display";
 import { Switch } from "@/components/ui/switch";
 import {
   appRoleForClientAccess,
@@ -658,11 +659,12 @@ export function OsDataPanel({ search }: { search: string }) {
         "Email",
         "Account created",
         "Last sign-in",
-        "Payments enabled",
+        "Administrative payment flag",
         "Plan ID",
         "Tier label",
         "Tier access",
         "Plan status",
+        "Internal test access",
         "Billing interval",
         "Account limit",
         "Connected accounts",
@@ -696,6 +698,7 @@ export function OsDataPanel({ search }: { search: string }) {
           ? "AI Assist + scheduling"
           : "Core tools; AI Assist and scheduling blocked",
         account.planStatus,
+        account.internalTestAccess ? "Yes" : "No",
         account.billingInterval,
         account.accountLimit,
         account.connectedAccounts,
@@ -771,6 +774,24 @@ export function OsDataPanel({ search }: { search: string }) {
         {(query.data?.accounts ?? []).map((account) => {
           const name =
             [account.firstName, account.lastName].filter(Boolean).join(" ") || "WaveOS member";
+          const subscriptionState = subscriptionDisplayState(
+            account.planStatus
+              ? {
+                  status: account.planStatus,
+                  cancelAtPeriodEnd: account.cancelAtPeriodEnd,
+                  currentPeriodEnd: account.currentPeriodEnd,
+                  trialEndsAt: account.trialEndsAt,
+                  internalTestAccess: account.internalTestAccess,
+                }
+              : null,
+          );
+          const subscriptionTone = {
+            positive: "border-success/30 bg-success/15 text-success",
+            warning: "border-warning/30 bg-warning/15 text-warning",
+            danger: "border-destructive/30 bg-destructive/15 text-destructive",
+            neutral: "border-border bg-elevated text-muted-foreground",
+            info: "border-primary/30 bg-primary/10 text-primary",
+          }[subscriptionState.tone];
           return (
             <article
               key={account.id}
@@ -804,16 +825,23 @@ export function OsDataPanel({ search }: { search: string }) {
                     </p>
                   )}
                 </div>
-                <span
-                  className={cn(
-                    "rounded-full px-3 py-1 text-xs font-semibold",
-                    account.paymentsEnabled
-                      ? "bg-success/15 text-success"
-                      : "bg-warning/15 text-warning",
-                  )}
-                >
-                  {account.paymentsEnabled ? "Payments on" : "Payments off"}
-                </span>
+                <div className="flex max-w-xs flex-col items-end gap-1.5 text-right">
+                  <span
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs font-semibold",
+                      subscriptionTone,
+                    )}
+                    title={subscriptionState.detail}
+                  >
+                    Stripe status: {subscriptionState.label}
+                  </span>
+                  <span className="rounded-full border border-border bg-elevated px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+                    Admin payment flag: {account.paymentsEnabled ? "on" : "off"}
+                  </span>
+                  <span className="text-[10px] leading-4 text-muted-foreground">
+                    The admin flag is profile metadata only; it does not change Stripe.
+                  </span>
+                </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -831,7 +859,7 @@ export function OsDataPanel({ search }: { search: string }) {
                   onClick={async () => {
                     if (
                       !confirm(
-                        `${account.paymentsEnabled ? "Disable" : "Enable"} payments for ${account.email}?`,
+                        `Turn the administrative payment flag ${account.paymentsEnabled ? "off" : "on"} for ${account.email}? This does not change the Stripe subscription.`,
                       )
                     )
                       return;
@@ -839,11 +867,11 @@ export function OsDataPanel({ search }: { search: string }) {
                       data: { userId: account.id, enabled: !account.paymentsEnabled },
                     });
                     await refresh();
-                    toast.success("Payment access updated.");
+                    toast.success("Administrative payment flag updated. Stripe was not changed.");
                   }}
                   className="rounded-lg border border-border px-3 py-2 text-xs font-semibold"
                 >
-                  {account.paymentsEnabled ? "Disable payments" : "Enable payments"}
+                  Turn admin payment flag {account.paymentsEnabled ? "off" : "on"}
                 </button>
                 <button
                   type="button"

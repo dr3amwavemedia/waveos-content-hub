@@ -25,11 +25,14 @@ import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authentica
 import { Route as AuthenticatedApprovalsRouteImport } from './routes/_authenticated/approvals'
 import { Route as AuthenticatedBrandVoiceRouteImport } from './routes/_authenticated/brand-voice'
 import { Route as AuthenticatedCalendarRouteImport } from './routes/_authenticated/calendar'
+import { Route as AuthenticatedCampaignsRouteImport } from './routes/_authenticated/campaigns'
 import { Route as AuthenticatedCatalogRouteImport } from './routes/_authenticated/catalog'
 import { Route as AuthenticatedClientsRouteImport } from './routes/_authenticated/clients'
+import { Route as AuthenticatedCompetitiveIntelligenceRouteImport } from './routes/_authenticated/competitive-intelligence'
 import { Route as AuthenticatedContentRouteImport } from './routes/_authenticated/content'
 import { Route as AuthenticatedContractReturnRouteImport } from './routes/_authenticated/contract-return'
 import { Route as AuthenticatedCreateRouteImport } from './routes/_authenticated/create'
+import { Route as AuthenticatedCreativeStudioRouteImport } from './routes/_authenticated/creative-studio'
 import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/crm'
 import { Route as AuthenticatedDeliveriesRouteImport } from './routes/_authenticated/deliveries'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
@@ -48,6 +51,7 @@ import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authe
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedToolsRouteImport } from './routes/_authenticated/tools'
+import { Route as AuthenticatedUpdatesRouteImport } from './routes/_authenticated/updates'
 import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
 import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
@@ -159,6 +163,11 @@ const AuthenticatedCalendarRoute = AuthenticatedCalendarRouteImport.update({
   path: '/calendar',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCampaignsRoute = AuthenticatedCampaignsRouteImport.update({
+  id: '/campaigns',
+  path: '/campaigns',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedCatalogRoute = AuthenticatedCatalogRouteImport.update({
   id: '/catalog',
   path: '/catalog',
@@ -169,6 +178,12 @@ const AuthenticatedClientsRoute = AuthenticatedClientsRouteImport.update({
   path: '/clients',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCompetitiveIntelligenceRoute =
+  AuthenticatedCompetitiveIntelligenceRouteImport.update({
+    id: '/competitive-intelligence',
+    path: '/competitive-intelligence',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedContentRoute = AuthenticatedContentRouteImport.update({
   id: '/content',
   path: '/content',
@@ -185,6 +200,12 @@ const AuthenticatedCreateRoute = AuthenticatedCreateRouteImport.update({
   path: '/create',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCreativeStudioRoute =
+  AuthenticatedCreativeStudioRouteImport.update({
+    id: '/creative-studio',
+    path: '/creative-studio',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedCrmRoute = AuthenticatedCrmRouteImport.update({
   id: '/crm',
   path: '/crm',
@@ -275,6 +296,11 @@ const AuthenticatedTemplatesRoute = AuthenticatedTemplatesRouteImport.update({
 const AuthenticatedToolsRoute = AuthenticatedToolsRouteImport.update({
   id: '/tools',
   path: '/tools',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedUpdatesRoute = AuthenticatedUpdatesRouteImport.update({
+  id: '/updates',
+  path: '/updates',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedVideographerRoute =
@@ -457,11 +483,14 @@ export interface FileRoutesByFullPath {
   '/approvals': typeof AuthenticatedApprovalsRoute
   '/brand-voice': typeof AuthenticatedBrandVoiceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
+  '/campaigns': typeof AuthenticatedCampaignsRoute
   '/catalog': typeof AuthenticatedCatalogRoute
   '/clients': typeof AuthenticatedClientsRoute
+  '/competitive-intelligence': typeof AuthenticatedCompetitiveIntelligenceRoute
   '/content': typeof AuthenticatedContentRoute
   '/contract-return': typeof AuthenticatedContractReturnRoute
   '/create': typeof AuthenticatedCreateRoute
+  '/creative-studio': typeof AuthenticatedCreativeStudioRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/deliveries': typeof AuthenticatedDeliveriesRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
@@ -480,6 +509,7 @@ export interface FileRoutesByFullPath {
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/templates': typeof AuthenticatedTemplatesRoute
   '/tools': typeof AuthenticatedToolsRoute
+  '/updates': typeof AuthenticatedUpdatesRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -527,11 +557,14 @@ export interface FileRoutesByTo {
   '/approvals': typeof AuthenticatedApprovalsRoute
   '/brand-voice': typeof AuthenticatedBrandVoiceRoute
   '/calendar': typeof AuthenticatedCalendarRoute
+  '/campaigns': typeof AuthenticatedCampaignsRoute
   '/catalog': typeof AuthenticatedCatalogRoute
   '/clients': typeof AuthenticatedClientsRoute
+  '/competitive-intelligence': typeof AuthenticatedCompetitiveIntelligenceRoute
   '/content': typeof AuthenticatedContentRoute
   '/contract-return': typeof AuthenticatedContractReturnRoute
   '/create': typeof AuthenticatedCreateRoute
+  '/creative-studio': typeof AuthenticatedCreativeStudioRoute
   '/crm': typeof AuthenticatedCrmRoute
   '/deliveries': typeof AuthenticatedDeliveriesRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
@@ -550,6 +583,7 @@ export interface FileRoutesByTo {
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/templates': typeof AuthenticatedTemplatesRoute
   '/tools': typeof AuthenticatedToolsRoute
+  '/updates': typeof AuthenticatedUpdatesRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -599,11 +633,14 @@ export interface FileRoutesById {
   '/_authenticated/approvals': typeof AuthenticatedApprovalsRoute
   '/_authenticated/brand-voice': typeof AuthenticatedBrandVoiceRoute
   '/_authenticated/calendar': typeof AuthenticatedCalendarRoute
+  '/_authenticated/campaigns': typeof AuthenticatedCampaignsRoute
   '/_authenticated/catalog': typeof AuthenticatedCatalogRoute
   '/_authenticated/clients': typeof AuthenticatedClientsRoute
+  '/_authenticated/competitive-intelligence': typeof AuthenticatedCompetitiveIntelligenceRoute
   '/_authenticated/content': typeof AuthenticatedContentRoute
   '/_authenticated/contract-return': typeof AuthenticatedContractReturnRoute
   '/_authenticated/create': typeof AuthenticatedCreateRoute
+  '/_authenticated/creative-studio': typeof AuthenticatedCreativeStudioRoute
   '/_authenticated/crm': typeof AuthenticatedCrmRoute
   '/_authenticated/deliveries': typeof AuthenticatedDeliveriesRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
@@ -622,6 +659,7 @@ export interface FileRoutesById {
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
   '/_authenticated/tools': typeof AuthenticatedToolsRoute
+  '/_authenticated/updates': typeof AuthenticatedUpdatesRoute
   '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
   '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -671,11 +709,14 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/brand-voice'
     | '/calendar'
+    | '/campaigns'
     | '/catalog'
     | '/clients'
+    | '/competitive-intelligence'
     | '/content'
     | '/contract-return'
     | '/create'
+    | '/creative-studio'
     | '/crm'
     | '/deliveries'
     | '/feedback'
@@ -694,6 +735,7 @@ export interface FileRouteTypes {
     | '/staff-email'
     | '/templates'
     | '/tools'
+    | '/updates'
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
@@ -741,11 +783,14 @@ export interface FileRouteTypes {
     | '/approvals'
     | '/brand-voice'
     | '/calendar'
+    | '/campaigns'
     | '/catalog'
     | '/clients'
+    | '/competitive-intelligence'
     | '/content'
     | '/contract-return'
     | '/create'
+    | '/creative-studio'
     | '/crm'
     | '/deliveries'
     | '/feedback'
@@ -764,6 +809,7 @@ export interface FileRouteTypes {
     | '/staff-email'
     | '/templates'
     | '/tools'
+    | '/updates'
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
@@ -812,11 +858,14 @@ export interface FileRouteTypes {
     | '/_authenticated/approvals'
     | '/_authenticated/brand-voice'
     | '/_authenticated/calendar'
+    | '/_authenticated/campaigns'
     | '/_authenticated/catalog'
     | '/_authenticated/clients'
+    | '/_authenticated/competitive-intelligence'
     | '/_authenticated/content'
     | '/_authenticated/contract-return'
     | '/_authenticated/create'
+    | '/_authenticated/creative-studio'
     | '/_authenticated/crm'
     | '/_authenticated/deliveries'
     | '/_authenticated/feedback'
@@ -835,6 +884,7 @@ export interface FileRouteTypes {
     | '/_authenticated/staff-email'
     | '/_authenticated/templates'
     | '/_authenticated/tools'
+    | '/_authenticated/updates'
     | '/_authenticated/videographer'
     | '/_authenticated/vision-board'
     | '/_authenticated/vision-studio'
@@ -1016,6 +1066,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCalendarRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/campaigns': {
+      id: '/_authenticated/campaigns'
+      path: '/campaigns'
+      fullPath: '/campaigns'
+      preLoaderRoute: typeof AuthenticatedCampaignsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/catalog': {
       id: '/_authenticated/catalog'
       path: '/catalog'
@@ -1028,6 +1085,13 @@ declare module '@tanstack/react-router' {
       path: '/clients'
       fullPath: '/clients'
       preLoaderRoute: typeof AuthenticatedClientsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/competitive-intelligence': {
+      id: '/_authenticated/competitive-intelligence'
+      path: '/competitive-intelligence'
+      fullPath: '/competitive-intelligence'
+      preLoaderRoute: typeof AuthenticatedCompetitiveIntelligenceRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/content': {
@@ -1049,6 +1113,13 @@ declare module '@tanstack/react-router' {
       path: '/create'
       fullPath: '/create'
       preLoaderRoute: typeof AuthenticatedCreateRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/creative-studio': {
+      id: '/_authenticated/creative-studio'
+      path: '/creative-studio'
+      fullPath: '/creative-studio'
+      preLoaderRoute: typeof AuthenticatedCreativeStudioRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/crm': {
@@ -1175,6 +1246,13 @@ declare module '@tanstack/react-router' {
       path: '/tools'
       fullPath: '/tools'
       preLoaderRoute: typeof AuthenticatedToolsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/updates': {
+      id: '/_authenticated/updates'
+      path: '/updates'
+      fullPath: '/updates'
+      preLoaderRoute: typeof AuthenticatedUpdatesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/videographer': {
@@ -1410,11 +1488,14 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedApprovalsRoute: typeof AuthenticatedApprovalsRoute
   AuthenticatedBrandVoiceRoute: typeof AuthenticatedBrandVoiceRoute
   AuthenticatedCalendarRoute: typeof AuthenticatedCalendarRoute
+  AuthenticatedCampaignsRoute: typeof AuthenticatedCampaignsRoute
   AuthenticatedCatalogRoute: typeof AuthenticatedCatalogRoute
   AuthenticatedClientsRoute: typeof AuthenticatedClientsRoute
+  AuthenticatedCompetitiveIntelligenceRoute: typeof AuthenticatedCompetitiveIntelligenceRoute
   AuthenticatedContentRoute: typeof AuthenticatedContentRoute
   AuthenticatedContractReturnRoute: typeof AuthenticatedContractReturnRoute
   AuthenticatedCreateRoute: typeof AuthenticatedCreateRoute
+  AuthenticatedCreativeStudioRoute: typeof AuthenticatedCreativeStudioRoute
   AuthenticatedCrmRoute: typeof AuthenticatedCrmRoute
   AuthenticatedDeliveriesRoute: typeof AuthenticatedDeliveriesRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
@@ -1433,6 +1514,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedStaffEmailRoute: typeof AuthenticatedStaffEmailRoute
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
   AuthenticatedToolsRoute: typeof AuthenticatedToolsRoute
+  AuthenticatedUpdatesRoute: typeof AuthenticatedUpdatesRoute
   AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
   AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRouteWithChildren
   AuthenticatedVisionStudioRoute: typeof AuthenticatedVisionStudioRoute
@@ -1445,11 +1527,15 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedApprovalsRoute: AuthenticatedApprovalsRoute,
   AuthenticatedBrandVoiceRoute: AuthenticatedBrandVoiceRoute,
   AuthenticatedCalendarRoute: AuthenticatedCalendarRoute,
+  AuthenticatedCampaignsRoute: AuthenticatedCampaignsRoute,
   AuthenticatedCatalogRoute: AuthenticatedCatalogRoute,
   AuthenticatedClientsRoute: AuthenticatedClientsRoute,
+  AuthenticatedCompetitiveIntelligenceRoute:
+    AuthenticatedCompetitiveIntelligenceRoute,
   AuthenticatedContentRoute: AuthenticatedContentRoute,
   AuthenticatedContractReturnRoute: AuthenticatedContractReturnRoute,
   AuthenticatedCreateRoute: AuthenticatedCreateRoute,
+  AuthenticatedCreativeStudioRoute: AuthenticatedCreativeStudioRoute,
   AuthenticatedCrmRoute: AuthenticatedCrmRoute,
   AuthenticatedDeliveriesRoute: AuthenticatedDeliveriesRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
@@ -1468,6 +1554,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedStaffEmailRoute: AuthenticatedStaffEmailRoute,
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
   AuthenticatedToolsRoute: AuthenticatedToolsRoute,
+  AuthenticatedUpdatesRoute: AuthenticatedUpdatesRoute,
   AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
   AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRouteWithChildren,
   AuthenticatedVisionStudioRoute: AuthenticatedVisionStudioRoute,

@@ -1,7 +1,15 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { SocialPlatform } from "@/hooks/use-content";
+import {
+  classifyAnalyticsError,
+  parseAnalyticsPayload,
+  unavailableAnalyticsSource,
+  type AnalyticsSource,
+  type AnalyticsSourceKey,
+} from "@/lib/analytics-transparency";
 
 type ZernioProfileRow = {
   profile_id: string;
@@ -11,81 +19,193 @@ type ZernioProfileRow = {
   last_error: string | null;
 };
 
-const METRIC_KEYS = [
-  "followers",
-  "impressions",
-  "reach",
-  "likes",
-  "comments",
-  "shares",
-  "saves",
-  "clicks",
-  "views",
-  "storyViews",
-] as const;
+const workspaceAnalyticsInput = z.object({
+  workspaceId: z.string().uuid(),
+  days: z.union([z.literal(7), z.literal(30), z.literal(90)]).default(30),
+});
 
-function sumMetrics(payload: Record<string, unknown>) {
-  const totals = Object.fromEntries(METRIC_KEYS.map((key) => [key, 0])) as Record<
-    (typeof METRIC_KEYS)[number],
-    number
-  >;
-  const visit = (value: unknown) => {
-    if (!value || typeof value !== "object") return;
-    if (Array.isArray(value)) return value.forEach(visit);
-    const row = value as Record<string, unknown>;
-    for (const key of METRIC_KEYS) {
-      const candidate = Number(row[key] ?? (key === "storyViews" ? row.story_views : undefined));
-      if (Number.isFinite(candidate) && candidate > 0) totals[key] += candidate;
-    }
-  };
-  visit(payload.analytics ?? payload.overview ?? payload.data ?? payload.posts ?? payload);
-  return totals;
+const workspaceInput = z.object({ workspaceId: z.string().uuid() });
+
+function schemaIsUnavailable(error: { code?: string; message?: string } | null) {
+  return Boolean(
+    error &&
+    (["42P01", "PGRST205"].includes(error.code ?? "") ||
+      /could not find.*social_intelligence|relation.*social_intelligence.*does not exist/i.test(
+        error.message ?? "",
+      )),
+  );
 }
 
 export const getZernioAnalytics = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { workspaceId: string; days?: 7 | 30 | 90 }) => data)
+  .validator((input) => workspaceAnalyticsInput.parse(input))
   .handler(async ({ data, context }) => {
-    const { requireSocialWorkspaceAccess, zernioRequest } = await import("./zernio.server");
-    await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
+    const { requireWorkspaceFeatureAccess, zernioRequest } = await import("./zernio.server");
+    await requireWorkspaceFeatureAccess(
+      context.supabase,
+      context.userId,
+      data.workspaceId,
+      "can_view_analytics_checkup",
+    );
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const profileResult = await supabaseAdmin
       .from("zernio_profiles" as never)
       .select("profile_id")
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
+    if (profileResult.error) throw profileResult.error;
     const profile = profileResult.data as { profile_id: string } | null;
-    if (!profile) return { organic: null, external: null, paid: null, paidAvailable: false };
     const toDate = new Date();
-    const fromDate = new Date(toDate.getTime() - (data.days ?? 30) * 86_400_000);
+    const fromDate = new Date(toDate.getTime() - data.days * 86_400_000);
+    const requestedRangeStart = fromDate.toISOString().slice(0, 10);
+    const requestedRangeEnd = toDate.toISOString().slice(0, 10);
+    if (!profile) {
+      const sources = (["organic", "external", "paid"] as AnalyticsSourceKey[]).map((key) =>
+        unavailableAnalyticsSource({
+          key,
+          availability: "not_synced",
+          requestedRangeStart,
+          requestedRangeEnd,
+          safeMessage: "No publishing-provider profile is connected to this workspace.",
+        }),
+      );
+      return { sources, requestedRangeStart, requestedRangeEnd };
+    }
     const base = new URLSearchParams({
       profileId: profile.profile_id,
-      fromDate: fromDate.toISOString().slice(0, 10),
-      toDate: toDate.toISOString().slice(0, 10),
+      fromDate: requestedRangeStart,
+      toDate: requestedRangeEnd,
     });
-    const [organicPayload, externalPayload] = await Promise.all([
-      zernioRequest<Record<string, unknown>>(`/analytics?${base}&source=late`),
-      zernioRequest<Record<string, unknown>>(`/analytics?${base}&source=external`),
+    const loadSource = async (key: AnalyticsSourceKey, path: string): Promise<AnalyticsSource> => {
+      try {
+        const payload = await zernioRequest<Record<string, unknown>>(path);
+        return parseAnalyticsPayload({
+          key,
+          payload,
+          requestedRangeStart,
+          requestedRangeEnd,
+        });
+      } catch (reason) {
+        const unavailable = classifyAnalyticsError(reason);
+        return unavailableAnalyticsSource({
+          key,
+          ...unavailable,
+          requestedRangeStart,
+          requestedRangeEnd,
+        });
+      }
+    };
+
+    const sources = await Promise.all([
+      loadSource("organic", `/analytics?${base}&source=late`),
+      loadSource("external", `/analytics?${base}&source=external`),
+      loadSource("paid", `/ads?${base}`),
     ]);
-    let paid: ReturnType<typeof sumMetrics> | null = null;
-    try {
-      const adsPayload = await zernioRequest<Record<string, unknown>>(`/ads?${base}`);
-      paid = sumMetrics(adsPayload);
-    } catch (reason) {
-      const error = reason as Error & { status?: number };
-      if (![400, 403, 404].includes(error.status ?? 0)) throw reason;
+    return { sources, requestedRangeStart, requestedRangeEnd };
+  });
+
+export const getSocialIntelligenceProfile = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input) => workspaceInput.parse(input))
+  .handler(async ({ data, context }) => {
+    const { requireWorkspaceFeatureAccess } = await import("./zernio.server");
+    await requireWorkspaceFeatureAccess(
+      context.supabase,
+      context.userId,
+      data.workspaceId,
+      "can_view_analytics_checkup",
+    );
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const profileResult = await supabaseAdmin
+      .from("social_intelligence_profiles" as never)
+      .select(
+        "id,provider,sync_state,analyzed_sources,requested_range_start,requested_range_end,available_range_start,available_range_end,record_count,last_attempt_at,last_success_at,safe_error_code,safe_error_message,updated_at",
+      )
+      .eq("workspace_id", data.workspaceId)
+      .maybeSingle();
+    if (schemaIsUnavailable(profileResult.error)) {
+      return {
+        schemaAvailable: false,
+        profile: null,
+        snapshots: [],
+        safeMessage: "Historical social intelligence is not available in this environment yet.",
+      };
+    }
+    if (profileResult.error) throw profileResult.error;
+    const profile = profileResult.data as {
+      id: string;
+      provider: string;
+      sync_state: string;
+      analyzed_sources: string[];
+      requested_range_start: string | null;
+      requested_range_end: string | null;
+      available_range_start: string | null;
+      available_range_end: string | null;
+      record_count: number;
+      last_attempt_at: string | null;
+      last_success_at: string | null;
+      safe_error_code: string | null;
+      safe_error_message: string | null;
+      updated_at: string;
+    } | null;
+    if (!profile) {
+      return {
+        schemaAvailable: true,
+        profile: null,
+        snapshots: [],
+        safeMessage: "No historical social intelligence sync has been recorded for this workspace.",
+      };
+    }
+    const snapshotResult = await supabaseAdmin
+      .from("social_intelligence_snapshots" as never)
+      .select(
+        "id,metric_key,provider,availability,value,unit,range_start,range_end,record_count,captured_at,source_reference,calculation_version",
+      )
+      .eq("workspace_id", data.workspaceId)
+      .eq("profile_id", profile.id)
+      .order("captured_at", { ascending: false })
+      .limit(100);
+    if (schemaIsUnavailable(snapshotResult.error)) {
+      return {
+        schemaAvailable: false,
+        profile: null,
+        snapshots: [],
+        safeMessage: "Historical social intelligence is not available in this environment yet.",
+      };
+    }
+    if (snapshotResult.error) throw snapshotResult.error;
+    type Snapshot = {
+      id: string;
+      metric_key: string;
+      provider: string;
+      availability: string;
+      value: number | string | null;
+      unit: string | null;
+      range_start: string | null;
+      range_end: string | null;
+      record_count: number;
+      captured_at: string;
+      source_reference: string | null;
+      calculation_version: string | null;
+    };
+    const latest = new Map<string, Snapshot>();
+    for (const row of (snapshotResult.data ?? []) as Snapshot[]) {
+      if (!latest.has(row.metric_key)) latest.set(row.metric_key, row);
     }
     return {
-      organic: sumMetrics(organicPayload),
-      external: sumMetrics(externalPayload),
-      paid,
-      paidAvailable: Boolean(paid),
+      schemaAvailable: true,
+      profile,
+      snapshots: [...latest.values()].map((row) => ({
+        ...row,
+        value: row.value === null ? null : Number(row.value),
+      })),
+      safeMessage: profile.safe_error_message,
     };
   });
 
 export const getZernioCommentInbox = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { workspaceId: string }) => data)
+  .validator((input) => workspaceInput.parse(input))
   .handler(async ({ data, context }) => {
     const { requireSocialWorkspaceAccess, zernioRequest } = await import("./zernio.server");
     await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
@@ -130,21 +250,20 @@ export const getZernioCommentInbox = createServerFn({ method: "POST" })
 
 export const replyToZernioComment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator(
-    (data: {
-      workspaceId: string;
-      postId: string;
-      commentId: string;
-      accountId: string;
-      message: string;
-    }) => data,
+  .validator((input) =>
+    z
+      .object({
+        workspaceId: z.string().uuid(),
+        postId: z.string().trim().min(1).max(512),
+        commentId: z.string().trim().min(1).max(512),
+        accountId: z.string().trim().min(1).max(512),
+        message: z.string().trim().min(1).max(2_000),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
-    const { requireSocialWorkspaceAccess, zernioRequest } = await import("./zernio.server");
-    await requireSocialWorkspaceAccess(context.supabase, context.userId, data.workspaceId);
-    if (!data.message.trim()) throw new Error("Reply cannot be empty.");
-    if (!data.accountId || !data.postId || !data.commentId)
-      throw new Error("Missing reply target.");
+    const { requireSocialWorkspaceWriter, zernioRequest } = await import("./zernio.server");
+    await requireSocialWorkspaceWriter(context.supabase, context.userId, data.workspaceId);
     // The replying social account must belong to this workspace.
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: owned } = await supabaseAdmin
@@ -162,7 +281,7 @@ export const replyToZernioComment = createServerFn({ method: "POST" })
       body: JSON.stringify({
         accountId: data.accountId,
         commentId: data.commentId,
-        message: data.message.trim(),
+        message: data.message,
       }),
     });
     return { replied: true };
