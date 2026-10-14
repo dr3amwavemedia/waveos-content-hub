@@ -249,15 +249,15 @@ function AuthPage() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
+    <div className="relative flex min-h-screen items-center justify-center px-3 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] sm:px-4 sm:py-12">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,color-mix(in_oklab,var(--color-primary)_18%,transparent),transparent_70%)]" />
       <div className="relative w-full max-w-md">
         <div className="mb-8 flex justify-center">
-          <Link to="/">
+          <Link to="/" className="inline-flex min-h-11 items-center" aria-label="WaveOS home">
             <WaveLogo />
           </Link>
         </div>
-        <div className="surface-card p-8">
+        <div className="surface-card p-5 sm:p-8">
           <div className="mb-6 text-center">
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
               {mode === "signin"
@@ -280,7 +280,7 @@ function AuthPage() {
                 type="button"
                 onClick={handleGoogle}
                 disabled={busy || !hydrated}
-                className="mb-4 flex w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-elevated disabled:opacity-60"
+                className="mb-4 flex min-h-11 w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-elevated disabled:opacity-60"
               >
                 <GoogleIcon /> Continue with Google
               </button>
@@ -303,16 +303,17 @@ function AuthPage() {
           >
             {mode === "signup" && (
               <fieldset className="space-y-2">
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <legend className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Choose your subscription
                   </legend>
-                  <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-foreground">
+                  <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
                     Monthly
                     <button
                       type="button"
                       role="switch"
                       aria-checked={annualBilling}
+                      aria-label="Use annual billing"
                       onClick={() => {
                         const nextAnnual = !annualBilling;
                         setAnnualBilling(nextAnnual);
@@ -326,7 +327,7 @@ function AuthPage() {
                       />
                     </button>
                     Annual
-                  </label>
+                  </div>
                 </div>
                 {(
                   [
@@ -375,9 +376,9 @@ function AuthPage() {
                       key={plan}
                       onClick={() => setSignupPlan(value)}
                       aria-pressed={selected}
-                      className={`w-full rounded-xl border px-3 py-3 text-left text-sm transition-all duration-200 active:scale-[0.98] ${selected ? "-translate-y-0.5 border-primary bg-primary/10 shadow-lg shadow-primary/10" : "border-border bg-surface/50 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-elevated"}`}
+                      className={`min-h-12 w-full rounded-xl border px-3 py-3 text-left text-sm transition-all duration-200 active:scale-[0.98] ${selected ? "-translate-y-0.5 border-primary bg-primary/10 shadow-lg shadow-primary/10" : "border-border bg-surface/50 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-elevated"}`}
                     >
-                      <span className="flex items-center justify-between gap-3">
+                      <span className="flex flex-col items-start gap-2 min-[380px]:flex-row min-[380px]:justify-between min-[380px]:gap-3">
                         <span className="flex items-center gap-2">
                           <span
                             aria-hidden="true"
@@ -413,7 +414,7 @@ function AuthPage() {
               </fieldset>
             )}
             {mode === "signup" && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-muted-foreground">
                     First name
@@ -423,7 +424,7 @@ function AuthPage() {
                     required
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+                    className="min-h-11 w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
                     placeholder="First"
                   />
                 </div>
@@ -436,7 +437,7 @@ function AuthPage() {
                     required
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                    className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+                    className="min-h-11 w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
                     placeholder="Last"
                   />
                 </div>
@@ -452,7 +453,7 @@ function AuthPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+                className="min-h-11 w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
                 placeholder="you@company.com"
               />
             </div>
@@ -465,7 +466,7 @@ function AuthPage() {
                   autoComplete="off"
                   value={promoCode}
                   onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
-                  className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 font-mono text-sm uppercase tracking-wider text-foreground placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+                  className="min-h-11 w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 font-mono text-sm uppercase tracking-wider text-foreground placeholder:font-sans placeholder:normal-case placeholder:tracking-normal placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
                   placeholder="Enter a promo code"
                   maxLength={24}
                 />
@@ -479,7 +480,7 @@ function AuthPage() {
                     hidden={mode !== "signin"}
                     type="button"
                     onClick={() => setMode("reset")}
-                    className="text-xs text-primary hover:text-primary-glow"
+                    className="min-h-11 px-1 text-xs text-primary hover:text-primary-glow"
                   >
                     Forgot?
                   </button>
@@ -490,7 +491,7 @@ function AuthPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
+                  className="min-h-11 w-full rounded-lg border border-input bg-surface/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-2 focus:ring-ring/40"
                   placeholder={mode === "signup" ? "At least 8 characters" : "••••••••"}
                   minLength={mode === "signup" ? 8 : undefined}
                 />
@@ -499,7 +500,7 @@ function AuthPage() {
             <button
               type="submit"
               disabled={busy || !hydrated}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110 disabled:opacity-60"
+              className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110 disabled:opacity-60"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {mode === "signin"
@@ -515,7 +516,7 @@ function AuthPage() {
                   setMode("signin");
                   setSignupSent(false);
                 }}
-                className="w-full text-center text-xs text-muted-foreground hover:text-foreground"
+                className="min-h-11 w-full text-center text-xs text-muted-foreground hover:text-foreground"
               >
                 {mode === "signup" ? "Already have an account? Sign in" : "← Back to sign in"}
               </button>

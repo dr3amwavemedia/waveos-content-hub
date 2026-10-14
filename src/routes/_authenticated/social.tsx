@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 
 import { RequireFeature } from "@/components/app/require-feature";
+import { AnalyticsCheckup } from "@/components/social/analytics-checkup";
 import { PublishResults, type PublishAttempt } from "@/components/social/publish-results";
 import { usePublishAttempts } from "@/hooks/use-content";
 import { useWorkspace } from "@/components/app/workspace-context";
@@ -57,7 +58,6 @@ import {
   createZernioConnectUrl,
   disconnectZernioAccount,
   ensureZernioProfile,
-  getZernioAnalytics,
   getZernioCommentInbox,
   getZernioWorkspaceStatus,
   replyToZernioComment,
@@ -384,7 +384,6 @@ function SocialWorkspace() {
       {activeView === "overview" && (
         <>
           <PostingGoalCard workspaceId={workspaceId!} items={items} />
-          <AchievementHighlight workspaceId={workspaceId!} />
           <OverviewView
             items={items}
             upcoming={upcoming}
@@ -516,48 +515,6 @@ function PostingGoalCard({ workspaceId, items }: { workspaceId: string; items: C
           </button>
         </form>
       )}
-    </section>
-  );
-}
-
-function AchievementHighlight({ workspaceId }: { workspaceId: string }) {
-  const analyticsFn = useServerFn(getZernioAnalytics);
-  const analytics = useQuery({
-    queryKey: ["zernio-achievement", workspaceId, 30],
-    queryFn: () => analyticsFn({ data: { workspaceId, days: 30 } }),
-    retry: false,
-  });
-  const combined = analytics.data
-    ? {
-        reach:
-          (analytics.data.organic?.reach ?? 0) +
-          (analytics.data.external?.reach ?? 0) +
-          (analytics.data.paid?.reach ?? 0),
-        impressions:
-          (analytics.data.organic?.impressions ?? 0) +
-          (analytics.data.external?.impressions ?? 0) +
-          (analytics.data.paid?.impressions ?? 0),
-        likes:
-          (analytics.data.organic?.likes ?? 0) +
-          (analytics.data.external?.likes ?? 0) +
-          (analytics.data.paid?.likes ?? 0),
-      }
-    : null;
-  const highlight = combined
-    ? (["reach", "impressions", "likes"] as const)
-        .map((key) => [key, combined[key]] as const)
-        .find(([, value]) => value > 0)
-    : null;
-  if (!highlight) return null;
-  return (
-    <section className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-100">
-      <p className="font-semibold">
-        <Sparkles className="mr-2 inline h-4 w-4" /> Your combined {highlight[0]} reached{" "}
-        {highlight[1].toLocaleString()} in the last 30 days. Great work—keep it going!
-      </p>
-      <p className="mt-1 text-xs text-emerald-100/75">
-        Open Posts & insights to separate Organic, Paid and Combined results.
-      </p>
     </section>
   );
 }
@@ -883,8 +840,6 @@ function CompactStat({ label, value, tone }: { label: string; value: number; ton
   );
 }
 
-type AnalyticsMode = "combined" | "organic" | "paid";
-
 function AnalyticsAndComments({
   workspaceId,
   published,
@@ -894,35 +849,15 @@ function AnalyticsAndComments({
   published: number;
   connectedCount: number;
 }) {
-  const analyticsFn = useServerFn(getZernioAnalytics);
   const commentsFn = useServerFn(getZernioCommentInbox);
   const replyFn = useServerFn(replyToZernioComment);
   const assistFn = useServerFn(waveAssist);
-  const [mode, setMode] = useState<AnalyticsMode>("combined");
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const analytics = useQuery({
-    queryKey: ["zernio-analytics", workspaceId, 30],
-    queryFn: () => analyticsFn({ data: { workspaceId, days: 30 } }),
-    retry: false,
-  });
   const comments = useQuery({
     queryKey: ["zernio-comment-inbox", workspaceId],
     queryFn: () => commentsFn({ data: { workspaceId } }),
     retry: false,
   });
-  const metric = (key: "impressions" | "reach" | "likes" | "comments" | "clicks" | "views") => {
-    const organic = (analytics.data?.organic?.[key] ?? 0) + (analytics.data?.external?.[key] ?? 0);
-    const paid = analytics.data?.paid?.[key] ?? 0;
-    return mode === "organic" ? organic : mode === "paid" ? paid : organic + paid;
-  };
-  const positive = [
-    ["reach", metric("reach")],
-    ["impressions", metric("impressions")],
-    ["likes", metric("likes")],
-    ["comments", metric("comments")],
-    ["clicks", metric("clicks")],
-  ].find(([, value]) => Number(value) > 0);
-
   const draftReply = async (comment: { id: string; platform: string; text: string }) => {
     try {
       const result = await assistFn({
@@ -941,86 +876,11 @@ function AnalyticsAndComments({
 
   return (
     <>
-      <section className="rounded-2xl border border-border bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_8%,var(--surface)),var(--surface))] p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 text-primary">
-              <BarChart3 className="h-5 w-5" />
-              <p className="text-xs font-semibold uppercase tracking-[0.18em]">
-                Verified analytics
-              </p>
-            </div>
-            <h2 className="mt-2 text-xl font-semibold text-foreground">
-              Organic, paid and combined progress
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Last 30 days. WaveOS never substitutes placeholder numbers for provider results.
-            </p>
-          </div>
-          <div className="flex rounded-xl border border-border bg-background/50 p-1">
-            {(["combined", "organic", "paid"] as AnalyticsMode[]).map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setMode(value)}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-xs font-semibold capitalize",
-                  mode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground",
-                )}
-              >
-                {value}
-              </button>
-            ))}
-          </div>
-        </div>
-        {mode === "paid" && !analytics.data?.paidAvailable && (
-          <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-xs text-amber-200">
-            Paid metrics will appear after an eligible ads connection is available. Organic data
-            remains separate.
-          </p>
-        )}
-        {positive && (
-          <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">
-            <Sparkles className="mr-2 inline h-4 w-4" />
-            Great work—your {String(positive[0])} reached {Number(positive[1]).toLocaleString()} in
-            this view. Keep the momentum going.
-          </div>
-        )}
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <InsightStat label="Published posts" value={String(published)} />
-          <InsightStat label="Connected channels" value={String(connectedCount)} />
-          <InsightStat
-            label="Impressions"
-            value={analytics.isPending ? "…" : metric("impressions").toLocaleString()}
-          />
-          <InsightStat
-            label="Engagements"
-            value={
-              analytics.isPending ? "…" : (metric("likes") + metric("comments")).toLocaleString()
-            }
-          />
-          <InsightStat
-            label="Likes"
-            value={analytics.isPending ? "…" : metric("likes").toLocaleString()}
-          />
-          <InsightStat
-            label="Reach"
-            value={analytics.isPending ? "…" : metric("reach").toLocaleString()}
-          />
-          <InsightStat
-            label="Views"
-            value={analytics.isPending ? "…" : metric("views").toLocaleString()}
-          />
-          <InsightStat
-            label="Comments"
-            value={analytics.isPending ? "…" : metric("comments").toLocaleString()}
-          />
-          <InsightStat
-            label="Clicks"
-            value={analytics.isPending ? "…" : metric("clicks").toLocaleString()}
-          />
-        </div>
-      </section>
+      <AnalyticsCheckup
+        workspaceId={workspaceId}
+        publishedPosts={{ value: published, state: "available" }}
+        connectedChannels={{ value: connectedCount, state: "available" }}
+      />
 
       <section className="rounded-2xl border border-border bg-surface/55 p-5">
         <div>
@@ -1095,24 +955,6 @@ function AnalyticsAndComments({
         </div>
       </section>
     </>
-  );
-}
-
-function InsightStat({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
-  return (
-    <div className="rounded-xl border border-border bg-background/45 p-3">
-      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "mt-1 text-2xl font-semibold",
-          muted ? "text-muted-foreground" : "text-foreground",
-        )}
-      >
-        {value}
-      </p>
-    </div>
   );
 }
 

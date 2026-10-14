@@ -22,9 +22,7 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-          WaveOS
-        </p>
+        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">WaveOS</p>
         <h1 className="mt-4 text-7xl font-bold text-foreground">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-foreground">Page not found</h2>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -85,12 +83,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "WaveOS" },
       {
         name: "description",
-        content:
-          "DWM",
+        content: "Create, plan, publish, and understand brand content in one workspace.",
       },
       { name: "author", content: "Dream Wave Media" },
       { name: "theme-color", content: "#075B7E" },
@@ -101,15 +98,25 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:title", content: "WaveOS" },
       {
         property: "og:description",
-        content:
-          "DWM",
+        content: "Create, plan, publish, and understand brand content in one workspace.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:title", content: "WaveOS" },
-      { name: "twitter:description", content: "DWM" },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d2459a2-580c-4295-ac1f-0ad8e3709d7f/id-preview-f652ad5c--5e51f033-dba6-4b7a-acb2-008cdd739997.lovable.app-1784095202192.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d2459a2-580c-4295-ac1f-0ad8e3709d7f/id-preview-f652ad5c--5e51f033-dba6-4b7a-acb2-008cdd739997.lovable.app-1784095202192.png" },
+      {
+        name: "twitter:description",
+        content: "Create, plan, publish, and understand brand content in one workspace.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d2459a2-580c-4295-ac1f-0ad8e3709d7f/id-preview-f652ad5c--5e51f033-dba6-4b7a-acb2-008cdd739997.lovable.app-1784095202192.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/6d2459a2-580c-4295-ac1f-0ad8e3709d7f/id-preview-f652ad5c--5e51f033-dba6-4b7a-acb2-008cdd739997.lovable.app-1784095202192.png",
+      },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
@@ -215,13 +222,20 @@ function RootComponent() {
               : "desktop";
           // The database derives user, email, session, and timestamp from the
           // signed JWT. A unique session constraint makes refreshes harmless.
-          void (supabase as unknown as {
-            from: (table: string) => {
-              insert: (values: { device_category: string }) => Promise<{ error: { code?: string } | null }>;
-            };
-          }).from("user_login_events").insert({ device_category }).then(({ error }) => {
-            if (error && error.code !== "23505") console.warn("Login activity was not recorded");
-          });
+          void (
+            supabase as unknown as {
+              from: (table: string) => {
+                insert: (values: {
+                  device_category: string;
+                }) => Promise<{ error: { code?: string } | null }>;
+              };
+            }
+          )
+            .from("user_login_events")
+            .insert({ device_category })
+            .then(({ error }) => {
+              if (error && error.code !== "23505") console.warn("Login activity was not recorded");
+            });
         }
         router.invalidate();
         if (event === "SIGNED_OUT") queryClient.clear();

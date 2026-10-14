@@ -34,10 +34,47 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
     throw new Error("Item must be approved before publishing.");
   }
 
+  // This function runs with service-role credentials for both interactive and
+  // cron publishing. Re-check the workspace entitlements here so neither path
+  // can bypass a lapsed subscription or a plan boundary.
+  const isScheduledPublish = item.status === "scheduled" || item.scheduled_at !== null;
+  const requiredFeatures = [
+    {
+      key: "can_publish_content",
+      message: "Publishing is not included for this workspace.",
+    },
+    ...(isScheduledPublish
+      ? [
+          {
+            key: "can_schedule_content",
+            message: "Scheduling is not included for this workspace.",
+          },
+        ]
+      : []),
+  ];
+  for (const feature of requiredFeatures) {
+    const { data: included, error: featureError } = await supabaseAdmin.rpc("has_feature", {
+      _workspace_id: item.workspace_id,
+      _feature: feature.key,
+    });
+    if (featureError) throw featureError;
+    if (included !== true) throw new Error(feature.message);
+  }
+  if (item.status === "scheduled" && !item.scheduled_at) {
+    throw new Error("Scheduled content is missing its publish time.");
+  }
+  if (item.scheduled_at) {
+    const publishAt = Date.parse(item.scheduled_at);
+    if (!Number.isFinite(publishAt) || publishAt > Date.now()) {
+      throw new Error("Scheduled content is not due yet.");
+    }
+  }
+
   const { data: variants, error: variantsError } = await supabaseAdmin
     .from("post_variants")
     .select("*")
     .eq("content_item_id", contentId)
+    .eq("workspace_id", item.workspace_id)
     .eq("enabled", true);
   if (variantsError) throw variantsError;
   if (!variants?.length) throw new Error("No platforms selected.");
@@ -56,10 +93,11 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
     throw new Error("This client workspace does not have a connected Zernio profile.");
   }
 
-  const { data: subprofiles } = await supabaseAdmin
+  const { data: subprofiles, error: subprofilesError } = await supabaseAdmin
     .from("zernio_workspace_subprofiles" as never)
     .select("profile_id")
     .eq("workspace_id", item.workspace_id);
+  if (subprofilesError) throw subprofilesError;
   const profileIds = [
     profile.profile_id,
     ...((subprofiles ?? []) as Array<{ profile_id: string }>).map((row) => row.profile_id),
@@ -82,14 +120,16 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
     .select("platform,provider_account_id,connected,connection_state")
     .eq("workspace_id", item.workspace_id)
     .eq("provider", "zernio")
-    .eq("connected", true);
+    .eq("connected", true)
+    .eq("connection_state", "connected");
   if (connectionsError) throw connectionsError;
-  const { data: rawLimit } = await supabaseAdmin.rpc(
+  const { data: rawLimit, error: limitError } = await supabaseAdmin.rpc(
     "social_account_limit" as never,
     {
       _workspace_id: item.workspace_id,
     } as never,
   );
+  if (limitError) throw limitError;
   const accountLimit = Number(rawLimit ?? 0);
   if ((connections?.length ?? 0) > accountLimit) {
     throw new Error(
@@ -136,12 +176,11 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
     type: assets[index]?.mime_type.startsWith("video/") ? "video" : "image",
   }));
 
-  await supabaseAdmin.from("content_items").update({ status: "publishing" }).eq("id", contentId);
-  let success = 0;
-  let failed = 0;
-  let pending = 0;
-
-  for (const variant of variants) {
+  // Build and validate every provider request before claiming the content item.
+  // A bad destination must not leave an otherwise editable post stuck in the
+  // publishing state, and no platform should publish before all destinations
+  // have passed the same preflight.
+  const preparedVariants = variants.map((variant) => {
     const platformConnections = accountsByPlatform.get(variant.platform) ?? [];
     const idempotencyKey = `${contentId}:${variant.platform}`;
     const platformOptions =
@@ -171,111 +210,164 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
         `One or more selected ${variant.platform} accounts are no longer connected. Review the post destinations and try again.`,
       );
     }
+    if (selectedConnections.length === 0) {
+      throw new Error(
+        `Connect ${variant.platform} to this client's Zernio profile before publishing.`,
+      );
+    }
     if (contentType && !["instagram", "facebook"].includes(variant.platform)) {
       throw new Error(`${variant.platform} does not support Story publishing through Zernio.`);
     }
     if (contentType && mediaItems.length !== 1) {
       throw new Error(`${variant.platform} Stories require exactly one media item.`);
     }
+    const providerPlatform = toZernioPlatform(variant.platform);
     const requestBody = {
       content: variant.caption || item.primary_caption || "",
       ...(mediaItems.length ? { mediaItems } : {}),
       platforms: [
         ...selectedConnections.map((connection) => ({
-          platform: toZernioPlatform(variant.platform),
+          platform: providerPlatform,
           accountId: connection.provider_account_id,
           ...(contentType ? { platformSpecificData: { contentType } } : {}),
         })),
       ],
       publishNow: true,
     };
+    return { idempotencyKey, providerPlatform, requestBody, variant };
+  });
 
-    const { data: existing } = await supabaseAdmin
-      .from("publish_attempts")
-      .select("id,status")
-      .eq("idempotency_key", idempotencyKey)
-      .eq("platform", variant.platform)
-      .maybeSingle();
-    if (existing?.status === "success") {
-      success += 1;
-      continue;
+  const { data: claimed, error: claimError } = await supabaseAdmin
+    .from("content_items")
+    .update({ status: "publishing" })
+    .eq("id", contentId)
+    .eq("workspace_id", item.workspace_id)
+    .eq("status", item.status)
+    .select("id")
+    .maybeSingle();
+  if (claimError) throw claimError;
+  if (!claimed) throw new Error("This content item is already being published or was changed.");
+
+  let success = 0;
+  let failed = 0;
+  let pending = 0;
+
+  try {
+    for (const { idempotencyKey, providerPlatform, requestBody, variant } of preparedVariants) {
+      const { data: existing, error: existingError } = await supabaseAdmin
+        .from("publish_attempts")
+        .select("id,status")
+        .eq("idempotency_key", idempotencyKey)
+        .eq("platform", variant.platform)
+        .eq("content_item_id", contentId)
+        .eq("workspace_id", item.workspace_id)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      if (existing?.status === "success") {
+        success += 1;
+        continue;
+      }
+
+      const { data: attempt, error: attemptError } = await supabaseAdmin
+        .from("publish_attempts")
+        .upsert(
+          {
+            content_item_id: contentId,
+            workspace_id: item.workspace_id,
+            platform: variant.platform,
+            provider: "zernio",
+            status: "sending",
+            idempotency_key: idempotencyKey,
+            request_snapshot: requestBody as unknown as Json,
+            attempted_at: new Date().toISOString(),
+            error_code: null,
+            error_message: null,
+            completed_at: null,
+          },
+          { onConflict: "idempotency_key,platform" },
+        )
+        .select("id")
+        .single();
+      if (attemptError) throw attemptError;
+
+      try {
+        const response = await zernioRequest<{ post?: ZernioPost }>("/posts", {
+          method: "POST",
+          headers: { "Idempotency-Key": idempotencyKey },
+          body: JSON.stringify(requestBody),
+        });
+        const result = zernioPostResult(response.post, providerPlatform);
+        const { error: attemptUpdateError } = await supabaseAdmin
+          .from("publish_attempts")
+          .update({
+            status: result.status,
+            provider: "zernio",
+            provider_post_id: result.postId,
+            response_snapshot: response as unknown as Json,
+            post_url: result.postUrl,
+            error_code: result.errorCode,
+            error_message: result.errorMessage,
+            completed_at: result.status === "sending" ? null : new Date().toISOString(),
+          })
+          .eq("id", attempt.id)
+          .eq("workspace_id", item.workspace_id)
+          .eq("content_item_id", contentId);
+        if (attemptUpdateError) throw attemptUpdateError;
+        if (result.status === "success") success += 1;
+        else if (result.status === "sending") pending += 1;
+        else failed += 1;
+      } catch (reason) {
+        const providerError = reason as Error & { code?: string; details?: unknown };
+        const { error: failureWriteError } = await supabaseAdmin
+          .from("publish_attempts")
+          .update({
+            status: "failed",
+            error_code: providerError.code ?? "zernio_request_failed",
+            error_message: providerError.message,
+            response_snapshot: (providerError.details ?? {}) as Json,
+            completed_at: new Date().toISOString(),
+          })
+          .eq("id", attempt.id)
+          .eq("workspace_id", item.workspace_id)
+          .eq("content_item_id", contentId);
+        if (failureWriteError) throw failureWriteError;
+        failed += 1;
+      }
     }
 
-    const { data: attempt, error: attemptError } = await supabaseAdmin
-      .from("publish_attempts")
-      .upsert(
-        {
-          content_item_id: contentId,
-          workspace_id: item.workspace_id,
-          platform: variant.platform,
-          provider: "zernio",
-          status: selectedConnections.length ? "sending" : "failed",
-          idempotency_key: idempotencyKey,
-          request_snapshot: requestBody as unknown as Json,
-          attempted_at: new Date().toISOString(),
-          error_code: selectedConnections.length ? null : "account_not_connected",
-          error_message: selectedConnections.length
-            ? null
-            : `Connect ${variant.platform} to this client's Zernio profile before publishing.`,
-          completed_at: selectedConnections.length ? null : new Date().toISOString(),
-        },
-        { onConflict: "idempotency_key,platform" },
-      )
+    const nextStatus = failed > 0 ? "failed" : pending > 0 ? "publishing" : "published";
+    const { data: finalized, error: finalizeError } = await supabaseAdmin
+      .from("content_items")
+      .update({
+        status: nextStatus,
+        published_at: success > 0 ? new Date().toISOString() : null,
+      })
+      .eq("id", contentId)
+      .eq("workspace_id", item.workspace_id)
+      .eq("status", "publishing")
       .select("id")
-      .single();
-    if (attemptError) throw attemptError;
-    if (!selectedConnections.length) {
-      failed += 1;
-      continue;
-    }
-
-    try {
-      const response = await zernioRequest<{ post?: ZernioPost }>("/posts", {
-        method: "POST",
-        headers: { "Idempotency-Key": idempotencyKey },
-        body: JSON.stringify(requestBody),
+      .maybeSingle();
+    if (finalizeError) throw finalizeError;
+    if (!finalized) throw new Error("Publishing state changed before completion.");
+  } catch (reason) {
+    // A database or orchestration failure after the atomic claim must never
+    // strand the item in `publishing`. Provider requests are idempotent, so a
+    // failed item can be safely reviewed and retried.
+    const { error: recoveryError } = await supabaseAdmin
+      .from("content_items")
+      .update({ status: "failed" })
+      .eq("id", contentId)
+      .eq("workspace_id", item.workspace_id)
+      .eq("status", "publishing");
+    if (recoveryError) {
+      console.error("Failed to recover content publishing state", {
+        contentId,
+        message: recoveryError.message,
       });
-      const result = zernioPostResult(response.post, toZernioPlatform(variant.platform));
-      await supabaseAdmin
-        .from("publish_attempts")
-        .update({
-          status: result.status,
-          provider: "zernio",
-          provider_post_id: result.postId,
-          response_snapshot: response as unknown as Json,
-          post_url: result.postUrl,
-          error_code: result.errorCode,
-          error_message: result.errorMessage,
-          completed_at: result.status === "sending" ? null : new Date().toISOString(),
-        })
-        .eq("id", attempt.id);
-      if (result.status === "success") success += 1;
-      else if (result.status === "sending") pending += 1;
-      else failed += 1;
-    } catch (reason) {
-      const providerError = reason as Error & { code?: string; details?: unknown };
-      await supabaseAdmin
-        .from("publish_attempts")
-        .update({
-          status: "failed",
-          error_code: providerError.code ?? "zernio_request_failed",
-          error_message: providerError.message,
-          response_snapshot: (providerError.details ?? {}) as Json,
-          completed_at: new Date().toISOString(),
-        })
-        .eq("id", attempt.id);
-      failed += 1;
     }
+    throw reason;
   }
 
-  const nextStatus = failed > 0 ? "failed" : pending > 0 ? "publishing" : "published";
-  await supabaseAdmin
-    .from("content_items")
-    .update({
-      status: nextStatus,
-      published_at: success > 0 ? new Date().toISOString() : null,
-    })
-    .eq("id", contentId);
   await supabaseAdmin.from("activity_logs").insert({
     workspace_id: item.workspace_id,
     actor_user_id: actorUserId ?? null,

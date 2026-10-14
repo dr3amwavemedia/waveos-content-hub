@@ -28,8 +28,8 @@ export const publishContentItem = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw error;
     if (!item) throw new Error("Post not found.");
-    const { requireSocialWorkspaceAccess } = await import("./zernio.server");
-    await requireSocialWorkspaceAccess(context.supabase, context.userId, item.workspace_id);
+    const { requireSocialWorkspaceWriter } = await import("./zernio.server");
+    await requireSocialWorkspaceWriter(context.supabase, context.userId, item.workspace_id);
     const { publishContentItemWithZernio } = await import("./zernio-publish.server");
     return publishContentItemWithZernio(data.contentId, context.userId);
   });

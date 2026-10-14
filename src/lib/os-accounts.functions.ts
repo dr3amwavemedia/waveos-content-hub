@@ -266,7 +266,7 @@ export const listOsAccounts = createServerFn({ method: "POST" })
       ? await admin
           .from("workspace_social_subscriptions" as never)
           .select(
-            "workspace_id,plan,status,billing_interval,account_limit,trial_started_at,trial_ends_at,current_period_end,cancel_at_period_end",
+            "workspace_id,plan,status,internal_test_access,billing_interval,account_limit,trial_started_at,trial_ends_at,current_period_end,cancel_at_period_end",
           )
           .in("workspace_id", workspaceIds)
       : { data: [] };
@@ -274,6 +274,7 @@ export const listOsAccounts = createServerFn({ method: "POST" })
       workspace_id: string;
       plan: string;
       status: string;
+      internal_test_access: boolean;
       billing_interval: string | null;
       account_limit: number;
       trial_started_at: string | null;
@@ -351,6 +352,7 @@ export const listOsAccounts = createServerFn({ method: "POST" })
           lastSignInAt: user?.last_sign_in_at ?? null,
           plan: subscription?.plan ?? null,
           planStatus: subscription?.status ?? null,
+          internalTestAccess: subscription?.internal_test_access ?? false,
           billingInterval: subscription?.billing_interval ?? null,
           accountLimit: subscription?.account_limit ?? 0,
           trialStartedAt: subscription?.trial_started_at ?? null,

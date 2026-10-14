@@ -1,0 +1,527 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  CalendarDays,
+  Check,
+  Clock3,
+  Loader2,
+  Megaphone,
+  Save,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
+import { toast } from "sonner";
+import { RequireFeature } from "@/components/app/require-feature";
+import { UnsavedChangesGuard } from "@/components/app/unsaved-changes-guard";
+import { Button } from "@/components/ui/button";
+import { useWorkspace } from "@/components/app/workspace-context";
+import { useWorkflowDraft } from "@/hooks/use-workflow-draft";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  buildCampaignPlan,
+  CAMPAIGN_GOALS,
+  validateCampaignPlanningInput,
+  type CampaignGoal,
+  type CampaignPlanningInput,
+  type CampaignPlanningItem,
+} from "@/lib/phase-one-planning";
+import { cn } from "@/lib/utils";
+
+export const Route = createFileRoute("/_authenticated/campaigns")({
+  component: () => (
+    <RequireFeature
+      feature="can_use_campaign_manager"
+      title="Campaign Manager isn't included in this plan"
+      description="Internal campaign planning is available with Current, Tidal, Full Retainer, and Social Management access."
+    >
+      <CampaignManagerPage />
+    </RequireFeature>
+  ),
+  head: () => ({
+    meta: [
+      { title: "Campaign Manager — WaveOS" },
+      {
+        name: "description",
+        content: "Build reviewable internal social campaign plans without auto-publishing.",
+      },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
+});
+
+const db = supabase as unknown as {
+  // Phase 1 additive tables can land before regenerated client definitions.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  from: (table: string) => any;
+};
+
+const PLATFORM_OPTIONS = ["instagram", "facebook", "linkedin", "tiktok", "youtube", "x"];
+const DAY_OPTIONS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+function dateOffset(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+const DEFAULT_INPUT: CampaignPlanningInput = {
+  name: "",
+  goal: "awareness",
+  startDate: dateOffset(1),
+  endDate: dateOffset(30),
+  platforms: ["instagram"],
+  maxPosts: 8,
+  postingHours: ["09:00", "15:00"],
+  excludedDays: ["saturday", "sunday"],
+  approvalRequired: true,
+};
+
+interface CampaignPlanRow {
+  id: string;
+  name: string;
+  goal: CampaignGoal;
+  start_date: string;
+  end_date: string;
+  platforms: string[];
+  max_posts: number;
+  status: string;
+  created_at: string;
+}
+
+function CampaignManagerPage() {
+  const { activeWorkspace } = useWorkspace();
+  const workspaceId = activeWorkspace?.id ?? null;
+  const queryClient = useQueryClient();
+  const [input, setInput] = useState<CampaignPlanningInput>(DEFAULT_INPUT);
+  const [preview, setPreview] = useState<CampaignPlanningItem[]>([]);
+  const [dirty, setDirty] = useState(false);
+  const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
+    workspaceId,
+    workflowKey: "campaign-manager",
+  });
+
+  const campaigns = useQuery({
+    queryKey: ["campaign-plans", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("campaign_plans")
+        .select("id,name,goal,start_date,end_date,platforms,max_posts,status,created_at")
+        .eq("workspace_id", workspaceId!)
+        .order("created_at", { ascending: false })
+        .limit(12);
+      if (error) throw error;
+      return (data ?? []) as CampaignPlanRow[];
+    },
+  });
+
+  const errors = useMemo(() => validateCampaignPlanningInput(input), [input]);
+
+  const savePlan = useMutation({
+    mutationFn: async () => {
+      if (!workspaceId) throw new Error("Select a workspace first.");
+      if (errors.length) throw new Error(errors[0]);
+      const plannedItems = preview.length ? preview : buildCampaignPlan(input);
+      if (!plannedItems.length) {
+        throw new Error("No planning slots remain after excluded days and times are applied.");
+      }
+      const { data: auth, error: authError } = await supabase.auth.getUser();
+      if (authError || !auth.user) throw authError ?? new Error("Sign in to save a campaign.");
+      const { data: plan, error: planError } = await db
+        .from("campaign_plans")
+        .insert({
+          workspace_id: workspaceId,
+          created_by: auth.user.id,
+          name: input.name.trim(),
+          goal: input.goal,
+          start_date: input.startDate,
+          end_date: input.endDate,
+          platforms: input.platforms,
+          max_posts: input.maxPosts,
+          posting_hours: input.postingHours,
+          excluded_days: input.excludedDays,
+          approval_required: input.approvalRequired,
+          status: "draft",
+        })
+        .select("id")
+        .single();
+      if (planError) throw planError;
+      const { error: itemsError } = await db.from("campaign_plan_items").insert(
+        plannedItems.map((item) => ({
+          workspace_id: workspaceId,
+          campaign_plan_id: plan.id,
+          position: item.sequence,
+          planned_date: item.plannedDate,
+          planned_time: item.localTime,
+          platform: item.platform,
+          content_pillar: item.pillar,
+          working_title: item.workingTitle,
+          copy_brief: item.copyBrief,
+          approval_required: item.approvalRequired,
+          status: "draft",
+        })),
+      );
+      if (itemsError) {
+        await db.from("campaign_plans").delete().eq("id", plan.id).eq("workspace_id", workspaceId);
+        throw itemsError;
+      }
+      return plan.id as string;
+    },
+    onSuccess: async () => {
+      await workflowDraft.discard.mutateAsync();
+      setDirty(false);
+      setPreview([]);
+      setInput(DEFAULT_INPUT);
+      await queryClient.invalidateQueries({ queryKey: ["campaign-plans", workspaceId] });
+      toast.success("Campaign plan saved for internal review.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Campaign plan could not be saved."),
+  });
+
+  function update<K extends keyof CampaignPlanningInput>(key: K, value: CampaignPlanningInput[K]) {
+    setInput((current) => ({ ...current, [key]: value }));
+    setPreview([]);
+    setDirty(true);
+  }
+
+  function toggleList(key: "platforms" | "excludedDays", value: string) {
+    const values = input[key];
+    update(
+      key,
+      values.includes(value) ? values.filter((item) => item !== value) : [...values, value],
+    );
+  }
+
+  async function saveServerDraft() {
+    try {
+      await workflowDraft.save.mutateAsync(input);
+      setDirty(false);
+      toast.success("Private server draft saved.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Draft could not be saved.");
+    }
+  }
+
+  function generatePlan() {
+    if (errors.length) {
+      toast.error(errors[0]);
+      return;
+    }
+    const next = buildCampaignPlan(input);
+    if (!next.length) {
+      toast.error("No planning slots remain. Change the dates, excluded days, or times.");
+      return;
+    }
+    setPreview(next);
+    setDirty(true);
+  }
+
+  if (!activeWorkspace) return null;
+
+  return (
+    <div className="space-y-6">
+      <UnsavedChangesGuard dirty={dirty} subject="this campaign plan" />
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+            <Megaphone className="h-4 w-4" /> Internal planning
+          </div>
+          <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Campaign Manager</h1>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            Build a reviewable campaign outline from your own constraints. Nothing here schedules,
+            publishes, spends money, or contacts an external platform.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => void saveServerDraft()}
+            disabled={workflowDraft.save.isPending}
+          >
+            {workflowDraft.save.isPending ? <Loader2 className="animate-spin" /> : <Save />}
+            Save draft
+          </Button>
+          <Button onClick={generatePlan} disabled={errors.length > 0}>
+            <Sparkles /> Build plan
+          </Button>
+        </div>
+      </header>
+
+      {workflowDraft.data?.payload && (
+        <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="font-semibold">A private server draft is available</div>
+            <div className="text-xs text-muted-foreground">
+              Last saved {new Date(workflowDraft.data.updated_at).toLocaleString()}.
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setInput(workflowDraft.data!.payload);
+                setPreview([]);
+                setDirty(false);
+              }}
+            >
+              Restore
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => workflowDraft.discard.mutate()}>
+              Discard
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)]">
+        <section className="surface-card space-y-5 p-4 sm:p-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Campaign name">
+              <input
+                className={inputClass}
+                value={input.name}
+                maxLength={120}
+                placeholder="Spring service launch"
+                onChange={(event) => update("name", event.target.value)}
+              />
+            </Field>
+            <Field label="Primary goal">
+              <select
+                className={inputClass}
+                value={input.goal}
+                onChange={(event) => update("goal", event.target.value as CampaignGoal)}
+              >
+                {CAMPAIGN_GOALS.map((goal) => (
+                  <option key={goal} value={goal}>
+                    {goal[0].toUpperCase() + goal.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Start date">
+              <input
+                className={inputClass}
+                type="date"
+                value={input.startDate}
+                onChange={(event) => update("startDate", event.target.value)}
+              />
+            </Field>
+            <Field label="End date">
+              <input
+                className={inputClass}
+                type="date"
+                value={input.endDate}
+                onChange={(event) => update("endDate", event.target.value)}
+              />
+            </Field>
+            <Field label="Maximum posts">
+              <input
+                className={inputClass}
+                type="number"
+                min={1}
+                max={60}
+                value={input.maxPosts}
+                onChange={(event) => update("maxPosts", Number(event.target.value))}
+              />
+            </Field>
+            <Field label="Planning times" hint="Local workspace times, comma separated">
+              <input
+                className={inputClass}
+                value={input.postingHours.join(", ")}
+                placeholder="09:00, 15:00"
+                onChange={(event) =>
+                  update(
+                    "postingHours",
+                    event.target.value
+                      .split(",")
+                      .map((value) => value.trim())
+                      .filter(Boolean),
+                  )
+                }
+              />
+            </Field>
+          </div>
+
+          <ChoiceGroup
+            label="Platforms"
+            values={PLATFORM_OPTIONS}
+            selected={input.platforms}
+            onToggle={(value) => toggleList("platforms", value)}
+          />
+          <ChoiceGroup
+            label="Days to exclude"
+            values={DAY_OPTIONS}
+            selected={input.excludedDays}
+            onToggle={(value) => toggleList("excludedDays", value)}
+          />
+
+          <label className="flex min-h-12 items-center justify-between gap-4 rounded-xl border border-border bg-background/40 px-4 py-3">
+            <span>
+              <span className="block text-sm font-semibold">Approval required</span>
+              <span className="block text-xs text-muted-foreground">
+                Mark every draft item as requiring review before any future scheduling step.
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-primary"
+              checked={input.approvalRequired}
+              onChange={(event) => update("approvalRequired", event.target.checked)}
+            />
+          </label>
+
+          {errors.length > 0 && (
+            <ul className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
+              {errors.map((error) => (
+                <li key={error}>• {error}</li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <aside className="space-y-5">
+          <section className="surface-card p-5">
+            <div className="flex items-center gap-2 font-semibold">
+              <ShieldCheck className="h-4 w-4 text-primary" /> Guardrails
+            </div>
+            <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
+              <li>• Internal plan only; no automatic publishing.</li>
+              <li>• Times are user-selected planning windows, not performance claims.</li>
+              <li>• Approval status is preserved on every generated item.</li>
+              <li>• AI and ad-spend actions are intentionally excluded.</li>
+            </ul>
+          </section>
+
+          <section className="surface-card p-5">
+            <h2 className="font-semibold">Recent plans</h2>
+            <div className="mt-3 space-y-2">
+              {campaigns.isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {(campaigns.data ?? []).map((campaign) => (
+                <div key={campaign.id} className="rounded-lg border border-border p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-sm font-semibold">{campaign.name}</span>
+                    <span className="rounded-full bg-elevated px-2 py-1 text-[10px] uppercase">
+                      {campaign.status}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {campaign.start_date} – {campaign.end_date} · {campaign.max_posts} max
+                  </div>
+                </div>
+              ))}
+              {!campaigns.isLoading && !campaigns.data?.length && (
+                <p className="text-sm text-muted-foreground">No saved plans yet.</p>
+              )}
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      {preview.length > 0 && (
+        <section className="surface-card overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div>
+              <h2 className="font-semibold">Draft plan · {preview.length} items</h2>
+              <p className="text-xs text-muted-foreground">
+                Review every working title before saving.
+              </p>
+            </div>
+            <Button onClick={() => savePlan.mutate()} disabled={savePlan.isPending}>
+              {savePlan.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+              Save for review
+            </Button>
+          </div>
+          <div className="divide-y divide-border">
+            {preview.map((item) => (
+              <article
+                key={`${item.plannedDate}-${item.localTime}-${item.sequence}`}
+                className="grid gap-3 p-4 sm:grid-cols-[6rem_8rem_minmax(0,1fr)] sm:p-5"
+              >
+                <div className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5" /> {item.plannedDate}
+                  </div>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <Clock3 className="h-3.5 w-3.5" /> {item.localTime}
+                  </div>
+                </div>
+                <div>
+                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase text-primary">
+                    {item.platform}
+                  </span>
+                </div>
+                <div>
+                  <div className="text-sm font-semibold">{item.workingTitle}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{item.copyBrief}</div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium">{label}</span>
+      {hint && <span className="ml-2 text-[11px] text-muted-foreground">{hint}</span>}
+      <span className="mt-1.5 block">{children}</span>
+    </label>
+  );
+}
+
+function ChoiceGroup({
+  label,
+  values,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  values: string[];
+  selected: string[];
+  onToggle: (value: string) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="text-sm font-medium">{label}</legend>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {values.map((value) => {
+          const active = selected.includes(value);
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onToggle(value)}
+              className={cn(
+                "min-h-10 rounded-full border px-3 text-xs font-semibold capitalize",
+                active
+                  ? "border-primary/50 bg-primary/15 text-foreground"
+                  : "border-border text-muted-foreground hover:bg-elevated",
+              )}
+            >
+              {active && <Check className="mr-1 inline h-3.5 w-3.5" />}
+              {value}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
+const inputClass =
+  "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";

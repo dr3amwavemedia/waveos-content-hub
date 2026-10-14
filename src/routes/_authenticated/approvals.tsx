@@ -200,14 +200,16 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
   const [comment, setComment] = useState("");
   const role = activeWorkspace?.role;
   const canApprove = Boolean(
-    user?.isStaff || role === "owner" || role === "admin" || role === "approver" || role === "editor",
+    user?.isStaff || role === "owner" || role === "admin" || role === "approver",
   );
-  const metadata = item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
-    ? item.metadata as Record<string, unknown>
-    : {};
-  const approvalRequest = metadata.approval_request && typeof metadata.approval_request === "object"
-    ? metadata.approval_request as Record<string, unknown>
-    : {};
+  const metadata =
+    item.metadata && typeof item.metadata === "object" && !Array.isArray(item.metadata)
+      ? (item.metadata as Record<string, unknown>)
+      : {};
+  const approvalRequest =
+    metadata.approval_request && typeof metadata.approval_request === "object"
+      ? (metadata.approval_request as Record<string, unknown>)
+      : {};
   const requestedAction = approvalRequest.action === "schedule" ? "schedule" : "publish_now";
 
   const captionPreview = useMemo(
@@ -235,7 +237,9 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
       }
       toast.success(
         decision === "approved"
-          ? requestedAction === "schedule" ? "Approved and scheduled" : "Approved"
+          ? requestedAction === "schedule"
+            ? "Approved and scheduled"
+            : "Approved"
           : decision === "changes_requested"
             ? "Changes requested"
             : "Rejected",
@@ -270,7 +274,12 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
         </div>
 
         <div className="rounded-lg border border-primary/25 bg-primary/10 px-4 py-3 text-sm text-foreground">
-          Requested action: <span className="font-semibold">{requestedAction === "schedule" ? `Schedule for ${item.scheduled_at ? new Date(item.scheduled_at).toLocaleString() : "the selected time"}` : "Publish immediately after approval"}</span>
+          Requested action:{" "}
+          <span className="font-semibold">
+            {requestedAction === "schedule"
+              ? `Schedule for ${item.scheduled_at ? new Date(item.scheduled_at).toLocaleString() : "the selected time"}`
+              : "Publish immediately after approval"}
+          </span>
         </div>
 
         <div className="space-y-2">
@@ -286,29 +295,32 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
           />
         </div>
 
-        {canApprove ? <div className="flex flex-wrap gap-2">
-          <button
-            disabled={decide.isPending}
-            onClick={() => act("approved")}
-            className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-950 hover:brightness-110"
-          >
-            <ThumbsUp className="h-4 w-4" /> {requestedAction === "schedule" ? "Approve & schedule" : "Approve & publish"}
-          </button>
-          <button
-            disabled={decide.isPending}
-            onClick={() => act("changes_requested")}
-            className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-amber-950 hover:brightness-110"
-          >
-            <ThumbsDown className="h-4 w-4" /> Request changes
-          </button>
-          <button
-            disabled={decide.isPending}
-            onClick={() => act("rejected")}
-            className="inline-flex items-center gap-2 rounded-full border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/20"
-          >
-            <XCircle className="h-4 w-4" /> Reject
-          </button>
-        </div> : (
+        {canApprove ? (
+          <div className="flex flex-wrap gap-2">
+            <button
+              disabled={decide.isPending}
+              onClick={() => act("approved")}
+              className="inline-flex items-center gap-2 rounded-full bg-emerald-500 px-4 py-2 text-sm font-semibold text-emerald-950 hover:brightness-110"
+            >
+              <ThumbsUp className="h-4 w-4" />{" "}
+              {requestedAction === "schedule" ? "Approve & schedule" : "Approve & publish"}
+            </button>
+            <button
+              disabled={decide.isPending}
+              onClick={() => act("changes_requested")}
+              className="inline-flex items-center gap-2 rounded-full bg-amber-500 px-4 py-2 text-sm font-semibold text-amber-950 hover:brightness-110"
+            >
+              <ThumbsDown className="h-4 w-4" /> Request changes
+            </button>
+            <button
+              disabled={decide.isPending}
+              onClick={() => act("rejected")}
+              className="inline-flex items-center gap-2 rounded-full border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive hover:bg-destructive/20"
+            >
+              <XCircle className="h-4 w-4" /> Reject
+            </button>
+          </div>
+        ) : (
           <p className="rounded-lg border border-border bg-elevated p-3 text-sm text-muted-foreground">
             This post is waiting for a client approver or Dream Wave Media admin.
           </p>
