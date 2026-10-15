@@ -31,6 +31,7 @@ import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
 import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
 import { ProductReleaseProvider, WhatsNewCard } from "@/components/app/product-releases";
 import { formatInTimeZone } from "@/lib/date-time";
+import { MobileCommandCenter } from "@/components/app/mobile-command-center";
 
 export const Route = createFileRoute("/_authenticated/home")({
   component: () => (
@@ -252,6 +253,13 @@ function HomeDashboard() {
           )}
         </div>
       </header>
+
+      <MobileCommandCenter
+        can={can}
+        scheduledCount={stats?.scheduledCount}
+        awaitingCount={stats?.awaitingCount}
+        approvalsTo={isPublicOs ? "/social" : "/approvals"}
+      />
 
       <WhatsNewCard />
 
