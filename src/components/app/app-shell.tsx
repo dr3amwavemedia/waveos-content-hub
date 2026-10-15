@@ -381,7 +381,7 @@ function Shell({ children }: { children: ReactNode }) {
   const showCreateFab =
     !isWeddingClient && !isLayer1 && !isCrew &&
     (isStaff ? can("can_create_content") : !permsLoading && visibility("can_create_content") !== "hidden");
-  const barNav = showCreateFab
+  const barNav: NavItem[] = showCreateFab
     ? mobilePrimaryNav.filter((item) => item.to !== "/create")
     : mobilePrimaryNav;
   // Merge client + staff capabilities without duplicating shared destinations
