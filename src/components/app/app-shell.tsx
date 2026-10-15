@@ -517,10 +517,26 @@ function Shell({ children }: { children: ReactNode }) {
       </main>
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-center justify-around border-t border-border bg-surface/95 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur lg:hidden">
-        {mobilePrimaryNav.map((item) => (
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-end justify-around rounded-t-3xl border-t border-border-strong bg-surface/90 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-elevated backdrop-blur-xl lg:hidden">
+        {(showCreateFab ? barNav.slice(0, 2) : barNav).map((item) => (
           <MobileNavLink key={`${item.to}#${item.hash ?? ""}`} item={item} />
         ))}
+        {showCreateFab && (
+          <>
+            <Link
+              to="/create"
+              aria-label="Create post"
+              className="-mt-6 flex flex-1 flex-col items-center justify-start"
+            >
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-primary-foreground shadow-glow ring-4 ring-background">
+                <Plus className="h-7 w-7" strokeWidth={2.5} />
+              </span>
+            </Link>
+            {barNav.slice(2, 3).map((item) => (
+              <MobileNavLink key={`${item.to}#${item.hash ?? ""}`} item={item} />
+            ))}
+          </>
+        )}
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
