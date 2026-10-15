@@ -245,7 +245,7 @@ function HomeDashboard() {
           {can("can_create_content") && (
             <Link
               to="/create"
-              className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
+              className="hidden min-h-11 w-fit items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110 sm:inline-flex"
             >
               <PenSquare className="h-4 w-4" />
               Create post
