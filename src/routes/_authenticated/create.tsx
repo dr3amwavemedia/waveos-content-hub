@@ -84,9 +84,14 @@ export const Route = createFileRoute("/_authenticated/create")({
       <CreatePost />
     </RequireFeature>
   ),
-  validateSearch: (s: Record<string, unknown>): { id?: string; media?: string } => ({
+  validateSearch: (
+    s: Record<string, unknown>,
+  ): { id?: string; media?: string; destination?: "feed" | "story" } => ({
     ...(typeof s.id === "string" ? { id: s.id } : {}),
     ...(typeof s.media === "string" ? { media: s.media } : {}),
+    ...(s.destination === "feed" || s.destination === "story"
+      ? { destination: s.destination }
+      : {}),
   }),
   head: () => ({
     meta: [{ title: "Create Post — WaveOS" }, { name: "robots", content: "noindex" }],
@@ -129,8 +134,15 @@ function CreatePost() {
   useEffect(() => {
     if (!search.media || editingId || pickedMedia.length) return;
     setPickedMedia([search.media]);
-    toast.success("Creative Studio image added to this post draft.");
-  }, [editingId, pickedMedia.length, search.media]);
+    if (search.destination === "story") {
+      setPlatforms(["instagram"]);
+      setActivePlatform("instagram");
+      setDraftPlatformOptions({ instagram: { contentType: "story" } });
+      toast.success("Creative Studio image added to an Instagram Story draft.");
+    } else {
+      toast.success("Creative Studio image added to this feed post draft.");
+    }
+  }, [editingId, pickedMedia.length, search.destination, search.media]);
 
   const draftStorageKey = workspaceId ? `waveos-create-draft-${workspaceId}` : null;
 
