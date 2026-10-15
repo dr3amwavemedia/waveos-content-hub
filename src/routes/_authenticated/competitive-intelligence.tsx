@@ -17,6 +17,7 @@ import { RequireFeature } from "@/components/app/require-feature";
 import { UnsavedChangesGuard } from "@/components/app/unsaved-changes-guard";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useWorkflowDraft } from "@/hooks/use-workflow-draft";
 import { supabase } from "@/integrations/supabase/client";
 import {
