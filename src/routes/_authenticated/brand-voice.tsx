@@ -381,34 +381,55 @@ function BrandVoicePage() {
 }
 
 function Stepper({ step, onStep }: { step: number; onStep: (n: number) => void }) {
-  const labels = ["Basics", "Audience", "Voice", "Content", "Review"];
+  const labels = ["Business basics", "Audience & goals", "Brand voice", "Content preferences", "Review & finish"];
   return (
-    <ol className="grid grid-cols-5 gap-2">
-      {labels.map((l, i) => {
-        const n = i + 1;
-        const active = n === step;
-        const done = n < step;
-        return (
-          <li key={l}>
-            <button onClick={() => onStep(n)}
-              className={cn(
-                "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium",
-                active ? "border-primary/50 bg-primary/15 text-foreground"
-                       : done ? "border-border bg-elevated text-foreground"
-                              : "border-border bg-surface/60 text-muted-foreground",
-              )}>
-              <span className={cn("flex h-5 w-5 items-center justify-center rounded-full text-[10px]",
-                active ? "bg-primary text-primary-foreground"
-                       : done ? "bg-success text-success-foreground"
-                              : "bg-elevated text-muted-foreground")}>
-                {done ? <Check className="h-3 w-3" /> : n}
-              </span>
-              <span className="truncate">{l}</span>
-            </button>
-          </li>
-        );
-      })}
-    </ol>
+    <>
+      <div className="rounded-xl border border-primary/25 bg-primary/[0.06] p-3 sm:hidden">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">Step {step} of {labels.length}</p>
+            <p className="mt-1 truncate text-sm font-semibold text-foreground">{labels[step - 1]}</p>
+          </div>
+          <select
+            aria-label="Brand voice section"
+            value={step}
+            onChange={(event) => onStep(Number(event.target.value))}
+            className="max-w-32 rounded-lg border border-border bg-surface px-2 py-2 text-xs font-medium text-foreground"
+          >
+            {labels.map((label, index) => <option key={label} value={index + 1}>{index + 1}. {label}</option>)}
+          </select>
+        </div>
+        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-elevated">
+          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${(step / labels.length) * 100}%` }} />
+        </div>
+      </div>
+      <ol className="hidden grid-cols-5 gap-2 sm:grid">
+        {labels.map((l, i) => {
+          const n = i + 1;
+          const active = n === step;
+          const done = n < step;
+          return (
+            <li key={l}>
+              <button onClick={() => onStep(n)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium",
+                  active ? "border-primary/50 bg-primary/15 text-foreground"
+                         : done ? "border-border bg-elevated text-foreground"
+                                : "border-border bg-surface/60 text-muted-foreground",
+                )}>
+                <span className={cn("flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px]",
+                  active ? "bg-primary text-primary-foreground"
+                         : done ? "bg-success text-success-foreground"
+                                : "bg-elevated text-muted-foreground")}>
+                  {done ? <Check className="h-3 w-3" /> : n}
+                </span>
+                <span className="truncate">{l}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </>
   );
 }
 

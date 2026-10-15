@@ -690,7 +690,7 @@ function CreativeStudioPage() {
     }, "image/png");
   }
 
-  async function sendToPost() {
+  async function sendToPost(destination: "feed" | "story" = "feed") {
     const canvas = canvasRef.current;
     if (!canvas) return;
     try {
@@ -713,8 +713,15 @@ function CreativeStudioPage() {
         folderId: null,
         tags: ["creative-studio", "export"],
       });
-      toast.success("A new image was saved to the Media Library. Opening a post draft…");
-      void navigate({ to: "/create", search: { media: asset.id } });
+      toast.success(
+        destination === "story"
+          ? "Design saved. Opening an Instagram Story draft…"
+          : "Design saved. Opening a feed post draft…",
+      );
+      void navigate({
+        to: "/create",
+        search: { media: asset.id, destination },
+      });
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "The design could not be sent to a post.",
@@ -855,11 +862,19 @@ function CreativeStudioPage() {
           </Button>
           <Button
             variant="outline"
-            onClick={() => void sendToPost()}
+            onClick={() => void sendToPost("feed")}
             disabled={uploadAsset.isPending}
           >
             {uploadAsset.isPending ? <Loader2 className="animate-spin" /> : <ImagePlus />}
-            Send to post
+            Post to feed
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => void sendToPost("story")}
+            disabled={uploadAsset.isPending}
+          >
+            {uploadAsset.isPending ? <Loader2 className="animate-spin" /> : <ImagePlus />}
+            Post to story
           </Button>
           <Button onClick={() => saveDesign.mutate()} disabled={saveDesign.isPending}>
             {saveDesign.isPending ? <Loader2 className="animate-spin" /> : <Save />}

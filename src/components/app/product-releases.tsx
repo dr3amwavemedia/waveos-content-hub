@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, BellOff, Check, ExternalLink, Loader2, Sparkles } from "lucide-react";
+import { ArrowRight, Check, ExternalLink, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -45,11 +45,17 @@ export function ProductReleaseProvider({
   const release = center.releases.find((item) => item.id === openReleaseId) ?? null;
 
   useEffect(() => {
-    if (!autoOpen || !center.autoShow || !center.popupRelease) return;
+    if (!autoOpen || !center.popupRelease) return;
     if (autoOpened.current.has(center.popupRelease.id)) return;
-    autoOpened.current.add(center.popupRelease.id);
-    setOpenReleaseId(center.popupRelease.id);
-  }, [autoOpen, center.autoShow, center.popupRelease]);
+    const nextRelease = center.popupRelease;
+    autoOpened.current.add(nextRelease.id);
+    setOpenReleaseId(nextRelease.id);
+    // Viewing once is enough to prevent the same announcement from auto-opening
+    // on a later login. Close/minimize can still record dismissal for history.
+    void center.markState({ release: nextRelease, action: "view" }).catch(() => {
+      // The announcement remains usable even if the view receipt cannot be saved.
+    });
+  }, [autoOpen, center.popupRelease]);
 
   const value = useMemo<ProductReleaseContextValue>(
     () => ({ ...center, openRelease: setOpenReleaseId }),
@@ -90,18 +96,6 @@ export function ProductReleaseProvider({
     await navigate({ to: "/updates" });
   };
 
-  const disablePopups = async () => {
-    try {
-      await center.setAutoShow(false);
-      toast.success("Automatic update popups are off. Updates remain available in What’s New.");
-      await dismiss();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "Your update preference could not be saved.",
-      );
-    }
-  };
-
   return (
     <ProductReleaseContext.Provider value={value}>
       {children}
@@ -135,20 +129,6 @@ export function ProductReleaseProvider({
             <p className="text-xs text-muted-foreground">
               Published {formatReleaseDate(release.published_at)}
             </p>
-
-            <button
-              type="button"
-              onClick={() => void disablePopups()}
-              disabled={center.preferencePending || center.statePending}
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-border px-3 text-sm font-medium text-muted-foreground hover:bg-elevated hover:text-foreground disabled:opacity-60 sm:w-auto"
-            >
-              {center.preferencePending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <BellOff className="h-4 w-4" />
-              )}
-              Don&apos;t show update popups
-            </button>
 
             <DialogFooter className="gap-2 sm:space-x-0">
               {safeReleaseLink(release.link_url) && (

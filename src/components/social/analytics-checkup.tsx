@@ -175,44 +175,34 @@ export function AnalyticsCheckup({
           </div>
         )}
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard
-            label="Published posts"
-            value={observedValue(publishedPosts)}
-            hint={
-              publishedPosts.state === "unavailable" ? publishedPosts.unavailableReason : undefined
-            }
-          />
-          <MetricCard
-            label="Connected channels"
-            value={observedValue(connectedChannels)}
-            hint={
-              connectedChannels.state === "unavailable"
-                ? connectedChannels.unavailableReason
-                : undefined
-            }
-          />
+        <div className="mt-5 sm:hidden">
+          <div className="rounded-xl border border-border bg-background/45">
+            <div className="grid grid-cols-2 divide-x divide-border border-b border-border">
+              <CompactMetric label="Published" value={observedValue(publishedPosts)} />
+              <CompactMetric label="Channels" value={observedValue(connectedChannels)} />
+            </div>
+            {metricRows.some(({ metric }) => metric.value === null) && !analytics.isPending && (
+              <p className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
+                Some performance data hasn&apos;t synced yet. Missing values stay unavailable rather than becoming zero.
+              </p>
+            )}
+            <div className="divide-y divide-border">
+              {metricRows.map(({ key, label, metric }) => (
+                <div key={key} className="flex min-h-11 items-center justify-between gap-3 px-3 py-2">
+                  <span className="text-xs font-medium text-muted-foreground">{label}</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {analytics.isPending ? "…" : metric.value === null ? "—" : metric.value.toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="mt-5 hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard label="Published posts" value={observedValue(publishedPosts)} hint={publishedPosts.state === "unavailable" ? publishedPosts.unavailableReason : undefined} />
+          <MetricCard label="Connected channels" value={observedValue(connectedChannels)} hint={connectedChannels.state === "unavailable" ? connectedChannels.unavailableReason : undefined} />
           {metricRows.map(({ key, label, metric }) => (
-            <MetricCard
-              key={key}
-              label={label}
-              value={
-                analytics.isPending
-                  ? "…"
-                  : metric.value === null
-                    ? "Unavailable"
-                    : metric.value.toLocaleString()
-              }
-              hint={
-                metric.coverage === "partial"
-                  ? `Partial: ${metric.contributingSources}/${metric.expectedSources} source observations.`
-                  : metric.value === null
-                    ? STATUS_LABEL[metric.availability]
-                    : metric.availability === "true_zero"
-                      ? "Provider reported a true zero."
-                      : undefined
-              }
-            />
+            <MetricCard key={key} label={label} value={analytics.isPending ? "…" : metric.value === null ? "Unavailable" : metric.value.toLocaleString()} hint={metric.coverage === "partial" ? `Partial: ${metric.contributingSources}/${metric.expectedSources} source observations.` : metric.value === null ? STATUS_LABEL[metric.availability] : metric.availability === "true_zero" ? "Provider reported a true zero." : undefined} />
           ))}
         </div>
 
@@ -303,6 +293,15 @@ export function AnalyticsCheckup({
         error={intelligence.error}
         data={intelligence.data}
       />
+    </div>
+  );
+}
+
+function CompactMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="p-3">
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
     </div>
   );
 }

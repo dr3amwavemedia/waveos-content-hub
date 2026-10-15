@@ -522,84 +522,28 @@ function MetricEditor({
   onChange: (patch: Partial<CompetitiveMetric>) => void;
   onRemove: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const commonMetrics = ["Posts per week", "Engagement rate", "Followers", "Response time", "Average views"];
   return (
-    <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-[1.2fr_.7fr_.7fr_.7fr_auto] sm:p-5">
-      <Field label="Metric">
-        <input
-          className={inputClass}
-          value={metric.label}
-          onChange={(event) => onChange({ label: event.target.value })}
-        />
-      </Field>
-      <Field label="Your value">
-        <input
-          className={inputClass}
-          type="number"
-          min={0}
-          value={metric.yourValue ?? ""}
-          onChange={(event) =>
-            onChange({ yourValue: event.target.value === "" ? null : Number(event.target.value) })
-          }
-        />
-      </Field>
-      <Field label="Competitor">
-        <input
-          className={inputClass}
-          type="number"
-          min={0}
-          value={metric.competitorValue ?? ""}
-          onChange={(event) =>
-            onChange({
-              competitorValue: event.target.value === "" ? null : Number(event.target.value),
-            })
-          }
-        />
-      </Field>
-      <Field label="Better when">
-        <select
-          className={inputClass}
-          value={metric.direction}
-          onChange={(event) => onChange({ direction: event.target.value as MetricDirection })}
-        >
-          <option value="higher">Higher</option>
-          <option value="lower">Lower</option>
-        </select>
-      </Field>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Remove metric"
-        className="self-end"
-        onClick={onRemove}
-      >
-        <Trash2 />
-      </Button>
-      <Field label="Unit">
-        <input
-          className={inputClass}
-          placeholder="%, posts, hours"
-          value={metric.unit}
-          onChange={(event) => onChange({ unit: event.target.value })}
-        />
-      </Field>
-      <div className="sm:col-span-1 lg:col-span-3">
-        <Field label="Source note">
-          <input
-            className={inputClass}
-            placeholder="How and where was this observed?"
-            value={metric.sourceNote}
-            onChange={(event) => onChange({ sourceNote: event.target.value })}
-          />
+    <div className="p-4 sm:p-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.2fr_.7fr_.7fr_.7fr_auto]">
+        <Field label="Metric">
+          <input className={inputClass} list="competitive-metric-options" value={metric.label} onChange={(event) => onChange({ label: event.target.value })} />
+          <datalist id="competitive-metric-options">{commonMetrics.map((option) => <option key={option} value={option} />)}</datalist>
         </Field>
+        <Field label="Your value"><input className={inputClass} type="number" min={0} value={metric.yourValue ?? ""} onChange={(event) => onChange({ yourValue: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
+        <Field label="Competitor"><input className={inputClass} type="number" min={0} value={metric.competitorValue ?? ""} onChange={(event) => onChange({ competitorValue: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
+        <Field label="Better when"><select className={inputClass} value={metric.direction} onChange={(event) => onChange({ direction: event.target.value as MetricDirection })}><option value="higher">Higher</option><option value="lower">Lower</option></select></Field>
+        <Button variant="ghost" size="icon" aria-label="Remove metric" className="self-end" onClick={onRemove}><Trash2 /></Button>
       </div>
-      <Field label="Observed">
-        <input
-          className={inputClass}
-          type="date"
-          value={metric.observedAt}
-          onChange={(event) => onChange({ observedAt: event.target.value })}
-        />
-      </Field>
+      <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-3 min-h-10 text-xs font-semibold text-primary sm:hidden">
+        {expanded ? "Hide source details" : "Source, unit & date"}
+      </button>
+      <div className={cn("mt-3 grid gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-5", expanded ? "grid" : "hidden")}>
+        <Field label="Unit"><input className={inputClass} placeholder="%, posts, hours" value={metric.unit} onChange={(event) => onChange({ unit: event.target.value })} /></Field>
+        <div className="sm:col-span-1 lg:col-span-3"><Field label="Source note"><input className={inputClass} placeholder="How and where was this observed?" value={metric.sourceNote} onChange={(event) => onChange({ sourceNote: event.target.value })} /></Field></div>
+        <Field label="Observed"><input className={inputClass} type="date" value={metric.observedAt} onChange={(event) => onChange({ observedAt: event.target.value })} /></Field>
+      </div>
     </div>
   );
 }

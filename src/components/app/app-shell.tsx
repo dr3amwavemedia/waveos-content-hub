@@ -108,7 +108,6 @@ const CLIENT_NAV: NavItem[] = [
     icon: MessageSquare,
     feature: "can_contact_support",
   },
-  { to: "/updates", label: "What's New", icon: Sparkles },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -143,7 +142,6 @@ const PUBLIC_OS_NAV: NavItem[] = [
   { to: "/content", label: "Media Library", icon: Images, feature: "can_view_media_library" },
   { to: "/calendar", label: "Calendar", icon: Calendar, feature: "can_view_calendar_preview" },
   { to: "/brand-voice", label: "Brand Voice", icon: Sparkles, feature: "can_manage_brand_voice" },
-  { to: "/updates", label: "What's New", icon: Sparkles },
   { to: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -174,7 +172,6 @@ const STAFF_NAV: NavItem[] = [
 
 const TEAM_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
-  { to: "/updates", label: "What's New", icon: Sparkles },
   { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
@@ -216,7 +213,6 @@ const LAYER1_NAV: NavItem[] = [
   { to: "/approvals", label: "Approvals", icon: CheckSquare },
   { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
-  { to: "/updates", label: "What's New", icon: Sparkles },
   { to: "/settings", label: "Your Information", icon: User },
   { to: "/feedback", label: "Request Something", icon: MessageSquare },
 ];
@@ -248,7 +244,6 @@ const WEDDING_NAV: NavItem[] = [
   },
   { to: "/home", hash: "wedding-contracts", label: "Contracts", icon: FileText },
   { to: "/home", hash: "wedding-invoices", label: "Payments", icon: FileText },
-  { to: "/updates", label: "What's New", icon: Sparkles },
   { to: "/settings", label: "Records & Settings", icon: Settings },
   { to: "/home", hash: "wedding-contact", label: "Contact Dream Wave", icon: MessageSquare },
 ];
@@ -382,7 +377,12 @@ function Shell({ children }: { children: ReactNode }) {
               ? LAYER1_MOBILE_NAV
               : filterByFeature(MOBILE_NAV);
   const mobilePrimaryNav = mobileNav.filter((item) => item.label !== "More").slice(0, 4);
-  const nav = [...clientNav, ...staffNav];
+  // Merge client + staff capabilities without duplicating shared destinations
+  // such as Approvals.
+  const nav = [...clientNav, ...staffNav].filter(
+    (item, index, items) =>
+      items.findIndex((candidate) => candidate.to === item.to && candidate.hash === item.hash) === index,
+  );
   // Phone navigation is intentionally task-focused. Template and catalog
   // maintenance remain available on the full desktop workspace.
   const mobileDrawerNav = nav.filter((item) => item.to !== "/templates" && item.to !== "/catalog");
@@ -452,7 +452,7 @@ function Shell({ children }: { children: ReactNode }) {
               className="mt-2 min-h-0 flex-1 overflow-y-auto"
               onClick={() => setMobileOpen(false)}
             >
-              <NavGroup items={mobileDrawerNav} className="mt-2" />
+              {isStaff ? <MobileAdminNav items={mobileDrawerNav} /> : <NavGroup items={mobileDrawerNav} className="mt-2" />}
             </div>
             <UserFooter />
           </div>
@@ -606,6 +606,32 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
         );
       })}
     </ul>
+  );
+}
+
+function MobileAdminNav({ items }: { items: NavItem[] }) {
+  const personalPaths = new Set(["/home", "/settings"]);
+  const osPaths = new Set([
+    "/social", "/analytics", "/creative-studio", "/campaigns",
+    "/competitive-intelligence", "/os-data", "/vision-studio", "/tools", "/admin",
+  ]);
+  const groups = [
+    { label: "Personal", items: items.filter((item) => personalPaths.has(item.to)) },
+    { label: "Business", items: items.filter((item) => !personalPaths.has(item.to) && !osPaths.has(item.to)) },
+    { label: "OS App", items: items.filter((item) => osPaths.has(item.to)) },
+  ].filter((group) => group.items.length);
+
+  return (
+    <div className="space-y-5 py-2">
+      {groups.map((group) => (
+        <section key={group.label}>
+          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+            {group.label}
+          </p>
+          <NavGroup items={group.items} />
+        </section>
+      ))}
+    </div>
   );
 }
 
