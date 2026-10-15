@@ -611,27 +611,33 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
   );
 }
 
-const MOBILE_PERSONAL_PATHS = new Set(["/home", "/settings", "/feedback"]);
+// DWM everyday working tools live under Personal (approved mobile design).
+const MOBILE_PERSONAL_PATHS = new Set([
+  "/home", "/social", "/creative-studio", "/campaigns", "/brand-voice",
+  "/analytics", "/feedback", "/settings",
+]);
 const MOBILE_OS_PATHS = new Set([
-  "/social", "/create", "/analytics", "/creative-studio", "/campaigns",
-  "/competitive-intelligence", "/content", "/calendar", "/approvals", "/vision-studio",
+  "/create", "/competitive-intelligence", "/content", "/calendar", "/approvals", "/vision-studio",
 ]);
 const MOBILE_SYSTEM_PATHS = new Set(["/os-data", "/tools", "/admin"]);
+const isPersonalItem = (i: NavItem) =>
+  i.hash === "invoices" || (!i.hash && MOBILE_PERSONAL_PATHS.has(i.to));
 
 function MobileAdminNav({ items }: { items: NavItem[] }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const groups = [
-    { label: "Personal", items: items.filter((i) => MOBILE_PERSONAL_PATHS.has(i.to) && !i.hash) },
+    { label: "Personal", items: items.filter(isPersonalItem) },
     {
       label: "Business",
       items: items.filter(
         (i) =>
-          (i.hash || !MOBILE_PERSONAL_PATHS.has(i.to)) &&
+          !isPersonalItem(i) &&
+          !(MOBILE_PERSONAL_PATHS.has(i.to) && !i.hash) &&
           !MOBILE_OS_PATHS.has(i.to) &&
           !MOBILE_SYSTEM_PATHS.has(i.to),
       ),
     },
-    { label: "OS App", items: items.filter((i) => MOBILE_OS_PATHS.has(i.to)) },
+    { label: "OS App", items: items.filter((i) => !i.hash && MOBILE_OS_PATHS.has(i.to)) },
     { label: "System", items: items.filter((i) => MOBILE_SYSTEM_PATHS.has(i.to)) },
   ].filter((group) => group.items.length);
 
