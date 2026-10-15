@@ -197,9 +197,9 @@ export function useProductReleases() {
     ...query,
     releases,
     unreadReleases: releases.filter((release) => !release.state?.acknowledged_at),
-    popupRelease:
-      releases.find((release) => !release.state?.acknowledged_at && !release.state?.dismissed_at) ??
-      null,
+    // Announcements are intentionally one-view. A release only becomes a popup when
+    // it was explicitly published and this user has never viewed it before.
+    popupRelease: releases.find((release) => !release.state?.viewed_at) ?? null,
     autoShow: query.data?.autoShow ?? true,
     markState: stateMutation.mutateAsync,
     statePending: stateMutation.isPending,
