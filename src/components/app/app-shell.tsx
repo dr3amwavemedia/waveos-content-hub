@@ -18,6 +18,7 @@ import {
   ChevronsUpDown,
   LogOut,
   Menu,
+  Plus,
   X,
   FileText,
   User,
