@@ -31,6 +31,7 @@ import { useWorkspaceBranding } from "@/hooks/use-workspace-branding";
 import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/use-frameio";
 import { ProductReleaseProvider, WhatsNewCard } from "@/components/app/product-releases";
 import { formatInTimeZone } from "@/lib/date-time";
+import { MobileCommandCenter } from "@/components/app/mobile-command-center";
 
 export const Route = createFileRoute("/_authenticated/home")({
   component: () => (
@@ -244,7 +245,7 @@ function HomeDashboard() {
           {can("can_create_content") && (
             <Link
               to="/create"
-              className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110"
+              className="hidden min-h-11 w-fit items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[var(--shadow-glow)] transition-all hover:brightness-110 sm:inline-flex"
             >
               <PenSquare className="h-4 w-4" />
               Create post
@@ -252,6 +253,13 @@ function HomeDashboard() {
           )}
         </div>
       </header>
+
+      <MobileCommandCenter
+        can={can}
+        scheduledCount={stats?.scheduledCount}
+        awaitingCount={stats?.awaitingCount}
+        approvalsTo={isPublicOs ? "/social" : "/approvals"}
+      />
 
       <WhatsNewCard />
 
