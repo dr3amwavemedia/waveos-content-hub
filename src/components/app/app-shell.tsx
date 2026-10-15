@@ -383,9 +383,11 @@ function Shell({ children }: { children: ReactNode }) {
     (item, index, items) =>
       items.findIndex((candidate) => candidate.to === item.to && candidate.hash === item.hash) === index,
   );
-  // Phone navigation is intentionally task-focused. Template and catalog
-  // maintenance remain available on the full desktop workspace.
-  const mobileDrawerNav = nav.filter((item) => item.to !== "/templates" && item.to !== "/catalog");
+  // Staff get Documents and Price List in the grouped phone menu; client menus
+  // stay task-focused.
+  const mobileDrawerNav = isStaff
+    ? nav
+    : nav.filter((item) => item.to !== "/templates" && item.to !== "/catalog");
 
   return (
     <div
@@ -609,26 +611,61 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
   );
 }
 
+const MOBILE_PERSONAL_PATHS = new Set(["/home", "/settings", "/feedback"]);
+const MOBILE_OS_PATHS = new Set([
+  "/social", "/create", "/analytics", "/creative-studio", "/campaigns",
+  "/competitive-intelligence", "/content", "/calendar", "/approvals", "/vision-studio",
+]);
+const MOBILE_SYSTEM_PATHS = new Set(["/os-data", "/tools", "/admin"]);
+
 function MobileAdminNav({ items }: { items: NavItem[] }) {
-  const personalPaths = new Set(["/home", "/settings"]);
-  const osPaths = new Set([
-    "/social", "/analytics", "/creative-studio", "/campaigns",
-    "/competitive-intelligence", "/os-data", "/vision-studio", "/tools", "/admin",
-  ]);
+  const pathname = useRouterState({ select: (r) => r.location.pathname });
   const groups = [
-    { label: "Personal", items: items.filter((item) => personalPaths.has(item.to)) },
-    { label: "Business", items: items.filter((item) => !personalPaths.has(item.to) && !osPaths.has(item.to)) },
-    { label: "OS App", items: items.filter((item) => osPaths.has(item.to)) },
+    { label: "Personal", items: items.filter((i) => MOBILE_PERSONAL_PATHS.has(i.to) && !i.hash) },
+    {
+      label: "Business",
+      items: items.filter(
+        (i) =>
+          (i.hash || !MOBILE_PERSONAL_PATHS.has(i.to)) &&
+          !MOBILE_OS_PATHS.has(i.to) &&
+          !MOBILE_SYSTEM_PATHS.has(i.to),
+      ),
+    },
+    { label: "OS App", items: items.filter((i) => MOBILE_OS_PATHS.has(i.to)) },
+    { label: "System", items: items.filter((i) => MOBILE_SYSTEM_PATHS.has(i.to)) },
   ].filter((group) => group.items.length);
 
   return (
-    <div className="space-y-5 py-2">
+    <div className="space-y-4 py-2">
       {groups.map((group) => (
         <section key={group.label}>
-          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80">
+          <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80">
             {group.label}
           </p>
-          <NavGroup items={group.items} />
+          <ul className="grid grid-cols-2 gap-1.5">
+            {group.items.map((item) => {
+              const active =
+                !item.hash && (pathname === item.to || pathname.startsWith(item.to + "/"));
+              const Icon = item.icon;
+              return (
+                <li key={`${item.to}#${item.hash ?? ""}`} className="min-w-0">
+                  <Link
+                    to={item.to}
+                    hash={item.hash}
+                    className={cn(
+                      "flex min-h-12 min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-medium transition-colors",
+                      active
+                        ? "border-primary/40 bg-primary/12 text-foreground"
+                        : "border-border/60 bg-surface/50 text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "")} />
+                    <span className="truncate">{item.label === "DOCUMENTS" ? "Documents" : item.label}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </section>
       ))}
     </div>

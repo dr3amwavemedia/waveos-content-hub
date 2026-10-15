@@ -206,6 +206,24 @@ html {
   background: var(--color-background);
 }
 
+/* Phone spacing: trim oversized card padding and headings inside the app,
+   leaving tap targets untouched. */
+@media (max-width: 639px) {
+  main .surface-card.p-8,
+  main .surface-card.p-6,
+  main .surface-card.sm\:p-8 {
+    padding: 1rem;
+  }
+  main h1.text-4xl,
+  main h1.text-3xl {
+    font-size: 1.5rem;
+    line-height: 1.2;
+  }
+  main .space-y-8 > :not(:last-child) {
+    margin-bottom: 1.25rem;
+  }
+}
+
 body {
   min-height: 100dvh;
   overscroll-behavior-y: none;
