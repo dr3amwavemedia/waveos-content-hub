@@ -105,7 +105,8 @@
             "body": {
               "type": "string",
               "minLength": 1,
-              "description": "Content body (Markdown or plain text)."
+              "maxLength": 20000,
+              "description": "Primary caption (Markdown or plain text)."
             }
           },
           "required": [
@@ -153,11 +154,11 @@
       {
         "name": "schedule_content",
         "title": "Schedule content",
-        "description": "Move a content item to 'scheduled' at the given ISO 8601 UTC timestamp. Caller must have permission in the item's workspace.",
+        "description": "Request approval or schedule an eligible content item at the given ISO 8601 timestamp, following the workspace approval policy.",
         "annotations": {
           "readOnlyHint": false,
           "destructiveHint": false,
-          "idempotentHint": true,
+          "idempotentHint": false,
           "openWorldHint": false
         },
         "inputSchema": {
