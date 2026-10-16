@@ -293,25 +293,25 @@ function SocialWorkspace() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-7">
-      <section className="relative overflow-hidden rounded-3xl border border-primary/20 bg-[radial-gradient(circle_at_top_right,color-mix(in_oklab,var(--primary)_22%,transparent),transparent_48%),linear-gradient(135deg,color-mix(in_oklab,var(--surface)_92%,black),var(--background))] p-5 shadow-xl shadow-black/10 sm:p-7">
+      <section className="relative overflow-hidden rounded-2xl border border-primary/20 bg-[radial-gradient(circle_at_top_right,color-mix(in_oklab,var(--primary)_22%,transparent),transparent_48%),linear-gradient(135deg,color-mix(in_oklab,var(--surface)_92%,black),var(--background))] p-3 shadow-xl shadow-black/10 sm:rounded-3xl sm:p-7">
         <div
           className="absolute -right-12 -top-16 h-48 w-48 rounded-full bg-primary/10 blur-3xl"
           aria-hidden
         />
-        <div className="relative flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="relative flex flex-col gap-3 sm:gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div className="max-w-2xl">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="mb-2 flex flex-wrap items-center gap-2 sm:mb-3">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                 <Megaphone className="h-3.5 w-3.5" /> Social Media
               </span>
-              <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
+              <span className="hidden rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200 sm:inline-flex">
                 Approval-protected publishing
               </span>
             </div>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-              One place to plan, review and measure.
+            <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-4xl">
+              Social Media
             </h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground sm:text-base">
+            <p className="mt-1 hidden max-w-xl text-sm leading-6 text-muted-foreground sm:block sm:text-base">
               {activeWorkspace?.name} content, approvals, account health and performance—organized
               without duplicate pages.
             </p>
@@ -349,7 +349,7 @@ function SocialWorkspace() {
 
       <nav
         aria-label="Social Media workspace"
-        className="grid grid-cols-2 gap-1 rounded-2xl border border-border bg-surface/70 p-1.5 sm:grid-cols-4"
+        className="grid grid-cols-4 gap-1 rounded-2xl border border-border bg-surface/70 p-1 sm:p-1.5"
       >
         <WorkspaceTab
           active={activeView === "overview"}
