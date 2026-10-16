@@ -54,6 +54,9 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --color-creative: var(--creative);
+  --color-analytics: var(--analytics);
+  --color-intelligence: var(--intelligence);
+  --color-campaign: var(--campaign);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -95,6 +98,10 @@
 
   --success: oklch(0.72 0.14 165);
   --creative: oklch(0.58 0.21 285);
+  /* Semantic WaveOS accents: data, AI, campaigns, status */
+  --analytics: oklch(0.78 0.14 205);
+  --intelligence: oklch(0.67 0.2 295);
+  --campaign: oklch(0.68 0.22 335);
   --warning: oklch(0.78 0.14 78);
   --destructive: oklch(0.62 0.2 22);
   --destructive-foreground: oklch(0.98 0.006 240);
@@ -149,6 +156,12 @@
   --secondary: oklch(0.28 0.05 258);
   --secondary-foreground: oklch(0.97 0.008 240);
   --accent: oklch(0.6 0.16 245);
+  --analytics: oklch(0.78 0.14 205);
+  --intelligence: oklch(0.67 0.2 295);
+  --campaign: oklch(0.68 0.22 335);
+  --success: oklch(0.72 0.14 165);
+  --creative: oklch(0.58 0.21 285);
+  --warning: oklch(0.78 0.14 78);
   --accent-foreground: oklch(0.98 0.006 240);
   --destructive: oklch(0.62 0.2 22);
   --destructive-foreground: oklch(0.98 0.006 240);
