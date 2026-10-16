@@ -292,6 +292,7 @@ function CompetitiveIntelligencePage() {
       if(error)throw error;competitorId=data.id;
       await queryClient.invalidateQueries({queryKey:['competitors',targetWorkspace]});
     }
+    if (!competitorId) throw new Error('The competitor could not be saved.');
     const {data,error}=await db.from('competitive_reports').insert({workspace_id:targetWorkspace,competitor_id:competitorId,created_by:auth.user.id,title:`Public research — ${result.report.company??new URL(result.inputUrl).hostname}`,metrics:[researchRecord(result)],score:null,confidence:null,methodology:result.methodology}).select('id').single();
     if(error)throw error;
     return {id:data.id,competitorId,targetWorkspace,key:result.inputUrl+result.researchedAt};
