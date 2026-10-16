@@ -118,7 +118,8 @@ export function AnalyticsCheckup({
     return { key, label, metric };
   });
   const providerError = analytics.error instanceof Error ? analytics.error.message : null;
-  const historicalRows = intelligence.data?.snapshots ?? [];
+  const cutoff = Date.now() - days * 86400000;
+  const historicalRows = (intelligence.data?.snapshots ?? []).filter(row=>row.evidence?.mode===mode && row.range_end && Date.parse(row.range_end)>=cutoff);
   const series = historySeries(historicalRows, graphMetric);
   const comparison = comparePeriods(historicalRows, graphMetric);
   const chartData = series.map(row=>({date:row.range_end,value:row.value}));
