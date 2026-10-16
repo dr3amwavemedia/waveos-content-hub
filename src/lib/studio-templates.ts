@@ -1,5 +1,5 @@
-import { FORMATS, type DesignDocument, type DesignFormat, type DesignElement } from './studio-document';
-import { ratioCrop } from './studio-geometry';
+import { FORMATS, type DesignDocument, type DesignFormat, type DesignElement } from './studio-document.ts';
+import { ratioCrop } from './studio-geometry.ts';
 export const STUDIO_TEMPLATES = [
   { name: 'Testimonial', category: 'Testimonials', photo: 'wellness', headline: '“An experience\nworth sharing.”', accent: 'Your words, our inspiration', font: 'Georgia', style: 'editorial' },
   { name: 'Our story', category: 'Brand Story', photo: 'studio', headline: 'Made with purpose.', accent: 'A little about us', font: 'Georgia', style: 'editorial' },
