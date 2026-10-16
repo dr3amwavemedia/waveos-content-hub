@@ -1,4 +1,6 @@
 import { RequireFeature } from "@/components/app/require-feature";
+import { attachStudioResult, type PostStudioSnapshot } from "@/lib/post-studio-handoff";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -87,9 +89,10 @@ export const Route = createFileRoute("/_authenticated/create")({
   ),
   validateSearch: (
     s: Record<string, unknown>,
-  ): { id?: string; media?: string; destination?: "feed" | "story"; brief?: string; briefWorkspace?: string } => ({
+  ): { id?: string; media?: string; destination?: "feed" | "story"; brief?: string; briefWorkspace?: string; handoff?: string } => ({
     ...(typeof s.brief === "string" && s.brief.length <= 6000 ? { brief: s.brief } : {}),
     ...(typeof s.briefWorkspace === "string" ? { briefWorkspace: s.briefWorkspace } : {}),
+    ...(typeof s.handoff === "string" ? {handoff:s.handoff} : {}),
     ...(typeof s.id === "string" ? { id: s.id } : {}),
     ...(typeof s.media === "string" ? { media: s.media } : {}),
     ...(s.destination === "feed" || s.destination === "story"
@@ -135,9 +138,25 @@ function CreatePost() {
     Partial<Record<SocialPlatform, { contentType?: "story" }>>
   >({});
   const [showLibrary, setShowLibrary] = useState(false);
+  const [platformSettings, setPlatformSettings] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<string | null>(null);
+  const handoffApplied = useRef<string | null>(null);
+  useEffect(() => {
+    if (!search.handoff || !search.media || !workspaceId || handoffApplied.current===search.handoff) return;
+    if (editingId && !existing.data?.item) return;
+    try {
+      const snapshot = JSON.parse(window.sessionStorage.getItem(`waveos-studio-handoff-${search.handoff}`) ?? 'null') as PostStudioSnapshot | null;
+      if (!snapshot || snapshot.workspaceId !== workspaceId || snapshot.postId !== editingId) return;
+      const restored = attachStudioResult(snapshot,search.media);
+      handoffApplied.current=search.handoff;
+      setTitle(restored.title);setCaption(restored.caption);setPickedMedia(restored.pickedMedia);setSelectedMedia(search.media);setScheduledAt(restored.scheduledAt);
+      setPlatforms(restored.platforms.filter((p): p is SocialPlatform=>ALL_PLATFORMS.includes(p as SocialPlatform)));setActivePlatform(restored.activePlatform as SocialPlatform);setDraftPlatformOptions(restored.platformOptions);
+      toast.success('Design attached to the same post. Review and save when ready.');
+    } catch { toast.error('Your original draft is unchanged; the Studio return could not be restored.'); }
+  },[search.handoff,search.media,workspaceId,editingId,existing.data?.item?.id]);
 
   useEffect(() => {
-    if (!search.media || editingId || pickedMedia.length) return;
+    if (!search.media || search.handoff || editingId || pickedMedia.length) return;
     setPickedMedia([search.media]);
     if (search.destination === "story") {
       setPlatforms(["instagram"]);
@@ -258,7 +277,7 @@ function CreatePost() {
     draftPlatformOptions,
   ]);
   useEffect(() => {
-    if (!existing.data?.item) return;
+    if (!existing.data?.item || handoffApplied.current === search.handoff && Boolean(search.handoff)) return;
     const it = existing.data.item;
     setTitle(it.title ?? "");
     setCaption(it.primary_caption ?? "");
@@ -371,6 +390,24 @@ function CreatePost() {
       setSaveStatus("error");
       toast.error((e as Error).message);
     }
+  }
+
+  function openStudio(quick: boolean) {
+    if (!workspaceId || locked) return;
+    const sourceMedia = selectedMedia && pickedMedia.includes(selectedMedia) ? selectedMedia : pickedMedia[0] ?? null;
+    const token=crypto.randomUUID();
+    const snapshot: PostStudioSnapshot={workspaceId,postId:editingId,title,caption,platforms,pickedMedia,scheduledAt,activePlatform,platformOptions:draftPlatformOptions,sourceMedia};
+    window.sessionStorage.setItem(`waveos-studio-handoff-${token}`,JSON.stringify(snapshot));
+    void navigate({to:'/creative-studio',search:{handoff:token,...(sourceMedia?{media:sourceMedia}:{}),quick}});
+  }
+
+  async function captionAction(action: 'Improve' | 'Shorten' | 'Add Hashtags') {
+    if (!workspaceId || !caption.trim() || assisting || locked || !canUseAiAssist) return;
+    setAssisting(true);
+    try {
+      const result=await assist({data:{workspaceId,input:caption,mode:action==='Add Hashtags'?'hashtags':'tone',toneHint:action==='Shorten'?'concise, shorter without changing any facts':'clear, polished, in the saved brand voice',platform:activePlatform}});
+      if(window.confirm('Use this suggestion?\n\n'+result.suggestion))setCaption(action==='Add Hashtags'?[caption,result.suggestion].join('\n\n'):result.suggestion);
+    } catch(error){toast.error(error instanceof Error?error.message:'Caption help unavailable');}finally{setAssisting(false);}
   }
 
   async function handleCaptionAssist() {
@@ -580,7 +617,7 @@ function CreatePost() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24 sm:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
@@ -639,7 +676,7 @@ function CreatePost() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+        <div className="flex flex-col gap-6">
           {locked && (
             <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
               {status === "published"
@@ -649,7 +686,8 @@ function CreatePost() {
                   : "This post is currently in client review. Editing is paused until the review is completed or changes are requested."}
             </div>
           )}
-          <div className="surface-card space-y-4 p-5">
+          <details open className="order-2 border-t border-border py-4">
+            <summary className="mb-4 min-h-11 cursor-pointer text-base font-semibold">Caption</summary>
             <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Internal title
             </label>
@@ -687,47 +725,39 @@ function CreatePost() {
                 ) : (
                   <Sparkles className="h-3 w-3" />
                 )}
-                Draft with Brand Voice
+                Generate · Brand Voice
               </button>
             </div>
-          </div>
+            <div className="mt-3 flex flex-wrap gap-2">{(['Improve','Shorten','Add Hashtags'] as const).map(action=><Button key={action} variant="outline" size="sm" disabled={locked||assisting||!caption.trim()||!canUseAiAssist} onClick={()=>void captionAction(action)}><Sparkles/>{action}</Button>)}</div>
+          </details>
 
-          <div className="surface-card p-5">
+          <section className="order-1">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <div className="text-sm font-semibold text-foreground">Media</div>
-                <div className="text-xs text-muted-foreground">
-                  Choose from your library. Same media applies to all platforms.
-                </div>
+                <h2 className="text-base font-semibold text-foreground">Content</h2>
               </div>
-              <button
-                onClick={() => setShowLibrary(true)}
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-elevated px-3 py-2 text-xs font-medium hover:bg-surface-2"
-              >
-                <ImagePlus className="h-4 w-4" /> Pick media
-              </button>
             </div>
-            <MediaPreviewRow
-              workspaceId={workspaceId}
-              picked={pickedMedia}
-              onRemove={(id) => setPickedMedia((cur) => cur.filter((x) => x !== id))}
-            />
-            <PlatformMediaGuide platforms={platforms} />
-          </div>
+            <MediaPreviewRow workspaceId={workspaceId} picked={pickedMedia} selected={selectedMedia} onSelect={setSelectedMedia} onRemove={id=>setPickedMedia(current=>current.filter(item=>item!==id))}/>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <Button variant="outline" disabled={locked||!pickedMedia.length} onClick={()=>openStudio(true)}><PenSquare/>Edit</Button>
+              <Button variant="outline" disabled={locked} onClick={()=>openStudio(false)}><Sparkles/>Design</Button>
+              <Button variant="outline" disabled={locked} className="whitespace-normal" onClick={()=>setShowLibrary(true)}><Plus/>Add Media</Button>
+            </div>
+          </section>
 
-          <div className="surface-card p-5">
+          <section className="order-3 border-t border-border py-4">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-foreground">Per-platform captions</div>
+                <div className="text-sm font-semibold text-foreground">Platforms</div>
                 <div className="text-xs text-muted-foreground">
-                  Edit each caption independently. Confirmation appears before an overwrite.
+                  
                 </div>
               </div>
             </div>
             <PlatformTabs
               platforms={platforms}
               active={activePlatform}
-              onActive={setActivePlatform}
+              onActive={p=>{setActivePlatform(p);setPlatformSettings(true);}}
               onTogglePlatform={(p) => {
                 setPlatforms((current) => {
                   const isEnabled = current.includes(p);
@@ -754,6 +784,7 @@ function CreatePost() {
               }}
               locked={locked}
             />
+            <Sheet open={platformSettings} onOpenChange={setPlatformSettings}><SheetContent side="bottom" aria-describedby={undefined} className="max-h-[85dvh] overflow-y-auto bg-background"><SheetHeader className="mb-4"><SheetTitle>{PLATFORM_LABEL[activePlatform]} settings</SheetTitle></SheetHeader>
             <div className="mt-4">
               <VariantEditor
                 contentId={savedId}
@@ -782,12 +813,15 @@ function CreatePost() {
                 </p>
               )}
             </div>
-          </div>
+            <PlatformMediaGuide platforms={[activePlatform]}/>
+            </SheetContent></Sheet>
+          </section>
         </div>
 
         <aside className="space-y-6">
-          <div className="surface-card space-y-3 p-5">
-            <div className="text-sm font-semibold text-foreground">Schedule</div>
+          <details className="border-t border-border py-4" open>
+            <summary className="min-h-11 cursor-pointer text-base font-semibold">Schedule</summary>
+            <div className="my-3 flex gap-2"><Button variant={scheduledAt?'outline':'secondary'} onClick={()=>setScheduledAt('')}>Post Now</Button><Button variant={scheduledAt?'secondary':'outline'} disabled={!canSchedule} onClick={()=>{if(!scheduledAt){const date=new Date(Date.now()+86400000);setScheduledAt(isoToDateTimeLocal(date.toISOString(),workspaceTimeZone));}}}>Schedule for Later</Button></div>
             <label className="block text-xs uppercase tracking-wider text-muted-foreground">
               Publish at ({activeWorkspace.timezone})
             </label>
@@ -806,9 +840,9 @@ function CreatePost() {
                 ? "Leave empty when you want to publish immediately."
                 : "Upgrade to Current or Tidal to schedule posts."}
             </p>
-          </div>
+          </details>
 
-          <div className="surface-card space-y-4 p-5">
+          <div className="hidden space-y-4 py-4 sm:block">
             <div>
               <div className="text-sm font-semibold text-foreground">Publish</div>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -849,19 +883,24 @@ function CreatePost() {
             </div>
           </div>
 
-          <div className="surface-card space-y-3 p-5">
+          <details className="border-t border-border py-4"><summary className="mb-3 min-h-11 cursor-pointer font-semibold">Advanced Options</summary>
             <div className="text-sm font-semibold text-foreground">Publishing checklist</div>
             <CheckRow line={caption.trim().length > 0} label="Caption written" />
             <CheckRow line={pickedMedia.length > 0} label="Media attached" />
             <CheckRow line={platforms.length > 0} label="Platform selected" />
             <CheckRow line={!!savedId} label="Draft saved" />
-          </div>
+            <PlatformMediaGuide platforms={platforms}/>
+          </details>
         </aside>
       </div>
 
+      <div className="sticky bottom-20 z-20 grid grid-cols-2 gap-2 border-t border-border bg-background py-3 sm:bottom-0">
+        <Button variant="outline" disabled={locked||create.isPending||update.isPending||publishing!==null} onClick={handleSaveDraft}><FileText/>Save Draft</Button>
+        <Button disabled={locked||publishing!==null||!caption.trim()||!platforms.length} onClick={scheduledAt?handleScheduleLater:handlePublishNow}>{publishing?<Loader2 className="animate-spin"/>:<Send/>}{scheduledAt?'Create & Schedule':'Create & Publish'}</Button>
+      </div>
       {showLibrary && (
         <MediaPicker
-          workspaceId={workspaceId!}
+          workspaceId={activeWorkspace.id}
           picked={pickedMedia}
           onClose={() => setShowLibrary(false)}
           onConfirm={(ids) => {
@@ -1220,8 +1259,9 @@ function PublishFormatPicker({
 function MediaPreviewRow({
   workspaceId,
   picked,
-  onRemove,
+  onRemove, selected, onSelect,
 }: {
+  selected: string | null; onSelect: (id:string)=>void;
   workspaceId: string | null;
   picked: string[];
   onRemove: (id: string) => void;
@@ -1241,17 +1281,18 @@ function MediaPreviewRow({
     );
   }
 
-  return (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
-      {picked.map((id) => {
-        const a = map.get(id);
-        return <MediaThumb key={id} asset={a} onRemove={() => onRemove(id)} />;
-      })}
-    </div>
-  );
+  const active=selected && picked.includes(selected)?selected:picked[0];
+  return <div className="space-y-3"><MediaHero asset={map.get(active)}/><div className="flex gap-2 overflow-x-auto">{picked.map(id=><div key={id} className="w-20 shrink-0"><Button variant={id===active?'secondary':'ghost'} className="h-auto w-full p-1" aria-label={`Select ${map.get(id)?.name??'media'}`} onClick={()=>onSelect(id)}><MediaThumb asset={map.get(id)}/></Button><Button variant="ghost" size="sm" className="w-full text-xs" disabled={false} onClick={()=>onRemove(id)}><X/>Remove</Button></div>)}</div></div>;
+
 }
 
-function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => void }) {
+function MediaHero({asset}:{asset?:MediaAsset}) {
+  const [url,setUrl]=useState<string|null>(null);
+  useEffect(()=>{let active=true;setUrl(null);if(asset)void getMediaPreviewUrl(asset,3600).then(value=>{if(active)setUrl(value);});return()=>{active=false;};},[asset?.id]);
+  return <div className="grid aspect-[4/3] w-full place-items-center overflow-hidden rounded-lg border border-border bg-elevated">{url&&asset?.mime_type.startsWith('video/')?<video controls src={url} className="h-full w-full object-contain"/>:url?<img src={url} alt={asset?.name??'Post media'} className="h-full w-full object-contain"/>:<ImagePlus className="h-10 w-10 text-muted-foreground"/>}</div>;
+}
+
+function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove?: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!asset) return;
@@ -1269,13 +1310,13 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
           {asset.name}
         </div>
       )}
-      <button
+      {onRemove && <button
         onClick={onRemove}
         className="absolute right-1 top-1 rounded-full bg-background/80 p-1 text-foreground opacity-0 backdrop-blur transition-opacity group-hover:opacity-100"
         aria-label="Remove"
       >
         <X className="h-3 w-3" />
-      </button>
+      </button>}
     </div>
   );
 }
