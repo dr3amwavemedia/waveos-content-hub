@@ -247,6 +247,15 @@ function CreativeStudioPage() {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
   const dragHistoryIndexRef = useRef<number | null>(null);
+  const activePointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const gestureRef = useRef<{
+    id: string;
+    startDistance: number;
+    startAngle: number;
+    startWidth: number;
+    startHeight: number;
+    startRotation: number;
+  } | null>(null);
   const queryClient = useQueryClient();
   const [name, setName] = useState("Untitled graphic");
   const [designId, setDesignId] = useState<string | null>(null);
@@ -368,6 +377,28 @@ function CreativeStudioPage() {
 
   useEffect(() => {
     let cancelled = false;
+    const assets = (mediaAssets.data ?? []).slice(0, 30).filter((asset) => !assetUrls[asset.id]);
+    if (!assets.length) return;
+    void Promise.all(
+      assets.map(async (asset) => {
+        try {
+          return [asset.id, await getMediaPreviewUrl(asset, 60 * 60 * 6)] as const;
+        } catch {
+          return null;
+        }
+      }),
+    ).then((entries) => {
+      if (cancelled) return;
+      setAssetUrls((current) => ({
+        ...current,
+        ...Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => Boolean(entry))),
+      }));
+    });
+    return () => { cancelled = true; };
+  }, [mediaAssets.data]);
+
+  useEffect(() => {
+    let cancelled = false;
     const canvas = canvasRef.current;
     if (!canvas) return;
     canvas.width = format.width;
@@ -451,6 +482,26 @@ function CreativeStudioPage() {
             context.fillText(line, 0, startY + index * lineHeight, maxWidth);
           });
         }
+        if (element.id === selectedId) {
+          context.globalAlpha = 1;
+          context.filter = "none";
+          context.strokeStyle = palette.primary;
+          context.lineWidth = Math.max(3, canvas.width / 300);
+          context.setLineDash([12, 8]);
+          if (element.type === "text") {
+            const boxWidth = Math.min(canvas.width * 0.88, Math.max(element.fontSize * 2, element.text.length * element.fontSize * 0.5));
+            const boxHeight = Math.max(element.fontSize * 1.2, element.text.split("\n").length * element.fontSize * 1.2);
+            context.strokeRect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
+          } else {
+            context.strokeRect(-element.width / 2, -element.height / 2, element.width, element.height);
+            context.setLineDash([]);
+            context.fillStyle = palette.primary;
+            const handle = Math.max(18, canvas.width / 55);
+            for (const [hx, hy] of [[-element.width/2,-element.height/2],[element.width/2,-element.height/2],[-element.width/2,element.height/2],[element.width/2,element.height/2]]) {
+              context.fillRect(hx - handle/2, hy - handle/2, handle, handle);
+            }
+          }
+        }
         context.restore();
       }
     }
@@ -458,7 +509,7 @@ function CreativeStudioPage() {
     return () => {
       cancelled = true;
     };
-  }, [assetUrls, branding.data?.logoUrl, document, format.height, format.width, mobileStarted]);
+  }, [assetUrls, branding.data?.logoUrl, document, format.height, format.width, mobileStarted, palette.primary, selectedId]);
 
   function commit(next: DesignDocument) {
     const nextHistory = [...history.slice(0, historyIndex + 1), cloneDocument(next)].slice(-50);
@@ -765,6 +816,7 @@ function CreativeStudioPage() {
 
   function beginCanvasMove(event: ReactPointerEvent<HTMLCanvasElement>) {
     const point = canvasPoint(event);
+    activePointersRef.current.set(event.pointerId, point);
     const element = hitElement(point);
     if (!element) {
       setSelectedId(null);
@@ -782,13 +834,50 @@ function CreativeStudioPage() {
       offsetY: point.y - element.y,
     };
     setSelectedId(element.id);
+    if (activePointersRef.current.size === 2) {
+      const points = [...activePointersRef.current.values()];
+      const dx = (points[1].x - points[0].x) * format.width;
+      const dy = (points[1].y - points[0].y) * format.height;
+      gestureRef.current = {
+        id: element.id,
+        startDistance: Math.max(1, Math.hypot(dx, dy)),
+        startAngle: Math.atan2(dy, dx),
+        startWidth: element.type === "text" ? element.fontSize : element.width,
+        startHeight: element.type === "text" ? element.fontSize : element.height,
+        startRotation: element.rotation ?? 0,
+      };
+    }
   }
 
   function moveCanvasElement(event: ReactPointerEvent<HTMLCanvasElement>) {
+    const point = canvasPoint(event);
+    if (activePointersRef.current.has(event.pointerId)) activePointersRef.current.set(event.pointerId, point);
+    const gesture = gestureRef.current;
+    if (gesture && activePointersRef.current.size >= 2) {
+      const points = [...activePointersRef.current.values()].slice(0, 2);
+      const dx = (points[1].x - points[0].x) * format.width;
+      const dy = (points[1].y - points[0].y) * format.height;
+      const distance = Math.max(1, Math.hypot(dx, dy));
+      const angle = Math.atan2(dy, dx);
+      const scale = Math.max(0.15, Math.min(6, distance / gesture.startDistance));
+      const rotation = gesture.startRotation + ((angle - gesture.startAngle) * 180) / Math.PI;
+      const targetIndex = dragHistoryIndexRef.current;
+      if (targetIndex !== null) {
+        setHistory((current) => current.map((item, index) => index !== targetIndex ? item : ({
+          ...item,
+          elements: item.elements.map((element) => {
+            if (element.id !== gesture.id) return element;
+            if (element.type === "text") return { ...element, fontSize: Math.max(12, Math.min(240, gesture.startWidth * scale)), rotation };
+            return { ...element, width: Math.max(40, gesture.startWidth * scale), height: Math.max(40, gesture.startHeight * scale), rotation };
+          }),
+        })));
+        setDirty(true);
+      }
+      return;
+    }
     const drag = dragRef.current;
     const targetIndex = dragHistoryIndexRef.current;
     if (!drag || targetIndex === null) return;
-    const point = canvasPoint(event);
     setHistory((current) =>
       current.map((item, index) =>
         index !== targetIndex
@@ -811,6 +900,8 @@ function CreativeStudioPage() {
   }
 
   function endCanvasMove(event: ReactPointerEvent<HTMLCanvasElement>) {
+    activePointersRef.current.delete(event.pointerId);
+    if (activePointersRef.current.size < 2) gestureRef.current = null;
     if (dragRef.current && event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -1031,16 +1122,22 @@ function CreativeStudioPage() {
           <section className={cn("surface-card p-4", mobileTool !== "Media" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">Media Library</h2>
             <Button variant="outline" className="mt-3 min-h-11 w-full sm:hidden" onClick={() => uploadInputRef.current?.click()}><Upload /> Upload image</Button>
-            <div className="mt-3 max-h-48 space-y-1 overflow-y-auto">
+            <div className="mt-3 grid max-h-[55dvh] grid-cols-3 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-2">
               {(mediaAssets.data ?? []).slice(0, 30).map((asset) => (
                 <button
                   key={asset.id}
                   type="button"
-                  className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs text-muted-foreground hover:bg-elevated hover:text-foreground"
+                  aria-label={`Use ${asset.name}`}
+                  title={asset.name}
+                  className="group relative aspect-square overflow-hidden rounded-xl border border-border bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   onClick={() => addImage(asset.id)}
                 >
-                  <ImageIcon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{asset.name}</span>
+                  {assetUrls[asset.id] ? (
+                    <img src={assetUrls[asset.id]} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                  ) : (
+                    <span className="grid h-full w-full place-items-center"><ImageIcon className="h-6 w-6 text-muted-foreground" /></span>
+                  )}
+                  <span className="absolute inset-x-0 bottom-0 truncate bg-background/80 px-2 py-1 text-[10px] text-foreground backdrop-blur">{asset.name}</span>
                 </button>
               ))}
               {!mediaAssets.isLoading && !mediaAssets.data?.length && (
@@ -1194,7 +1291,14 @@ function CreativeStudioPage() {
 
       {mobileStarted && <div className="space-y-4 sm:hidden">
         <div className="grid grid-cols-4 gap-1" aria-label="Editing tools">
-          {(photoMode ? [{label:"Media",icon:ImageIcon},{label:"Crop",icon:Crop},{label:"Adjust",icon:SlidersHorizontal},{label:"Brand",icon:WandSparkles},{label:"Layers",icon:Layers3},{label:"Edit",icon:SlidersHorizontal},{label:"Canvas",icon:Square}] : [{label:"Add",icon:Plus},{label:"Media",icon:ImageIcon},{label:"Brand",icon:WandSparkles},{label:"Templates",icon:Square},{label:"Layers",icon:Layers3},{label:"Edit",icon:SlidersHorizontal},{label:"Canvas",icon:Crop}]).map(({label,icon:Icon}) => <Button key={label} variant="ghost" className="h-auto min-h-16 flex-col gap-2 px-1 text-[10px]" onClick={() => setMobileTool(label)}><span className="grid size-10 place-items-center rounded-xl border border-border-strong bg-elevated"><Icon className="text-primary" /></span>{label}</Button>)}
+          {(selected?.type === "image"
+            ? [{label:"Adjust",icon:SlidersHorizontal},{label:"Crop",icon:Crop},{label:"Media",icon:ImageIcon},{label:"Layers",icon:Layers3},{label:"Edit",icon:SlidersHorizontal}]
+            : selected?.type === "text"
+              ? [{label:"Edit",icon:Type},{label:"Layers",icon:Layers3},{label:"Add",icon:Plus},{label:"Brand",icon:WandSparkles}]
+              : photoMode
+                ? [{label:"Media",icon:ImageIcon},{label:"Brand",icon:WandSparkles},{label:"Layers",icon:Layers3},{label:"Canvas",icon:Square}]
+                : [{label:"Add",icon:Plus},{label:"Media",icon:ImageIcon},{label:"Templates",icon:Square},{label:"Brand",icon:WandSparkles},{label:"Layers",icon:Layers3},{label:"Canvas",icon:Crop}]
+          ).map(({label,icon:Icon}) => <Button key={label} variant="ghost" className="h-auto min-h-16 flex-col gap-2 px-1 text-[10px]" onClick={() => setMobileTool(label)}><span className="grid size-10 place-items-center rounded-xl border border-border-strong bg-elevated"><Icon className="text-primary" /></span>{label}</Button>)}
         </div>
         <div className="rounded-2xl border border-border-strong bg-gradient-to-br from-primary/10 to-surface p-4">
           <p className="mb-3 text-sm font-semibold">Done with your design?</p>
