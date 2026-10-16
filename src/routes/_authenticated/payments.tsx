@@ -1,6 +1,7 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ReceiptText } from "lucide-react";
+import { CheckCircle2, ReceiptText, Plus, FileText, Clock3 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Bar,
   BarChart,
@@ -73,7 +74,7 @@ export const Route = createFileRoute("/_authenticated/payments")({
       throw redirect({ to: "/home" });
   },
   component: PaymentsPage,
-  head: () => ({ meta: [{ title: "Payments — WaveOS" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Payments — WaveOS" }, { name: "description", content: "Review invoice progress and payment activity in WaveOS." }, { property: "og:title", content: "Payments — WaveOS" }, { property: "og:description", content: "Review invoice progress and payment activity." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }] }),
 });
 
 function dateKey(value: string): string {
@@ -126,6 +127,7 @@ function PaymentsPage() {
   const [parsed, setParsed] = useState<ParsedBloomFile | null>(null);
   const [plan, setPlan] = useState<PlanRow[] | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mobileView, setMobileView] = useState<"draft" | "outstanding" | "paid" | null>(null);
 
   async function reload() {
     setLoading(true);
@@ -470,11 +472,21 @@ function PaymentsPage() {
     <div className="w-full min-w-0 space-y-6 pb-12 sm:space-y-8">
         <header className="max-w-3xl">
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Payments</h1>
-          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+          <p className="mt-2 hidden text-sm text-muted-foreground sm:block sm:text-base">
             Booked sales, money received, refunds, Bloom imports, and invoice progress. USD totals
             use Sarasota dates.
           </p>
         </header>
+        <section className="space-y-4 sm:hidden">
+          <div className="grid grid-cols-2 gap-3">
+            <Button asChild className="min-h-24 flex-col gap-2 rounded-xl"><Link to="/clients"><Plus />Create Invoice</Link></Button>
+            {[{key:"draft",label:"View Drafts",icon:FileText},{key:"outstanding",label:"Outstanding",icon:Clock3},{key:"paid",label:"Paid",icon:CheckCircle2}].map(({key,label,icon:Icon}) => <Button key={key} variant="outline" aria-pressed={mobileView === key} className={`min-h-24 flex-col gap-2 rounded-xl ${mobileView === key ? "border-primary bg-primary/10 text-primary" : ""}`} onClick={() => setMobileView((current) => current === key ? null : key as "draft" | "outstanding" | "paid")}><Icon />{label}</Button>)}
+          </div>
+          {mobileView && <div className="space-y-2">
+            {salesInvoices.filter((invoice) => mobileView === "outstanding" ? OPEN_INVOICE_STATUSES.has(invoice.status) : invoice.status === mobileView).map((invoice) => <Link key={invoice.id} to="/clients" className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3"><span className="min-w-0"><span className="block truncate text-sm font-semibold">{invoice.number || "Invoice"}</span><span className="block truncate text-xs text-muted-foreground">{invoice.description || invoice.status}</span></span><span className="shrink-0 text-sm text-primary">{invoice.currency} {((invoice.amount_cents ?? 0) / 100).toFixed(2)}</span></Link>)}
+            {!loading && !salesInvoices.some((invoice) => mobileView === "outstanding" ? OPEN_INVOICE_STATUSES.has(invoice.status) : invoice.status === mobileView) && <p className="text-sm text-muted-foreground">No invoices in this view.</p>}
+          </div>}
+        </section>
         {truncated && (
           <p className="rounded-xl border border-amber-500/40 p-4 text-sm">
             More than 20,000 ledger rows exist. Totals on this screen are incomplete; export or
@@ -500,7 +512,7 @@ function PaymentsPage() {
               ))}
             </div>
           </div>
-          <div className="grid gap-px bg-border/70 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-px bg-border/70 lg:grid-cols-3 xl:grid-cols-5">
             {[
               ["Net sales", money(netSales), "Issued invoices less refunds", "text-sky-400"],
               ["Cash collected", money(collected), "Posted payments", "text-emerald-400"],

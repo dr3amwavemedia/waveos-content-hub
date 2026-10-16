@@ -32,6 +32,7 @@ import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/us
 import { ProductReleaseProvider, WhatsNewCard } from "@/components/app/product-releases";
 import { formatInTimeZone } from "@/lib/date-time";
 import { MobileCommandCenter } from "@/components/app/mobile-command-center";
+import { MobileRecentMedia } from "@/components/app/mobile-recent-media";
 
 export const Route = createFileRoute("/_authenticated/home")({
   component: () => (
@@ -39,7 +40,7 @@ export const Route = createFileRoute("/_authenticated/home")({
       <HomeRoute />
     </ProductReleaseProvider>
   ),
-  head: () => ({ meta: [{ title: "Home — WaveOS" }] }),
+  head: () => ({ meta: [{ title: "Home — WaveOS" }, { name: "description", content: "Your WaveOS workspace, recent content and upcoming work." }, { property: "og:title", content: "Home — WaveOS" }, { property: "og:description", content: "Your workspace, recent content and upcoming work at a glance." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
 });
 
 function HomeRoute() {
@@ -91,7 +92,7 @@ function HomeRoute() {
 function HomeDashboard() {
   const { data: user } = useCurrentUser();
   const { activeWorkspace } = useWorkspace();
-  const { can } = usePermissions();
+  const { can, isStaff } = usePermissions();
   const wsId = activeWorkspace?.id;
   const isPublicOs = activeWorkspace?.data_source === "os_data";
   const branding = useWorkspaceBranding(wsId);
@@ -229,7 +230,7 @@ function HomeDashboard() {
             <h1 className="mt-2 truncate text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
               {greeting}, {firstName}.
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
               Here's what's happening in your workspace.
             </p>
           </div>
@@ -237,7 +238,7 @@ function HomeDashboard() {
         <div className="flex flex-wrap gap-2">
           <Link
             to="/updates"
-            className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full border border-border bg-surface/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-elevated"
+            className="hidden min-h-11 w-fit items-center gap-2 rounded-full border border-border bg-surface/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-elevated sm:inline-flex"
           >
             <Sparkles className="h-4 w-4 text-primary" />
             What&apos;s new
@@ -259,9 +260,12 @@ function HomeDashboard() {
         scheduledCount={stats?.scheduledCount}
         awaitingCount={stats?.awaitingCount}
         approvalsTo={isPublicOs ? "/social" : "/approvals"}
+        role={isStaff ? user?.roles.includes("dream_wave_owner") ? "admin" : "staff" : "user"}
       />
 
       <WhatsNewCard />
+
+      <MobileRecentMedia workspaceId={wsId} />
 
       {!isPublicOs && <UpcomingShootPanel />}
 
@@ -297,7 +301,7 @@ function HomeDashboard() {
         </Section>
       )}
 
-      <section className="space-y-4">
+      <section className="hidden space-y-4 sm:block">
         <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/15 via-card to-card p-5 shadow-[var(--shadow-glow)] sm:p-7">
           <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-primary/15 blur-3xl" />
 
@@ -549,7 +553,7 @@ function HomeDashboard() {
         )}
       </Section>
 
-      <Section title="Quick actions" subtitle="Common things you can do right now.">
+      <div className="hidden sm:block"><Section title="Quick actions" subtitle="Common things you can do right now.">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {can("can_create_content") && (
             <QuickAction
@@ -606,7 +610,7 @@ function HomeDashboard() {
             />
           )}
         </div>
-      </Section>
+      </Section></div>
     </div>
   );
 }

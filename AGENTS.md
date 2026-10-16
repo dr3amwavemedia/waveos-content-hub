@@ -8,3 +8,6 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+Mobile guided workflows wrap existing fields and actions with shared step controls; desktop keeps all fields visible, so presentation changes do not fork business logic.
+Creative Studio uses the same canvas and undo history on every device; mobile tool panels disclose existing tools without changing persistence or publish actions.

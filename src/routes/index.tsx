@@ -26,6 +26,10 @@ export const Route = createFileRoute("/")({
         content:
           "Create, manage, and understand your social content in one calm workspace with WaveOS.",
       },
+      { property: "og:title", content: "WaveOS" },
+      { property: "og:description", content: "Create, manage, and understand your social content in one calm workspace." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });

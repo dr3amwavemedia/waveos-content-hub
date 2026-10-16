@@ -6,6 +6,8 @@ import {
   ChevronRight as Chevron,
   PlusCircle,
   Wand2,
+  Users,
+  FolderOpen,
   type LucideIcon,
 } from "lucide-react";
 
@@ -23,7 +25,7 @@ type Tile = {
 
 const TILES: Tile[] = [
   { to: "/create", label: "Create Post", hint: "Plan or publish", icon: PlusCircle, feature: "can_create_content", primary: true },
-  { to: "/creative-studio", label: "Creative Studio", hint: "Design graphics", icon: Wand2, feature: "can_create_content" },
+  { to: "/creative-studio", label: "Creative Studio", hint: "Design graphics", icon: Wand2, feature: "can_use_creative_studio" },
   { to: "/social", search: { view: "analytics" }, label: "Analytics", hint: "View performance", icon: ChartIcon, feature: "can_view_analytics_checkup" },
   { to: "/calendar", label: "Calendar", hint: "See what's next", icon: CalendarDays, feature: "can_view_calendar_preview" },
 ];
@@ -34,13 +36,16 @@ export function MobileCommandCenter({
   scheduledCount,
   awaitingCount,
   approvalsTo,
+  role = "user",
 }: {
   can: (feature: FeatureKey) => boolean;
   scheduledCount?: number;
   awaitingCount?: number;
   approvalsTo: string;
+  role?: "admin" | "staff" | "user";
 }) {
-  const tiles = TILES.filter((tile) => can(tile.feature)).slice(0, 4);
+  const roleTiles: Tile[] = role === "admin" ? [...TILES.slice(0, 2), { to: "/clients", label: "Manage Clients", hint: "Users & workspaces", icon: Users, feature: "can_view_profile" }, TILES[2]] : role === "staff" ? [...TILES.slice(0, 2), TILES[3], { to: "/content", label: "Content Library", hint: "Access assets", icon: FolderOpen, feature: "can_view_media_library" }] : TILES;
+  const tiles = roleTiles.filter((tile) => can(tile.feature)).slice(0, 4);
   const focus = [
     scheduledCount
       ? { label: `${scheduledCount} ${scheduledCount === 1 ? "post" : "posts"} scheduled`, to: "/calendar", icon: CalendarDays }
@@ -64,7 +69,7 @@ export function MobileCommandCenter({
               className={
                 primary
                   ? "flex min-h-24 flex-col items-center justify-center gap-1.5 rounded-2xl bg-gradient-to-br from-primary to-primary-glow p-3 text-center text-primary-foreground shadow-[var(--shadow-glow)]"
-                  : "flex min-h-24 flex-col items-center justify-center gap-1.5 rounded-2xl border border-border-strong bg-gradient-to-br from-secondary to-surface p-3 text-center text-foreground"
+                  : `flex min-h-24 flex-col items-center justify-center gap-1.5 rounded-2xl border border-border-strong bg-gradient-to-br ${to === "/creative-studio" ? "from-creative/70 to-surface" : "from-secondary to-surface"} p-3 text-center text-foreground`
               }
             >
               <Icon className={primary ? "h-6 w-6" : "h-6 w-6 text-primary"} />
