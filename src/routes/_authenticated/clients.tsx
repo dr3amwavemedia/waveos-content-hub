@@ -211,7 +211,7 @@ export const Route = createFileRoute("/_authenticated/clients")({
   },
   component: ClientsPage,
   head: () => ({
-    meta: [{ title: "Clients — WaveOS" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Clients — WaveOS" }, { name: "description", content: "Manage client workspaces, documents and invoices in WaveOS." }, { property: "og:title", content: "Clients — WaveOS" }, { property: "og:description", content: "Manage client workspaces, documents and invoices." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }],
   }),
 });
 
@@ -2662,6 +2662,7 @@ function clientDeleteMessage(message: string) {
 function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
+  const [mobileInvoiceFilter, setMobileInvoiceFilter] = useState("all");
   const q = useQuery({
     queryKey: ["client-deliveries", workspaceId],
     queryFn: async () => {
@@ -3392,12 +3393,16 @@ function InvoicesTab({
           />
         </div>
       )}
+      {!showForm && <div className="grid grid-cols-2 gap-3 sm:hidden">
+        <Button className="min-h-20 flex-col gap-2 rounded-xl" onClick={() => { setEditingInvoice(null); setShowForm(true); }}><Plus /> Create Invoice</Button>
+        {[{key:"draft",label:"View Drafts"},{key:"outstanding",label:"Outstanding"},{key:"paid",label:"Paid"}].map(({key,label}) => <Button key={key} variant="outline" aria-pressed={mobileInvoiceFilter === key} className={cn("min-h-20 flex-col gap-2 rounded-xl", mobileInvoiceFilter === key && "border-primary bg-primary/10")} onClick={() => setMobileInvoiceFilter((value) => value === key ? "all" : key)}><Eye />{label}</Button>)}
+      </div>}
       {q.isSuccess && (
         <div className="hidden sm:block">
           <InvoiceExportTools key={workspaceId} invoices={q.data ?? []} />
         </div>
       )}
-      <div className="flex justify-end">
+      <div className="hidden justify-end sm:flex">
         <button
           onClick={() => {
             if (showForm && !editingInvoice) {
@@ -3434,10 +3439,10 @@ function InvoicesTab({
         <p className="text-sm text-muted-foreground">No invoices yet.</p>
       ) : (
         <ul className="space-y-2">
-          {q.data!.map((i) => (
+          {(q.data ?? []).map((i) => (
             <li
               key={i.id}
-              className="flex flex-col items-stretch justify-between gap-3 rounded-lg border border-border/60 bg-surface/40 p-3 sm:flex-row sm:items-start"
+              className={cn("flex flex-col items-stretch justify-between gap-3 rounded-lg border border-border/60 bg-surface/40 p-3 sm:flex-row sm:items-start", mobileInvoiceFilter !== "all" && (mobileInvoiceFilter === "outstanding" ? !["sent","unpaid","overdue","deposit"].includes(i.status) : i.status !== mobileInvoiceFilter) && "hidden sm:flex")}
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
@@ -4172,8 +4177,8 @@ function InvoiceForm({
           </p>
         </div>
       )}
-      <Field label="Service description"><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className={inputCls} /></Field>
-      <Field label="Manual amount"><input type="number" min="0" step="0.01" value={subtotalAmount} readOnly={items.length > 0} onChange={(event) => setAmount(event.target.value)} className={inputCls} /></Field>
+      <div className="space-y-3 sm:hidden"><Field label="Service description"><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className={inputCls} /></Field>
+      <Field label="Manual amount"><input type="number" min="0" step="0.01" value={subtotalAmount} readOnly={items.length > 0} onChange={(event) => setAmount(event.target.value)} className={inputCls} /></Field></div>
       </MobileWorkflowSection>
       <MobileWorkflowSection active={mobileStep === 2}>
       <div className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-3">
@@ -4458,6 +4463,7 @@ function InvoiceForm({
         </button>
       </div>
       <MobileWorkflowFooter step={mobileStep} total={mobileSteps.length} onChange={setMobileStep} canNext={mobileStep === 0 ? amountValid : mobileStep === 1 ? discountValid && currencyValid : mobileStep === 2 ? checkoutPaymentValid && paidValid : true} final={<Button type="submit" className="min-h-12" disabled={!canSave || save.isPending}>{save.isPending && <Loader2 className="animate-spin" />} {invoice ? "Save changes" : "Save invoice"}</Button>} />
+      <Button type="button" variant="ghost" className="min-h-11 w-full sm:hidden" onClick={onDone}>Cancel</Button>
     </form>
   );
 }

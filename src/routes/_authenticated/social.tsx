@@ -548,7 +548,7 @@ function WorkspaceTab({
           : "text-muted-foreground hover:bg-elevated hover:text-foreground",
       )}
     >
-      <Icon className={cn("h-4 w-4 shrink-0", active && "text-primary")} />
+      <Icon className={cn("hidden h-4 w-4 shrink-0 sm:block", active && "text-primary")} />
       <span className="min-w-0">
         <span className="block truncate text-xs font-semibold sm:text-sm">{label}</span>
         <span className="hidden truncate text-[11px] text-muted-foreground md:block">
