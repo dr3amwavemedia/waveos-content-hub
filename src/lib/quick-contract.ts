@@ -19,4 +19,3 @@ export function invoiceScope(invoice: ScopeInvoice): string {
   if(invoice.due_at)parts.push(`Due: ${invoice.due_at.slice(0,10)}`);
   return parts.join('\n\n');
 }
-export const SMALL_JOB_TEMPLATE = `DREAM WAVE MEDIA — SMALL-JOB AGREEMENT\n\nClient: {{client_name}}\nBusiness: {{business_name}}\nPrepared: {{today_date}}\n\nSERVICES & DELIVERABLES / SCOPE OF WORK\n{{services}}\n\nADDITIONAL AGREED TERMS\n{{custom_terms}}\n\nOnly the services and deliverables stated above are included. Changes to scope or price require a revised agreement or written change order. Payment follows the linked invoice where one is referenced. This agreement does not alter an already executed agreement.`;

@@ -119,6 +119,7 @@ function CreatePost() {
   const editingId = search.id ?? savedId ?? null;
   const existing = useContentItem(editingId);
   const socialConnections = useSocialConnections(workspaceId);
+  const composerAssets=useMediaAssets(workspaceId,{kind:"all"});
   const create = useCreateContentItem(workspaceId);
   const update = useUpdateContentItem();
   const updateVariant = useUpdateVariant();
@@ -395,6 +396,7 @@ function CreatePost() {
   function openStudio(quick: boolean) {
     if (!workspaceId || locked) return;
     const sourceMedia = selectedMedia && pickedMedia.includes(selectedMedia) ? selectedMedia : pickedMedia[0] ?? null;
+    if(sourceMedia && !composerAssets.data?.find(asset=>asset.id===sourceMedia)?.mime_type.startsWith("image/")){toast.error("Studio edits still images only. Video editing is not available.");return;}
     const token=crypto.randomUUID();
     const snapshot: PostStudioSnapshot={workspaceId,postId:editingId,title,caption,platforms,pickedMedia,scheduledAt,activePlatform,platformOptions:draftPlatformOptions,sourceMedia};
     window.sessionStorage.setItem(`waveos-studio-handoff-${token}`,JSON.stringify(snapshot));
@@ -737,9 +739,9 @@ function CreatePost() {
                 <h2 className="text-base font-semibold text-foreground">Content</h2>
               </div>
             </div>
-            <MediaPreviewRow workspaceId={workspaceId} picked={pickedMedia} selected={selectedMedia} onSelect={setSelectedMedia} onRemove={id=>setPickedMedia(current=>current.filter(item=>item!==id))}/>
+            <MediaPreviewRow workspaceId={workspaceId} picked={pickedMedia} selected={selectedMedia} onSelect={setSelectedMedia} onRemove={id=>{if(!locked)setPickedMedia(current=>current.filter(item=>item!==id));}}/>
             <div className="mt-3 grid grid-cols-3 gap-2">
-              <Button variant="outline" disabled={locked||!pickedMedia.length||!can("can_use_creative_studio")} onClick={()=>openStudio(true)}><PenSquare/>Edit</Button>
+              <Button variant="outline" disabled={locked||!pickedMedia.length||!can("can_use_creative_studio")||!composerAssets.data?.find(asset=>asset.id===(selectedMedia??pickedMedia[0]))?.mime_type.startsWith("image/")} onClick={()=>openStudio(true)}><PenSquare/>Edit</Button>
               <Button variant="outline" disabled={locked||!can("can_use_creative_studio")} onClick={()=>openStudio(false)}><Sparkles/>Design</Button>
               <Button variant="outline" disabled={locked} className="whitespace-normal" onClick={()=>setShowLibrary(true)}><Plus/>Add Media</Button>
             </div>
