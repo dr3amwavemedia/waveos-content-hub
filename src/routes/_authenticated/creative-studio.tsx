@@ -1148,7 +1148,7 @@ function CreativeStudioPage() {
           </div>
         </section>
 
-        <MobileToolPanel open={["Canvas", "Adjust", "Crop"].includes(mobileTool ?? "")} title={mobileTool ?? "Canvas"} onClose={() => setMobileTool(null)}>
+        <MobileToolPanel open={["Canvas", "Adjust", "Crop", "Edit"].includes(mobileTool ?? "")} title={mobileTool ?? "Canvas"} onClose={() => setMobileTool(null)}>
           <section className={cn("surface-card space-y-4 p-4", mobileTool !== "Canvas" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">Canvas</h2>
             <Field label="Background">
@@ -1196,7 +1196,7 @@ function CreativeStudioPage() {
             })}
           </section>}
 
-          <div className={cn(["Adjust", "Crop"].includes(mobileTool ?? "") && "hidden sm:block")}>
+          <div className={cn(mobileTool !== "Edit" && "hidden sm:block")}>
           {selected ? (
             <ElementInspector
               element={selected}
@@ -1220,8 +1220,8 @@ function CreativeStudioPage() {
       </div>
 
       {mobileStarted && <div className="space-y-4 sm:hidden">
-        <div className="grid grid-cols-5 gap-1" aria-label="Editing tools">
-          {(photoMode ? [{label:"Media",icon:ImageIcon},{label:"Crop",icon:Crop},{label:"Adjust",icon:SlidersHorizontal},{label:"Brand",icon:WandSparkles},{label:"Layers",icon:Layers3}] : [{label:"Add",icon:Plus},{label:"Media",icon:ImageIcon},{label:"Brand",icon:WandSparkles},{label:"Templates",icon:Square},{label:"Layers",icon:Layers3}]).map(({label,icon:Icon}) => <Button key={label} variant="ghost" className="h-auto min-h-16 flex-col gap-2 px-1 text-[10px]" onClick={() => setMobileTool(label)}><span className="grid size-10 place-items-center rounded-xl border border-border-strong bg-elevated"><Icon className="text-primary" /></span>{label}</Button>)}
+        <div className="grid grid-cols-4 gap-1" aria-label="Editing tools">
+          {(photoMode ? [{label:"Media",icon:ImageIcon},{label:"Crop",icon:Crop},{label:"Adjust",icon:SlidersHorizontal},{label:"Brand",icon:WandSparkles},{label:"Layers",icon:Layers3},{label:"Edit",icon:SlidersHorizontal},{label:"Canvas",icon:Square}] : [{label:"Add",icon:Plus},{label:"Media",icon:ImageIcon},{label:"Brand",icon:WandSparkles},{label:"Templates",icon:Square},{label:"Layers",icon:Layers3},{label:"Edit",icon:SlidersHorizontal},{label:"Canvas",icon:Crop}]).map(({label,icon:Icon}) => <Button key={label} variant="ghost" className="h-auto min-h-16 flex-col gap-2 px-1 text-[10px]" onClick={() => setMobileTool(label)}><span className="grid size-10 place-items-center rounded-xl border border-border-strong bg-elevated"><Icon className="text-primary" /></span>{label}</Button>)}
         </div>
         <div className="rounded-2xl border border-border-strong bg-gradient-to-br from-primary/10 to-surface p-4">
           <p className="mb-3 text-sm font-semibold">Done with your design?</p>
