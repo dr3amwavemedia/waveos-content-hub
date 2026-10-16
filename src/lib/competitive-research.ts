@@ -13,7 +13,8 @@ export const researchReportSchema = z.object({
 });
 export type ResearchReport = z.infer<typeof researchReportSchema>;
 export function publicResearchUrl(raw: string) {
-  const url = new URL(/^https:\/\//i.test(raw) ? raw : `https://${raw}`);
+  const value = raw.trim();
+  const url = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`);
   const host = url.hostname.toLowerCase();
   if (url.protocol !== "https:" || url.username || url.password || url.port || !host.includes(".") ||
     /(^|\.)(localhost|local|internal|test|invalid)$/.test(host) || /^\d+\.\d+\.\d+\.\d+$/.test(host) || host.includes(":")) {
@@ -21,9 +22,10 @@ export function publicResearchUrl(raw: string) {
   }
   return url.href;
 }
-export function groundedReport(report: ResearchReport): ResearchReport {
+export function groundedReport(report: ResearchReport, consultedUrls?: string[]): ResearchReport {
+  const consulted = consultedUrls ? new Set(consultedUrls.flatMap(url=>{try{return [publicResearchUrl(url)];}catch{return [];}})) : null;
   const clean = (claim: z.infer<typeof researchClaim>) => {
-    const sources = claim.sources.flatMap(source => { try { return [publicResearchUrl(source)]; } catch { return []; } });
+    const sources = claim.sources.flatMap(source => { try { const url = publicResearchUrl(source); return !consulted || consulted.has(url) ? [url] : []; } catch { return []; } });
     return sources.length && claim.text.trim() ? [{ text: claim.text, sources }] : [];
   };
   return { ...report, sections: report.sections.map(section => ({ ...section, findings: section.findings.flatMap(clean) })), ideas: report.ideas.flatMap(clean) };

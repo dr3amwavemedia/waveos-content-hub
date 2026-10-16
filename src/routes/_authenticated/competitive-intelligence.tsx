@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
@@ -86,7 +86,11 @@ interface ReportRow {
   created_at: string;
 }
 
+type PublicResearchResult = {report:ResearchReport;inputUrl:string;researchedAt:string;methodology:string};
+
 interface CompetitiveDraft {
+  researchResults?: PublicResearchResult[];
+  researchInput?: string;
   selectedCompetitorId: string | null;
   competitorName: string;
   websiteUrl: string;
@@ -134,14 +138,35 @@ function CompetitiveIntelligencePage() {
   const [screen, setScreen] = useState<"overview" | "editor">("editor");
   const [researchInput, setResearchInput] = useState("");
   const [showManual, setShowManual] = useState(false);
-  const [researchResults, setResearchResults] = useState<Array<{report:ResearchReport;inputUrl:string;researchedAt:string;methodology:string}>>([]);
+  const [researchResults, setResearchResults] = useState<PublicResearchResult[]>([]);
   const [openedReport, setOpenedReport] = useState<ReportRow | null>(null);
   const navigate = useNavigate();
+  const currentWorkspaceRef = useRef(workspaceId);
+  currentWorkspaceRef.current = workspaceId;
   const researchFn = useServerFn(researchCompetitor);
-  const research = useMutation({ mutationFn: () => {
-    if (!workspaceId) throw new Error("Select a workspace first.");
-    return researchFn({data:{workspaceId,url:researchInput}});
-  }, onSuccess: result => {setResearchResults(current=>[...current.filter(item=>item.inputUrl!==result.inputUrl),result].slice(-5));setDirty(true);}, onError:error=>toast.error(error instanceof Error?error.message:"Analysis unavailable") });
+  const research = useMutation({ mutationFn: async (input: {url:string;workspaceId:string}) => {
+    const result = await researchFn({data:input});
+    return {...result,workspaceId:input.workspaceId};
+  }, onSuccess: result => {
+    if (result.workspaceId !== currentWorkspaceRef.current) return;
+    setResearchResults(current=>{
+      const next=[...current.filter(item=>item.inputUrl!==result.inputUrl),result].slice(-5);
+      window.sessionStorage.setItem(`waveos-research-${result.workspaceId}`,JSON.stringify(next));
+      return next;
+    });
+  }, onError:error=>toast.error(error instanceof Error?error.message:"Analysis unavailable") });
+  useEffect(()=>{
+    setResearchInput(""); setResearchResults([]); setOpenedReport(null); setDraft({...DEFAULT_DRAFT,metrics:DEFAULT_DRAFT.metrics.map(metric=>({...metric}))});setDirty(false);
+    research.reset();
+    if (!workspaceId) return;
+    try {
+      const stored = JSON.parse(window.sessionStorage.getItem(`waveos-research-${workspaceId}`) ?? "[]");
+      if (Array.isArray(stored)) setResearchResults(stored.flatMap(item=>{const parsed=researchReportSchema.safeParse(item.report);return parsed.success && typeof item.inputUrl==="string" && typeof item.researchedAt==="string" && typeof item.methodology==="string"?[{...item,report:parsed.data}]:[];}).slice(-5));
+    } catch { /* Keep old manual reports intact if local research cannot restore. */ }
+  },[workspaceId]);
+  function runResearch(url: string) {
+    if (workspaceId) research.mutate({url,workspaceId});
+  }
   const workflowDraft = useWorkflowDraft<CompetitiveDraft>({
     workspaceId,
     workflowKey: "competitive-intelligence",
@@ -186,7 +211,7 @@ function CompetitiveIntelligencePage() {
       if (draft.websiteUrl.trim() && !isValidHttpsUrl(normalizeHttpsUrl(draft.websiteUrl))) {
         throw new Error("Use a valid HTTPS website URL or leave it blank.");
       }
-      if (result.score === null) throw new Error("Add values for at least two comparable metrics.");
+      if (result.score === null) throw new Error("Add at least two comparable metrics with source notes and observation dates.");
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw authError ?? new Error("Sign in to save this report.");
 
@@ -286,7 +311,7 @@ function CompetitiveIntelligencePage() {
 
   async function saveServerDraft() {
     try {
-      await workflowDraft.save.mutateAsync(draft);
+      await workflowDraft.save.mutateAsync({...draft,researchResults,researchInput});
       setDirty(false);
       toast.success("Private server draft saved.");
     } catch (error) {
@@ -305,7 +330,7 @@ function CompetitiveIntelligencePage() {
           <Button className="hidden sm:inline-flex" onClick={() => setScreen("editor")}><Plus /> Add observation</Button>
         </header>
         <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-background/60 p-1 text-xs sm:w-fit">
-          <button className="min-h-10 rounded-lg bg-intelligence/15 px-3 font-semibold text-intelligence">Overview</button><button className="min-h-10 rounded-lg px-3 text-muted-foreground" onClick={() => document.getElementById("tracked-competitors")?.scrollIntoView({behavior:"smooth"})}>Competitors</button><button className="min-h-10 rounded-lg px-3 text-muted-foreground" onClick={() => document.getElementById("opportunities")?.scrollIntoView({behavior:"smooth"})}>Opportunities</button>
+          <button className="min-h-10 rounded-lg bg-intelligence/15 px-3 font-semibold text-intelligence">Overview</button><button className="min-h-10 rounded-lg px-3 text-muted-foreground" onClick={() => window.document.getElementById("tracked-competitors")?.scrollIntoView({behavior:"smooth"})}>Competitors</button><button className="min-h-10 rounded-lg px-3 text-muted-foreground" onClick={() => window.document.getElementById("opportunities")?.scrollIntoView({behavior:"smooth"})}>Opportunities</button>
         </div>
         <section className="rounded-2xl border border-intelligence/30 bg-gradient-to-br from-intelligence/20 via-card to-primary/5 p-5">
           <div className="flex items-center gap-2 text-sm font-semibold text-intelligence"><Sparkles className="h-4 w-4" /> WaveOS Intelligence</div>
@@ -319,7 +344,7 @@ function CompetitiveIntelligencePage() {
         </section>
         <section id="tracked-competitors" className="surface-card p-4 sm:p-5"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Tracked competitors</p><h2 className="mt-1 text-lg font-semibold">Competitors</h2></div><Button size="sm" variant="outline" onClick={() => setScreen("editor")}><Plus /> Add</Button></div><div className="mt-4 grid gap-3 sm:grid-cols-2">{tracked.map((competitor) => <button key={competitor.id} type="button" onClick={() => {selectCompetitor(competitor.id);setScreen("editor");}} className="rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary/40"><div className="font-semibold">{competitor.name}</div><div className="mt-1 truncate text-xs text-muted-foreground">{competitor.website_url || "No website added"}</div><div className="mt-3 text-xs text-primary">Open research →</div></button>)}{!competitors.isLoading && !tracked.length && <div className="col-span-full rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No competitors yet. Add your first public observation to begin.</div>}</div></section>
         <section id="opportunities" className="surface-card p-5"><div className="flex items-center gap-2 font-semibold"><Target className="h-4 w-4 text-campaign" /> Opportunities</div><p className="mt-2 text-sm text-muted-foreground">{tracked.length ? "WaveOS only surfaces opportunities from comparisons you document. Open a competitor to add metrics and source notes." : "Opportunities will appear after you document comparable competitor signals."}</p><Button variant="ghost" className="mt-2 px-0 text-intelligence" onClick={() => setScreen("editor")}>Document a comparison <ArrowRight /></Button></section>
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-xs text-muted-foreground">Competitive Intelligence uses only observations you enter and sources you cite. WaveOS does not scrape competitor accounts or fabricate performance data.</div>
+        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-xs text-muted-foreground">Competitive Intelligence uses cited public research and documented manual observations. Private account metrics are never inferred.</div>
       </div>
     );
   }
@@ -359,7 +384,7 @@ function CompetitiveIntelligencePage() {
               variant="outline"
               onClick={() => {
                 const restored = workflowDraft.data?.payload;
-                if (restored) setDraft(restored);
+                if (restored) {setDraft(restored);setResearchResults(restored.researchResults??[]);setResearchInput(restored.researchInput??"");}
                 setDirty(false);
               }}
             >
@@ -374,8 +399,8 @@ function CompetitiveIntelligencePage() {
 
       <section className="overflow-hidden rounded-2xl border border-intelligence/30 bg-gradient-to-br from-intelligence/15 via-card to-primary/5 p-5 sm:p-7">
         <div className="flex items-center gap-2 text-sm font-semibold text-intelligence"><Sparkles className="h-4 w-4" /> WaveOS Intelligence</div>
-        <h2 className="mt-3 text-xl font-semibold sm:text-2xl">Find the useful signals without filling out a report</h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Start with one public link. Website and social discovery, positioning, services, messaging, content signals, strengths, gaps, and opportunities are the target research outputs.</p>
+        <h2 className="mt-3 text-xl font-semibold sm:text-2xl">Public competitor research</h2>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Start with one public link. Research accessible public sources for positioning, messaging, strengths and original opportunities.</p>
         <div className="mt-5 flex flex-col gap-3 sm:flex-row">
           <label className="relative flex-1">
             <Globe2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
@@ -390,12 +415,12 @@ function CompetitiveIntelligencePage() {
           <Button
             className="min-h-14 rounded-xl px-6"
             disabled={!researchInput.trim() || research.isPending}
-            onClick={() => research.mutate()}
+            onClick={() => runResearch(researchInput)}
           >
             {research.isPending ? <Loader2 className="animate-spin" /> : <Search />} {research.isPending ? "Researching public sources…" : "Analyze Competitor"}
           </Button>
         </div>
-        <p className="mt-3 text-xs text-muted-foreground">One input is enough to start. If WaveOS cannot confidently determine something, it should show “Not found” instead of blocking the analysis.</p>
+        <p className="mt-3 text-xs text-muted-foreground">One input is enough to start. If WaveOS cannot confidently determine something, it shows “Not found” instead of blocking the analysis.</p>
         <button type="button" onClick={() => setShowManual((value) => !value)} className="mt-4 min-h-10 text-sm font-semibold text-intelligence">
           {showManual ? "Hide manual details" : "Add details manually"}
         </button>
@@ -403,7 +428,7 @@ function CompetitiveIntelligencePage() {
 
       {research.isError && <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">{research.error instanceof Error ? research.error.message : "Analysis unavailable"}</p>}
       {researchResults.map(result=><section key={result.inputUrl} className="space-y-5 border-t border-border pt-5">
-        <header className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">{result.report.company ?? "Identity not found"}</h2><p className="mt-1 text-xs text-muted-foreground">Public-source analysis · {new Date(result.researchedAt).toLocaleString()}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>{setResearchInput(result.inputUrl);setShowManual(true);update("competitorName",result.report.company??"");update("websiteUrl",result.report.website??result.inputUrl);}}>Edit</Button><Button variant="outline" disabled={research.isPending} onClick={()=>{setResearchInput(result.inputUrl);setTimeout(()=>research.mutate(),0);}}>Refresh analysis</Button><Button variant="outline" onClick={()=>document.getElementById("competitive-landscape")?.scrollIntoView()}>Compare</Button><Button variant="outline" onClick={()=>{setResearchInput("");window.scrollTo({top:0,behavior:"smooth"});}}>Add another competitor</Button></div></header>
+        <header className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">{result.report.company ?? "Identity not found"}</h2><p className="mt-1 text-xs text-muted-foreground">Public-source analysis · {new Date(result.researchedAt).toLocaleString()}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>{setResearchInput(result.inputUrl);setShowManual(true);update("competitorName",result.report.company??"");update("websiteUrl",result.report.website??result.inputUrl);}}>Edit</Button><Button variant="outline" disabled={research.isPending} onClick={()=>{setResearchInput(result.inputUrl);runResearch(result.inputUrl);}}>Refresh analysis</Button><Button variant="outline" onClick={()=>window.document.getElementById("competitive-landscape")?.scrollIntoView()}>Compare</Button><Button variant="outline" onClick={()=>{setResearchInput("");window.scrollTo({top:0,behavior:"smooth"});}}>Add another competitor</Button></div></header>
         <dl className="grid grid-cols-2 gap-4 text-sm"><div><dt className="text-muted-foreground">Industry</dt><dd>{result.report.industry??"Not found"}</dd></div><div><dt className="text-muted-foreground">Market</dt><dd>{result.report.market??"Not found"}</dd></div><div className="col-span-2"><dt className="text-muted-foreground">Website</dt><dd className="break-all">{result.report.website?<a href={result.report.website} target="_blank" rel="noopener noreferrer" className="text-primary">{result.report.website}</a>:"Not found"}</dd></div></dl>
         <div className="flex flex-wrap gap-2">{result.report.channels.map(url=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="max-w-full break-all text-xs text-primary">{url}</a>)}</div>
         <div className="grid gap-5 sm:grid-cols-2">{result.report.sections.map(section=><section key={section.title} className="border-t border-border pt-4"><h3 className="font-semibold text-intelligence">{section.title}</h3><ul className="mt-3 space-y-3 text-sm">{section.findings.map((finding,index)=><li key={index}><p>{finding.text}</p><div className="mt-1 flex flex-wrap gap-2">{finding.sources.map((url,i)=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary">Source {i+1}</a>)}</div></li>)}</ul>{!section.findings.length&&<p className="mt-2 text-sm text-muted-foreground">Not found in accessible sources.</p>}</section>)}</div>
