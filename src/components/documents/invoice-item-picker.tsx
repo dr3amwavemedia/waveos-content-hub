@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTemplates } from "./template-picker";
 import { invoiceItemsFromJson, type DraftInvoiceItem } from "@/lib/invoice-items";
+import { Button } from "@/components/ui/button";
 
 export function InvoiceItemPicker({
   onAdd,
@@ -11,6 +12,7 @@ export function InvoiceItemPicker({
 }) {
   const q = useTemplates("invoice");
   const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const entries = (q.data ?? []).flatMap((template) =>
     invoiceItemsFromJson((template.body as { items?: unknown } | null)?.items).map((item, index) => ({
       item,
@@ -57,8 +59,8 @@ export function InvoiceItemPicker({
         <p className="text-xs text-muted-foreground">No items match your search.</p>
       ) : (
         <div className="flex max-h-60 flex-wrap gap-2 overflow-y-auto">
-          {filtered.map(({ item, template, index }) => (
-            <button
+          {filtered.map(({ item, template, index }, position) => (
+            <Button variant="outline"
               key={`${template.id}-${index}`}
               type="button"
               disabled={currency.toUpperCase() !== "USD"}
@@ -70,13 +72,14 @@ export function InvoiceItemPicker({
                 })
               }
               title={`Add ${item.title ?? item.description} from ${template.name}`}
-              className="min-h-11 rounded-lg border border-border px-3 py-2 text-left text-xs font-medium text-foreground hover:border-primary hover:bg-primary/10"
+              className={`min-h-11 whitespace-normal rounded-lg border border-border px-3 py-2 text-left text-xs font-medium text-foreground hover:border-primary hover:bg-primary/10 ${!expanded && position >= 5 ? "hidden sm:inline-flex" : ""}`}
             >
               + {item.title ?? item.description}
-            </button>
+            </Button>
           ))}
         </div>
       )}
+      {filtered.length > 5 && <Button variant="ghost" className="min-h-11 w-full text-xs text-primary sm:hidden" onClick={() => setExpanded((value) => !value)}>{expanded ? "Show fewer" : `Show all ${filtered.length} items`}</Button>}
     </div>
   );
 }

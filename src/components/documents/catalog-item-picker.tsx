@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "@/components/ui/button";
 import { useCatalogItems } from "@/hooks/use-catalog";
 import { moneyInputToCents, type DraftInvoiceItem } from "@/lib/invoice-items";
 import {
@@ -27,6 +28,7 @@ export function CatalogItemPicker({
 }) {
   const q = useCatalogItems(true);
   const [search, setSearch] = useState("");
+  const [expanded, setExpanded] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [billing, setBilling] = useState<BillingChoice>("monthly");
   const [finalPrice, setFinalPrice] = useState("");
@@ -82,8 +84,8 @@ export function CatalogItemPicker({
         <p className="text-xs text-muted-foreground">No price list items match your search.</p>
       ) : (
         <div className="flex max-h-60 flex-wrap gap-2 overflow-y-auto">
-          {items.map((item) => (
-            <button
+          {items.map((item, position) => (
+            <Button variant="outline"
               key={item.id}
               type="button"
               disabled={!usd}
@@ -93,15 +95,16 @@ export function CatalogItemPicker({
                 setFinalPrice("");
               }}
               title={priceSummary(item)}
-              className={`min-h-11 rounded-lg border px-3 py-2 text-left text-xs font-medium text-foreground hover:border-primary hover:bg-primary/10 ${
+              className={`min-h-11 whitespace-normal rounded-lg border px-3 py-2 text-left text-xs font-medium text-foreground hover:border-primary hover:bg-primary/10 ${!expanded && position >= 5 ? "hidden sm:inline-flex" : ""} ${
                 selectedId === item.id ? "border-primary bg-primary/10" : "border-border"
               }`}
             >
               {item.name}
-            </button>
+            </Button>
           ))}
         </div>
       )}
+      {items.length > 5 && <Button variant="ghost" className="min-h-11 w-full text-xs text-primary sm:hidden" onClick={() => setExpanded((value) => !value)}>{expanded ? "Show fewer" : `Show all ${items.length} services`}</Button>}
       {selected && (
         <div className="space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
           <div className="flex flex-wrap items-center gap-2">

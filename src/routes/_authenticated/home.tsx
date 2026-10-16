@@ -32,6 +32,7 @@ import { getFrameioWorkspaceStatus, listFrameioWorkspaceMedia } from "@/hooks/us
 import { ProductReleaseProvider, WhatsNewCard } from "@/components/app/product-releases";
 import { formatInTimeZone } from "@/lib/date-time";
 import { MobileCommandCenter } from "@/components/app/mobile-command-center";
+import { MobileRecentMedia } from "@/components/app/mobile-recent-media";
 
 export const Route = createFileRoute("/_authenticated/home")({
   component: () => (
@@ -39,7 +40,7 @@ export const Route = createFileRoute("/_authenticated/home")({
       <HomeRoute />
     </ProductReleaseProvider>
   ),
-  head: () => ({ meta: [{ title: "Home — WaveOS" }] }),
+  head: () => ({ meta: [{ title: "Home — WaveOS" }, { name: "description", content: "Your WaveOS workspace, recent content and upcoming work." }, { property: "og:title", content: "Home — WaveOS" }, { property: "og:description", content: "Your workspace, recent content and upcoming work at a glance." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }] }),
 });
 
 function HomeRoute() {
@@ -263,6 +264,8 @@ function HomeDashboard() {
 
       <WhatsNewCard />
 
+      <MobileRecentMedia workspaceId={wsId} />
+
       {!isPublicOs && <UpcomingShootPanel />}
 
       {!isPublicOs && frameioQ.data && frameioQ.data.files.length > 0 && (
@@ -297,7 +300,7 @@ function HomeDashboard() {
         </Section>
       )}
 
-      <section className="space-y-4">
+      <section className="hidden space-y-4 sm:block">
         <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/15 via-card to-card p-5 shadow-[var(--shadow-glow)] sm:p-7">
           <div className="pointer-events-none absolute -right-12 -top-16 h-48 w-48 rounded-full bg-primary/15 blur-3xl" />
 
@@ -549,7 +552,7 @@ function HomeDashboard() {
         )}
       </Section>
 
-      <Section title="Quick actions" subtitle="Common things you can do right now.">
+      <div className="hidden sm:block"><Section title="Quick actions" subtitle="Common things you can do right now.">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {can("can_create_content") && (
             <QuickAction
@@ -606,7 +609,7 @@ function HomeDashboard() {
             />
           )}
         </div>
-      </Section>
+      </Section></div>
     </div>
   );
 }

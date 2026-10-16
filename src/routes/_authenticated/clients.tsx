@@ -4,6 +4,8 @@ import { ContractSigningActions } from "@/components/documents/contract-signing-
 import { ContractBuilder } from "@/components/documents/contract-builder";
 import { InvoiceItemPicker } from "@/components/documents/invoice-item-picker";
 import { CatalogItemPicker } from "@/components/documents/catalog-item-picker";
+import { MobileWorkflowSteps, MobileWorkflowSection, MobileWorkflowFooter } from "@/components/app/mobile-workflow";
+import { Button } from "@/components/ui/button";
 import {
   invoiceItemsFromJson,
   invoiceItemTotal,
@@ -3588,6 +3590,8 @@ function InvoiceForm({
   onDone: () => void;
 }) {
   const qc = useQueryClient();
+  const [mobileStep, setMobileStep] = useState(0);
+  const mobileSteps = ["Services & items", "Review pricing", "Payment details", "Preview", "Save invoice"];
   const [number, setNumber] = useState(invoice?.number ?? "");
   const [description, setDescription] = useState(invoice?.description ?? "");
   const [items, setItems] = useState<DraftInvoiceItem[]>(() =>
@@ -3942,6 +3946,8 @@ function InvoiceForm({
             : "Add an invoice to this client's account."}
         </p>
       </div>
+      <MobileWorkflowSteps steps={mobileSteps} step={mobileStep} onChange={setMobileStep} />
+      <MobileWorkflowSection active={mobileStep === 1}>
       <div className="flex flex-col gap-3 rounded-xl border border-primary/50 bg-primary/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -3982,6 +3988,8 @@ function InvoiceForm({
           {serviceFeeEnabled ? "Fee on — remove" : "Fee off — add 2.9%"}
         </button>
       </div>
+      </MobileWorkflowSection>
+      <MobileWorkflowSection active={mobileStep === 1}>
       <div className="grid gap-3 sm:grid-cols-3">
         {invoice ? (
           <Field label="Number">
@@ -4024,6 +4032,8 @@ function InvoiceForm({
           )}
         </Field>
       </div>
+      </MobileWorkflowSection>
+      <MobileWorkflowSection active={mobileStep === 1}>
       <div className="grid gap-3 rounded-lg border border-border/70 bg-background/40 p-3 sm:grid-cols-2">
         <Field label="Discount">
           <select
@@ -4071,6 +4081,8 @@ function InvoiceForm({
           issued invoices and automatic charges keep their original recorded totals.
         </p>
       </div>
+      </MobileWorkflowSection>
+      <MobileWorkflowSection active={mobileStep === 0}>
       <CatalogItemPicker
         currency={currency}
         onAdd={(item) => setItems((current) => [...current, item])}
@@ -4160,6 +4172,10 @@ function InvoiceForm({
           </p>
         </div>
       )}
+      <Field label="Service description"><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className={inputCls} /></Field>
+      <Field label="Manual amount"><input type="number" min="0" step="0.01" value={subtotalAmount} readOnly={items.length > 0} onChange={(event) => setAmount(event.target.value)} className={inputCls} /></Field>
+      </MobileWorkflowSection>
+      <MobileWorkflowSection active={mobileStep === 2}>
       <div className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-3">
         <div>
           <p className="text-sm font-semibold text-foreground">Client payment options</p>
@@ -4301,14 +4317,14 @@ function InvoiceForm({
           </Field>
         )}
       </div>
-      <Field label="Description">
+      <div className="hidden sm:block"><Field label="Description">
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={2}
           className={inputCls}
         />
-      </Field>
+      </Field></div>
       <div className="space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
         <div className="flex min-h-12 items-center justify-between gap-4">
           <div>
@@ -4370,6 +4386,8 @@ function InvoiceForm({
           </div>
         )}
       </div>
+      </MobileWorkflowSection>
+      <MobileWorkflowSection active={mobileStep === 4}>
       <div className="grid gap-3 sm:grid-cols-3">
         <Field label="Status">
           <select
@@ -4414,7 +4432,15 @@ function InvoiceForm({
           <p className="mt-1 text-xs text-destructive">{URL_VALIDATION_MESSAGE}</p>
         )}
       </Field>
-      <div className="flex justify-end gap-2">
+      </MobileWorkflowSection>
+      {mobileStep === 3 && <div className="space-y-4 rounded-xl border border-border bg-background p-4 sm:hidden" aria-label="Invoice preview">
+        <div className="border-b border-border pb-3"><p className="text-xs text-primary">Dream Wave Media</p><h3 className="mt-1 text-lg font-semibold">Invoice {number || "Draft"}</h3><p className="mt-1 text-sm text-muted-foreground">{description || "Services"}</p></div>
+        {items.map((item,index) => <div key={index} className="flex justify-between gap-3 text-sm"><span className="min-w-0 break-words">{item.quantity} × {item.title || item.description}</span><span className="shrink-0">{currency} {(item.quantity * item.unitCents / 100).toFixed(2)}</span></div>)}
+        <div className="flex justify-between border-t border-border pt-3 font-semibold"><span>Total</span><span>{currency} {effectiveAmount}</span></div>
+        <p className="text-xs text-muted-foreground">{paymentPlan.replaceAll("_", " ")} · {dueAt ? `Due ${dueAt}` : "No due date"}</p>
+        {serviceFeeEnabled && <p className="text-xs text-muted-foreground">{previewProcessingFeeAtCheckout ? "Processing fee added at checkout" : "Processing fee included"}: {currency} {(previewServiceFeeCents / 100).toFixed(2)}</p>}
+      </div>}
+      <div className="hidden justify-end gap-2 sm:flex">
         <button
           type="button"
           onClick={onDone}
@@ -4431,6 +4457,7 @@ function InvoiceForm({
           {invoice ? "Save changes" : "Add invoice"}
         </button>
       </div>
+      <MobileWorkflowFooter step={mobileStep} total={mobileSteps.length} onChange={setMobileStep} canNext={mobileStep === 0 ? amountValid : mobileStep === 1 ? discountValid && currencyValid : mobileStep === 2 ? checkoutPaymentValid && paidValid : true} final={<Button type="submit" className="min-h-12" disabled={!canSave || save.isPending}>{save.isPending && <Loader2 className="animate-spin" />} {invoice ? "Save changes" : "Save invoice"}</Button>} />
     </form>
   );
 }
