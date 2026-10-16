@@ -159,7 +159,7 @@ export const getSocialIntelligenceProfile = createServerFn({ method: "POST" })
     const snapshotResult = await supabaseAdmin
       .from("social_intelligence_snapshots" as never)
       .select(
-        "id,metric_key,provider,availability,value,unit,range_start,range_end,record_count,captured_at,source_reference,calculation_version",
+        "id,metric_key,provider,availability,value,unit,range_start,range_end,record_count,captured_at,source_reference,calculation_version,evidence",
       )
       .eq("workspace_id", data.workspaceId)
       .eq("profile_id", profile.id)
@@ -187,6 +187,7 @@ export const getSocialIntelligenceProfile = createServerFn({ method: "POST" })
       captured_at: string;
       source_reference: string | null;
       calculation_version: string | null;
+      evidence: { coverage?: string; mode?: string } | null;
     };
     return {
       schemaAvailable: true,

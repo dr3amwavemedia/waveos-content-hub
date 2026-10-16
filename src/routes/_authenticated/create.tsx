@@ -1,4 +1,5 @@
 import { RequireFeature } from "@/components/app/require-feature";
+import { Button } from "@/components/ui/button";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
