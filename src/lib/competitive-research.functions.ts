@@ -28,9 +28,15 @@ export const researchCompetitor = createServerFn({ method: "POST" })
         text: { format: { type: "json_schema", name: "competitor_research", schema } } }),
     });
     if (!response.ok) { const body = await response.text(); console.error(`Research failed [${response.status}]: ${body}`); throw new Error(`Public research failed [${response.status}]: ${body}`); }
-    const payload = await response.json() as { output?: Array<{ content?: Array<{ type?: string; text?: string }> }> };
+    const payload = await response.json() as { output?: Array<{ content?: Array<{ type?: string; text?: string; annotations?: Array<{ type?: string; url?: string }> }>; action?: { url?: string; sources?: Array<{url?:string}> } }> };
     const raw = payload.output?.flatMap(item => item.content ?? []).find(item => item.type === "output_text")?.text;
     if (!raw) throw new Error("Analysis unavailable: the research service returned no report.");
-    const report = groundedReport(researchReportSchema.parse(JSON.parse(raw)));
+    const consulted = payload.output?.flatMap(item=>[
+      ...(item.action?.url ? [item.action.url] : []),
+      ...(item.action?.sources ?? []).flatMap(source=>source.url?[source.url]:[]),
+      ...(item.content ?? []).flatMap(content=>(content.annotations ?? []).flatMap(annotation=>annotation.type==="url_citation" && annotation.url?[annotation.url]:[])),
+    ]) ?? [];
+    const report = groundedReport(researchReportSchema.parse(JSON.parse(raw)), consulted);
+    if (!report.sections.some(section=>section.findings.length)) report.limitations.push("No findings could be matched to the research service's consulted sources.");
     return { report, inputUrl: url, researchedAt: new Date().toISOString(), methodology: "Public-source qualitative research. Source links identify reviewed public pages, not platform-provided analytics. Missing observations are not proof of absence." };
   });

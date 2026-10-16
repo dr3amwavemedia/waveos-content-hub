@@ -10,3 +10,9 @@ test('unsupported competitor findings and content ideas are omitted', () => {
   assert.deepEqual(report.sections[0].findings,[{text:'Public offer',sources:['https://example.com/']}]);
   assert.deepEqual(report.ideas,[]);
 });
+test('a citation must match a consulted provider source',()=>{
+ const report={company:null,industry:null,market:null,website:null,channels:[],sections:[{title:'Offer',findings:[{text:'Unconsulted',sources:['https://fake.example']},{text:'Consulted',sources:['https://example.com']}]}],ideas:[],limitations:[]};
+ assert.equal(groundedReport(report,['https://example.com']).sections[0].findings.length,1);
+ assert.equal(groundedReport(report,[]).sections[0].findings.length,0);
+ assert.throws(()=>publicResearchUrl('http://example.com'));
+});
