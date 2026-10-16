@@ -58,11 +58,7 @@ export function CatalogItemPicker({
 
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
-      <p className="text-sm font-medium text-foreground">Add from the 2026 price list</p>
-      <p className="text-xs text-muted-foreground">
-        Each item is added once with its own wording. Ranges and starting-at items need the final
-        agreed amount first. Price list amounts are in USD.
-      </p>
+      <p className="text-sm font-medium text-foreground">Services & Pricing</p>
       {!usd && (
         <p className="text-xs text-destructive">
           Change the invoice currency to USD before adding price list items.
@@ -70,18 +66,18 @@ export function CatalogItemPicker({
       )}
       <input
         type="search"
-        aria-label="Search the price list"
+        aria-label="Search services and pricing"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="Search packages and services"
         className={inputCls}
       />
       {q.isLoading ? (
-        <p className="text-xs text-muted-foreground">Loading the price list…</p>
+        <p className="text-xs text-muted-foreground">Loading services…</p>
       ) : q.isError ? (
-        <p className="text-xs text-destructive">The price list could not load. Try again.</p>
+        <p className="text-xs text-destructive">Services could not load. Try again.</p>
       ) : items.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No price list items match your search.</p>
+        <p className="text-xs text-muted-foreground">No services match your search.</p>
       ) : (
         <div className="flex max-h-60 flex-wrap gap-2 overflow-y-auto">
           {items.map((item, position) => (
