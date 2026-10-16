@@ -401,8 +401,7 @@ select {
     padding-bottom: 0;
   }
   body:has([data-studio-focused="true"]) main ~ nav,
-  body:has([data-studio-focused="true"]) header:has(> a),
-  body:has([data-studio-focused="true"]) header:has(> svg) {
+  body:has([data-studio-focused="true"]) [data-global-mobile-header] {
     display: none;
   }
 }

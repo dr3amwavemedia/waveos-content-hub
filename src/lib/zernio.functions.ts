@@ -188,16 +188,12 @@ export const getSocialIntelligenceProfile = createServerFn({ method: "POST" })
       source_reference: string | null;
       calculation_version: string | null;
     };
-    const latest = new Map<string, Snapshot>();
-    for (const row of (snapshotResult.data ?? []) as Snapshot[]) {
-      if (!latest.has(row.metric_key)) latest.set(row.metric_key, row);
-    }
     return {
       schemaAvailable: true,
       profile,
-      snapshots: [...latest.values()].map((row) => ({
+      snapshots: ((snapshotResult.data ?? []) as Snapshot[]).map((row) => ({
         ...row,
-        value: row.value === null ? null : Number(row.value),
+        value: row.value === null || !Number.isFinite(Number(row.value)) ? null : Number(row.value),
       })),
       safeMessage: profile.safe_error_message,
     };
