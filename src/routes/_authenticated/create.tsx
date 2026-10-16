@@ -1275,8 +1275,9 @@ function MediaPreviewRow({
 
   if (!picked.length) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-elevated/30 p-6 text-center text-sm text-muted-foreground">
-        No media selected yet.
+      <div className="grid aspect-[4/3] place-content-center rounded-lg border border-dashed border-border bg-elevated/30 p-6 text-center text-sm text-muted-foreground">
+        <ImagePlus className="mx-auto mb-3 h-8 w-8"/>
+        Add your post media
       </div>
     );
   }
