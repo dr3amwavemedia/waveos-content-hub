@@ -398,10 +398,12 @@ function Shell({ children }: { children: ReactNode }) {
     (item, index, items) =>
       items.findIndex((candidate) => candidate.to === item.to && candidate.hash === item.hash) === index,
   );
-  // Staff get Documents and Price List in the grouped phone menu; client menus
+  // Staff get Documents and Services & Pricing in the grouped phone menu; client menus
   // stay task-focused.
   const mobileDrawerNav = isStaff
-    ? nav
+    ? [...nav, ...filterByFeature([{ to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" }])].filter(
+        (item, index, items) => items.findIndex((candidate) => candidate.to === item.to && candidate.hash === item.hash) === index,
+      )
     : nav.filter((item) => item.to !== "/templates" && item.to !== "/catalog");
 
   return (
@@ -685,10 +687,11 @@ const MOBILE_OS_PATHS = new Set(["/os-data"]);
 
 function MobileAdminNav({ items }: { items: NavItem[] }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const orderedItems = (paths: Set<string>) => [...paths].flatMap((path) => items.filter((item) => !item.hash && item.to === path));
   const groupedPaths = new Set([...MOBILE_PERSONAL_PATHS, ...MOBILE_BUSINESS_PATHS, ...MOBILE_OS_PATHS]);
   const groups = [
-    { label: "Personal", items: items.filter((i) => !i.hash && MOBILE_PERSONAL_PATHS.has(i.to)) },
-    { label: "Business", items: items.filter((i) => !i.hash && MOBILE_BUSINESS_PATHS.has(i.to)) },
+    { label: "Personal", items: orderedItems(MOBILE_PERSONAL_PATHS) },
+    { label: "Business", items: orderedItems(MOBILE_BUSINESS_PATHS) },
     { label: "OS", items: items.filter((i) => !i.hash && MOBILE_OS_PATHS.has(i.to)) },
     { label: "More", items: items.filter((i) => i.hash || !groupedPaths.has(i.to)) },
   ].filter((group) => group.items.length);
@@ -702,11 +705,16 @@ function MobileAdminNav({ items }: { items: NavItem[] }) {
             {group.items.map((item) => {
               const active = !item.hash && (pathname === item.to || pathname.startsWith(item.to + "/"));
               const Icon = item.icon;
-              const label = item.label === "DOCUMENTS" ? "Documents" : item.label;
+              const labels: Record<string, string> = {
+                "/social": "Social Accounts", "/analytics": "Analytics",
+                "/competitive-intelligence": "Competitive Intelligence", "/content": "Content",
+                "/templates": "Documents", "/admin": "Staff/Admin",
+              };
+              const label = labels[item.to] ?? item.label;
               return (
                 <li key={`${item.to}#${item.hash ?? ""}`} className="min-w-0">
                   <Link to={item.to} hash={item.hash} className={cn(
-                    "flex min-h-14 min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-[11px] font-medium leading-tight transition-colors min-[380px]:text-xs",
+                    "grid min-h-14 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-medium leading-tight transition-colors",
                     active ? "border-primary/40 bg-primary/12 text-foreground" : "border-border/60 bg-surface/50 text-muted-foreground hover:text-foreground",
                   )}>
                     <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "")} />
