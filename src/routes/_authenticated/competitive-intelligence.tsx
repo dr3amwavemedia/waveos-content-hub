@@ -86,7 +86,11 @@ interface ReportRow {
   created_at: string;
 }
 
+type PublicResearchResult = {report:ResearchReport;inputUrl:string;researchedAt:string;methodology:string};
+
 interface CompetitiveDraft {
+  researchResults?: PublicResearchResult[];
+  researchInput?: string;
   selectedCompetitorId: string | null;
   competitorName: string;
   websiteUrl: string;
@@ -134,7 +138,7 @@ function CompetitiveIntelligencePage() {
   const [screen, setScreen] = useState<"overview" | "editor">("editor");
   const [researchInput, setResearchInput] = useState("");
   const [showManual, setShowManual] = useState(false);
-  const [researchResults, setResearchResults] = useState<Array<{report:ResearchReport;inputUrl:string;researchedAt:string;methodology:string}>>([]);
+  const [researchResults, setResearchResults] = useState<PublicResearchResult[]>([]);
   const [openedReport, setOpenedReport] = useState<ReportRow | null>(null);
   const navigate = useNavigate();
   const currentWorkspaceRef = useRef(workspaceId);
@@ -307,7 +311,7 @@ function CompetitiveIntelligencePage() {
 
   async function saveServerDraft() {
     try {
-      await workflowDraft.save.mutateAsync(draft);
+      await workflowDraft.save.mutateAsync({...draft,researchResults,researchInput});
       setDirty(false);
       toast.success("Private server draft saved.");
     } catch (error) {
@@ -380,7 +384,7 @@ function CompetitiveIntelligencePage() {
               variant="outline"
               onClick={() => {
                 const restored = workflowDraft.data?.payload;
-                if (restored) setDraft(restored);
+                if (restored) {setDraft(restored);setResearchResults(restored.researchResults??[]);setResearchInput(restored.researchInput??"");}
                 setDirty(false);
               }}
             >
