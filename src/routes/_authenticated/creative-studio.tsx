@@ -27,6 +27,11 @@ import {
   Undo2,
   Upload,
   WandSparkles,
+  Crop,
+  SlidersHorizontal,
+  RotateCw,
+  Maximize2,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequireFeature } from "@/components/app/require-feature";
@@ -38,6 +43,8 @@ import { getMediaPreviewUrl, useMediaAssets, useUploadAsset } from "@/hooks/use-
 import { useWorkspaceBranding, workspacePalette } from "@/hooks/use-workspace-branding";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
+import { MobileToolPanel } from "@/components/app/mobile-tool-panel";
+import { Slider } from "@/components/ui/slider";
 
 export const Route = createFileRoute("/_authenticated/creative-studio")({
   component: () => (
@@ -57,6 +64,10 @@ export const Route = createFileRoute("/_authenticated/creative-studio")({
         content: "Create and export static social graphics using workspace brand colors.",
       },
       { name: "robots", content: "noindex" },
+      { property: "og:title", content: "Creative Studio — WaveOS" },
+      { property: "og:description", content: "Create and edit branded social graphics in your workspace." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
@@ -107,6 +118,10 @@ type ImageElement = {
   name: string;
   sourceType: "media" | "workspace-logo";
   assetId: string | null;
+  brightness?: number;
+  contrast?: number;
+  saturation?: number;
+  crop?: { x: number; y: number; width: number; height: number };
   x: number;
   y: number;
   width: number;
@@ -268,6 +283,9 @@ function CreativeStudioPage() {
   const [selectedId, setSelectedId] = useState<string | null>("headline");
   const [dirty, setDirty] = useState(false);
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
+  const [mobileStarted, setMobileStarted] = useState(false);
+  const [mobileTool, setMobileTool] = useState<string | null>(null);
+  const [photoMode, setPhotoMode] = useState(false);
   const document = history[historyIndex];
   const format = FORMATS[document.format];
   const mediaAssets = useMediaAssets(workspaceId, { kind: "image" });
@@ -423,8 +441,14 @@ function CreativeStudioPage() {
               const image = await loadCanvasImage(url);
               if (cancelled) return;
               context.globalAlpha = element.opacity;
+              context.filter = `brightness(${element.brightness ?? 100}%) contrast(${element.contrast ?? 100}%) saturate(${element.saturation ?? 100}%)`;
+              const crop = element.crop ?? { x: 0, y: 0, width: 1, height: 1 };
               context.drawImage(
                 image,
+                image.naturalWidth * crop.x,
+                image.naturalHeight * crop.y,
+                image.naturalWidth * crop.width,
+                image.naturalHeight * crop.height,
                 -element.width / 2,
                 -element.height / 2,
                 element.width,
@@ -532,8 +556,10 @@ function CreativeStudioPage() {
       opacity: 1,
       rotation: 0,
     };
-    changeDocument((current) => ({ ...current, elements: [...current.elements, element] }));
+    changeDocument((current) => ({ ...current, elements: photoMode ? [{ ...element, x: 0.5, y: 0.5, width: format.width, height: format.height }] : [...current.elements, element] }));
     setSelectedId(element.id);
+    setMobileStarted(true);
+    setMobileTool(null);
   }
 
   function addWorkspaceLogo() {
@@ -664,6 +690,8 @@ function CreativeStudioPage() {
     setHistoryIndex(0);
     setSelectedId(safe.elements.at(-1)?.id ?? null);
     setDirty(false);
+    setMobileStarted(true);
+    setMobileTool(null);
   }
 
   function exportPng() {
@@ -730,7 +758,8 @@ function CreativeStudioPage() {
   }
 
   function canvasPoint(event: ReactPointerEvent<HTMLCanvasElement>) {
-    const canvas = canvasRef.current!;
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
     const bounds = canvas.getBoundingClientRect();
     return {
       x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
@@ -839,16 +868,16 @@ function CreativeStudioPage() {
       <UnsavedChangesGuard dirty={dirty} subject="this design" />
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+          <div className="hidden items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary sm:flex">
             <ImageIcon className="h-4 w-4" /> Static images only
           </div>
           <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Creative Studio</h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+          <p className="mt-2 hidden max-w-3xl text-sm text-muted-foreground sm:block">
             Compose branded text and shapes, save editable designs, and export a high-resolution
             PNG. Video timelines and generative credits are not used.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="hidden flex-wrap gap-2 sm:flex">
           <Button
             variant="outline"
             onClick={() => void saveServerDraft()}
@@ -883,6 +912,15 @@ function CreativeStudioPage() {
         </div>
       </header>
 
+      {!mobileStarted && <section className="grid grid-cols-2 gap-3 sm:hidden" aria-label="Start a design">
+        {[
+          { label: "Create Graphic", icon: WandSparkles, tool: "Templates", photo: false },
+          { label: "Edit Photo", icon: ImageIcon, tool: "Media", photo: true },
+          { label: "Resize Content", icon: Maximize2, tool: "Canvas", photo: false },
+          { label: "Brand Template", icon: Layers3, tool: "Templates", photo: false },
+        ].map(({ label, icon: Icon, tool, photo }) => <Button key={label} variant="outline" className="min-h-32 flex-col gap-3 whitespace-normal rounded-2xl border-border-strong bg-gradient-to-br from-secondary to-surface text-center" onClick={() => { setPhotoMode(photo); setMobileStarted(true); setMobileTool(tool); }}><Icon className="size-8 text-primary" /><span>{label}</span></Button>)}
+      </section>}
+
       {workflowDraft.data?.payload && (
         <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -896,12 +934,14 @@ function CreativeStudioPage() {
               size="sm"
               variant="outline"
               onClick={() => {
-                const restored = workflowDraft.data!.payload;
+                const restored = workflowDraft.data?.payload;
+                if (!restored) return;
                 setName(restored.name);
                 setDesignId(restored.designId);
                 setHistory([normalizeDocument(restored.document)]);
                 setHistoryIndex(0);
                 setDirty(false);
+                setMobileStarted(true);
               }}
             >
               Restore
@@ -913,10 +953,10 @@ function CreativeStudioPage() {
         </div>
       )}
 
-      <section className="surface-card flex flex-wrap items-end gap-3 p-3 sm:p-4">
+      <section className={cn("flex flex-wrap items-end gap-3 sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-4", !mobileStarted && "hidden sm:flex")}>
         <Field label="Design name">
           <input
-            className={`${inputClass} min-w-56`}
+            className={`${inputClass} min-w-0 sm:min-w-56`}
             value={name}
             maxLength={120}
             onChange={(event) => {
@@ -971,9 +1011,9 @@ function CreativeStudioPage() {
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[14rem_minmax(0,1fr)_18rem]">
-        <aside className="space-y-4">
-          <section className="surface-card p-4">
+      <div className={cn("grid gap-5 xl:grid-cols-[14rem_minmax(0,1fr)_18rem]", !mobileStarted && "hidden sm:grid")}>
+        <MobileToolPanel open={["Add", "Media", "Brand", "Templates", "Layers"].includes(mobileTool ?? "")} title={mobileTool ?? "Tools"} onClose={() => setMobileTool(null)}>
+          <section className={cn("surface-card p-4", mobileTool && !["Add", "Brand"].includes(mobileTool) && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">Add</h2>
             <input
               ref={uploadInputRef}
@@ -995,7 +1035,7 @@ function CreativeStudioPage() {
               <ToolButton icon={WandSparkles} label="Apply my brand" onClick={applyBrand} />
             </div>
           </section>
-          <section className="surface-card p-4">
+          <section className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">Templates</h2>
             <div className="mt-3 max-h-48 space-y-1 overflow-y-auto">
               {TEMPLATE_NAMES.map((template) => (
@@ -1016,8 +1056,9 @@ function CreativeStudioPage() {
               ))}
             </div>
           </section>
-          <section className="surface-card p-4">
+          <section className={cn("surface-card p-4", mobileTool !== "Media" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">Media Library</h2>
+            <Button variant="outline" className="mt-3 min-h-11 w-full sm:hidden" onClick={() => uploadInputRef.current?.click()}><Upload /> Upload image</Button>
             <div className="mt-3 max-h-48 space-y-1 overflow-y-auto">
               {(mediaAssets.data ?? []).slice(0, 30).map((asset) => (
                 <button
@@ -1035,7 +1076,7 @@ function CreativeStudioPage() {
               )}
             </div>
           </section>
-          <section className="surface-card p-4">
+          <section className={cn("surface-card p-4", mobileTool !== "Layers" && "hidden sm:block")}>
             <div className="flex items-center gap-2 text-sm font-semibold">
               <Layers3 className="h-4 w-4" /> Layers
             </div>
@@ -1066,7 +1107,7 @@ function CreativeStudioPage() {
               ))}
             </div>
           </section>
-          <section className="surface-card p-4">
+          <section className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">Saved designs</h2>
             <div className="mt-3 space-y-1">
               {(designs.data ?? []).map((row) => (
@@ -1087,28 +1128,28 @@ function CreativeStudioPage() {
               )}
             </div>
           </section>
-        </aside>
+        </MobileToolPanel>
 
-        <section className="surface-card flex min-h-[30rem] items-center justify-center overflow-hidden p-3 sm:p-6">
+        <section className="flex min-h-64 items-center justify-center overflow-hidden sm:surface-card sm:min-h-[30rem] sm:p-6">
           <div className="w-full max-w-3xl">
             <canvas
               ref={canvasRef}
               aria-label={`${name} design preview`}
-              className="h-auto w-full touch-none cursor-move rounded-lg shadow-2xl ring-1 ring-white/10"
+              className="mx-auto h-auto max-h-[48dvh] w-auto max-w-full touch-none cursor-move ring-1 ring-border-strong sm:max-h-none sm:w-full sm:rounded-lg"
               style={{ aspectRatio: `${format.width}/${format.height}` }}
               onPointerDown={beginCanvasMove}
               onPointerMove={moveCanvasElement}
               onPointerUp={endCanvasMove}
               onPointerCancel={endCanvasMove}
             />
-            <div className="mt-3 text-center text-xs text-muted-foreground">
+            <div className="mt-3 hidden text-center text-xs text-muted-foreground sm:block">
               Preview scaled to fit · export is {format.width} × {format.height}px
             </div>
           </div>
         </section>
 
-        <aside className="space-y-4">
-          <section className="surface-card space-y-4 p-4">
+        <MobileToolPanel open={["Canvas", "Adjust", "Crop"].includes(mobileTool ?? "")} title={mobileTool ?? "Canvas"} onClose={() => setMobileTool(null)}>
+          <section className={cn("surface-card space-y-4 p-4", mobileTool !== "Canvas" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">Canvas</h2>
             <Field label="Background">
               <input
@@ -1137,6 +1178,24 @@ function CreativeStudioPage() {
             </div>
           </section>
 
+          {selected?.type === "image" && <section className="space-y-5 rounded-xl border border-border p-4">
+            {mobileTool === "Crop" ? <>
+              <div className="grid grid-cols-3 gap-2">
+                {[{label:"Original",ratio:null},{label:"Square",ratio:1},{label:"Portrait",ratio:0.8}].map(({label,ratio}) => <Button key={label} variant="outline" className="min-h-11" onClick={() => {
+                  const asset = mediaAssets.data?.find((item) => item.id === selected.assetId);
+                  const sourceRatio = (asset?.width ?? selected.width) / (asset?.height ?? selected.height);
+                  const width = ratio && sourceRatio > ratio ? ratio / sourceRatio : 1;
+                  const height = ratio && sourceRatio < ratio ? sourceRatio / ratio : 1;
+                  updateElement(selected.id, { crop: { x: (1-width)/2, y: (1-height)/2, width, height }, ...(ratio ? { height: selected.width / ratio } : {}) });
+                }}>{label}</Button>)}
+              </div>
+              <Button variant="outline" className="min-h-11 w-full" onClick={() => updateElement(selected.id, { rotation: ((selected.rotation ?? 0) + 90) % 360 })}><RotateCw /> Rotate 90°</Button>
+            </> : ["brightness", "contrast", "saturation"].map((key) => {
+              const metric = key as "brightness" | "contrast" | "saturation";
+              return <label key={key} className="block space-y-3"><span className="flex justify-between text-sm capitalize">{key}<span className="text-primary">{selected[metric] ?? 100}%</span></span><Slider aria-label={key} value={[selected[metric] ?? 100]} min={0} max={200} step={1} onValueChange={([value]) => updateElement(selected.id, { [key]: value })} /></label>;
+            })}
+          </section>}
+
           {selected ? (
             <ElementInspector
               element={selected}
@@ -1155,8 +1214,24 @@ function CreativeStudioPage() {
               Select a layer to edit it.
             </section>
           )}
-        </aside>
+        </MobileToolPanel>
       </div>
+
+      {mobileStarted && <div className="space-y-4 sm:hidden">
+        <div className="grid grid-cols-5 gap-1" aria-label="Editing tools">
+          {(photoMode ? [{label:"Media",icon:ImageIcon},{label:"Crop",icon:Crop},{label:"Adjust",icon:SlidersHorizontal},{label:"Brand",icon:WandSparkles},{label:"Layers",icon:Layers3}] : [{label:"Add",icon:Plus},{label:"Media",icon:ImageIcon},{label:"Brand",icon:WandSparkles},{label:"Templates",icon:Square},{label:"Layers",icon:Layers3}]).map(({label,icon:Icon}) => <Button key={label} variant="ghost" className="h-auto min-h-16 flex-col gap-2 px-1 text-[10px]" onClick={() => setMobileTool(label)}><span className="grid size-10 place-items-center rounded-xl border border-border-strong bg-elevated"><Icon className="text-primary" /></span>{label}</Button>)}
+        </div>
+        <div className="rounded-2xl border border-border-strong bg-gradient-to-br from-primary/10 to-surface p-4">
+          <p className="mb-3 text-sm font-semibold">Done with your design?</p>
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant="outline" className="min-h-20 flex-col gap-2 whitespace-normal px-1 text-xs" onClick={() => void saveServerDraft()} disabled={workflowDraft.save.isPending}><Save /> Save Draft</Button>
+            <Button variant="outline" className="min-h-20 flex-col gap-2 whitespace-normal px-1 text-xs" onClick={() => void sendToPost("feed")} disabled={uploadAsset.isPending}><ImagePlus /> Post to Feed</Button>
+            <Button variant="outline" className="min-h-20 flex-col gap-2 whitespace-normal px-1 text-xs" onClick={() => void sendToPost("story")} disabled={uploadAsset.isPending}><ImagePlus /> Post to Story</Button>
+          </div>
+          <Button variant="outline" className="mt-3 min-h-11 w-full" onClick={exportPng}><Download /> Export PNG</Button>
+          <Button variant="ghost" className="mt-2 min-h-11 w-full" onClick={() => saveDesign.mutate()} disabled={saveDesign.isPending}><Save /> Save editable design</Button>
+        </div>
+      </div>}
     </div>
   );
 }
@@ -1348,13 +1423,13 @@ function ToolButton({
   onClick: () => void;
 }) {
   return (
-    <button
+    <Button variant="outline"
       type="button"
       onClick={onClick}
       className="flex min-h-12 items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold hover:bg-elevated"
     >
       <Icon className="h-4 w-4 text-primary" /> {label}
-    </button>
+    </Button>
   );
 }
 
