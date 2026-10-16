@@ -27,6 +27,7 @@ import {
   type CampaignPlanningItem,
 } from "@/lib/phase-one-planning";
 import { cn } from "@/lib/utils";
+import { MobileWorkflowSteps, MobileWorkflowSection, MobileWorkflowFooter } from "@/components/app/mobile-workflow";
 
 export const Route = createFileRoute("/_authenticated/campaigns")({
   component: () => (
@@ -46,6 +47,10 @@ export const Route = createFileRoute("/_authenticated/campaigns")({
         content: "Build reviewable internal social campaign plans without auto-publishing.",
       },
       { name: "robots", content: "noindex" },
+      { property: "og:title", content: "Campaign Manager — WaveOS" },
+      { property: "og:description", content: "Build and review your next social campaign plan." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
@@ -96,6 +101,8 @@ function CampaignManagerPage() {
   const [input, setInput] = useState<CampaignPlanningInput>(DEFAULT_INPUT);
   const [preview, setPreview] = useState<CampaignPlanningItem[]>([]);
   const [dirty, setDirty] = useState(false);
+  const [mobileStep, setMobileStep] = useState(0);
+  const mobileSteps = ["Campaign name", "Your goal", "Platforms", "Posting frequency", "Planning schedule", "Review campaign"];
   const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
     workspaceId,
     workflowKey: "campaign-manager",
@@ -229,7 +236,7 @@ function CampaignManagerPage() {
             <Megaphone className="h-4 w-4" /> Internal planning
           </div>
           <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Campaign Manager</h1>
-          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+          <p className="mt-2 hidden max-w-3xl text-sm text-muted-foreground sm:block">
             Build a reviewable campaign outline from your own constraints. Nothing here schedules,
             publishes, spends money, or contacts an external platform.
           </p>
@@ -243,7 +250,7 @@ function CampaignManagerPage() {
             {workflowDraft.save.isPending ? <Loader2 className="animate-spin" /> : <Save />}
             Save draft
           </Button>
-          <Button onClick={generatePlan} disabled={errors.length > 0}>
+          <Button className="hidden sm:inline-flex" onClick={generatePlan} disabled={errors.length > 0}>
             <Sparkles /> Build plan
           </Button>
         </div>
@@ -262,7 +269,9 @@ function CampaignManagerPage() {
               size="sm"
               variant="outline"
               onClick={() => {
-                setInput(workflowDraft.data!.payload);
+                const restored = workflowDraft.data?.payload;
+                if (!restored) return;
+                setInput(restored);
                 setPreview([]);
                 setDirty(false);
               }}
@@ -277,8 +286,10 @@ function CampaignManagerPage() {
       )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)]">
-        <section className="surface-card space-y-5 p-4 sm:p-6">
+        <section className="space-y-5 sm:surface-card sm:p-6">
+          <MobileWorkflowSteps steps={mobileSteps} step={mobileStep} onChange={setMobileStep} />
           <div className="grid gap-4 sm:grid-cols-2">
+            <MobileWorkflowSection active={mobileStep === 0}>
             <Field label="Campaign name">
               <input
                 className={inputClass}
@@ -288,6 +299,12 @@ function CampaignManagerPage() {
                 onChange={(event) => update("name", event.target.value)}
               />
             </Field>
+            </MobileWorkflowSection>
+            <MobileWorkflowSection active={mobileStep === 1}>
+            <div className="grid grid-cols-2 gap-3 sm:hidden" aria-label="Campaign goal">
+              {CAMPAIGN_GOALS.map((goal) => <Button key={goal} variant="outline" aria-pressed={input.goal === goal} className={cn("min-h-24 whitespace-normal rounded-xl", input.goal === goal && "border-primary bg-primary/10 text-primary")} onClick={() => update("goal", goal)}>{({ awareness: "Brand Awareness", engagement: "Increase Engagement", leads: "Generate Leads", launch: "Promote a Service", retention: "Keep Customers" })[goal]}</Button>)}
+            </div>
+            <div className="hidden sm:block">
             <Field label="Primary goal">
               <select
                 className={inputClass}
@@ -301,6 +318,9 @@ function CampaignManagerPage() {
                 ))}
               </select>
             </Field>
+            </div>
+            </MobileWorkflowSection>
+            <MobileWorkflowSection active={mobileStep === 4}>
             <Field label="Start date">
               <input
                 className={inputClass}
@@ -309,6 +329,8 @@ function CampaignManagerPage() {
                 onChange={(event) => update("startDate", event.target.value)}
               />
             </Field>
+            </MobileWorkflowSection>
+            <MobileWorkflowSection active={mobileStep === 4}>
             <Field label="End date">
               <input
                 className={inputClass}
@@ -317,6 +339,8 @@ function CampaignManagerPage() {
                 onChange={(event) => update("endDate", event.target.value)}
               />
             </Field>
+            </MobileWorkflowSection>
+            <MobileWorkflowSection active={mobileStep === 3}>
             <Field label="Maximum posts">
               <input
                 className={inputClass}
@@ -327,6 +351,8 @@ function CampaignManagerPage() {
                 onChange={(event) => update("maxPosts", Number(event.target.value))}
               />
             </Field>
+            </MobileWorkflowSection>
+            <MobileWorkflowSection active={mobileStep === 4}>
             <Field label="Planning times" hint="Local workspace times, comma separated">
               <input
                 className={inputClass}
@@ -343,21 +369,34 @@ function CampaignManagerPage() {
                 }
               />
             </Field>
+            </MobileWorkflowSection>
           </div>
 
+          <MobileWorkflowSection active={mobileStep === 2}>
           <ChoiceGroup
             label="Platforms"
             values={PLATFORM_OPTIONS}
             selected={input.platforms}
             onToggle={(value) => toggleList("platforms", value)}
           />
+          </MobileWorkflowSection>
+          <MobileWorkflowSection active={mobileStep === 4}>
           <ChoiceGroup
             label="Days to exclude"
             values={DAY_OPTIONS}
             selected={input.excludedDays}
             onToggle={(value) => toggleList("excludedDays", value)}
           />
+          </MobileWorkflowSection>
 
+          <MobileWorkflowSection active={mobileStep === 5}>
+          <dl className="grid grid-cols-2 gap-3 rounded-xl border border-border bg-surface p-4 text-sm sm:hidden">
+            <dt className="text-muted-foreground">Campaign</dt><dd className="break-words">{input.name || "Not named"}</dd>
+            <dt className="text-muted-foreground">Goal</dt><dd className="capitalize">{input.goal}</dd>
+            <dt className="text-muted-foreground">Platforms</dt><dd className="break-words capitalize">{input.platforms.join(", ") || "None"}</dd>
+            <dt className="text-muted-foreground">Maximum posts</dt><dd>{input.maxPosts}</dd>
+            <dt className="text-muted-foreground">Dates</dt><dd>{input.startDate} – {input.endDate}</dd>
+          </dl>
           <label className="flex min-h-12 items-center justify-between gap-4 rounded-xl border border-border bg-background/40 px-4 py-3">
             <span>
               <span className="block text-sm font-semibold">Approval required</span>
@@ -372,18 +411,20 @@ function CampaignManagerPage() {
               onChange={(event) => update("approvalRequired", event.target.checked)}
             />
           </label>
+          </MobileWorkflowSection>
 
           {errors.length > 0 && (
-            <ul className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
+            <ul className={cn("rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning", mobileStep !== 5 && "hidden sm:block")}>
               {errors.map((error) => (
                 <li key={error}>• {error}</li>
               ))}
             </ul>
           )}
+          <MobileWorkflowFooter step={mobileStep} total={mobileSteps.length} onChange={setMobileStep} canNext={mobileStep === 0 ? Boolean(input.name.trim()) : mobileStep === 2 ? input.platforms.length > 0 : mobileStep === 3 ? input.maxPosts > 0 && input.maxPosts <= 60 : true} final={<Button className="min-h-12" onClick={generatePlan} disabled={errors.length > 0}><Sparkles /> Build plan</Button>} />
         </section>
 
         <aside className="space-y-5">
-          <section className="surface-card p-5">
+          <section className="surface-card hidden p-5 sm:block">
             <div className="flex items-center gap-2 font-semibold">
               <ShieldCheck className="h-4 w-4 text-primary" /> Guardrails
             </div>
@@ -502,7 +543,7 @@ function ChoiceGroup({
         {values.map((value) => {
           const active = selected.includes(value);
           return (
-            <button
+            <Button variant="outline"
               key={value}
               type="button"
               onClick={() => onToggle(value)}
@@ -515,7 +556,7 @@ function ChoiceGroup({
             >
               {active && <Check className="mr-1 inline h-3.5 w-3.5" />}
               {value}
-            </button>
+            </Button>
           );
         })}
       </div>

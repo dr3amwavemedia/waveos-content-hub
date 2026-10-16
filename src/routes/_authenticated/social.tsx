@@ -96,6 +96,10 @@ export const Route = createFileRoute("/_authenticated/social")({
         content: "Plan, review and understand social content in one workspace.",
       },
       { name: "robots", content: "noindex" },
+      { property: "og:title", content: "Social Media — WaveOS" },
+      { property: "og:description", content: "Plan, review and understand social content in one workspace." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
@@ -580,33 +584,33 @@ function OverviewView({
       value: count(["draft"]),
       detail: "Ready to shape",
       icon: FileText,
-      tone: "border-sky-400/25 bg-sky-400/[0.08] text-sky-300",
+      tone: "border-primary/25 bg-primary/10 text-primary",
     },
     {
       label: "Needs review",
       value: count(["in_review", "changes_requested", "approved"]),
       detail: "Awaiting a decision",
       icon: CheckSquare,
-      tone: "border-amber-400/25 bg-amber-400/[0.08] text-amber-300",
+      tone: "border-warning/25 bg-warning/10 text-warning",
     },
     {
       label: "Scheduled",
       value: count(["scheduled", "publishing"]),
       detail: "Coming up",
       icon: CalendarClock,
-      tone: "border-violet-400/25 bg-violet-400/[0.08] text-violet-300",
+      tone: "border-border-strong bg-secondary text-primary",
     },
     {
       label: "Published",
       value: count(["published"]),
       detail: "Live content",
       icon: CheckCircle2,
-      tone: "border-emerald-400/25 bg-emerald-400/[0.08] text-emerald-300",
+      tone: "border-success/25 bg-success/10 text-success",
     },
   ];
 
   return (
-    <div className="space-y-7">
+    <div className="space-y-4 sm:space-y-7">
       <section aria-labelledby="social-summary-title">
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
@@ -625,12 +629,17 @@ function OverviewView({
             View posts <ArrowRight className="h-4 w-4" />
           </button>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
           {metrics.map((metric) => (
             <MetricCard key={metric.label} {...metric} />
           ))}
         </div>
       </section>
+
+      <div className="flex items-center justify-between gap-3 sm:hidden">
+        <span className="text-sm text-muted-foreground">{count(["failed"]) > 0 ? `${count(["failed"])} failed ${count(["failed"]) === 1 ? "post" : "posts"} needs attention` : "Your next post starts here"}</span>
+        <Link to="/create" className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl bg-primary px-3 text-xs font-semibold text-primary-foreground"><PenSquare className="size-4" /> Create Post</Link>
+      </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(19rem,0.8fr)]">
         <section className="rounded-2xl border border-border bg-surface/55 p-4 sm:p-5">
@@ -730,8 +739,8 @@ function MetricCard({
         <Icon className="h-5 w-5" />
         <span className="text-3xl font-semibold tracking-tight text-foreground">{value}</span>
       </div>
-      <p className="mt-4 text-sm font-semibold text-foreground">{label}</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
+      <p className="mt-2 text-sm font-semibold text-foreground sm:mt-4">{label}</p>
+      <p className="mt-0.5 hidden text-xs text-muted-foreground sm:block">{detail}</p>
     </div>
   );
 }
@@ -782,7 +791,7 @@ function PostsAndInsights({
           </Link>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <CompactStat label="Scheduled" value={scheduled} tone="text-violet-300" />
           <CompactStat label="Published" value={published} tone="text-emerald-300" />
           <CompactStat label="Needs attention" value={failed} tone="text-rose-300" />

@@ -23,7 +23,7 @@ type Tile = {
 
 const TILES: Tile[] = [
   { to: "/create", label: "Create Post", hint: "Plan or publish", icon: PlusCircle, feature: "can_create_content", primary: true },
-  { to: "/creative-studio", label: "Creative Studio", hint: "Design graphics", icon: Wand2, feature: "can_create_content" },
+  { to: "/creative-studio", label: "Creative Studio", hint: "Design graphics", icon: Wand2, feature: "can_use_creative_studio" },
   { to: "/social", search: { view: "analytics" }, label: "Analytics", hint: "View performance", icon: ChartIcon, feature: "can_view_analytics_checkup" },
   { to: "/calendar", label: "Calendar", hint: "See what's next", icon: CalendarDays, feature: "can_view_calendar_preview" },
 ];
