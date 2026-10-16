@@ -486,7 +486,7 @@ function CreativeStudioPage() {
     return () => {
       cancelled = true;
     };
-  }, [assetUrls, branding.data?.logoUrl, document, format.height, format.width]);
+  }, [assetUrls, branding.data?.logoUrl, document, format.height, format.width, mobileStarted]);
 
   function commit(next: DesignDocument) {
     const nextHistory = [...history.slice(0, historyIndex + 1), cloneDocument(next)].slice(-50);
@@ -1196,6 +1196,7 @@ function CreativeStudioPage() {
             })}
           </section>}
 
+          <div className={cn(["Adjust", "Crop"].includes(mobileTool ?? "") && "hidden sm:block")}>
           {selected ? (
             <ElementInspector
               element={selected}
@@ -1214,6 +1215,7 @@ function CreativeStudioPage() {
               Select a layer to edit it.
             </section>
           )}
+          </div>
         </MobileToolPanel>
       </div>
 

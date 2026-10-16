@@ -2662,7 +2662,6 @@ function clientDeleteMessage(message: string) {
 function DeliveriesTab({ workspaceId }: { workspaceId: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
-  const [mobileInvoiceFilter, setMobileInvoiceFilter] = useState("all");
   const q = useQuery({
     queryKey: ["client-deliveries", workspaceId],
     queryFn: async () => {
@@ -3301,6 +3300,7 @@ function InvoicesTab({
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(false);
   const [editingInvoice, setEditingInvoice] = useState<InvoiceListItem | null>(null);
+  const [mobileInvoiceFilter, setMobileInvoiceFilter] = useState("all");
   const closeForm = () => {
     setShowForm(false);
     setEditingInvoice(null);
