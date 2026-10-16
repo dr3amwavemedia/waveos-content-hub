@@ -918,10 +918,6 @@ function CreativeStudioPage() {
       if (remaining && item) dragRef.current = {id:item.id,offsetX:remaining.x-item.x,offsetY:remaining.y-item.y};
       return;
     }
-    if (transactionRef.current && JSON.stringify(transactionRef.current) === JSON.stringify(document)) {
-      const target = dragHistoryIndexRef.current;
-      if (target !== null) { setHistory((current) => current.filter((_,index)=>index !== target)); setHistoryIndex(Math.max(0,target-1)); }
-    }
     transactionRef.current = null; dragRef.current = null; gestureRef.current = null; resizeRef.current = null; viewportGestureRef.current = null; dragHistoryIndexRef.current = null; setGuides({x:null,y:null});
   }
 
@@ -952,7 +948,7 @@ function CreativeStudioPage() {
         <Button size="icon" variant="ghost" aria-label="Redo" disabled={historyIndex === history.length-1} onClick={() => {setHistoryIndex(i=>Math.min(history.length-1,i+1));setDirty(true);}}><Redo2 /></Button>
         <Button variant="ghost" onClick={() => { setMobileStarted(false); setMobileTool(null); setCropId(null); }}>Done</Button>
       </header>}
-      <header className={cn(mobileStarted && "hidden sm:flex", "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between")}>
+      <header className={cn("flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", mobileStarted ? "hidden sm:flex" : "flex")}>
         <div>
           <div className="hidden items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary sm:flex">
             <ImageIcon className="h-4 w-4" /> Static images only

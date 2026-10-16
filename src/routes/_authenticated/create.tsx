@@ -124,6 +124,7 @@ function CreatePost() {
 
   const [title, setTitle] = useState("");
   const briefApplied = useRef<string | null>(null);
+  const [pendingBrief,setPendingBrief] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
   const [platforms, setPlatforms] = useState<SocialPlatform[]>(["instagram"]);
   const [pickedMedia, setPickedMedia] = useState<string[]>([]);
@@ -152,12 +153,14 @@ function CreatePost() {
   useEffect(() => {
     if (search.brief && search.briefWorkspace === workspaceId && !editingId && briefApplied.current !== search.brief) {
       briefApplied.current = search.brief;
-      setTitle("Research-inspired content"); setCaption(search.brief);
+      const stored = draftStorageKey ? window.localStorage.getItem(draftStorageKey) : null;
+      if (stored) setPendingBrief(search.brief);
+      else { setTitle("Research-inspired content"); setCaption(search.brief); }
     }
   }, [search.brief, search.briefWorkspace, workspaceId, editingId]);
 
   useEffect(() => {
-    if (!draftStorageKey || savedId || (search.brief && search.briefWorkspace === workspaceId)) return;
+    if (!draftStorageKey || savedId) return;
 
     const storedDraft = window.localStorage.getItem(draftStorageKey);
 
@@ -590,6 +593,7 @@ function CreatePost() {
             <h1 className="text-xl font-semibold text-foreground">
               {savedId ? "Edit post" : "Create post"}
             </h1>
+              {pendingBrief && search.briefWorkspace === workspaceId && <div className="mt-3 border-l-2 border-intelligence pl-3 text-sm"><p>A research idea is ready. Your existing draft is unchanged.</p><Button variant="outline" className="mt-2" onClick={()=>{setCaption(current=>[current,pendingBrief].filter(Boolean).join("\n\n"));setPendingBrief(null);}}>Add idea to draft</Button><Button variant="ghost" onClick={()=>setPendingBrief(null)}>Dismiss</Button></div>}
             <p className="text-xs uppercase tracking-widest text-muted-foreground">
               {activeWorkspace.name} · Status: {status.replace("_", " ")}
             </p>

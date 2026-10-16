@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   BarChart3,
@@ -137,13 +137,19 @@ function CompetitiveIntelligencePage() {
   const [researchResults, setResearchResults] = useState<Array<{report:ResearchReport;inputUrl:string;researchedAt:string;methodology:string}>>([]);
   const [openedReport, setOpenedReport] = useState<ReportRow | null>(null);
   const navigate = useNavigate();
+  const currentWorkspaceRef = useRef(workspaceId);
+  currentWorkspaceRef.current = workspaceId;
   const researchFn = useServerFn(researchCompetitor);
   const research = useMutation({ mutationFn: async (input: {url:string;workspaceId:string}) => {
     const result = await researchFn({data:input});
     return {...result,workspaceId:input.workspaceId};
   }, onSuccess: result => {
-    if (result.workspaceId !== workspaceId) return;
-    setResearchResults(current=>[...current.filter(item=>item.inputUrl!==result.inputUrl),result].slice(-5));
+    if (result.workspaceId !== currentWorkspaceRef.current) return;
+    setResearchResults(current=>{
+      const next=[...current.filter(item=>item.inputUrl!==result.inputUrl),result].slice(-5);
+      window.sessionStorage.setItem(`waveos-research-${result.workspaceId}`,JSON.stringify(next));
+      return next;
+    });
   }, onError:error=>toast.error(error instanceof Error?error.message:"Analysis unavailable") });
   useEffect(()=>{
     setResearchInput(""); setResearchResults([]); setOpenedReport(null); setDraft({...DEFAULT_DRAFT,metrics:DEFAULT_DRAFT.metrics.map(metric=>({...metric}))});setDirty(false);
@@ -157,9 +163,6 @@ function CompetitiveIntelligencePage() {
   function runResearch(url: string) {
     if (workspaceId) research.mutate({url,workspaceId});
   }
-  useEffect(()=>{
-    if (workspaceId && researchResults.length) window.sessionStorage.setItem(`waveos-research-${workspaceId}`,JSON.stringify(researchResults));
-  },[workspaceId,researchResults]);
   const workflowDraft = useWorkflowDraft<CompetitiveDraft>({
     workspaceId,
     workflowKey: "competitive-intelligence",
