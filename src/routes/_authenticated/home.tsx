@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { CSSProperties } from "react";
 import {
+  ChevronDown,
   ArrowRight,
   BarChart3,
   CalendarDays,
@@ -92,7 +93,7 @@ function HomeRoute() {
 function HomeDashboard() {
   const { data: user } = useCurrentUser();
   const { activeWorkspace } = useWorkspace();
-  const { can, isStaff } = usePermissions();
+  const { can } = usePermissions();
   const wsId = activeWorkspace?.id;
   const isPublicOs = activeWorkspace?.data_source === "os_data";
   const branding = useWorkspaceBranding(wsId);
@@ -482,6 +483,7 @@ function HomeDashboard() {
           />
         )}
       </Section>
+      </div>
 
       <Section
         title="Needs your attention"
