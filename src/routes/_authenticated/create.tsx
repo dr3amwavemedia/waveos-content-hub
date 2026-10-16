@@ -86,7 +86,9 @@ export const Route = createFileRoute("/_authenticated/create")({
   ),
   validateSearch: (
     s: Record<string, unknown>,
-  ): { id?: string; media?: string; destination?: "feed" | "story" } => ({
+  ): { id?: string; media?: string; destination?: "feed" | "story"; brief?: string; briefWorkspace?: string } => ({
+    ...(typeof s.brief === "string" && s.brief.length <= 6000 ? { brief: s.brief } : {}),
+    ...(typeof s.briefWorkspace === "string" ? { briefWorkspace: s.briefWorkspace } : {}),
     ...(typeof s.id === "string" ? { id: s.id } : {}),
     ...(typeof s.media === "string" ? { media: s.media } : {}),
     ...(s.destination === "feed" || s.destination === "story"
@@ -94,7 +96,7 @@ export const Route = createFileRoute("/_authenticated/create")({
       : {}),
   }),
   head: () => ({
-    meta: [{ title: "Create Post — WaveOS" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Create Post — WaveOS" }, { name: "description", content: "Review and draft social content in your WaveOS workspace." }, { property: "og:title", content: "Create Post — WaveOS" }, { property: "og:description", content: "Review and draft social content in your WaveOS workspace." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }],
   }),
 });
 
@@ -121,6 +123,7 @@ function CreatePost() {
   const submitForApproval = useSubmitForApproval();
 
   const [title, setTitle] = useState("");
+  const briefApplied = useRef<string | null>(null);
   const [caption, setCaption] = useState("");
   const [platforms, setPlatforms] = useState<SocialPlatform[]>(["instagram"]);
   const [pickedMedia, setPickedMedia] = useState<string[]>([]);
@@ -147,7 +150,14 @@ function CreatePost() {
   const draftStorageKey = workspaceId ? `waveos-create-draft-${workspaceId}` : null;
 
   useEffect(() => {
-    if (!draftStorageKey || savedId) return;
+    if (search.brief && search.briefWorkspace === workspaceId && !editingId && briefApplied.current !== search.brief) {
+      briefApplied.current = search.brief;
+      setTitle("Research-inspired content"); setCaption(search.brief);
+    }
+  }, [search.brief, search.briefWorkspace, workspaceId, editingId]);
+
+  useEffect(() => {
+    if (!draftStorageKey || savedId || (search.brief && search.briefWorkspace === workspaceId)) return;
 
     const storedDraft = window.localStorage.getItem(draftStorageKey);
 

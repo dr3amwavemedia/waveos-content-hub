@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -29,6 +29,9 @@ import {
   type CompetitiveMetric,
   type MetricDirection,
 } from "@/lib/phase-one-planning";
+import { useServerFn } from "@tanstack/react-start";
+import { researchCompetitor } from "@/lib/competitive-research.functions";
+import { researchReportSchema, type ResearchReport } from "@/lib/competitive-research";
 import { isValidHttpsUrl, normalizeHttpsUrl } from "@/lib/url-validation";
 
 export const Route = createFileRoute("/_authenticated/competitive-intelligence")({
@@ -50,6 +53,10 @@ export const Route = createFileRoute("/_authenticated/competitive-intelligence")
           "Research competitors from a public website or social profile, with optional documented manual comparisons.",
       },
       { name: "robots", content: "noindex" },
+      { property: "og:title", content: "Competitive Intelligence — WaveOS" },
+      { property: "og:description", content: "Evidence-backed public competitor research and documented comparisons." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
@@ -69,6 +76,8 @@ interface CompetitorRow {
 }
 
 interface ReportRow {
+  metrics: CompetitiveMetric[];
+  methodology: string;
   id: string;
   competitor_id: string;
   title: string;
@@ -122,9 +131,17 @@ function CompetitiveIntelligencePage() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<CompetitiveDraft>(DEFAULT_DRAFT);
   const [dirty, setDirty] = useState(false);
-  const [screen, setScreen] = useState<"overview" | "editor">("overview");
+  const [screen, setScreen] = useState<"overview" | "editor">("editor");
   const [researchInput, setResearchInput] = useState("");
   const [showManual, setShowManual] = useState(false);
+  const [researchResults, setResearchResults] = useState<Array<{report:ResearchReport;inputUrl:string;researchedAt:string;methodology:string}>>([]);
+  const [openedReport, setOpenedReport] = useState<ReportRow | null>(null);
+  const navigate = useNavigate();
+  const researchFn = useServerFn(researchCompetitor);
+  const research = useMutation({ mutationFn: () => {
+    if (!workspaceId) throw new Error("Select a workspace first.");
+    return researchFn({data:{workspaceId,url:researchInput}});
+  }, onSuccess: result => {setResearchResults(current=>[...current.filter(item=>item.inputUrl!==result.inputUrl),result].slice(-5));setDirty(true);}, onError:error=>toast.error(error instanceof Error?error.message:"Analysis unavailable") });
   const workflowDraft = useWorkflowDraft<CompetitiveDraft>({
     workspaceId,
     workflowKey: "competitive-intelligence",
@@ -137,7 +154,7 @@ function CompetitiveIntelligencePage() {
       const { data, error } = await db
         .from("competitors")
         .select("id,name,website_url,social_handles,notes,created_at")
-        .eq("workspace_id", workspaceId!)
+        .eq("workspace_id", workspaceId)
         .order("name");
       if (error) throw error;
       return (data ?? []) as CompetitorRow[];
@@ -150,9 +167,9 @@ function CompetitiveIntelligencePage() {
     queryFn: async () => {
       const { data, error } = await db
         .from("competitive_reports")
-        .select("id,competitor_id,title,score,confidence,created_at")
-        .eq("workspace_id", workspaceId!)
-        .eq("competitor_id", draft.selectedCompetitorId!)
+        .select("id,competitor_id,title,score,confidence,created_at,metrics,methodology")
+        .eq("workspace_id", workspaceId)
+        .eq("competitor_id", draft.selectedCompetitorId)
         .order("created_at", { ascending: false })
         .limit(10);
       if (error) throw error;
@@ -220,7 +237,8 @@ function CompetitiveIntelligencePage() {
         methodology: METHOD,
       });
       if (reportError) throw reportError;
-      return competitorId!;
+      if (!competitorId) throw new Error("Competitor could not be saved.");
+      return competitorId;
     },
     onSuccess: async (competitorId) => {
       setDraft((current) => ({ ...current, selectedCompetitorId: competitorId }));
@@ -340,7 +358,8 @@ function CompetitiveIntelligencePage() {
               size="sm"
               variant="outline"
               onClick={() => {
-                setDraft(workflowDraft.data!.payload);
+                const restored = workflowDraft.data?.payload;
+                if (restored) setDraft(restored);
                 setDirty(false);
               }}
             >
@@ -370,16 +389,10 @@ function CompetitiveIntelligencePage() {
           </label>
           <Button
             className="min-h-14 rounded-xl px-6"
-            disabled={!researchInput.trim()}
-            onClick={() => {
-              const value = researchInput.trim();
-              const looksLikeWebsite = !value.includes("@") && !/instagram\.com|facebook\.com|tiktok\.com|linkedin\.com|youtube\.com|x\.com/i.test(value);
-              if (looksLikeWebsite) update("websiteUrl", value);
-              else update("observationLinks", value);
-              toast.message("Competitor link captured", { description: "Automated public-source analysis will be connected in the next implementation step. You can add optional details now." });
-            }}
+            disabled={!researchInput.trim() || research.isPending}
+            onClick={() => research.mutate()}
           >
-            <Search /> Analyze Competitor
+            {research.isPending ? <Loader2 className="animate-spin" /> : <Search />} {research.isPending ? "Researching public sources…" : "Analyze Competitor"}
           </Button>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">One input is enough to start. If WaveOS cannot confidently determine something, it should show “Not found” instead of blocking the analysis.</p>
@@ -388,6 +401,16 @@ function CompetitiveIntelligencePage() {
         </button>
       </section>
 
+      {research.isError && <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">{research.error instanceof Error ? research.error.message : "Analysis unavailable"}</p>}
+      {researchResults.map(result=><section key={result.inputUrl} className="space-y-5 border-t border-border pt-5">
+        <header className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">{result.report.company ?? "Identity not found"}</h2><p className="mt-1 text-xs text-muted-foreground">Public-source analysis · {new Date(result.researchedAt).toLocaleString()}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>{setResearchInput(result.inputUrl);setShowManual(true);update("competitorName",result.report.company??"");update("websiteUrl",result.report.website??result.inputUrl);}}>Edit</Button><Button variant="outline" disabled={research.isPending} onClick={()=>{setResearchInput(result.inputUrl);setTimeout(()=>research.mutate(),0);}}>Refresh analysis</Button><Button variant="outline" onClick={()=>document.getElementById("competitive-landscape")?.scrollIntoView()}>Compare</Button><Button variant="outline" onClick={()=>{setResearchInput("");window.scrollTo({top:0,behavior:"smooth"});}}>Add another competitor</Button></div></header>
+        <dl className="grid grid-cols-2 gap-4 text-sm"><div><dt className="text-muted-foreground">Industry</dt><dd>{result.report.industry??"Not found"}</dd></div><div><dt className="text-muted-foreground">Market</dt><dd>{result.report.market??"Not found"}</dd></div><div className="col-span-2"><dt className="text-muted-foreground">Website</dt><dd className="break-all">{result.report.website?<a href={result.report.website} target="_blank" rel="noopener noreferrer" className="text-primary">{result.report.website}</a>:"Not found"}</dd></div></dl>
+        <div className="flex flex-wrap gap-2">{result.report.channels.map(url=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="max-w-full break-all text-xs text-primary">{url}</a>)}</div>
+        <div className="grid gap-5 sm:grid-cols-2">{result.report.sections.map(section=><section key={section.title} className="border-t border-border pt-4"><h3 className="font-semibold text-intelligence">{section.title}</h3><ul className="mt-3 space-y-3 text-sm">{section.findings.map((finding,index)=><li key={index}><p>{finding.text}</p><div className="mt-1 flex flex-wrap gap-2">{finding.sources.map((url,i)=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary">Source {i+1}</a>)}</div></li>)}</ul>{!section.findings.length&&<p className="mt-2 text-sm text-muted-foreground">Not found in accessible sources.</p>}</section>)}</div>
+        <section className="border-t border-border pt-4"><h3 className="font-semibold">Original content ideas</h3><div className="mt-3 space-y-4">{result.report.ideas.map((idea,index)=><div key={index}><p className="text-sm">{idea.text}</p><div className="my-2 flex flex-wrap gap-2">{idea.sources.map((url,i)=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary">Evidence {i+1}</a>)}</div><Button variant="outline" onClick={()=>void navigate({to:"/create",search:{brief:idea.text,briefWorkspace:workspaceId??undefined}})}>Create this content <ArrowRight /></Button></div>)}</div></section>
+        <details className="border-t border-border pt-3 text-xs text-muted-foreground"><summary>Methodology and coverage</summary><p className="mt-2">{result.methodology}</p>{result.report.limitations.map((item,i)=><p key={i} className="mt-2">{item}</p>)}</details>
+      </section>)}
+      {researchResults.length>=2&&<section id="competitive-landscape" className="space-y-4 border-t border-border pt-5"><h2 className="text-xl font-semibold">Competitive Landscape</h2><p className="text-xs text-muted-foreground">Qualitative comparison of reviewed public sources; not market-share or performance scoring.</p><div className="grid gap-3 sm:grid-cols-2">{researchResults.map(item=><article key={item.inputUrl} className="rounded-lg border border-border p-4"><h3 className="font-semibold">{item.report.company??"Identity not found"}</h3><p className="mt-2 text-sm text-muted-foreground">{item.report.industry??"Industry not found"} · {item.report.market??"Market not found"}</p>{item.report.sections.filter(section=>/Messaging|Strengths|Opportunities|Social/.test(section.title)).map(section=><div key={section.title} className="mt-3"><h4 className="text-xs font-semibold text-intelligence">{section.title}</h4><p className="mt-1 text-xs">{section.findings[0]?.text??"Not found"}</p>{section.findings[0]?.sources.map((url,i)=><a key={url} href={url} className="mr-2 text-xs text-primary" target="_blank" rel="noopener noreferrer">Source {i+1}</a>)}</div>)}</article>)}</div></section>}
       <div className={cn(showManual ? "grid" : "hidden", "gap-5 xl:grid-cols-[15rem_minmax(0,1fr)]")}>
         <aside className="surface-card p-4">
           <div className="flex items-center justify-between gap-2">
@@ -554,7 +577,7 @@ function CompetitiveIntelligencePage() {
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {(reports.data ?? []).map((report) => (
                   <div key={report.id} className="rounded-lg border border-border p-3">
-                    <div className="text-sm font-semibold">{report.title}</div>
+                    <Button variant="ghost" className="h-auto justify-start whitespace-normal px-0 text-left text-sm font-semibold" onClick={()=>setOpenedReport(report)}>{report.title}</Button>
                     <div className="mt-1 text-xs text-muted-foreground">
                       Score {report.score ?? "—"} ·{" "}
                       {new Date(report.created_at).toLocaleDateString()}
@@ -570,6 +593,7 @@ function CompetitiveIntelligencePage() {
             </section>
           )}
 
+          {openedReport && <section className="space-y-3 border-t border-border pt-4"><h3 className="font-semibold">{openedReport.title}</h3><p className="text-xs text-muted-foreground">{openedReport.methodology}</p>{openedReport.metrics.map((metric,index)=><div key={index} className="rounded-lg border border-border p-3 text-sm"><p className="font-semibold">{metric.label}</p><p>Your value: {metric.yourValue??"Unavailable"} · Competitor: {metric.competitorValue??"Unavailable"} {metric.unit}</p><p className="mt-1 text-xs text-muted-foreground">{metric.sourceNote||"Source not recorded"} · {metric.observedAt||"Date not recorded"}</p></div>)}</section>}
           <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-muted-foreground">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             Only enter observations you are permitted to use. Scores are directional planning aids,
@@ -578,16 +602,7 @@ function CompetitiveIntelligencePage() {
         </div>
       </div>
 
-      {!showManual && (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {["Competitor Overview", "Brand & Messaging", "Website & SEO", "Opportunities"].map((label) => (
-            <div key={label} className="rounded-2xl border border-border bg-surface/60 p-4">
-              <div className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-intelligence" /> {label}</div>
-              <p className="mt-2 text-xs text-muted-foreground">Results will populate here after public-source analysis is connected.</p>
-            </div>
-          ))}
-        </section>
-      )}
+
     </div>
   );
 }

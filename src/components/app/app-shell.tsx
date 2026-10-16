@@ -432,7 +432,7 @@ function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/80 px-4 py-3 backdrop-blur lg:hidden">
+      <header data-global-mobile-header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/80 px-4 py-3 backdrop-blur lg:hidden">
         <WaveLogo compact />
         <div className="flex items-center gap-2">
           <NotificationsBell />

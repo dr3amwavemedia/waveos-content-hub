@@ -12,6 +12,8 @@ import {
 } from "@/lib/analytics-transparency";
 import { getSocialIntelligenceProfile, getZernioAnalytics } from "@/lib/zernio.functions";
 import { cn } from "@/lib/utils";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { historySeries, comparePeriods } from "@/lib/analytics-history";
 import { Button } from "@/components/ui/button";
 
 type AnalyticsMode = "combined" | "organic" | "paid";
@@ -87,10 +89,12 @@ export function AnalyticsCheckup({
 }) {
   const analyticsFn = useServerFn(getZernioAnalytics);
   const intelligenceFn = useServerFn(getSocialIntelligenceProfile);
+  const [days, setDays] = useState<7|30|90>(30);
+  const [graphMetric, setGraphMetric] = useState("reach");
   const [mode, setMode] = useState<AnalyticsMode>("combined");
   const analytics = useQuery({
-    queryKey: ["analytics-checkup", workspaceId, 30],
-    queryFn: () => analyticsFn({ data: { workspaceId, days: 30 } }),
+    queryKey: ["analytics-checkup", workspaceId, days],
+    queryFn: () => analyticsFn({ data: { workspaceId, days } }),
     retry: false,
   });
   const intelligence = useQuery({
@@ -113,174 +117,30 @@ export function AnalyticsCheckup({
         : combineAnalyticsMetric(selectedSources, key);
     return { key, label, metric };
   });
-  const strongest = metricRows
-    .filter(
-      (row): row is (typeof metricRows)[number] & { metric: { value: number } } =>
-        row.metric.value !== null && row.metric.value > 0,
-    )
-    .sort((left, right) => right.metric.value - left.metric.value)[0];
   const providerError = analytics.error instanceof Error ? analytics.error.message : null;
-  const availableMetrics = metricRows.filter((row) => row.metric.value !== null);
-  const maxMetric = Math.max(1, ...availableMetrics.map((row) => row.metric.value ?? 0));
-
+  const historicalRows = intelligence.data?.snapshots ?? [];
+  const series = historySeries(historicalRows, graphMetric);
+  const comparison = comparePeriods(historicalRows, graphMetric);
+  const chartData = series.map(row=>({date:row.range_end,value:row.value}));
+  const comparisons = ["reach","views","followers","likes","comments"].flatMap(key=>{const result=comparePeriods(historicalRows,key);return result?[{key,...result}]:[];});
   return (
     <div className="space-y-6">
-      <section className="space-y-4 sm:rounded-2xl sm:border sm:border-border sm:bg-surface sm:p-6">
-        <div className="grid min-w-0 gap-4 sm:flex sm:flex-wrap sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-primary">
-              <BarChart3 className="h-5 w-5" />
-              <p className="text-xs font-semibold uppercase tracking-[0.18em]">Analytics checkup</p>
-            </div>
-            <h2 className="mt-2 hidden text-xl font-semibold text-foreground sm:block">
-              Provider-reported performance
-            </h2>
-            <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
-              Requested range: last 30 days. Missing or failed sources remain unavailable; WaveOS
-              does not replace them with zero.
-            </p>
-          </div>
-          <div className="grid grid-cols-3 rounded-xl border border-border bg-background/50 p-1">
-            {(["combined", "organic", "paid"] as AnalyticsMode[]).map((value) => (
-              <Button variant="ghost"
-                key={value}
-                type="button"
-                onClick={() => setMode(value)}
-                className={cn(
-                  "min-h-11 rounded-lg px-3 py-1.5 text-xs font-semibold capitalize",
-                  mode === value ? "bg-primary text-primary-foreground" : "text-muted-foreground",
-                )}
-              >
-                {value}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        <div className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-gradient-to-br from-emerald-400/10 via-primary/5 to-surface p-4 sm:p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 text-emerald-300">
-                <TrendingUp className="h-5 w-5" />
-                <span className="text-xs font-semibold uppercase tracking-[0.16em]">Growth overview</span>
-              </div>
-              <h3 className="mt-2 text-xl font-semibold sm:text-2xl">Your performance at a glance</h3>
-              <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Last 30 days · provider-reported metrics only</p>
-            </div>
-            <div className="rounded-full border border-emerald-400/25 bg-emerald-400/10 p-2 text-emerald-300">
-              <ArrowUpRight className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-5 grid grid-cols-4 items-end gap-2 sm:gap-3" aria-label="Relative performance graph">
-            {metricRows.slice(0, 8).map(({ key, label, metric }, index) => {
-              const value = metric.value ?? 0;
-              const height = metric.value === null ? 8 : Math.max(14, Math.round((value / maxMetric) * 100));
-              const tones = ["bg-blue-400", "bg-violet-400", "bg-emerald-400", "bg-amber-400"];
-              return <div key={key} className="min-w-0 text-center">
-                <div className="flex h-28 items-end justify-center rounded-lg bg-background/35 p-1 sm:h-36">
-                  <div className={cn("w-full max-w-12 rounded-md transition-all", metric.value === null ? "bg-muted" : tones[index % tones.length])} style={{ height: `${height}%` }} />
-                </div>
-                <p className="mt-2 truncate text-[9px] font-medium text-muted-foreground sm:text-[11px]">{label}</p>
-                <p className="truncate text-[10px] font-semibold sm:text-xs">{metric.value === null ? "—" : metric.value.toLocaleString()}</p>
-              </div>;
-            })}
-          </div>
-          {!analytics.isPending && availableMetrics.length === 0 && <p className="mt-4 text-xs text-muted-foreground">Connect or sync a supported social source to populate the growth visualization.</p>}
-        </div>
-
-        <div className="mt-4 flex snap-x gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-4 sm:overflow-visible">
-          {metricRows.slice(0, 4).map(({ key, label, metric }, index) => {
-            const Icon = key === "engagements" || key === "likes" ? Heart : key === "followers" || key === "reach" ? Users : Eye;
-            const tone = index === 0 ? "border-blue-400/25 bg-blue-400/10 text-blue-300" : index === 1 ? "border-violet-400/25 bg-violet-400/10 text-violet-300" : index === 2 ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300" : "border-amber-400/25 bg-amber-400/10 text-amber-300";
-            return <article key={key} className={cn("min-w-[10rem] snap-start rounded-2xl border p-4 sm:min-w-0", tone)}>
-              <div className="flex items-center justify-between"><span className="text-xs font-medium">{label}</span><Icon className="h-4 w-4" /></div>
-              <p className="mt-3 text-2xl font-semibold text-foreground">{analytics.isPending ? "…" : metric.value === null ? "—" : metric.value.toLocaleString()}</p>
-              <div className="mt-3 flex h-6 items-end gap-1 opacity-80" aria-hidden="true">
-                {[35,48,42,62,55,74,68,88].map((bar, barIndex) => <span key={barIndex} className="w-full rounded-sm bg-current" style={{ height: `${metric.value === null ? 12 : Math.max(12, bar - index * 4)}%` }} />)}
-              </div>
-              <p className="mt-2 text-[10px] opacity-80">{metric.value === null ? "Awaiting provider data" : metric.coverage === "partial" ? "Partial coverage" : "Provider reported"}</p>
-            </article>;
-          })}
-        </div>
-
-        {analytics.isPending && (
-          <div className="mt-5 flex items-center gap-2 text-sm text-muted-foreground" role="status">
-            <Loader2 className="h-4 w-4 animate-spin" /> Loading provider metrics…
-          </div>
-        )}
-        {analytics.isError && (
-          <div className="mt-5 rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
-            <AlertTriangle className="mr-2 inline h-4 w-4" /> Metrics are unavailable. No values
-            were substituted.
-            {providerError === "forbidden"
-              ? " This workspace does not grant analytics access."
-              : " Try again after the provider connection is available."}
-          </div>
-        )}
-        {!analytics.isPending && !analytics.isError && strongest && (
-          <div className="mt-5 hidden rounded-xl border border-success/30 bg-success/10 p-4 text-sm text-success sm:block">
-            <Sparkles className="mr-2 inline h-4 w-4" /> {strongest.label} is the largest reported
-            value in this view at {strongest.metric.value.toLocaleString()}. This is a descriptive
-            comparison, not a claim about what caused the result.
-          </div>
-        )}
-
-        <div className="mt-5 sm:hidden">
-          <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">Last 30 days</p>
-            <div className="grid grid-cols-2 divide-x divide-border border-b border-border">
-              <CompactMetric label="Published" value={observedValue(publishedPosts)} />
-              <CompactMetric label="Channels" value={observedValue(connectedChannels)} />
-            </div>
-            {metricRows.some(({ metric }) => metric.value === null) && !analytics.isPending && (
-              <p className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
-                Some performance data hasn&apos;t synced yet. Missing values stay unavailable rather than becoming zero.
-              </p>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              {metricRows.map(({ key, label, metric }, index) => {
-                const Icon = key === "engagements" || key === "likes" ? Heart : key === "followers" || key === "reach" ? Users : key === "clicks" ? MousePointerClick : key === "comments" ? MessageCircle : Eye;
-                return <article key={key} className={cn("min-w-0 rounded-xl border p-4", index % 2 ? "border-border-strong bg-gradient-to-br from-secondary to-surface" : "border-primary/25 bg-gradient-to-br from-primary/10 to-surface")}>
-                  <div className="flex items-center justify-between gap-2"><span className="text-xs text-muted-foreground">{label}</span><Icon className="size-4 shrink-0 text-primary" /></div>
-                  <p className="mt-3 break-words text-2xl font-semibold">{analytics.isPending ? "…" : metric.value === null ? "—" : metric.value.toLocaleString()}</p>
-                  <p className="mt-2 text-[10px] text-muted-foreground">{metric.value === null ? "Not available" : metric.coverage === "partial" ? "Partial coverage" : "Provider reported"}</p>
-                </article>;
-              })}
-            </div>
-            <div className="rounded-xl border border-border bg-surface p-4">
-              <h3 className="text-sm font-semibold">Source comparison</h3>
-              {selectedSources.map((source) => { const value = source.metrics.impressions.value; const maximum = Math.max(1, ...selectedSources.map((item) => item.metrics.impressions.value ?? 0)); return <div key={source.key} className="mt-3"><div className="flex justify-between gap-2 text-xs"><span className="text-muted-foreground">{source.label}</span><span>{value === null ? "Unavailable" : value.toLocaleString()}</span></div>{value !== null && <progress aria-label={`${source.label} impressions`} className="mt-2 h-2 w-full overflow-hidden rounded-full [&::-webkit-progress-bar]:bg-elevated [&::-webkit-progress-value]:bg-primary [&::-moz-progress-bar]:bg-primary" value={value} max={maximum} />}</div>; })}
-              {!selectedSources.length && <p className="mt-2 text-xs text-muted-foreground">No source data available yet.</p>}
-            </div>
-            <p className="text-xs text-muted-foreground">Performance trends and top content are unavailable until the connected sources report them.</p>
-          </div>
-        </div>
-        <div className="mt-5 hidden gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Published posts" value={observedValue(publishedPosts)} hint={publishedPosts.state === "unavailable" ? publishedPosts.unavailableReason : undefined} />
-          <MetricCard label="Connected channels" value={observedValue(connectedChannels)} hint={connectedChannels.state === "unavailable" ? connectedChannels.unavailableReason : undefined} />
-          {metricRows.map(({ key, label, metric }) => (
-            <MetricCard key={key} label={label} value={analytics.isPending ? "…" : metric.value === null ? "Unavailable" : metric.value.toLocaleString()} hint={metric.coverage === "partial" ? `Partial: ${metric.contributingSources}/${metric.expectedSources} source observations.` : metric.value === null ? STATUS_LABEL[metric.availability] : metric.availability === "true_zero" ? "Provider reported a true zero." : undefined} />
-          ))}
-        </div>
-
-        <details className="mt-5 rounded-xl border border-border bg-background/35">
-          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-foreground">
-            Why am I seeing this?
-          </summary>
-          <div className="space-y-3 border-t border-border p-4 text-xs text-muted-foreground">
-            <p>
-              Combined adds every available provider source; Organic uses published-content and
-              connected-network sources; Paid uses only the paid-media source. Engagements equals
-              reported likes plus reported comments (calculation version
-              waveos-engagements-likes-plus-comments-v1).
-            </p>
-            <p>
-              “Unavailable” means a value was not returned or could not be accessed. “Reported zero”
-              appears only when the source returned a numeric zero. Partial totals identify how many
-              expected source observations contributed.
-            </p>
-          </div>
-        </details>
+      <section className="space-y-5">
+        <header className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-analytics">Performance & growth</p><h2 className="mt-1 text-xl font-semibold">Your business at a glance</h2></div><label className="text-xs text-muted-foreground"><span className="sr-only">Performance period</span><select aria-label="Performance period" className="min-h-11 rounded-lg border border-border bg-surface px-3 text-foreground" value={days} onChange={event=>setDays(Number(event.target.value) as 7|30|90)}>{[7,30,90].map(value=><option key={value} value={value}>Last {value} days</option>)}</select></label></header>
+        <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">{(["combined","organic","paid"] as AnalyticsMode[]).map(value=><Button key={value} variant={mode===value?"secondary":"ghost"} className="min-w-0 flex-1 capitalize" onClick={()=>setMode(value)}>{value}</Button>)}</div>
+        <section className="border-y border-border py-5">
+          <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">Growth over time</h3><p className="mt-1 text-xs text-muted-foreground">{series.length?`${series[0].range_start} – ${series.at(-1)?.range_end} · ${series.at(-1)?.provider}`:"Awaiting sourced historical observations"}</p></div>{comparison?.change!==null&&comparison?.change!==undefined&&<span className={cn("text-lg font-semibold",comparison.change>=0?"text-success":"text-destructive")}>{comparison.change>=0?"+":""}{comparison.change.toFixed(1)}%</span>}</div>
+          <div className="mt-3 flex gap-1 overflow-x-auto">{["reach","views","likes","followers"].map(key=><Button size="sm" key={key} className="capitalize" variant={graphMetric===key?"secondary":"ghost"} onClick={()=>setGraphMetric(key)}>{key}</Button>)}</div>
+          <div className="mt-4 h-56 min-w-0 sm:h-80">{series.length>=2?<ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData} margin={{top:10,right:12,left:0,bottom:8}}><CartesianGrid stroke="var(--border)" vertical={false}/><XAxis dataKey="date" tick={{fill:"var(--muted-foreground)",fontSize:10}} tickFormatter={value=>String(value).slice(5)}/><YAxis width={42} tick={{fill:"var(--muted-foreground)",fontSize:10}}/><Tooltip contentStyle={{background:"var(--surface)",borderColor:"var(--border)",color:"var(--foreground)"}}/><Area type="monotone" dataKey="value" name={graphMetric} stroke="var(--analytics)" fill="var(--analytics)" fillOpacity={.12} connectNulls={false}/></AreaChart></ResponsiveContainer>:<div className="flex h-full flex-col items-center justify-center gap-3 border border-dashed border-border p-6 text-center"><TrendingUp className="h-8 w-8 text-analytics"/><p className="text-sm text-muted-foreground">{intelligence.isPending?"Loading historical observations…":"Growth history not available yet"}</p><p className="max-w-sm text-xs text-muted-foreground">{series.length===1?"One sourced observation is available. A trend needs at least two compatible observations.":"Current totals remain below. A historical line will appear only when dated, compatible observations are available."}</p></div>}</div>
+          {comparison&&<p className="mt-3 text-xs text-muted-foreground">Current observed period: {comparison.current.value?.toLocaleString()} · Previous non-overlapping period: {comparison.previous.value?.toLocaleString()}{comparison.change===null?" · Percentage unavailable: previous value is zero.":""}</p>}
+        </section>
+        <div className="flex snap-x gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-4 sm:overflow-visible">{metricRows.filter(row=>["views","reach","engagements","followers"].includes(row.key)).map(({key,label,metric},index)=>{const trend=historySeries(historicalRows,key);const change=comparePeriods(historicalRows,key);return <article key={key} className="min-w-40 snap-start rounded-lg border border-border bg-surface p-4 sm:min-w-0"><div className="flex items-center justify-between"><p className="text-xs text-muted-foreground">{label}</p>{index===2?<Heart className="size-4 text-intelligence"/>:<Eye className="size-4 text-analytics"/>}</div><p className="mt-3 text-2xl font-semibold">{analytics.isPending?"…":metric.value===null?"—":metric.value.toLocaleString()}</p>{trend.length>=2?<div className="mt-3 h-8"><ResponsiveContainer width="100%" height="100%"><AreaChart data={trend}><Area dataKey="value" stroke="var(--analytics)" fill="var(--analytics)" fillOpacity={.1}/></AreaChart></ResponsiveContainer></div>:<p className="mt-3 text-[11px] text-muted-foreground">Historical trend unavailable</p>}<p className="mt-2 text-[11px] text-muted-foreground">{metric.value===null?STATUS_LABEL[metric.availability]:metric.coverage==="partial"?"Partial coverage":"Provider reported"}</p>{change?.change!==null&&change?.change!==undefined&&<p className={cn("mt-1 text-xs",change.change>=0?"text-success":"text-destructive")}>{change.change>=0?"+":""}{change.change.toFixed(1)}% across comparable stored periods</p>}</article>})}</div>
+        {analytics.isPending&&<p role="status" className="text-sm text-muted-foreground"><Loader2 className="mr-2 inline size-4 animate-spin"/>Loading provider metrics…</p>}
+        {analytics.isError&&<p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">Metrics are unavailable. No values were substituted. {providerError==="forbidden"?"This workspace does not grant analytics access.":"Retry when the provider connection is available."}<Button variant="ghost" onClick={()=>void analytics.refetch()}>Retry</Button></p>}
+        <section className="border-t border-border pt-5"><h3 className="flex items-center gap-2 text-lg font-semibold"><Sparkles className="size-5 text-warning"/>Evidence-backed insights</h3>{comparisons.length?<ul className="mt-3 space-y-3">{comparisons.map(item=><li key={item.key} className="text-sm"><span className="capitalize">{item.key}</span> {item.change===null?`changed from ${item.previous.value} to ${item.current.value}`:`${item.change>=0?"increased":"declined"} by ${Math.abs(item.change).toFixed(1)}%`} across equal-length, non-overlapping observed periods.<p className="mt-1 text-xs text-muted-foreground">{item.current.source_reference} · {item.current.calculation_version}</p></li>)}</ul>:<p className="mt-3 text-sm text-muted-foreground">Not enough comparable evidence for a growth conclusion, best posting time or content-format recommendation.</p>}<p className="mt-3 text-xs text-muted-foreground">These are calculated observations, not AI conclusions. AI analysis is currently unavailable.</p></section>
+        <section className="grid gap-5 border-t border-border pt-5 sm:grid-cols-2"><div><h3 className="font-semibold">Content breakdown</h3><p className="mt-2 text-sm text-muted-foreground">Reel, photo, story and carousel performance is not available from the current metric response.</p></div><div><h3 className="font-semibold">Platform performance</h3><div className="mt-2 space-y-3">{selectedSources.map(source=><div key={source.key}><div className="flex justify-between gap-2 text-sm"><span>{source.label}</span><span>{source.metrics.reach.value?.toLocaleString()??"Unavailable"}</span></div><p className="mt-1 text-xs text-muted-foreground">Reach · {STATUS_LABEL[source.availability]}</p></div>)}</div></div><div><h3 className="font-semibold">Competitive benchmark</h3><p className="mt-2 text-sm text-muted-foreground">Comparable competitor platform metrics are not available. Public research is not a performance benchmark.</p></div><div><h3 className="font-semibold">Brand consistency</h3><p className="mt-2 text-sm text-muted-foreground">Not evaluated. A score requires a review of recent content against your saved Brand Voice.</p></div></section>
+        <section className="border-t border-border pt-5"><h3 className="text-lg font-semibold">What should I do next?</h3><p className="mt-2 text-sm text-muted-foreground">{comparisons.length?"Review the observed changes above before choosing a content direction. These totals alone cannot identify which topic or format caused growth.":"Collect comparable historical observations before making performance-driven content decisions."}</p></section>
+        <details className="border-t border-border pt-4"><summary className="cursor-pointer text-sm font-semibold">All metrics and calculation details</summary><div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4"><MetricCard label="Published posts" value={observedValue(publishedPosts)}/><MetricCard label="Connected channels" value={observedValue(connectedChannels)}/>{metricRows.map(({key,label,metric})=><MetricCard key={key} label={label} value={metric.value===null?"Unavailable":metric.value.toLocaleString()} hint={metric.coverage==="partial"?"Partial coverage":STATUS_LABEL[metric.availability]}/>)}</div><p className="mt-3 text-xs text-muted-foreground">Combined adds available sources. Organic uses published-content and connected-network data; Paid uses paid-media only. Engagements is reported likes plus comments (waveos-engagements-likes-plus-comments-v1). Missing values are never zero. Historical comparisons use one compatible provider/calculation series; they are separate from the requested current totals and do not mix organic/paid observations.</p></details>
       </section>
 
       <details className="rounded-xl border border-border bg-surface/55 p-4 sm:p-6">

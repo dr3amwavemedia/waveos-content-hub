@@ -32,6 +32,9 @@ import {
   RotateCw,
   Maximize2,
   Plus,
+  ArrowLeft,
+  MoreHorizontal,
+  Palette,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequireFeature } from "@/components/app/require-feature";
@@ -45,6 +48,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { MobileToolPanel } from "@/components/app/mobile-tool-panel";
 import { Slider } from "@/components/ui/slider";
+import { clamp, containsPoint, cornerHit, snapPosition, ratioCrop, zoomCrop } from "@/lib/studio-geometry";
 
 export const Route = createFileRoute("/_authenticated/creative-studio")({
   component: () => (
@@ -94,6 +98,7 @@ type TextElement = {
   y: number;
   color: string;
   fontSize: number;
+  fontFamily?: string;
   fontWeight: 400 | 600 | 700;
   align: CanvasTextAlign;
   opacity: number;
@@ -121,6 +126,10 @@ type ImageElement = {
   brightness?: number;
   contrast?: number;
   saturation?: number;
+  warmth?: number;
+  highlights?: number;
+  shadows?: number;
+  sharpness?: number;
   crop?: { x: number; y: number; width: number; height: number };
   x: number;
   y: number;
@@ -244,6 +253,19 @@ function CreativeStudioPage() {
   const branding = useWorkspaceBranding(activeWorkspace?.id);
   const palette = workspacePalette(branding.data?.accentColor);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayRef = useRef<HTMLCanvasElement>(null);
+  const transactionRef = useRef<DesignDocument | null>(null);
+  const resizeRef = useRef<{ id: string; distance: number; width: number; height: number } | null>(null);
+  const viewportGestureRef = useRef<{ distance: number; zoom: number } | null>(null);
+  const lastTapRef = useRef<{ id: string; at: number } | null>(null);
+  const [viewportZoom, setViewportZoom] = useState(1);
+  const [cropId, setCropId] = useState<string | null>(null);
+  const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const [mediaTab, setMediaTab] = useState("All");
+  const [replaceId, setReplaceId] = useState<string | null>(null);
+  const [adjustment, setAdjustment] = useState("brightness");
+  const [reviewLook, setReviewLook] = useState(false);
+  const [lookChoices, setLookChoices] = useState<string[]>(["contrast", "brightness"]);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
   const dragHistoryIndexRef = useRef<number | null>(null);
@@ -255,6 +277,7 @@ function CreativeStudioPage() {
     startWidth: number;
     startHeight: number;
     startRotation: number;
+    crop?: { x: number; y: number; width: number; height: number };
   } | null>(null);
   const queryClient = useQueryClient();
   const [name, setName] = useState("Untitled graphic");
@@ -289,7 +312,7 @@ function CreativeStudioPage() {
       const { data, error } = await db
         .from("creative_designs")
         .select("id,name,format,document,updated_at")
-        .eq("workspace_id", workspaceId!)
+        .eq("workspace_id", workspaceId)
         .order("updated_at", { ascending: false })
         .limit(20);
       if (error) throw error;
@@ -354,6 +377,10 @@ function CreativeStudioPage() {
     void Promise.all(
       Array.from(new Set(missingIds)).map(async (assetId) => {
         const asset = mediaAssets.data?.find((candidate) => candidate.id === assetId);
+    if (replaceId) {
+      updateElement(replaceId, { assetId, sourceType: "media", name: asset?.name ?? "Media image", crop: undefined });
+      setReplaceId(null); setMobileTool(null); return;
+    }
         if (!asset) return null;
         try {
           return [assetId, await getMediaPreviewUrl(asset, 60 * 60 * 6)] as const;
@@ -377,7 +404,7 @@ function CreativeStudioPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const assets = (mediaAssets.data ?? []).slice(0, 30).filter((asset) => !assetUrls[asset.id]);
+    const assets = (mediaAssets.data ?? []).filter((asset) => !assetUrls[asset.id]);
     if (!assets.length) return;
     void Promise.all(
       assets.map(async (asset) => {
@@ -471,7 +498,7 @@ function CreativeStudioPage() {
         } else {
           context.globalAlpha = element.opacity ?? 1;
           context.fillStyle = element.color;
-          context.font = `${element.fontWeight} ${element.fontSize}px Inter, Arial, sans-serif`;
+          context.font = `${element.fontWeight} ${element.fontSize}px ${element.fontFamily ?? "Inter"}, Arial, sans-serif`;
           context.textAlign = element.align;
           context.textBaseline = "middle";
           const maxWidth = canvas.width * 0.88;
@@ -482,26 +509,6 @@ function CreativeStudioPage() {
             context.fillText(line, 0, startY + index * lineHeight, maxWidth);
           });
         }
-        if (element.id === selectedId) {
-          context.globalAlpha = 1;
-          context.filter = "none";
-          context.strokeStyle = palette.primary;
-          context.lineWidth = Math.max(3, canvas.width / 300);
-          context.setLineDash([12, 8]);
-          if (element.type === "text") {
-            const boxWidth = Math.min(canvas.width * 0.88, Math.max(element.fontSize * 2, element.text.length * element.fontSize * 0.5));
-            const boxHeight = Math.max(element.fontSize * 1.2, element.text.split("\n").length * element.fontSize * 1.2);
-            context.strokeRect(-boxWidth / 2, -boxHeight / 2, boxWidth, boxHeight);
-          } else {
-            context.strokeRect(-element.width / 2, -element.height / 2, element.width, element.height);
-            context.setLineDash([]);
-            context.fillStyle = palette.primary;
-            const handle = Math.max(18, canvas.width / 55);
-            for (const [hx, hy] of [[-element.width/2,-element.height/2],[element.width/2,-element.height/2],[-element.width/2,element.height/2],[element.width/2,element.height/2]]) {
-              context.fillRect(hx - handle/2, hy - handle/2, handle, handle);
-            }
-          }
-        }
         context.restore();
       }
     }
@@ -510,6 +517,26 @@ function CreativeStudioPage() {
       cancelled = true;
     };
   }, [assetUrls, branding.data?.logoUrl, document, format.height, format.width, mobileStarted, palette.primary, selectedId]);
+
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+    overlay.width = format.width; overlay.height = format.height;
+    const ctx = overlay.getContext("2d"); if (!ctx) return;
+    const item = document.elements.find((element) => element.id === selectedId);
+    if (item) {
+      const box = elementBox(item);
+      ctx.save(); ctx.translate(box.x, box.y); ctx.rotate(box.rotation * Math.PI / 180);
+      ctx.strokeStyle = palette.primary; ctx.fillStyle = palette.primary; ctx.lineWidth = format.width / 350;
+      ctx.strokeRect(-box.width / 2, -box.height / 2, box.width, box.height);
+      const size = format.width / 45;
+      for (const x of [-box.width / 2, box.width / 2]) for (const y of [-box.height / 2, box.height / 2]) ctx.fillRect(x-size/2,y-size/2,size,size);
+      ctx.restore();
+    }
+    ctx.strokeStyle = palette.primary; ctx.lineWidth = format.width / 500;
+    if (guides.x !== null) { ctx.beginPath(); ctx.moveTo(guides.x, 0); ctx.lineTo(guides.x, format.height); ctx.stroke(); }
+    if (guides.y !== null) { ctx.beginPath(); ctx.moveTo(0, guides.y); ctx.lineTo(format.width, guides.y); ctx.stroke(); }
+  }, [document, selectedId, guides, format, palette.primary, mobileStarted]);
 
   function commit(next: DesignDocument) {
     const nextHistory = [...history.slice(0, historyIndex + 1), cloneDocument(next)].slice(-50);
@@ -579,7 +606,7 @@ function CreativeStudioPage() {
       opacity: 1,
       rotation: 0,
     };
-    changeDocument((current) => ({ ...current, elements: photoMode ? [{ ...element, x: 0.5, y: 0.5, width: format.width, height: format.height }] : [...current.elements, element] }));
+    changeDocument((current) => ({ ...current, elements: [...current.elements, element] }));
     setSelectedId(element.id);
     setMobileStarted(true);
     setMobileTool(null);
@@ -790,123 +817,94 @@ function CreativeStudioPage() {
     };
   }
 
-  function hitElement(point: { x: number; y: number }) {
-    const px = point.x * format.width;
-    const py = point.y * format.height;
-    return [...document.elements].reverse().find((element) => {
-      const centerX = element.x * format.width;
-      const centerY = element.y * format.height;
-      const width =
-        element.type === "text"
-          ? Math.min(
-              format.width * 0.88,
-              Math.max(element.fontSize * 2, element.text.length * element.fontSize * 0.5),
-            )
-          : element.width;
-      const height =
-        element.type === "text"
-          ? Math.max(
-              element.fontSize * 1.2,
-              element.text.split("\n").length * element.fontSize * 1.2,
-            )
-          : element.height;
-      return Math.abs(px - centerX) <= width / 2 && Math.abs(py - centerY) <= height / 2;
-    });
+  function elementBox(element: DesignElement) {
+    return { x: element.x * format.width, y: element.y * format.height,
+      width: element.type === "text" ? Math.min(format.width * .88, Math.max(element.fontSize * 2, element.text.length * element.fontSize * .5)) : element.width,
+      height: element.type === "text" ? Math.max(element.fontSize * 1.2, element.text.split("\n").length * element.fontSize * 1.2) : element.height,
+      rotation: element.rotation ?? 0 };
   }
-
+  function hitElement(point: { x: number; y: number }) {
+    return [...document.elements].reverse().find((element) => containsPoint(elementBox(element), { x: point.x * format.width, y: point.y * format.height }));
+  }
+  function startTransaction() {
+    if (transactionRef.current) return;
+    transactionRef.current = cloneDocument(document);
+    const next = [...history.slice(0, historyIndex + 1), cloneDocument(document)].slice(-50);
+    setHistory(next); setHistoryIndex(next.length - 1); dragHistoryIndexRef.current = next.length - 1;
+  }
+  function gesturePatch(id: string, patch: Partial<DesignElement>) {
+    const target = dragHistoryIndexRef.current; if (target === null) return;
+    setHistory((current) => current.map((item, index) => index === target ? { ...item, elements: item.elements.map((element) => element.id === id ? { ...element, ...patch } as DesignElement : element) } : item));
+    setDirty(true);
+  }
   function beginCanvasMove(event: ReactPointerEvent<HTMLCanvasElement>) {
     const point = canvasPoint(event);
     activePointersRef.current.set(event.pointerId, point);
-    const element = hitElement(point);
-    if (!element) {
-      setSelectedId(null);
-      return;
-    }
     event.currentTarget.setPointerCapture(event.pointerId);
-    const nextHistory = [...history.slice(0, historyIndex + 1), cloneDocument(document)].slice(-50);
-    const nextIndex = nextHistory.length - 1;
-    setHistory(nextHistory);
-    setHistoryIndex(nextIndex);
-    dragHistoryIndexRef.current = nextIndex;
-    dragRef.current = {
-      id: element.id,
-      offsetX: point.x - element.x,
-      offsetY: point.y - element.y,
-    };
-    setSelectedId(element.id);
     if (activePointersRef.current.size === 2) {
       const points = [...activePointersRef.current.values()];
-      const dx = (points[1].x - points[0].x) * format.width;
-      const dy = (points[1].y - points[0].y) * format.height;
-      gestureRef.current = {
-        id: element.id,
-        startDistance: Math.max(1, Math.hypot(dx, dy)),
-        startAngle: Math.atan2(dy, dx),
-        startWidth: element.type === "text" ? element.fontSize : element.width,
-        startHeight: element.type === "text" ? element.fontSize : element.height,
-        startRotation: element.rotation ?? 0,
-      };
+      const dx = (points[1].x - points[0].x) * format.width, dy = (points[1].y - points[0].y) * format.height;
+      const element = document.elements.find((item) => item.id === selectedId);
+      if (!element) { viewportGestureRef.current = { distance: Math.max(1, Math.hypot(dx, dy)), zoom: viewportZoom }; return; }
+      startTransaction();
+      gestureRef.current = { id: element.id, startDistance: Math.max(1, Math.hypot(dx, dy)), startAngle: Math.atan2(dy, dx), startWidth: element.type === "text" ? element.fontSize : element.width, startHeight: element.type === "text" ? element.fontSize : element.height, startRotation: element.rotation, crop: element.type === "image" ? element.crop : undefined };
+      resizeRef.current = null; return;
     }
+    const prior = document.elements.find((item) => item.id === selectedId);
+    const corner = prior && cornerHit(elementBox(prior), { x: point.x * format.width, y: point.y * format.height }, format.width / 30);
+    const element = corner ? prior : hitElement(point);
+    if (!element) { setSelectedId(null); setCropId(null); return; }
+    setSelectedId(element.id); startTransaction();
+    const now = Date.now();
+    if (element.type === "image" && lastTapRef.current?.id === element.id && now - lastTapRef.current.at < 350) { setCropId(element.id); setMobileTool(null); }
+    lastTapRef.current = { id: element.id, at: now };
+    dragRef.current = { id: element.id, offsetX: point.x - element.x, offsetY: point.y - element.y };
+    if (corner) resizeRef.current = { id: element.id, distance: Math.max(1, Math.hypot((point.x-element.x)*format.width,(point.y-element.y)*format.height)), width: element.type === "text" ? element.fontSize : element.width, height: element.type === "text" ? element.fontSize : element.height };
   }
-
   function moveCanvasElement(event: ReactPointerEvent<HTMLCanvasElement>) {
     const point = canvasPoint(event);
-    if (activePointersRef.current.has(event.pointerId)) activePointersRef.current.set(event.pointerId, point);
-    const gesture = gestureRef.current;
-    if (gesture && activePointersRef.current.size >= 2) {
-      const points = [...activePointersRef.current.values()].slice(0, 2);
-      const dx = (points[1].x - points[0].x) * format.width;
-      const dy = (points[1].y - points[0].y) * format.height;
-      const distance = Math.max(1, Math.hypot(dx, dy));
-      const angle = Math.atan2(dy, dx);
-      const scale = Math.max(0.15, Math.min(6, distance / gesture.startDistance));
-      const rotation = gesture.startRotation + ((angle - gesture.startAngle) * 180) / Math.PI;
-      const targetIndex = dragHistoryIndexRef.current;
-      if (targetIndex !== null) {
-        setHistory((current) => current.map((item, index) => index !== targetIndex ? item : ({
-          ...item,
-          elements: item.elements.map((element) => {
-            if (element.id !== gesture.id) return element;
-            if (element.type === "text") return { ...element, fontSize: Math.max(12, Math.min(240, gesture.startWidth * scale)), rotation };
-            return { ...element, width: Math.max(40, gesture.startWidth * scale), height: Math.max(40, gesture.startHeight * scale), rotation };
-          }),
-        })));
-        setDirty(true);
-      }
-      return;
+    if (!activePointersRef.current.has(event.pointerId)) return;
+    activePointersRef.current.set(event.pointerId, point);
+    const points = [...activePointersRef.current.values()].slice(0, 2);
+    if (points.length === 2) {
+      const dx = (points[1].x-points[0].x)*format.width, dy = (points[1].y-points[0].y)*format.height;
+      const distance = Math.max(1,Math.hypot(dx,dy));
+      const viewport = viewportGestureRef.current;
+      if (viewport) { setViewportZoom(clamp(viewport.zoom*distance/viewport.distance, .5, 3)); return; }
+      const gesture = gestureRef.current; if (!gesture) return;
+      const scale = clamp(distance/gesture.startDistance, .15, 6);
+      const element = document.elements.find((item) => item.id === gesture.id); if (!element) return;
+      if (cropId === element.id && element.type === "image") { gesturePatch(element.id, { crop: zoomCrop(gesture.crop ?? {x:0,y:0,width:1,height:1}, scale) }); return; }
+      const rotation = gesture.startRotation + (Math.atan2(dy,dx)-gesture.startAngle)*180/Math.PI;
+      gesturePatch(element.id, element.type === "text" ? {fontSize:clamp(gesture.startWidth*scale,12,240),rotation} : {width:Math.max(20,gesture.startWidth*scale),height:Math.max(20,gesture.startHeight*scale),rotation}); return;
     }
-    const drag = dragRef.current;
-    const targetIndex = dragHistoryIndexRef.current;
-    if (!drag || targetIndex === null) return;
-    setHistory((current) =>
-      current.map((item, index) =>
-        index !== targetIndex
-          ? item
-          : {
-              ...item,
-              elements: item.elements.map((element) =>
-                element.id === drag.id
-                  ? {
-                      ...element,
-                      x: Math.max(0, Math.min(1, point.x - drag.offsetX)),
-                      y: Math.max(0, Math.min(1, point.y - drag.offsetY)),
-                    }
-                  : element,
-              ),
-            },
-      ),
-    );
-    setDirty(true);
+    if (viewportGestureRef.current || gestureRef.current) return;
+    const drag = dragRef.current; if (!drag) return;
+    const item = document.elements.find((element) => element.id === drag.id); if (!item) return;
+    const resize = resizeRef.current;
+    if (resize) {
+      const scale = clamp(Math.hypot((point.x-item.x)*format.width,(point.y-item.y)*format.height)/resize.distance,.15,6);
+      gesturePatch(item.id,item.type === "text" ? {fontSize:clamp(resize.width*scale,12,240)} : {width:resize.width*scale,height:resize.height*scale}); return;
+    }
+    if (cropId === item.id && item.type === "image") {
+      const original = transactionRef.current?.elements.find((element) => element.id === item.id);
+      const crop = original?.type === "image" ? original.crop ?? {x:0,y:0,width:1,height:1} : {x:0,y:0,width:1,height:1};
+      gesturePatch(item.id,{crop:{...crop,x:clamp(crop.x-(point.x-item.x-drag.offsetX)*format.width/item.width*crop.width,0,1-crop.width),y:clamp(crop.y-(point.y-item.y-drag.offsetY)*format.height/item.height*crop.height,0,1-crop.height)}}); return;
+    }
+    const box = elementBox(item), others = document.elements.filter((element) => element.id !== item.id).map(elementBox);
+    const sx = snapPosition((point.x-drag.offsetX)*format.width,box.width,[0,format.width/2,format.width,...others.flatMap((b)=>[b.x,b.x-b.width/2,b.x+b.width/2])],format.width*.008);
+    const sy = snapPosition((point.y-drag.offsetY)*format.height,box.height,[0,format.height/2,format.height,...others.flatMap((b)=>[b.y,b.y-b.height/2,b.y+b.height/2])],format.height*.008);
+    setGuides({x:sx.guide,y:sy.guide}); gesturePatch(item.id,{x:clamp(sx.value/format.width,0,1),y:clamp(sy.value/format.height,0,1)});
   }
-
   function endCanvasMove(event: ReactPointerEvent<HTMLCanvasElement>) {
     activePointersRef.current.delete(event.pointerId);
-    if (activePointersRef.current.size < 2) gestureRef.current = null;
-    if (dragRef.current && event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (activePointersRef.current.size) return;
+    if (transactionRef.current && JSON.stringify(transactionRef.current) === JSON.stringify(document)) {
+      const target = dragHistoryIndexRef.current;
+      if (target !== null) { setHistory((current) => current.filter((_,index)=>index !== target)); setHistoryIndex(Math.max(0,target-1)); }
     }
-    dragRef.current = null;
-    dragHistoryIndexRef.current = null;
+    transactionRef.current = null; dragRef.current = null; gestureRef.current = null; resizeRef.current = null; viewportGestureRef.current = null; dragHistoryIndexRef.current = null; setGuides({x:null,y:null});
   }
 
   async function saveServerDraft() {
@@ -927,9 +925,16 @@ function CreativeStudioPage() {
   if (!activeWorkspace) return null;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-studio-focused={mobileStarted ? "true" : "false"}>
       <UnsavedChangesGuard dirty={dirty} subject="this design" />
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      {mobileStarted && <header className="studio-focus-header sticky top-0 z-20 flex items-center gap-1 border-b border-border bg-background py-2 sm:hidden">
+        <Button size="icon" variant="ghost" aria-label="Leave focused editor" onClick={() => { setMobileStarted(false); setMobileTool(null); setCropId(null); }}><ArrowLeft /></Button>
+        <h1 className="min-w-0 flex-1 text-sm font-semibold">Creative Studio</h1>
+        <Button size="icon" variant="ghost" aria-label="Undo" disabled={historyIndex === 0} onClick={() => {setHistoryIndex(i=>Math.max(0,i-1));setDirty(true);}}><Undo2 /></Button>
+        <Button size="icon" variant="ghost" aria-label="Redo" disabled={historyIndex === history.length-1} onClick={() => {setHistoryIndex(i=>Math.min(history.length-1,i+1));setDirty(true);}}><Redo2 /></Button>
+        <Button variant="ghost" onClick={() => { setMobileStarted(false); setMobileTool(null); setCropId(null); }}>Done</Button>
+      </header>}
+      <header className={cn(mobileStarted && "hidden sm:flex", "flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between")}>
         <div>
           <div className="hidden items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary sm:flex">
             <ImageIcon className="h-4 w-4" /> Static images only
@@ -1016,7 +1021,7 @@ function CreativeStudioPage() {
         </div>
       )}
 
-      <section className={cn("flex flex-wrap items-end gap-3 sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-4", !mobileStarted && "hidden sm:flex")}>
+      <section className={cn("flex flex-wrap items-end gap-3 sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-4", "hidden sm:flex")}>
         <Field label="Design name">
           <input
             className={`${inputClass} min-w-0 sm:min-w-56`}
@@ -1100,30 +1105,34 @@ function CreativeStudioPage() {
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">Templates</h2>
-            <div className="mt-3 max-h-48 space-y-1 overflow-y-auto">
+            <div className="mt-3 grid max-h-[45dvh] grid-cols-2 gap-2 overflow-y-auto">
               {TEMPLATE_NAMES.map((template) => (
                 <button
                   key={template}
                   type="button"
-                  className="min-h-10 w-full rounded-lg px-3 text-left text-xs text-muted-foreground hover:bg-elevated hover:text-foreground"
+                  className="min-h-10 w-full overflow-hidden rounded-lg border border-border text-left text-xs text-muted-foreground hover:bg-elevated hover:text-foreground"
                   onClick={() => {
                     const next = templateDocument(template, palette.primary);
+                    setMobileTool(null);
                     commit(next);
                     setName(`${template} graphic`);
                     setDesignId(null);
                     setSelectedId(next.elements.at(-1)?.id ?? null);
                   }}
                 >
-                  {template}
+                  <DesignThumbnail document={templateDocument(template, palette.primary)} urls={assetUrls} logo={branding.data?.logoUrl} />
+                  <span className="block p-2">{template}</span>
                 </button>
               ))}
             </div>
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Media" && "hidden sm:block")}>
-            <h2 className="text-sm font-semibold">Media Library</h2>
+            <h2 className="text-sm font-semibold">{replaceId ? "Replace image" : "Media Library"}</h2>
+            <div className="mt-2 flex gap-1">{["All","Uploads","Brand","Recent"].map(tab=><Button key={tab} size="sm" variant={mediaTab === tab ? "secondary" : "ghost"} onClick={()=>setMediaTab(tab)}>{tab}</Button>)}</div>
+            {mediaTab === "Brand" && branding.data?.logoUrl && <Button variant="outline" className="mt-3 h-20 w-full" onClick={addWorkspaceLogo}><img src={branding.data.logoUrl} alt="Workspace logo" className="max-h-14 max-w-full object-contain" /></Button>}
             <Button variant="outline" className="mt-3 min-h-11 w-full sm:hidden" onClick={() => uploadInputRef.current?.click()}><Upload /> Upload image</Button>
             <div className="mt-3 grid max-h-[55dvh] grid-cols-3 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-2">
-              {(mediaAssets.data ?? []).slice(0, 30).map((asset) => (
+              {(mediaAssets.data ?? []).filter(asset => mediaTab === "All" || mediaTab === "Uploads" || (mediaTab === "Recent" && document.elements.some(item => item.type === "image" && item.assetId === asset.id)) || (mediaTab === "Brand" && asset.tags?.includes("brand"))).map((asset) => (
                 <button
                   key={asset.id}
                   type="button"
@@ -1154,7 +1163,7 @@ function CreativeStudioPage() {
                 <button
                   key={element.id}
                   type="button"
-                  onClick={() => setSelectedId(element.id)}
+                  onClick={() => { setSelectedId(element.id); setMobileTool("Edit"); }}
                   className={cn(
                     "flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs",
                     selectedId === element.id
@@ -1162,15 +1171,7 @@ function CreativeStudioPage() {
                       : "text-muted-foreground hover:bg-elevated",
                   )}
                 >
-                  {element.type === "text" ? (
-                    <Type className="h-3.5 w-3.5" />
-                  ) : element.type === "image" ? (
-                    <ImageIcon className="h-3.5 w-3.5" />
-                  ) : element.shape === "circle" ? (
-                    <Circle className="h-3.5 w-3.5" />
-                  ) : (
-                    <Square className="h-3.5 w-3.5" />
-                  )}
+                  <span className="w-12 shrink-0 overflow-hidden rounded border border-border"><DesignThumbnail document={{...document, elements:[{...element,x:.5,y:.5} as DesignElement]}} urls={assetUrls} logo={branding.data?.logoUrl} /></span>
                   <span className="truncate">{element.name}</span>
                 </button>
               ))}
@@ -1186,7 +1187,7 @@ function CreativeStudioPage() {
                   className="w-full rounded-lg px-3 py-2 text-left hover:bg-elevated"
                   onClick={() => loadDesign(row)}
                 >
-                  <div className="truncate text-xs font-semibold">{row.name}</div>
+                  <DesignThumbnail document={row.document} urls={assetUrls} logo={branding.data?.logoUrl} /><div className="mt-2 truncate text-xs font-semibold">{row.name}</div>
                   <div className="text-[10px] text-muted-foreground">
                     {FORMATS[row.format]?.label ?? row.format}
                   </div>
@@ -1202,23 +1203,26 @@ function CreativeStudioPage() {
         <section className="relative flex min-h-64 items-center justify-center overflow-hidden sm:surface-card sm:min-h-[30rem] sm:p-6">
           <div className="w-full max-w-3xl">
             {document.elements.length === 0 && <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center"><div className="rounded-full border border-border/80 bg-background/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">Tap Add, Media, or Templates to start creating</div></div>}
-            <canvas
+            <div className="relative mx-auto w-fit max-w-full" style={{ transform: `scale(${viewportZoom})` }}><canvas
               ref={canvasRef}
               aria-label={`${name} design preview`}
-              className="mx-auto h-auto max-h-[48dvh] w-auto max-w-full touch-none cursor-move ring-1 ring-border-strong sm:max-h-none sm:w-full sm:rounded-lg"
+              className="mx-auto h-auto max-h-[calc(100dvh-13rem)] w-auto max-w-full touch-none cursor-move ring-1 ring-border-strong sm:max-h-none sm:w-full sm:rounded-lg"
               style={{ aspectRatio: `${format.width}/${format.height}` }}
               onPointerDown={beginCanvasMove}
               onPointerMove={moveCanvasElement}
               onPointerUp={endCanvasMove}
               onPointerCancel={endCanvasMove}
             />
+            <canvas ref={overlayRef} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />
+            </div>
+            {cropId && <div className="absolute left-3 top-3 flex gap-2"><Button variant="secondary" onClick={() => setMobileTool("Crop")}><Crop /> Ratio</Button><Button onClick={() => { setCropId(null); setMobileTool(null); }}>Done cropping</Button></div>}
             <div className="mt-3 hidden text-center text-xs text-muted-foreground sm:block">
               Preview scaled to fit · export is {format.width} × {format.height}px
             </div>
           </div>
         </section>
 
-        <MobileToolPanel open={["Canvas", "Adjust", "Crop", "Edit"].includes(mobileTool ?? "")} title={mobileTool ?? "Canvas"} onClose={() => setMobileTool(null)}>
+        <MobileToolPanel open={["Canvas", "Adjust", "Crop", "Edit", "Looks", "Auto", "More", "Font", "Size", "Color", "Style", "Align", "Fill", "Border", "Opacity", "Arrange", "Position"].includes(mobileTool ?? "")} title={mobileTool ?? "Canvas"} onClose={() => setMobileTool(null)}>
           <section className={cn("surface-card space-y-4 p-4", mobileTool !== "Canvas" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">Canvas</h2>
             <Field label="Background">
@@ -1248,25 +1252,17 @@ function CreativeStudioPage() {
             </div>
           </section>
 
-          {selected?.type === "image" && <section className="space-y-5 rounded-xl border border-border p-4">
+          {selected?.type === "image" && <section className={cn("space-y-4", !["Crop","Adjust","Looks","Auto"].includes(mobileTool ?? "") && "hidden sm:block")}>
             {mobileTool === "Crop" ? <>
-              <div className="grid grid-cols-3 gap-2">
-                {[{label:"Original",ratio:null},{label:"Square",ratio:1},{label:"Portrait",ratio:0.8}].map(({label,ratio}) => <Button key={label} variant="outline" className="min-h-11" onClick={() => {
-                  const asset = mediaAssets.data?.find((item) => item.id === selected.assetId);
-                  const sourceRatio = (asset?.width ?? selected.width) / (asset?.height ?? selected.height);
-                  const width = ratio && sourceRatio > ratio ? ratio / sourceRatio : 1;
-                  const height = ratio && sourceRatio < ratio ? sourceRatio / ratio : 1;
-                  updateElement(selected.id, { crop: { x: (1-width)/2, y: (1-height)/2, width, height }, ...(ratio ? { height: selected.width / ratio } : {}) });
-                }}>{label}</Button>)}
-              </div>
-              <Button variant="outline" className="min-h-11 w-full" onClick={() => updateElement(selected.id, { rotation: ((selected.rotation ?? 0) + 90) % 360 })}><RotateCw /> Rotate 90°</Button>
-            </> : ["brightness", "contrast", "saturation"].map((key) => {
-              const metric = key as "brightness" | "contrast" | "saturation";
-              return <label key={key} className="block space-y-3"><span className="flex justify-between text-sm capitalize">{key}<span className="text-primary">{selected[metric] ?? 100}%</span></span><Slider aria-label={key} value={[selected[metric] ?? 100]} min={0} max={200} step={1} onValueChange={([value]) => updateElement(selected.id, { [key]: value })} /></label>;
-            })}
+              <div className="grid grid-cols-3 gap-2">{[{label:"Free",ratio:null},{label:"Original",ratio:null},{label:"1:1",ratio:1},{label:"4:5",ratio:.8},{label:"9:16",ratio:9/16},{label:"16:9",ratio:16/9}].map(({label,ratio})=><Button key={label} variant="outline" onClick={()=>{const asset=mediaAssets.data?.find(item=>item.id===selected.assetId);const sourceRatio=(asset?.width??selected.width)/(asset?.height??selected.height);updateElement(selected.id,{crop:ratioCrop(sourceRatio,ratio),...(ratio?{height:selected.width/ratio}:{})});setCropId(selected.id);setMobileTool(null);}}>{label}</Button>)}</div>
+              <Button variant="outline" onClick={()=>updateElement(selected.id,{rotation:(selected.rotation+90)%360})}><RotateCw /> Rotate</Button>
+            </> : mobileTool === "Looks" ? <div className="flex gap-2 overflow-x-auto">{[{name:"Original",brightness:100,contrast:100,saturation:100},{name:"Clean",brightness:105,contrast:108,saturation:95},{name:"Warm",brightness:104,contrast:103,saturation:115},{name:"Cool",brightness:100,contrast:105,saturation:85},{name:"Bright",brightness:118,contrast:102,saturation:105},{name:"Moody",brightness:85,contrast:120,saturation:80},{name:"Cinematic",brightness:95,contrast:125,saturation:75},{name:"Soft",brightness:108,contrast:88,saturation:92}].map(look=><Button key={look.name} variant="outline" className="h-auto w-20 shrink-0 flex-col p-1" onClick={()=>updateElement(selected.id,{brightness:look.brightness,contrast:look.contrast,saturation:look.saturation})}><img src={selected.sourceType === "workspace-logo" ? branding.data?.logoUrl ?? "" : assetUrls[selected.assetId ?? ""]} alt={look.name} className="aspect-square w-full object-cover" style={{filter:`brightness(${look.brightness}%) contrast(${look.contrast}%) saturate(${look.saturation}%)`}}/><span>{look.name}</span></Button>)}</div>
+            : mobileTool === "Auto" ? <><p className="text-sm text-muted-foreground">AI image analysis is unavailable while its required package is pending release eligibility. These are optional manual starting points, not image analysis.</p>{["brightness","contrast","saturation"].map(key=><label key={key} className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={lookChoices.includes(key)} onChange={e=>setLookChoices(v=>e.target.checked?[...v,key]:v.filter(k=>k!==key))}/><span className="capitalize">{key === "brightness" ? "Slight brightness" : key === "contrast" ? "Gentle contrast" : "Subtle saturation"}</span></label>)}<Button onClick={()=>updateElement(selected.id,Object.fromEntries(lookChoices.map(key=>[key,key === "brightness"?108:105])))}>Apply selected presets</Button></>
+            : <><div className="flex flex-wrap gap-1">{[{key:"brightness",label:"Exposure"},{key:"contrast",label:"Contrast"},{key:"saturation",label:"Saturation"}].map(item=><Button key={item.key} size="sm" variant={adjustment===item.key?"secondary":"ghost"} onClick={()=>setAdjustment(item.key)}>{item.label}</Button>)}</div><label className="block space-y-4"><span className="flex justify-between text-sm capitalize">{adjustment}<span>{selected[adjustment as "brightness"|"contrast"|"saturation"]??100}%</span></span><Slider aria-label={adjustment} value={[selected[adjustment as "brightness"|"contrast"|"saturation"]??100]} min={0} max={200} onValueChange={([value])=>updateElement(selected.id,{[adjustment]:value})}/></label></>}
           </section>}
+          {mobileTool === "More" && <div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>setMobileTool("Layers")}><Layers3 /> Layers</Button><Button variant="outline" onClick={()=>setMobileTool("Canvas")}><Square /> Canvas</Button>{selected?.type === "image" && <Button variant="outline" onClick={()=>{setReplaceId(selected.id);setMobileTool("Media");}}><ImageIcon /> Replace</Button>}<Button variant="outline" onClick={exportPng}><Download /> Export</Button></div>}
 
-          <div className={cn(mobileTool !== "Edit" && "hidden sm:block")}>
+          <div className={cn(!["Edit","More","Font","Size","Color","Style","Align","Fill","Border","Opacity","Arrange","Position"].includes(mobileTool ?? "") && "hidden sm:block")}>
           {selected ? (
             <ElementInspector
               element={selected}
@@ -1289,28 +1285,13 @@ function CreativeStudioPage() {
         </MobileToolPanel>
       </div>
 
-      {mobileStarted && <div className="space-y-4 sm:hidden">
-        <div className="grid grid-cols-4 gap-1" aria-label="Editing tools">
-          {(selected?.type === "image"
-            ? [{label:"Adjust",icon:SlidersHorizontal},{label:"Crop",icon:Crop},{label:"Media",icon:ImageIcon},{label:"Layers",icon:Layers3},{label:"Edit",icon:SlidersHorizontal}]
-            : selected?.type === "text"
-              ? [{label:"Edit",icon:Type},{label:"Layers",icon:Layers3},{label:"Add",icon:Plus},{label:"Brand",icon:WandSparkles}]
-              : photoMode
-                ? [{label:"Media",icon:ImageIcon},{label:"Brand",icon:WandSparkles},{label:"Layers",icon:Layers3},{label:"Canvas",icon:Square}]
-                : [{label:"Add",icon:Plus},{label:"Media",icon:ImageIcon},{label:"Templates",icon:Square},{label:"Brand",icon:WandSparkles},{label:"Layers",icon:Layers3},{label:"Canvas",icon:Crop}]
-          ).map(({label,icon:Icon}) => <Button key={label} variant="ghost" className="h-auto min-h-16 flex-col gap-2 px-1 text-[10px]" onClick={() => setMobileTool(label)}><span className="grid size-10 place-items-center rounded-xl border border-border-strong bg-elevated"><Icon className="text-primary" /></span>{label}</Button>)}
-        </div>
-        <div className="rounded-2xl border border-border-strong bg-gradient-to-br from-primary/10 to-surface p-4">
-          <p className="mb-3 text-sm font-semibold">Done with your design?</p>
-          <div className="grid grid-cols-3 gap-2">
-            <Button variant="outline" className="min-h-20 flex-col gap-2 whitespace-normal px-1 text-xs" onClick={() => void saveServerDraft()} disabled={workflowDraft.save.isPending}><Save /> Save Draft</Button>
-            <Button variant="outline" className="min-h-20 flex-col gap-2 whitespace-normal px-1 text-xs" onClick={() => void sendToPost("feed")} disabled={uploadAsset.isPending}><ImagePlus /> Post to Feed</Button>
-            <Button variant="outline" className="min-h-20 flex-col gap-2 whitespace-normal px-1 text-xs" onClick={() => void sendToPost("story")} disabled={uploadAsset.isPending}><ImagePlus /> Post to Story</Button>
-          </div>
-          <Button variant="outline" className="mt-3 min-h-11 w-full" onClick={exportPng}><Download /> Export PNG</Button>
-          <Button variant="ghost" className="mt-2 min-h-11 w-full" onClick={() => saveDesign.mutate()} disabled={saveDesign.isPending}><Save /> Save editable design</Button>
+      {mobileStarted && <div className="studio-context-toolbar sticky bottom-0 z-10 border-t border-border bg-background pb-[max(.5rem,env(safe-area-inset-bottom))] sm:hidden">
+        <div className="flex justify-evenly gap-1" aria-label="Editing tools">
+          {(selected?.type === "image" ? selected.sourceType === "workspace-logo" ? ["Replace","Size","Opacity","Position","More"] : ["Auto","Crop","Adjust","Looks","Remove","More"] : selected?.type === "text" ? ["Font","Size","Color","Style","Align","More"] : selected?.type === "shape" ? ["Fill","Opacity","Arrange","More"] : ["Add","Media","Templates","Brand","More"]).map(label=><Button key={label} variant="ghost" className="h-auto min-h-16 min-w-0 flex-1 flex-col gap-1 px-0 text-[10px]" onClick={()=>{if(label === "Remove" && selected){removeElement(selected.id);return;}if(label === "Replace" && selected){setReplaceId(selected.id);setMobileTool("Media");return;}setMobileTool(label);}}>{label === "More" ? <MoreHorizontal /> : label === "Crop" ? <Crop /> : label === "Font" ? <Type /> : label === "Media" || label === "Replace" ? <ImageIcon /> : label === "Color" || label === "Fill" || label === "Looks" ? <Palette /> : label === "Remove" ? <Trash2 /> : label === "Auto" || label === "Brand" ? <WandSparkles /> : <SlidersHorizontal />}{label}</Button>)}
         </div>
       </div>}
+      {!mobileStarted && document.elements.length > 0 && <section className="space-y-3 sm:hidden"><Button className="w-full" onClick={()=>setMobileStarted(true)}>Continue editing</Button><div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>void saveServerDraft()} disabled={workflowDraft.save.isPending}><Save /> Save draft</Button><Button variant="outline" onClick={exportPng}><Download /> Export</Button><Button variant="outline" onClick={()=>void sendToPost("feed")} disabled={uploadAsset.isPending}><ImagePlus /> Post to feed</Button><Button variant="outline" onClick={()=>void sendToPost("story")} disabled={uploadAsset.isPending}><ImagePlus /> Post to story</Button></div><Button variant="outline" className="w-full" onClick={()=>saveDesign.mutate()} disabled={saveDesign.isPending}><Save /> Save editable design</Button></section>}
+
     </div>
   );
 }
@@ -1362,6 +1343,7 @@ function ElementInspector({
               onChange={(event) => onChange({ text: event.target.value })}
             />
           </Field>
+          <Field label="Font"><select className={inputClass} value={element.fontFamily ?? "Inter"} onChange={event=>onChange({fontFamily:event.target.value})}>{["Inter","Arial","Helvetica","Georgia","Courier New"].map(font=><option key={font}>{font}</option>)}</select></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Size">
               <input
@@ -1525,3 +1507,9 @@ const inputClass =
   "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary";
 const textareaClass =
   "w-full rounded-lg border border-border bg-background p-3 text-sm outline-none focus:border-primary";
+
+function DesignThumbnail({document,urls,logo}:{document:DesignDocument;urls:Record<string,string>;logo?:string|null}) {
+  const ref=useRef<HTMLCanvasElement>(null);
+  useEffect(()=>{let cancelled=false;const canvas=ref.current;if(!canvas)return;const format=FORMATS[document.format];canvas.width=240;canvas.height=Math.round(240*format.height/format.width);const ctx=canvas.getContext("2d");if(!ctx)return;void (async()=>{ctx.fillStyle=document.background;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.scale(canvas.width/format.width,canvas.height/format.height);for(const element of document.elements){if(cancelled)return;ctx.save();ctx.translate(element.x*format.width,element.y*format.height);ctx.rotate(element.rotation*Math.PI/180);ctx.globalAlpha=element.opacity;if(element.type==="text"){ctx.fillStyle=element.color;ctx.font=`${element.fontWeight} ${element.fontSize}px ${element.fontFamily??"Inter"}`;ctx.textAlign=element.align;ctx.fillText(element.text,0,0,format.width*.88);}else if(element.type==="shape"){ctx.fillStyle=element.color;if(element.shape==="circle"){ctx.beginPath();ctx.ellipse(0,0,element.width/2,element.height/2,0,0,Math.PI*2);ctx.fill();}else ctx.fillRect(-element.width/2,-element.height/2,element.width,element.height);}else{const url=element.sourceType==="workspace-logo"?logo:urls[element.assetId??""];if(url)try{const image=await loadCanvasImage(url);if(cancelled)return;const crop=element.crop??{x:0,y:0,width:1,height:1};ctx.filter=`brightness(${element.brightness??100}%) contrast(${element.contrast??100}%) saturate(${element.saturation??100}%)`;ctx.drawImage(image,image.naturalWidth*crop.x,image.naturalHeight*crop.y,image.naturalWidth*crop.width,image.naturalHeight*crop.height,-element.width/2,-element.height/2,element.width,element.height);}catch{}}ctx.restore();}})();return()=>{cancelled=true;};},[document,urls,logo]);
+  return <canvas ref={ref} aria-label="Design thumbnail" className="w-full"/>;
+}
