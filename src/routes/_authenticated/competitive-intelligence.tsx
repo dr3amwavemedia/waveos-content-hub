@@ -8,7 +8,6 @@ import {
   Loader2,
   Plus,
   Save,
-  Scale,
   ShieldAlert,
   Trash2,
   Sparkles,
