@@ -19,6 +19,8 @@ import {
   LogOut,
   Menu,
   Plus,
+  Upload,
+  Wand2,
   X,
   FileText,
   User,
@@ -284,6 +286,12 @@ function Shell({ children }: { children: ReactNode }) {
   const { activeWorkspace, error: workspaceError, retry: retryWorkspace } = useWorkspace();
   const branding = useWorkspaceBranding(activeWorkspace?.id);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [createSheetOpen, setCreateSheetOpen] = useState(false);
+  useEffect(() => {
+    const open = () => setMobileOpen(true);
+    window.addEventListener("waveos:open-menu", open);
+    return () => window.removeEventListener("waveos:open-menu", open);
+  }, []);
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const useWideCanvas = pathname === "/payments";
   const navigate = useNavigate();
@@ -523,6 +531,31 @@ function Shell({ children }: { children: ReactNode }) {
         </div>
       </main>
 
+      {createSheetOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-label="Create">
+          <div className="absolute inset-0 bg-background/70 backdrop-blur" onClick={() => setCreateSheetOpen(false)} />
+          <div className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-border-strong bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border-strong" />
+            <p className="mb-2 px-1 text-sm font-semibold text-foreground">Create</p>
+            <div className="grid grid-cols-2 gap-2" onClick={() => setCreateSheetOpen(false)}>
+              {[
+                { to: "/create", label: "Create Post", icon: Plus, show: true },
+                { to: "/content", label: "Upload Media", icon: Upload, show: can("can_upload_media") },
+                { to: "/creative-studio", label: "Creative Studio", icon: Wand2, show: can("can_use_creative_studio") },
+                { to: "/campaigns", label: "Create Campaign", icon: Megaphone, show: can("can_use_campaign_manager") },
+              ]
+                .filter((a) => a.show)
+                .map(({ to, label, icon: Icon }) => (
+                  <Link key={to} to={to} className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-elevated px-3 text-sm font-medium text-foreground">
+                    <Icon className="h-5 w-5 text-primary" />
+                    {label}
+                  </Link>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mobile bottom nav */}
       <nav className="fixed inset-x-0 bottom-0 z-20 flex items-end justify-around rounded-t-3xl border-t border-border-strong bg-surface/90 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[var(--shadow-elevated)] backdrop-blur-xl lg:hidden">
         {(showCreateFab ? barNav.slice(0, 2) : barNav).map((item) => (
@@ -530,15 +563,16 @@ function Shell({ children }: { children: ReactNode }) {
         ))}
         {showCreateFab && (
           <>
-            <Link
-              to="/create"
-              aria-label="Create post"
+            <button
+              type="button"
+              onClick={() => setCreateSheetOpen(true)}
+              aria-label="Create"
               className="-mt-6 flex flex-1 flex-col items-center justify-start"
             >
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary-glow text-primary-foreground shadow-[var(--shadow-glow)] ring-4 ring-background">
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[var(--shadow-elevated)] ring-4 ring-background">
                 <Plus className="h-7 w-7" strokeWidth={2.5} />
               </span>
-            </Link>
+            </button>
             {barNav.slice(2, 3).map((item) => (
               <MobileNavLink key={`${item.to}#${item.hash ?? ""}`} item={item} />
             ))}
