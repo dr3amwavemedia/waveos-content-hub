@@ -3596,7 +3596,7 @@ function InvoiceForm({
 }) {
   const qc = useQueryClient();
   const [mobileStep, setMobileStep] = useState(0);
-  const mobileSteps = ["Services & items", "Review pricing", "Payment details", "Preview", "Save invoice"];
+  const mobileSteps = ["Services", "Pricing", "Payment", "Preview", "Save"];
   const [number, setNumber] = useState(invoice?.number ?? "");
   const [description, setDescription] = useState(invoice?.description ?? "");
   const [items, setItems] = useState<DraftInvoiceItem[]>(() =>
@@ -3944,11 +3944,6 @@ function InvoiceForm({
       <div>
         <p className="text-sm font-semibold text-foreground">
           {invoice ? `Edit ${invoice.number || "invoice"}` : "New invoice"}
-        </p>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {invoice
-            ? "Update the invoice details below. Clients will see the changes immediately."
-            : "Add an invoice to this client's account."}
         </p>
       </div>
       <MobileWorkflowSteps steps={mobileSteps} step={mobileStep} onChange={setMobileStep} />
