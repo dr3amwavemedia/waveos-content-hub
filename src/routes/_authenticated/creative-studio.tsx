@@ -856,7 +856,7 @@ function CreativeStudioPage() {
           <Button
             variant="outline"
             onClick={() => void saveServerDraft()}
-            disabled={workflowDraft.save.isPending}
+            disabled={workflowDraft.save.isPending || workflowDraft.isError}
           >
             {workflowDraft.save.isPending ? <Loader2 className="animate-spin" /> : <Save />}
             Save draft
@@ -887,7 +887,7 @@ function CreativeStudioPage() {
         </div>
       </header>
 
-      {designs.isError && <p role="alert" className="border-l-2 border-warning pl-3 text-sm text-muted-foreground">Editable design saves are unavailable because the required workspace save setup has not been applied. You can still edit and export a PNG.</p>}
+      {(designs.isError || workflowDraft.isError) && <p role="alert" className="border-l-2 border-warning pl-3 text-sm text-muted-foreground">Workspace saves are currently unavailable. You can still edit and export a PNG.</p>}
       {!mobileStarted && <section className="grid grid-cols-2 gap-3 sm:hidden" aria-label="Start a design">
         {[
           { label: "Create Graphic", icon: WandSparkles, tool: "Templates", photo: false },
