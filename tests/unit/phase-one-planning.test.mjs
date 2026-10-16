@@ -77,3 +77,5 @@ assert.equal(insufficient.score, null);
 assert.equal(insufficient.confidence, "insufficient");
 
 console.log("Phase 1 campaign planning and manual comparison rules passed");
+
+assert.equal(scoreCompetitiveMetrics([{label:"reach",yourValue:100,competitorValue:50,unit:"people",direction:"higher",sourceNote:"",observedAt:"2026-10-16"},{label:"views",yourValue:200,competitorValue:150,unit:"views",direction:"higher",sourceNote:"public count",observedAt:""}]).score, null);

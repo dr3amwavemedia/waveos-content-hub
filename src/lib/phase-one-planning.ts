@@ -127,6 +127,7 @@ export interface CompetitiveScore {
 }
 
 function metricScore(metric: CompetitiveMetric) {
+  if (!metric.sourceNote.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(metric.observedAt) || !Number.isFinite(Date.parse(metric.observedAt))) return null;
   if (metric.yourValue === null || metric.competitorValue === null) return null;
   if (!Number.isFinite(metric.yourValue) || !Number.isFinite(metric.competitorValue)) return null;
   const ours = Math.max(0, metric.yourValue);

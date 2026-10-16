@@ -264,7 +264,7 @@ function CreativeStudioPage() {
   const [mediaTab, setMediaTab] = useState("All");
   const [replaceId, setReplaceId] = useState<string | null>(null);
   const [adjustment, setAdjustment] = useState("brightness");
-  const [reviewLook, setReviewLook] = useState(false);
+  const [renderReady, setRenderReady] = useState(false);
   const [lookChoices, setLookChoices] = useState<string[]>(["contrast", "brightness"]);
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ id: string; offsetX: number; offsetY: number } | null>(null);
@@ -377,10 +377,6 @@ function CreativeStudioPage() {
     void Promise.all(
       Array.from(new Set(missingIds)).map(async (assetId) => {
         const asset = mediaAssets.data?.find((candidate) => candidate.id === assetId);
-    if (replaceId) {
-      updateElement(replaceId, { assetId, sourceType: "media", name: asset?.name ?? "Media image", crop: undefined });
-      setReplaceId(null); setMobileTool(null); return;
-    }
         if (!asset) return null;
         try {
           return [assetId, await getMediaPreviewUrl(asset, 60 * 60 * 6)] as const;
@@ -428,12 +424,15 @@ function CreativeStudioPage() {
     let cancelled = false;
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.width = format.width;
-    canvas.height = format.height;
-    const context = canvas.getContext("2d");
+    setRenderReady(false);
+    const artwork = window.document.createElement("canvas");
+    artwork.width = format.width;
+    artwork.height = format.height;
+    const context = artwork.getContext("2d");
     if (!context) return;
 
     async function paint(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D) {
+      let missingImage = false;
       context.clearRect(0, 0, canvas.width, canvas.height);
       context.fillStyle = document.background;
       context.fillRect(0, 0, canvas.width, canvas.height);
@@ -485,15 +484,10 @@ function CreativeStudioPage() {
                 element.height,
               );
             } catch {
-              context.strokeStyle = "#ef4444";
-              context.lineWidth = 4;
-              context.strokeRect(
-                -element.width / 2,
-                -element.height / 2,
-                element.width,
-                element.height,
-              );
+              missingImage = true;
             }
+          } else {
+            missingImage = true;
           }
         } else {
           context.globalAlpha = element.opacity ?? 1;
@@ -511,12 +505,18 @@ function CreativeStudioPage() {
         }
         context.restore();
       }
+      if (cancelled) return;
+      const displayed = canvasRef.current;
+      if (!displayed) return;
+      displayed.width = canvas.width; displayed.height = canvas.height;
+      displayed.getContext("2d")?.drawImage(canvas, 0, 0);
+      setRenderReady(!missingImage);
     }
-    void paint(canvas, context);
+    void paint(artwork, context);
     return () => {
       cancelled = true;
     };
-  }, [assetUrls, branding.data?.logoUrl, document, format.height, format.width, mobileStarted, palette.primary, selectedId]);
+  }, [assetUrls, branding.data?.logoUrl, document, format.height, format.width, mobileStarted]);
 
   useEffect(() => {
     const overlay = overlayRef.current;
@@ -588,6 +588,10 @@ function CreativeStudioPage() {
 
   function addImage(assetId: string) {
     const asset = mediaAssets.data?.find((candidate) => candidate.id === assetId);
+    if (replaceId) {
+      updateElement(replaceId, { assetId, sourceType: "media", name: asset?.name ?? "Media image", crop: undefined });
+      setReplaceId(null); setMobileTool(null); return;
+    }
     const sourceWidth = asset?.width ?? 800;
     const sourceHeight = asset?.height ?? 800;
     const maxWidth = format.width * 0.72;
@@ -746,7 +750,7 @@ function CreativeStudioPage() {
 
   function exportPng() {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !renderReady) { toast.error("Wait until all artwork images have loaded before exporting."); return; }
     canvas.toBlob((blob) => {
       if (!blob) {
         toast.error("The PNG could not be created.");
@@ -763,14 +767,14 @@ function CreativeStudioPage() {
           .toLowerCase() || "waveos-design"
       }.png`;
       link.click();
-      URL.revokeObjectURL(url);
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       toast.success(`Exported ${format.width} × ${format.height} PNG.`);
     }, "image/png");
   }
 
   async function sendToPost(destination: "feed" | "story" = "feed") {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !renderReady) { toast.error("Wait until all artwork images have loaded before sending to a post."); return; }
     try {
       const blob = await new Promise<Blob>((resolve, reject) =>
         canvas.toBlob(
@@ -829,12 +833,20 @@ function CreativeStudioPage() {
   function startTransaction() {
     if (transactionRef.current) return;
     transactionRef.current = cloneDocument(document);
-    const next = [...history.slice(0, historyIndex + 1), cloneDocument(document)].slice(-50);
-    setHistory(next); setHistoryIndex(next.length - 1); dragHistoryIndexRef.current = next.length - 1;
+
   }
   function gesturePatch(id: string, patch: Partial<DesignElement>) {
-    const target = dragHistoryIndexRef.current; if (target === null) return;
-    setHistory((current) => current.map((item, index) => index === target ? { ...item, elements: item.elements.map((element) => element.id === id ? { ...element, ...patch } as DesignElement : element) } : item));
+    const original = transactionRef.current; if (!original) return;
+    let target = dragHistoryIndexRef.current;
+    if (target === null) {
+      const changed = { ...original, elements: original.elements.map(element=>element.id===id?{...element,...patch} as DesignElement:element) };
+      if (JSON.stringify(changed) === JSON.stringify(original)) return;
+      const next = [...history.slice(0, historyIndex + 1), changed].slice(-50);
+      target = next.length - 1; dragHistoryIndexRef.current = target;
+      setHistory(next); setHistoryIndex(target);
+    } else {
+      setHistory(current=>current.map((item,index)=>index===target?{...item,elements:item.elements.map(element=>element.id===id?{...element,...patch} as DesignElement:element)}:item));
+    }
     setDirty(true);
   }
   function beginCanvasMove(event: ReactPointerEvent<HTMLCanvasElement>) {
@@ -899,7 +911,13 @@ function CreativeStudioPage() {
   function endCanvasMove(event: ReactPointerEvent<HTMLCanvasElement>) {
     activePointersRef.current.delete(event.pointerId);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    if (activePointersRef.current.size) return;
+    if (activePointersRef.current.size) {
+      gestureRef.current = null; viewportGestureRef.current = null; resizeRef.current = null;
+      const remaining = [...activePointersRef.current.values()][0];
+      const item = document.elements.find(element=>element.id===selectedId);
+      if (remaining && item) dragRef.current = {id:item.id,offsetX:remaining.x-item.x,offsetY:remaining.y-item.y};
+      return;
+    }
     if (transactionRef.current && JSON.stringify(transactionRef.current) === JSON.stringify(document)) {
       const target = dragHistoryIndexRef.current;
       if (target !== null) { setHistory((current) => current.filter((_,index)=>index !== target)); setHistoryIndex(Math.max(0,target-1)); }
@@ -1257,7 +1275,7 @@ function CreativeStudioPage() {
               <div className="grid grid-cols-3 gap-2">{[{label:"Free",ratio:null},{label:"Original",ratio:null},{label:"1:1",ratio:1},{label:"4:5",ratio:.8},{label:"9:16",ratio:9/16},{label:"16:9",ratio:16/9}].map(({label,ratio})=><Button key={label} variant="outline" onClick={()=>{const asset=mediaAssets.data?.find(item=>item.id===selected.assetId);const sourceRatio=(asset?.width??selected.width)/(asset?.height??selected.height);updateElement(selected.id,{crop:ratioCrop(sourceRatio,ratio),...(ratio?{height:selected.width/ratio}:{})});setCropId(selected.id);setMobileTool(null);}}>{label}</Button>)}</div>
               <Button variant="outline" onClick={()=>updateElement(selected.id,{rotation:(selected.rotation+90)%360})}><RotateCw /> Rotate</Button>
             </> : mobileTool === "Looks" ? <div className="flex gap-2 overflow-x-auto">{[{name:"Original",brightness:100,contrast:100,saturation:100},{name:"Clean",brightness:105,contrast:108,saturation:95},{name:"Warm",brightness:104,contrast:103,saturation:115},{name:"Cool",brightness:100,contrast:105,saturation:85},{name:"Bright",brightness:118,contrast:102,saturation:105},{name:"Moody",brightness:85,contrast:120,saturation:80},{name:"Cinematic",brightness:95,contrast:125,saturation:75},{name:"Soft",brightness:108,contrast:88,saturation:92}].map(look=><Button key={look.name} variant="outline" className="h-auto w-20 shrink-0 flex-col p-1" onClick={()=>updateElement(selected.id,{brightness:look.brightness,contrast:look.contrast,saturation:look.saturation})}><img src={selected.sourceType === "workspace-logo" ? branding.data?.logoUrl ?? "" : assetUrls[selected.assetId ?? ""]} alt={look.name} className="aspect-square w-full object-cover" style={{filter:`brightness(${look.brightness}%) contrast(${look.contrast}%) saturate(${look.saturation}%)`}}/><span>{look.name}</span></Button>)}</div>
-            : mobileTool === "Auto" ? <><p className="text-sm text-muted-foreground">AI image analysis is unavailable while its required package is pending release eligibility. These are optional manual starting points, not image analysis.</p>{["brightness","contrast","saturation"].map(key=><label key={key} className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={lookChoices.includes(key)} onChange={e=>setLookChoices(v=>e.target.checked?[...v,key]:v.filter(k=>k!==key))}/><span className="capitalize">{key === "brightness" ? "Slight brightness" : key === "contrast" ? "Gentle contrast" : "Subtle saturation"}</span></label>)}<Button onClick={()=>updateElement(selected.id,Object.fromEntries(lookChoices.map(key=>[key,key === "brightness"?108:105])))}>Apply selected presets</Button></>
+            : mobileTool === "Auto" ? <><p className="text-sm text-muted-foreground">AI image analysis is temporarily unavailable. These are optional manual presets, not image analysis.</p>{["brightness","contrast","saturation"].map(key=><label key={key} className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={lookChoices.includes(key)} onChange={e=>setLookChoices(v=>e.target.checked?[...v,key]:v.filter(k=>k!==key))}/><span className="capitalize">{key === "brightness" ? "Slight brightness" : key === "contrast" ? "Gentle contrast" : "Subtle saturation"}</span></label>)}<Button onClick={()=>updateElement(selected.id,Object.fromEntries(lookChoices.map(key=>[key,key === "brightness"?108:105])))}>Apply selected presets</Button></>
             : <><div className="flex flex-wrap gap-1">{[{key:"brightness",label:"Exposure"},{key:"contrast",label:"Contrast"},{key:"saturation",label:"Saturation"}].map(item=><Button key={item.key} size="sm" variant={adjustment===item.key?"secondary":"ghost"} onClick={()=>setAdjustment(item.key)}>{item.label}</Button>)}</div><label className="block space-y-4"><span className="flex justify-between text-sm capitalize">{adjustment}<span>{selected[adjustment as "brightness"|"contrast"|"saturation"]??100}%</span></span><Slider aria-label={adjustment} value={[selected[adjustment as "brightness"|"contrast"|"saturation"]??100]} min={0} max={200} onValueChange={([value])=>updateElement(selected.id,{[adjustment]:value})}/></label></>}
           </section>}
           {mobileTool === "More" && <div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>setMobileTool("Layers")}><Layers3 /> Layers</Button><Button variant="outline" onClick={()=>setMobileTool("Canvas")}><Square /> Canvas</Button>{selected?.type === "image" && <Button variant="outline" onClick={()=>{setReplaceId(selected.id);setMobileTool("Media");}}><ImageIcon /> Replace</Button>}<Button variant="outline" onClick={exportPng}><Download /> Export</Button></div>}
@@ -1290,7 +1308,7 @@ function CreativeStudioPage() {
           {(selected?.type === "image" ? selected.sourceType === "workspace-logo" ? ["Replace","Size","Opacity","Position","More"] : ["Auto","Crop","Adjust","Looks","Remove","More"] : selected?.type === "text" ? ["Font","Size","Color","Style","Align","More"] : selected?.type === "shape" ? ["Fill","Opacity","Arrange","More"] : ["Add","Media","Templates","Brand","More"]).map(label=><Button key={label} variant="ghost" className="h-auto min-h-16 min-w-0 flex-1 flex-col gap-1 px-0 text-[10px]" onClick={()=>{if(label === "Remove" && selected){removeElement(selected.id);return;}if(label === "Replace" && selected){setReplaceId(selected.id);setMobileTool("Media");return;}setMobileTool(label);}}>{label === "More" ? <MoreHorizontal /> : label === "Crop" ? <Crop /> : label === "Font" ? <Type /> : label === "Media" || label === "Replace" ? <ImageIcon /> : label === "Color" || label === "Fill" || label === "Looks" ? <Palette /> : label === "Remove" ? <Trash2 /> : label === "Auto" || label === "Brand" ? <WandSparkles /> : <SlidersHorizontal />}{label}</Button>)}
         </div>
       </div>}
-      {!mobileStarted && document.elements.length > 0 && <section className="space-y-3 sm:hidden"><Button className="w-full" onClick={()=>setMobileStarted(true)}>Continue editing</Button><div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>void saveServerDraft()} disabled={workflowDraft.save.isPending}><Save /> Save draft</Button><Button variant="outline" onClick={exportPng}><Download /> Export</Button><Button variant="outline" onClick={()=>void sendToPost("feed")} disabled={uploadAsset.isPending}><ImagePlus /> Post to feed</Button><Button variant="outline" onClick={()=>void sendToPost("story")} disabled={uploadAsset.isPending}><ImagePlus /> Post to story</Button></div><Button variant="outline" className="w-full" onClick={()=>saveDesign.mutate()} disabled={saveDesign.isPending}><Save /> Save editable design</Button></section>}
+      {!mobileStarted && document.elements.length > 0 && <section className="space-y-3 sm:hidden"><Button className="w-full" onClick={()=>setMobileStarted(true)}>Continue editing</Button><div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>void saveServerDraft()} disabled={workflowDraft.save.isPending}><Save /> Save draft</Button><Button variant="outline" onClick={exportPng}><Download /> Export</Button><Button variant="outline" aria-label="Send to post" onClick={()=>void sendToPost("feed")} disabled={uploadAsset.isPending}><ImagePlus /> Post to feed</Button><Button variant="outline" onClick={()=>void sendToPost("story")} disabled={uploadAsset.isPending}><ImagePlus /> Post to story</Button></div><Button variant="outline" className="w-full" onClick={()=>saveDesign.mutate()} disabled={saveDesign.isPending}><Save /> Save editable design</Button></section>}
 
     </div>
   );
