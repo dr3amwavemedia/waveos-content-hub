@@ -8,6 +8,7 @@ Complete the uploaded brief in Preview: natural touch editing, clear growth anal
 - Contextual tools for images, text, shapes and logos, with compact sheets for secondary controls.
 - Direct selection, drag, proportional corner resize, pinch resize and twist rotation; pinch with nothing selected changes only workspace zoom.
 - Temporary snapping guides; double-tap crop/reposition mode with ratio previews and touch positioning.
+- Keep selections and guides out of exported artwork; verify gesture targeting and one undo entry per completed interaction.
 - Visual media picker, replacement picker, templates, layers, brand assets, saved designs and recent media.
 - Touch-friendly adjustments, visual Looks previews, fit/fill/background controls, and reviewable Auto and Brand Look suggestions. Never label a preset or heuristic as AI analysis.
 
