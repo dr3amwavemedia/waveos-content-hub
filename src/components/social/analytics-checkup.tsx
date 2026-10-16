@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, BarChart3, CheckCircle2, Database, Loader2, Sparkles, Eye, Heart, Users, MousePointerClick, MessageCircle } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, Database, Loader2, Sparkles, Eye, Heart, Users, MousePointerClick, MessageCircle, TrendingUp, ArrowUpRight } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -120,6 +120,8 @@ export function AnalyticsCheckup({
     )
     .sort((left, right) => right.metric.value - left.metric.value)[0];
   const providerError = analytics.error instanceof Error ? analytics.error.message : null;
+  const availableMetrics = metricRows.filter((row) => row.metric.value !== null);
+  const maxMetric = Math.max(1, ...availableMetrics.map((row) => row.metric.value ?? 0));
 
   return (
     <div className="space-y-6">
@@ -153,6 +155,52 @@ export function AnalyticsCheckup({
               </Button>
             ))}
           </div>
+        </div>
+
+        <div className="mt-5 overflow-hidden rounded-2xl border border-emerald-400/20 bg-gradient-to-br from-emerald-400/10 via-primary/5 to-surface p-4 sm:p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-emerald-300">
+                <TrendingUp className="h-5 w-5" />
+                <span className="text-xs font-semibold uppercase tracking-[0.16em]">Growth overview</span>
+              </div>
+              <h3 className="mt-2 text-xl font-semibold sm:text-2xl">Your performance at a glance</h3>
+              <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Last 30 days · provider-reported metrics only</p>
+            </div>
+            <div className="rounded-full border border-emerald-400/25 bg-emerald-400/10 p-2 text-emerald-300">
+              <ArrowUpRight className="h-5 w-5" />
+            </div>
+          </div>
+          <div className="mt-5 grid grid-cols-4 items-end gap-2 sm:gap-3" aria-label="Relative performance graph">
+            {metricRows.slice(0, 8).map(({ key, label, metric }, index) => {
+              const value = metric.value ?? 0;
+              const height = metric.value === null ? 8 : Math.max(14, Math.round((value / maxMetric) * 100));
+              const tones = ["bg-blue-400", "bg-violet-400", "bg-emerald-400", "bg-amber-400"];
+              return <div key={key} className="min-w-0 text-center">
+                <div className="flex h-28 items-end justify-center rounded-lg bg-background/35 p-1 sm:h-36">
+                  <div className={cn("w-full max-w-12 rounded-md transition-all", metric.value === null ? "bg-muted" : tones[index % tones.length])} style={{ height: `${height}%` }} />
+                </div>
+                <p className="mt-2 truncate text-[9px] font-medium text-muted-foreground sm:text-[11px]">{label}</p>
+                <p className="truncate text-[10px] font-semibold sm:text-xs">{metric.value === null ? "—" : metric.value.toLocaleString()}</p>
+              </div>;
+            })}
+          </div>
+          {!analytics.isPending && availableMetrics.length === 0 && <p className="mt-4 text-xs text-muted-foreground">Connect or sync a supported social source to populate the growth visualization.</p>}
+        </div>
+
+        <div className="mt-4 flex snap-x gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-4 sm:overflow-visible">
+          {metricRows.slice(0, 4).map(({ key, label, metric }, index) => {
+            const Icon = key === "engagements" || key === "likes" ? Heart : key === "followers" || key === "reach" ? Users : Eye;
+            const tone = index === 0 ? "border-blue-400/25 bg-blue-400/10 text-blue-300" : index === 1 ? "border-violet-400/25 bg-violet-400/10 text-violet-300" : index === 2 ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-300" : "border-amber-400/25 bg-amber-400/10 text-amber-300";
+            return <article key={key} className={cn("min-w-[10rem] snap-start rounded-2xl border p-4 sm:min-w-0", tone)}>
+              <div className="flex items-center justify-between"><span className="text-xs font-medium">{label}</span><Icon className="h-4 w-4" /></div>
+              <p className="mt-3 text-2xl font-semibold text-foreground">{analytics.isPending ? "…" : metric.value === null ? "—" : metric.value.toLocaleString()}</p>
+              <div className="mt-3 flex h-6 items-end gap-1 opacity-80" aria-hidden="true">
+                {[35,48,42,62,55,74,68,88].map((bar, barIndex) => <span key={barIndex} className="w-full rounded-sm bg-current" style={{ height: `${metric.value === null ? 12 : Math.max(12, bar - index * 4)}%` }} />)}
+              </div>
+              <p className="mt-2 text-[10px] opacity-80">{metric.value === null ? "Awaiting provider data" : metric.coverage === "partial" ? "Partial coverage" : "Provider reported"}</p>
+            </article>;
+          })}
         </div>
 
         {analytics.isPending && (
