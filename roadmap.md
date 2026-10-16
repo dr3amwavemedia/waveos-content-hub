@@ -28,10 +28,10 @@
 
 # Approved October 16 update round
 
-- [ ] Organize Create Post around media, quick Edit, Studio Design, caption, platform settings and schedule; preserve existing actions.
-- [ ] Preserve the same post draft across Creative Studio round trips.
-- [ ] Add Quick Contract entry points using existing invoice/catalog data and protect signed snapshots.
-- [ ] Save/export cited competitor research without requiring manual metrics or repeated details.
-- [ ] Verify image adjustments across canvas, editable save/reload and export.
-- [ ] Add visual editable photo-first templates, brand assets and Apply My Brand across supported formats.
-- [ ] Run focused tests and signed-in preview checks without production publishing or live financial actions.
+- [x] Organize Create Post around media, quick Edit, Studio Design, caption, platform settings and schedule; preserve existing actions.
+- [ ] Same-post handoff implemented and unit-tested; full Done round trip awaits external media export verification.
+- [ ] Quick Contract entry points and invoice/catalog scope implemented; signed-scope guard applied additively with no row changes; full client-flow verification remains pending.
+- [ ] Save/export cited competitor research without requiring manual metrics or repeated details: controls and serialization implemented; durable saving blocked by missing competitors/competitive_reports tables and Phase 1 entitlement functions.
+- [ ] Verify image adjustments across canvas, editable save/reload and export: brightness canvas changes verified; durable save/reload blocked by missing creative_designs table and Phase 1 entitlement functions.
+- [x] Add visual editable photo-first templates, brand assets and Apply My Brand across supported formats; actual Story canvas checked.
+- [x] Run 19 focused tests and signed-in phone template / desktop adjustment checks without publishing, charges, signatures or emails.
