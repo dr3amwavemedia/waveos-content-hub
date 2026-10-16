@@ -25,3 +25,13 @@
 - [x] Verify phone, tablet and desktop workflows without changing production or live records; 168 unit tests passed.
 - [ ] AI photo analysis and AI analytics: blocked by the required AI package's release-age safeguard; no substitute is presented as AI.
 - [ ] Physical-device gesture feel: requires a real phone/tablet review; browser touch interactions passed.
+
+# Approved October 16 update round
+
+- [ ] Organize Create Post around media, quick Edit, Studio Design, caption, platform settings and schedule; preserve existing actions.
+- [ ] Preserve the same post draft across Creative Studio round trips.
+- [ ] Add Quick Contract entry points using existing invoice/catalog data and protect signed snapshots.
+- [ ] Save/export cited competitor research without requiring manual metrics or repeated details.
+- [ ] Verify image adjustments across canvas, editable save/reload and export.
+- [ ] Add visual editable photo-first templates, brand assets and Apply My Brand across supported formats.
+- [ ] Run focused tests and signed-in preview checks without production publishing or live financial actions.
