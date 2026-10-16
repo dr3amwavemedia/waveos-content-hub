@@ -167,7 +167,7 @@ const STAFF_NAV: NavItem[] = [
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
   { to: "/templates", label: "DOCUMENTS", icon: FileStack, staffOnly: true, ownerOnly: true },
-  { to: "/catalog", label: "Price List", icon: Tag, staffOnly: true },
+  { to: "/catalog", label: "Services & Pricing", icon: Tag, staffOnly: true },
   { to: "/payments", label: "Payments", icon: BarChart3, staffOnly: true, ownerOnly: true },
   { to: "/tools", label: "Tools", icon: QrCode, staffOnly: true, ownerOnly: true },
   { to: "/admin", label: "Staff", icon: ShieldCheck, staffOnly: true, ownerOnly: true },
@@ -398,10 +398,12 @@ function Shell({ children }: { children: ReactNode }) {
     (item, index, items) =>
       items.findIndex((candidate) => candidate.to === item.to && candidate.hash === item.hash) === index,
   );
-  // Staff get Documents and Price List in the grouped phone menu; client menus
+  // Staff get Documents and Services & Pricing in the grouped phone menu; client menus
   // stay task-focused.
   const mobileDrawerNav = isStaff
-    ? nav
+    ? [...nav, ...filterByFeature([{ to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" }])].filter(
+        (item, index, items) => items.findIndex((candidate) => candidate.to === item.to && candidate.hash === item.hash) === index,
+      )
     : nav.filter((item) => item.to !== "/templates" && item.to !== "/catalog");
 
   return (
@@ -669,63 +671,54 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
 }
 
 // Approved DWM mobile grouping:
-// Personal = the signed-in user's everyday workspace tools.
-// Business = Dream Wave Media operations.
-// OS App = WaveOS platform/system data.
-// Keep routes and permissions unchanged; this only controls mobile organization.
+// Personal = DWM using WaveOS as a creator/user.
+// Business = running Dream Wave Media.
+// OS = administering the WaveOS platform.
+// Routes and permissions stay unchanged; this only controls mobile organization.
 const MOBILE_PERSONAL_PATHS = new Set([
-  "/competitive-intelligence", "/content", "/calendar", "/approvals",
+  "/home", "/create", "/social", "/creative-studio", "/campaigns", "/analytics",
+  "/competitive-intelligence", "/brand-voice", "/content", "/calendar", "/approvals", "/deliveries",
 ]);
 const MOBILE_BUSINESS_PATHS = new Set([
-  "/deliveries", "/videographer", "/projects", "/crm", "/clients", "/templates",
-  "/catalog", "/payments", "/vision-studio", "/tools", "/admin",
+  "/clients", "/projects", "/crm", "/payments", "/templates", "/catalog",
+  "/videographer", "/vision-studio", "/admin", "/tools",
 ]);
 const MOBILE_OS_PATHS = new Set(["/os-data"]);
-const isPersonalItem = (i: NavItem) => !i.hash && MOBILE_PERSONAL_PATHS.has(i.to);
 
 function MobileAdminNav({ items }: { items: NavItem[] }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const groupedPaths = new Set([
-    ...MOBILE_PERSONAL_PATHS,
-    ...MOBILE_BUSINESS_PATHS,
-    ...MOBILE_OS_PATHS,
-  ]);
+  const orderedItems = (paths: Set<string>) => [...paths].flatMap((path) => items.filter((item) => !item.hash && item.to === path));
+  const groupedPaths = new Set([...MOBILE_PERSONAL_PATHS, ...MOBILE_BUSINESS_PATHS, ...MOBILE_OS_PATHS]);
   const groups = [
-    { label: "Business", items: items.filter((i) => !i.hash && MOBILE_BUSINESS_PATHS.has(i.to)) },
-    { label: "Personal", items: items.filter(isPersonalItem) },
-    { label: "OS App", items: items.filter((i) => !i.hash && MOBILE_OS_PATHS.has(i.to)) },
-    {
-      label: "More",
-      items: items.filter((i) => i.hash || !groupedPaths.has(i.to)),
-    },
+    { label: "Personal", items: orderedItems(MOBILE_PERSONAL_PATHS) },
+    { label: "Business", items: orderedItems(MOBILE_BUSINESS_PATHS) },
+    { label: "OS", items: items.filter((i) => !i.hash && MOBILE_OS_PATHS.has(i.to)) },
+    { label: "More", items: items.filter((i) => i.hash || !groupedPaths.has(i.to)) },
   ].filter((group) => group.items.length);
 
   return (
-    <div className="space-y-4 py-2">
+    <div className="space-y-5 py-2">
       {groups.map((group) => (
         <section key={group.label}>
-          <p className="mb-1.5 px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80">
-            {group.label}
-          </p>
-          <ul className="grid grid-cols-2 gap-1.5">
+          <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80">{group.label}</p>
+          <ul className="grid grid-cols-2 gap-2">
             {group.items.map((item) => {
-              const active =
-                !item.hash && (pathname === item.to || pathname.startsWith(item.to + "/"));
+              const active = !item.hash && (pathname === item.to || pathname.startsWith(item.to + "/"));
               const Icon = item.icon;
+              const labels: Record<string, string> = {
+                "/social": "Social Accounts", "/analytics": "Analytics",
+                "/competitive-intelligence": "Competitive Intelligence", "/content": "Content",
+                "/templates": "Documents", "/admin": "Staff/Admin",
+              };
+              const label = labels[item.to] ?? item.label;
               return (
                 <li key={`${item.to}#${item.hash ?? ""}`} className="min-w-0">
-                  <Link
-                    to={item.to}
-                    hash={item.hash}
-                    className={cn(
-                      "flex min-h-12 min-w-0 items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-medium transition-colors",
-                      active
-                        ? "border-primary/40 bg-primary/12 text-foreground"
-                        : "border-border/60 bg-surface/50 text-muted-foreground hover:text-foreground",
-                    )}
-                  >
+                  <Link to={item.to} hash={item.hash} className={cn(
+                    "grid min-h-14 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-medium leading-tight transition-colors",
+                    active ? "border-primary/40 bg-primary/12 text-foreground" : "border-border/60 bg-surface/50 text-muted-foreground hover:text-foreground",
+                  )}>
                     <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "")} />
-                    <span className="truncate">{item.label === "DOCUMENTS" ? "Documents" : item.label}</span>
+                    <span className="min-w-0 whitespace-normal break-words">{label}</span>
                   </Link>
                 </li>
               );
