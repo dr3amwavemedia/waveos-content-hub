@@ -176,6 +176,13 @@
       "when": 1791420821967,
       "tag": "0024_tidal_team_access",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792194129399,
+      "tag": "0025_freeze_signed_contract_scope",
+      "breakpoints": true
     }
   ]
 }

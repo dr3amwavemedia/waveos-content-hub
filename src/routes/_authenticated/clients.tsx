@@ -2941,7 +2941,7 @@ function DeliveryForm({ workspaceId, onDone }: { workspaceId: string; onDone: ()
 function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clientLabel: string }) {
   const qc = useQueryClient();
   const [showForm, setShowForm] = useState(true);
-  const [creationMode, setCreationMode] = useState<"external" | "template">("template");
+  const [creationMode, setCreationMode] = useState<"external" | "template" | "quick">("quick");
   const [editingDraft, setEditingDraft] = useState<ContractRow | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -3077,6 +3077,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
       </div>
       {showForm && (
         <div className="flex flex-wrap gap-2">
+          <Button variant={creationMode === "quick" ? "secondary" : "outline"} onClick={()=>setCreationMode("quick")}>Quick Contract</Button>
           <button
             type="button"
             onClick={() => setCreationMode("template")}
@@ -3085,7 +3086,7 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
               creationMode === "template" ? "border-primary bg-primary/10" : "border-border",
             )}
           >
-            Contract template
+            Custom / Full Contract
           </button>
           <button
             type="button"
@@ -3099,12 +3100,13 @@ function ContractsTab({ workspaceId, clientLabel }: { workspaceId: string; clien
           </button>
         </div>
       )}
-      {(editingDraft || (showForm && creationMode === "template")) && (
+      {(editingDraft || (showForm && (creationMode === "template" || creationMode === "quick"))) && (
         <ContractBuilder
-          key={editingDraft?.id ?? `new-${workspaceId}`}
+          key={editingDraft?.id ?? `new-${workspaceId}-${creationMode}`}
           workspaceId={workspaceId}
           clientLabel={clientLabel}
           draft={editingDraft}
+          quick={creationMode === "quick"}
           onDone={async () => {
             setEditingDraft(null);
             setShowForm(false);

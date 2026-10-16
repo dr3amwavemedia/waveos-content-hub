@@ -25,3 +25,13 @@
 - [x] Verify phone, tablet and desktop workflows without changing production or live records; 168 unit tests passed.
 - [ ] AI photo analysis and AI analytics: blocked by the required AI package's release-age safeguard; no substitute is presented as AI.
 - [ ] Physical-device gesture feel: requires a real phone/tablet review; browser touch interactions passed.
+
+# Approved October 16 update round
+
+- [x] Organize Create Post around media, quick Edit, Studio Design, caption, platform settings and schedule; preserve existing actions.
+- [ ] Same-post handoff implemented and unit-tested; full Done round trip awaits external media export verification.
+- [ ] Quick Contract entry points and invoice/catalog scope implemented; signed-scope guard applied additively with no row changes; full client-flow verification remains pending.
+- [ ] Save/export cited competitor research without requiring manual metrics or repeated details: controls and serialization implemented; durable saving blocked by missing competitors/competitive_reports tables and Phase 1 entitlement functions.
+- [ ] Verify image adjustments across canvas, editable save/reload and export: exposure, contrast and saturation visibly changed the canvas and exported PNG; durable save/reload blocked by missing creative_designs table and Phase 1 entitlement functions.
+- [x] Add visual editable photo-first templates, brand assets and Apply My Brand across supported formats; actual Story canvas checked.
+- [x] Run focused tests (latest run: 17 passed) and signed-in phone template / desktop adjustment and PNG export checks without publishing, charges, signatures or emails.

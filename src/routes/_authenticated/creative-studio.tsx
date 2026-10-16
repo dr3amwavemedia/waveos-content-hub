@@ -47,6 +47,13 @@ import { useWorkspaceBranding, workspacePalette } from "@/hooks/use-workspace-br
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { MobileToolPanel } from "@/components/app/mobile-tool-panel";
+import { FORMATS, type DesignDocument, type DesignElement, type DesignFormat, type DesignRow, type TextElement, type ShapeElement, type ImageElement } from '@/lib/studio-document';
+import { STUDIO_TEMPLATES, createStudioTemplate, adaptStudioFormat } from '@/lib/studio-templates';
+import tradesPhoto from '@/assets/templates/trades.jpg';
+import wellnessPhoto from '@/assets/templates/wellness.jpg';
+import studioPhoto from '@/assets/templates/studio.jpg';
+import { type PostStudioSnapshot } from '@/lib/post-studio-handoff';
+const TEMPLATE_PHOTOS = { trades: tradesPhoto, wellness: wellnessPhoto, studio: studioPhoto };
 import { Slider } from "@/components/ui/slider";
 import { clamp, containsPoint, cornerHit, snapPosition, ratioCrop, zoomCrop } from "@/lib/studio-geometry";
 
@@ -60,6 +67,11 @@ export const Route = createFileRoute("/_authenticated/creative-studio")({
       <CreativeStudioPage />
     </RequireFeature>
   ),
+  validateSearch: (s: Record<string, unknown>): { handoff?: string; media?: string; quick?: boolean } => ({
+    ...(typeof s.handoff === 'string' ? { handoff: s.handoff } : {}),
+    ...(typeof s.media === 'string' ? { media: s.media } : {}),
+    ...(s.quick === true || s.quick === 'true' ? { quick: true } : {}),
+  }),
   head: () => ({
     meta: [
       { title: "Creative Studio — WaveOS" },
@@ -81,146 +93,12 @@ const db = supabase as unknown as {
   from: (table: string) => any;
 };
 
-const FORMATS = {
-  square: { label: "Square", width: 1080, height: 1080 },
-  portrait: { label: "Portrait", width: 1080, height: 1350 },
-  story: { label: "Story", width: 1080, height: 1920 },
-  landscape: { label: "Landscape", width: 1200, height: 628 },
-} as const;
-
-type DesignFormat = keyof typeof FORMATS;
-type TextElement = {
-  id: string;
-  type: "text";
-  name: string;
-  text: string;
-  x: number;
-  y: number;
-  color: string;
-  fontSize: number;
-  fontFamily?: string;
-  fontWeight: 400 | 600 | 700;
-  align: CanvasTextAlign;
-  opacity: number;
-  rotation: number;
-};
-type ShapeElement = {
-  id: string;
-  type: "shape";
-  name: string;
-  shape: "rectangle" | "circle";
-  borderColor?: string;
-  borderWidth?: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  opacity: number;
-  rotation: number;
-};
-type ImageElement = {
-  id: string;
-  type: "image";
-  name: string;
-  sourceType: "media" | "workspace-logo";
-  assetId: string | null;
-  brightness?: number;
-  contrast?: number;
-  saturation?: number;
-  warmth?: number;
-  highlights?: number;
-  shadows?: number;
-  sharpness?: number;
-  crop?: { x: number; y: number; width: number; height: number };
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  opacity: number;
-  rotation: number;
-};
-type DesignElement = TextElement | ShapeElement | ImageElement;
-type DesignDocument = {
-  version: 1;
-  format: DesignFormat;
-  background: string;
-  elements: DesignElement[];
-};
-
-interface DesignRow {
-  id: string;
-  name: string;
-  format: DesignFormat;
-  document: DesignDocument;
-  updated_at: string;
-}
-
 const DEFAULT_DOCUMENT: DesignDocument = {
   version: 1,
   format: "square",
   background: "#0b1220",
   elements: [],
 };
-
-const TEMPLATE_NAMES = [
-  "Sale",
-  "Grand Opening",
-  "New Product",
-  "Testimonial",
-  "Event",
-  "Weekend Special",
-  "Announcement",
-  "Holiday",
-  "Before / After",
-] as const;
-
-function templateDocument(
-  template: (typeof TEMPLATE_NAMES)[number],
-  accent: string,
-): DesignDocument {
-  const headline =
-    template === "Testimonial"
-      ? "“An experience worth sharing.”"
-      : template === "Before / After"
-        ? "Before → After"
-        : template;
-  return {
-    version: 1,
-    format: template === "Event" ? "portrait" : "square",
-    background: "#0b1220",
-    elements: [
-      {
-        id: crypto.randomUUID(),
-        type: "shape",
-        name: "Brand block",
-        shape: "rectangle",
-        x: 0.5,
-        y: 0.78,
-        width: 900,
-        height: 210,
-        color: accent,
-        opacity: 1,
-        rotation: 0,
-      },
-      {
-        id: crypto.randomUUID(),
-        type: "text",
-        name: "Headline",
-        text: headline,
-        x: 0.5,
-        y: 0.43,
-        color: "#ffffff",
-        fontSize: template === "Testimonial" ? 68 : 96,
-        fontWeight: 700,
-        align: "center",
-        opacity: 1,
-        rotation: 0,
-      },
-
-    ],
-  };
-}
 
 function cloneDocument(document: DesignDocument): DesignDocument {
   return JSON.parse(JSON.stringify(document)) as DesignDocument;
@@ -250,6 +128,16 @@ function loadCanvasImage(url: string) {
 
 function CreativeStudioPage() {
   const navigate = useNavigate();
+  const search = Route.useSearch();
+  const loadedHandoff = useRef<string | null>(null);
+  const [postHandoff, setPostHandoff] = useState<PostStudioSnapshot | null>(null);
+  const [templateCategory, setTemplateCategory] = useState('All');
+  const [templateFormat, setTemplateFormat] = useState<DesignFormat>('story');
+  const [studioColors, setStudioColors] = useState({ background: '#0b1220', ink: '#ffffff' });
+  useEffect(() => {
+    const styles = getComputedStyle(window.document.documentElement);
+    setStudioColors({ background: styles.getPropertyValue('--studio-artwork-background').trim(), ink: styles.getPropertyValue('--studio-artwork-ink').trim() });
+  }, []);
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id ?? null;
   const branding = useWorkspaceBranding(activeWorkspace?.id);
@@ -296,6 +184,22 @@ function CreativeStudioPage() {
   const format = FORMATS[document.format];
   const mediaAssets = useMediaAssets(workspaceId, { kind: "image" });
   const uploadAsset = useUploadAsset(workspaceId);
+
+  useEffect(() => {
+    if (!search.handoff || !workspaceId || !mediaAssets.data || loadedHandoff.current === search.handoff) return;
+    try {
+      const snapshot = JSON.parse(window.sessionStorage.getItem(`waveos-studio-handoff-${search.handoff}`) ?? 'null') as PostStudioSnapshot | null;
+      if (!snapshot || snapshot.workspaceId !== workspaceId) return;
+      loadedHandoff.current = search.handoff; setPostHandoff(snapshot); setMobileStarted(true); setPhotoMode(Boolean(search.quick));
+      const asset = mediaAssets.data.find(item => item.id === search.media);
+      if (asset) {
+        const nextFormat: DesignFormat = (asset.height ?? 1) / (asset.width ?? 1) > 1.5 ? 'story' : (asset.height ?? 1) > (asset.width ?? 1) ? 'portrait' : 'square';
+        const size = FORMATS[nextFormat];
+        const element: ImageElement = {id:crypto.randomUUID(),type:'image',name:asset.name,sourceType:'media',assetId:asset.id,x:.5,y:.5,width:size.width,height:size.height,opacity:1,rotation:0,crop:ratioCrop((asset.width??800)/(asset.height??800),size.width/size.height)};
+        setHistory([{version:1,format:nextFormat,background:studioColors.background,elements:[element]}]);setHistoryIndex(0);setSelectedId(element.id);setName(snapshot.title || 'Post design');
+      }
+    } catch { toast.error('The originating post could not be restored. Your post draft is unchanged.'); }
+  }, [search.handoff, search.media, workspaceId, mediaAssets.data]);
 
   const workflowDraft = useWorkflowDraft<{
     name: string;
@@ -470,7 +374,7 @@ function CreativeStudioPage() {
           const url =
             element.sourceType === "workspace-logo"
               ? branding.data?.logoUrl
-              : element.assetId
+              : element.sourceType === "template-photo" ? TEMPLATE_PHOTOS[element.templatePhoto ?? "studio"] : element.assetId
                 ? assetUrls[element.assetId]
                 : null;
           if (url) {
@@ -505,7 +409,8 @@ function CreativeStudioPage() {
           context.textBaseline = "middle";
           const maxWidth = canvas.width * 0.88;
           const lines = element.text.split("\n").slice(0, 8);
-          const lineHeight = element.fontSize * 1.18;
+          const lineHeight = element.fontSize * (element.lineHeight ?? 1.18);
+          context.letterSpacing = `${element.letterSpacing ?? 0}px`;
           const startY = -((lines.length - 1) * lineHeight) / 2;
           lines.forEach((line, index) => {
             context.fillText(line, 0, startY + index * lineHeight, maxWidth);
@@ -647,35 +552,12 @@ function CreativeStudioPage() {
   }
 
   function applyBrand() {
-    changeDocument((current) => {
-      const hasLogo = current.elements.some(
-        (element) => element.type === "image" && element.sourceType === "workspace-logo",
-      );
-      const elements = current.elements.map((element) =>
-        element.type === "shape"
-          ? { ...element, color: palette.primary }
-          : element.type === "text"
-            ? { ...element, color: "#ffffff" }
-            : element,
-      ) as DesignElement[];
-      if (!hasLogo && branding.data?.logoUrl) {
-        elements.push({
-          id: crypto.randomUUID(),
-          type: "image",
-          name: "Workspace logo",
-          sourceType: "workspace-logo",
-          assetId: null,
-          x: 0.5,
-          y: 0.14,
-          width: Math.round(FORMATS[current.format].width * 0.28),
-          height: Math.round(FORMATS[current.format].height * 0.1),
-          opacity: 1,
-          rotation: 0,
-        });
-      }
-      return { ...current, background: "#0b1220", elements };
+    changeDocument(current => {
+      const elements = current.elements.map(element => element.type === 'shape' && element.name !== 'Readable photo shade' ? {...element,color:palette.primary} : element) as DesignElement[];
+      if (!elements.some(e=>e.type==='image' && e.sourceType==='workspace-logo') && branding.data?.logoUrl) elements.push({id:crypto.randomUUID(),type:'image',name:'Workspace logo',sourceType:'workspace-logo',assetId:null,x:.76,y:.87,width:FORMATS[current.format].width*.22,height:FORMATS[current.format].height*.07,opacity:1,rotation:0});
+      return {...current,elements};
     });
-    toast.success("Workspace colors applied. Undo restores the previous design.");
+    toast.success('Available workspace colors and logo applied. No saved brand fonts are configured.');
   }
 
   async function uploadImage(file: File | undefined) {
@@ -808,10 +690,12 @@ function CreativeStudioPage() {
           ? "Design saved. Opening an Instagram Story draft…"
           : "Design saved. Opening a feed post draft…",
       );
-      void navigate({
-        to: "/create",
-        search: { media: asset.id, destination },
-      });
+      if (search.handoff && postHandoff?.workspaceId === workspaceId) {
+        setDirty(false);
+        void navigate({ to: '/create', search: { ...(postHandoff.postId ? {id:postHandoff.postId} : {}), handoff:search.handoff, media:asset.id } });
+      } else {
+        void navigate({ to: '/create', search: { media: asset.id, destination } });
+      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "The design could not be sent to a post.",
@@ -951,10 +835,10 @@ function CreativeStudioPage() {
       <UnsavedChangesGuard dirty={dirty} subject="this design" />
       {mobileStarted && <header className="studio-focus-header sticky top-0 z-20 flex items-center gap-1 border-b border-border bg-background py-2 sm:hidden">
         <Button size="icon" variant="ghost" aria-label="Leave focused editor" onClick={() => { setMobileStarted(false); setMobileTool(null); setCropId(null); }}><ArrowLeft /></Button>
-        <h1 className="min-w-0 flex-1 text-sm font-semibold">Creative Studio</h1>
+        <h1 className="min-w-0 flex-1 text-sm font-semibold">{photoMode ? "Edit Media" : "Creative Studio"}</h1>
         <Button size="icon" variant="ghost" aria-label="Undo" disabled={historyIndex === 0} onClick={() => {setHistoryIndex(i=>Math.max(0,i-1));setDirty(true);}}><Undo2 /></Button>
         <Button size="icon" variant="ghost" aria-label="Redo" disabled={historyIndex === history.length-1} onClick={() => {setHistoryIndex(i=>Math.min(history.length-1,i+1));setDirty(true);}}><Redo2 /></Button>
-        <Button variant="ghost" onClick={() => { setMobileStarted(false); setMobileTool(null); setCropId(null); }}>Done</Button>
+        <Button variant="ghost" disabled={uploadAsset.isPending} onClick={() => { if(postHandoff) void sendToPost(); else {setMobileStarted(false);setMobileTool(null);setCropId(null);} }}>Done</Button>
       </header>}
       <header className={cn("flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", mobileStarted ? "hidden sm:flex" : "flex")}>
         <div>
@@ -968,10 +852,11 @@ function CreativeStudioPage() {
           </p>
         </div>
         <div className="hidden flex-wrap gap-2 sm:flex">
+          {postHandoff && <Button onClick={()=>void sendToPost()} disabled={uploadAsset.isPending || !renderReady}>Done — return to post</Button>}
           <Button
             variant="outline"
             onClick={() => void saveServerDraft()}
-            disabled={workflowDraft.save.isPending}
+            disabled={workflowDraft.save.isPending || workflowDraft.isError}
           >
             {workflowDraft.save.isPending ? <Loader2 className="animate-spin" /> : <Save />}
             Save draft
@@ -995,13 +880,14 @@ function CreativeStudioPage() {
             {uploadAsset.isPending ? <Loader2 className="animate-spin" /> : <ImagePlus />}
             Post to story
           </Button>
-          <Button onClick={() => saveDesign.mutate()} disabled={saveDesign.isPending}>
+          <Button onClick={() => saveDesign.mutate()} disabled={saveDesign.isPending || designs.isError}>
             {saveDesign.isPending ? <Loader2 className="animate-spin" /> : <Save />}
             Save design
           </Button>
         </div>
       </header>
 
+      {(designs.isError || workflowDraft.isError) && <p role="alert" className="border-l-2 border-warning pl-3 text-sm text-muted-foreground">Workspace saves are currently unavailable. You can still edit and export a PNG.</p>}
       {!mobileStarted && <section className="grid grid-cols-2 gap-3 sm:hidden" aria-label="Start a design">
         {[
           { label: "Create Graphic", icon: WandSparkles, tool: "Templates", photo: false },
@@ -1060,10 +946,7 @@ function CreativeStudioPage() {
             className={inputClass}
             value={document.format}
             onChange={(event) =>
-              changeDocument((current) => ({
-                ...current,
-                format: event.target.value as DesignFormat,
-              }))
+              changeDocument(current => adaptStudioFormat(current, event.target.value as DesignFormat))
             }
           >
             {Object.entries(FORMATS).map(([value, item]) => (
@@ -1127,29 +1010,20 @@ function CreativeStudioPage() {
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">Templates</h2>
+            <select aria-label="Template format" className={inputClass} value={templateFormat} onChange={e=>setTemplateFormat(e.target.value as DesignFormat)}>{Object.entries(FORMATS).map(([id,item])=><option key={id} value={id}>{item.label}</option>)}</select>
+            <select aria-label="Template category" className={`${inputClass} mt-2`} value={templateCategory} onChange={e=>setTemplateCategory(e.target.value)}>{['All',...new Set(STUDIO_TEMPLATES.map(t=>t.category))].map(category=><option key={category}>{category}</option>)}</select>
+            <p className="mt-2 text-xs text-muted-foreground">Sample photography · replace with your business photos</p>
             <div className="mt-3 grid max-h-[45dvh] grid-cols-2 gap-2 overflow-y-auto">
-              {TEMPLATE_NAMES.map((template) => (
-                <button
-                  key={template}
-                  type="button"
-                  className="min-h-10 w-full overflow-hidden rounded-lg border border-border text-left text-xs text-muted-foreground hover:bg-elevated hover:text-foreground"
-                  onClick={() => {
-                    const next = templateDocument(template, palette.primary);
-                    setMobileTool(null);
-                    commit(next);
-                    setName(`${template} graphic`);
-                    setDesignId(null);
-                    setSelectedId(next.elements.at(-1)?.id ?? null);
-                  }}
-                >
-                  <DesignThumbnail document={templateDocument(template, palette.primary)} urls={assetUrls} logo={branding.data?.logoUrl} />
-                  <span className="block p-2">{template}</span>
-                </button>
-              ))}
+              {STUDIO_TEMPLATES.filter(t=>templateCategory==='All'||t.category===templateCategory).map(template=>{
+                const next=createStudioTemplate(template,templateFormat,{...studioColors,accent:palette.primary});
+                return <Button variant="outline" key={template.name} className="h-auto min-w-0 flex-col overflow-hidden p-0 text-left" onClick={()=>{if(document.elements.length && !window.confirm('Replace the current composition? Undo restores it.'))return;commit(next);setMobileTool(null);setMobileStarted(true);setName(template.name);setDesignId(null);setSelectedId(next.elements.find(e=>e.type==='text')?.id??null);}}>
+                  <DesignThumbnail document={next} urls={assetUrls} logo={branding.data?.logoUrl}/><span className="block w-full whitespace-normal p-2 text-xs">{template.name}</span>
+                </Button>;
+              })}
             </div>
           </section>
-          <section className={cn("surface-card p-4", mobileTool !== "Media" && "hidden sm:block")}>
-            <h2 className="text-sm font-semibold">{replaceId ? "Replace image" : "Media Library"}</h2>
+          <section className={cn("surface-card p-4", !["Media","Brand"].includes(mobileTool ?? "") && "hidden sm:block")}>
+            <h2 className="text-sm font-semibold">{replaceId ? "Replace image" : mobileTool === "Brand" ? "Logo / Brand Assets" : "Media Library"}</h2>
             <div className="mt-2 flex gap-1">{["All","Uploads","Brand","Recent"].map(tab=><Button key={tab} size="sm" variant={mediaTab === tab ? "secondary" : "ghost"} onClick={()=>setMediaTab(tab)}>{tab}</Button>)}</div>
             {mediaTab === "Brand" && branding.data?.logoUrl && <Button variant="outline" className="mt-3 h-20 w-full" onClick={addWorkspaceLogo}><img src={branding.data.logoUrl} alt="Workspace logo" className="max-h-14 max-w-full object-contain" /></Button>}
             <Button variant="outline" className="mt-3 min-h-11 w-full sm:hidden" onClick={() => uploadInputRef.current?.click()}><Upload /> Upload image</Button>
@@ -1278,11 +1152,11 @@ function CreativeStudioPage() {
             {mobileTool === "Crop" ? <>
               <div className="grid grid-cols-3 gap-2">{[{label:"Free",ratio:null},{label:"Original",ratio:null},{label:"1:1",ratio:1},{label:"4:5",ratio:.8},{label:"9:16",ratio:9/16},{label:"16:9",ratio:16/9}].map(({label,ratio})=><Button key={label} variant="outline" onClick={()=>{const asset=mediaAssets.data?.find(item=>item.id===selected.assetId);const sourceRatio=(asset?.width??selected.width)/(asset?.height??selected.height);updateElement(selected.id,{crop:ratioCrop(sourceRatio,ratio),...(ratio?{height:selected.width/ratio}:label==="Original"?{height:selected.width/sourceRatio}:{})});setCropId(selected.id);setMobileTool(null);}}>{label}</Button>)}</div>
               <Button variant="outline" onClick={()=>updateElement(selected.id,{rotation:(selected.rotation+90)%360})}><RotateCw /> Rotate</Button>
-            </> : mobileTool === "Looks" ? <div className="flex gap-2 overflow-x-auto">{[{name:"Original",brightness:100,contrast:100,saturation:100},{name:"Clean",brightness:105,contrast:108,saturation:95},{name:"Warm",brightness:104,contrast:103,saturation:115},{name:"Cool",brightness:100,contrast:105,saturation:85},{name:"Bright",brightness:118,contrast:102,saturation:105},{name:"Moody",brightness:85,contrast:120,saturation:80},{name:"Cinematic",brightness:95,contrast:125,saturation:75},{name:"Soft",brightness:108,contrast:88,saturation:92}].map(look=><Button key={look.name} variant="outline" className="h-auto w-20 shrink-0 flex-col p-1" onClick={()=>updateElement(selected.id,{brightness:look.brightness,contrast:look.contrast,saturation:look.saturation})}><img src={selected.sourceType === "workspace-logo" ? branding.data?.logoUrl ?? "" : assetUrls[selected.assetId ?? ""]} alt={look.name} className="aspect-square w-full object-cover" style={{filter:`brightness(${look.brightness}%) contrast(${look.contrast}%) saturate(${look.saturation}%)`}}/><span>{look.name}</span></Button>)}</div>
+            </> : mobileTool === "Looks" ? <div className="flex gap-2 overflow-x-auto">{[{name:"Original",brightness:100,contrast:100,saturation:100},{name:"Clean",brightness:105,contrast:108,saturation:95},{name:"Warm",brightness:104,contrast:103,saturation:115},{name:"Cool",brightness:100,contrast:105,saturation:85},{name:"Bright",brightness:118,contrast:102,saturation:105},{name:"Moody",brightness:85,contrast:120,saturation:80},{name:"Cinematic",brightness:95,contrast:125,saturation:75},{name:"Soft",brightness:108,contrast:88,saturation:92}].map(look=><Button key={look.name} variant="outline" className="h-auto w-20 shrink-0 flex-col p-1" onClick={()=>updateElement(selected.id,{brightness:look.brightness,contrast:look.contrast,saturation:look.saturation})}><img src={selected.sourceType === "workspace-logo" ? branding.data?.logoUrl ?? "" : selected.sourceType === "template-photo" ? TEMPLATE_PHOTOS[selected.templatePhoto ?? "studio"] : assetUrls[selected.assetId ?? ""]} alt={look.name} className="aspect-square w-full object-cover" style={{filter:`brightness(${look.brightness}%) contrast(${look.contrast}%) saturate(${look.saturation}%)`}}/><span>{look.name}</span></Button>)}</div>
             : mobileTool === "Auto" ? <><p className="text-sm text-muted-foreground">AI image analysis is temporarily unavailable. These are optional manual presets, not image analysis.</p>{["brightness","contrast","saturation"].map(key=><label key={key} className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={lookChoices.includes(key)} onChange={e=>setLookChoices(v=>e.target.checked?[...v,key]:v.filter(k=>k!==key))}/><span className="capitalize">{key === "brightness" ? "Slight brightness" : key === "contrast" ? "Gentle contrast" : "Subtle saturation"}</span></label>)}<Button onClick={()=>updateElement(selected.id,Object.fromEntries(lookChoices.map(key=>[key,key === "brightness"?108:105])))}>Apply selected presets</Button></>
             : <><div className="flex flex-wrap gap-1">{[{key:"brightness",label:"Exposure"},{key:"contrast",label:"Contrast"},{key:"saturation",label:"Saturation"}].map(item=><Button key={item.key} size="sm" variant={adjustment===item.key?"secondary":"ghost"} onClick={()=>setAdjustment(item.key)}>{item.label}</Button>)}</div><label className="block space-y-4"><span className="flex justify-between text-sm capitalize">{adjustment}<span>{selected[adjustment as "brightness"|"contrast"|"saturation"]??100}%</span></span><Slider aria-label={adjustment} value={[selected[adjustment as "brightness"|"contrast"|"saturation"]??100]} min={0} max={200} onValueChange={([value])=>updateElement(selected.id,{[adjustment]:value})}/></label></>}
           </section>}
-          {mobileTool === "More" && <div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>setMobileTool("Layers")}><Layers3 /> Layers</Button><Button variant="outline" onClick={()=>setMobileTool("Canvas")}><Square /> Canvas</Button>{selected?.type === "image" && <Button variant="outline" onClick={()=>{setReplaceId(selected.id);setMobileTool("Media");}}><ImageIcon /> Replace</Button>}<Button variant="outline" onClick={exportPng}><Download /> Export</Button></div>}
+          {mobileTool === "More" && <div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>setMobileTool("Layers")}><Layers3 /> Layers</Button><Button variant="outline" onClick={()=>setMobileTool("Canvas")}><Square /> Canvas</Button>{selected?.type === "image" && <Button variant="outline" onClick={()=>{setReplaceId(selected.id);setMobileTool("Media");}}><ImageIcon /> Replace</Button>}<Button variant="outline" onClick={exportPng}><Download /> Export</Button><Button variant="outline" onClick={()=>saveDesign.mutate()} disabled={saveDesign.isPending || designs.isError}><Save/>Save design</Button><Button variant="outline" onClick={()=>void saveServerDraft()} disabled={workflowDraft.save.isPending || workflowDraft.isError}><Save/>Save draft</Button><Button variant="outline" onClick={()=>{setSelectedId(null);setMobileTool("Templates");}}>Saved designs</Button></div>}
 
           <div className={cn(!["Edit","More","Font","Size","Color","Style","Align","Fill","Border","Opacity","Arrange","Position"].includes(mobileTool ?? "") && "hidden sm:block")}>
           {selected ? (
@@ -1309,10 +1183,10 @@ function CreativeStudioPage() {
 
       {mobileStarted && <div className="studio-context-toolbar sticky bottom-0 z-10 border-t border-border bg-background pb-[max(.5rem,env(safe-area-inset-bottom))] sm:hidden">
         <div className="flex justify-evenly gap-1" aria-label="Editing tools">
-          {(selected?.type === "image" ? selected.sourceType === "workspace-logo" ? ["Replace","Size","Opacity","Position","More"] : ["Auto","Crop","Adjust","Looks","Remove","More"] : selected?.type === "text" ? ["Font","Size","Color","Style","Align","More"] : selected?.type === "shape" ? ["Fill","Border","Opacity","Arrange","More"] : ["Add","Media","Templates","Brand","More"]).map(label=><Button key={label} variant="ghost" className="h-auto min-h-16 min-w-0 flex-1 flex-col gap-1 px-0 text-[10px]" onClick={()=>{if(label === "Remove" && selected){removeElement(selected.id);return;}if(label === "Replace" && selected){setReplaceId(selected.id);setMobileTool("Media");return;}setMobileTool(label);}}>{label === "More" ? <MoreHorizontal /> : label === "Crop" ? <Crop /> : label === "Font" ? <Type /> : label === "Media" || label === "Replace" ? <ImageIcon /> : label === "Color" || label === "Fill" || label === "Looks" ? <Palette /> : label === "Remove" ? <Trash2 /> : label === "Auto" || label === "Brand" ? <WandSparkles /> : <SlidersHorizontal />}{label}</Button>)}
+          {(selected?.type === "image" ? selected.sourceType === "workspace-logo" ? ["Replace","Size","Opacity","Position","More"] : ["Auto","Crop","Adjust","Looks","Remove","More"] : selected?.type === "text" ? ["Font","Size","Color","Style","Align","More"] : selected?.type === "shape" ? ["Fill","Border","Opacity","Arrange","More"] : ["Add","Media","Templates","Brand","More"]).map(label=><Button key={label} variant="ghost" className="h-auto min-h-16 min-w-0 flex-1 flex-col gap-1 px-0 text-[10px]" onClick={()=>{if(label === "Remove" && selected){removeElement(selected.id);return;}if(label === "Replace" && selected){setReplaceId(selected.id);setMobileTool("Media");return;}if(label === "Brand") setMediaTab("Brand");setMobileTool(label);}}>{label === "More" ? <MoreHorizontal /> : label === "Crop" ? <Crop /> : label === "Font" ? <Type /> : label === "Media" || label === "Replace" ? <ImageIcon /> : label === "Color" || label === "Fill" || label === "Looks" ? <Palette /> : label === "Remove" ? <Trash2 /> : label === "Auto" || label === "Brand" ? <WandSparkles /> : <SlidersHorizontal />}{label}</Button>)}
         </div>
       </div>}
-      {!mobileStarted && document.elements.length > 0 && <section className="space-y-3 sm:hidden"><Button className="w-full" onClick={()=>setMobileStarted(true)}>Continue editing</Button><div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>void saveServerDraft()} disabled={workflowDraft.save.isPending}><Save /> Save draft</Button><Button variant="outline" onClick={exportPng}><Download /> Export</Button><Button variant="outline" aria-label="Send to post" onClick={()=>void sendToPost("feed")} disabled={uploadAsset.isPending}><ImagePlus /> Post to feed</Button><Button variant="outline" onClick={()=>void sendToPost("story")} disabled={uploadAsset.isPending}><ImagePlus /> Post to story</Button></div><Button variant="outline" className="w-full" onClick={()=>saveDesign.mutate()} disabled={saveDesign.isPending}><Save /> Save editable design</Button></section>}
+      {!mobileStarted && document.elements.length > 0 && <section className="space-y-3 sm:hidden"><Button className="w-full" onClick={()=>setMobileStarted(true)}>Continue editing</Button><div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>void saveServerDraft()} disabled={workflowDraft.save.isPending || workflowDraft.isError}><Save /> Save draft</Button><Button variant="outline" onClick={exportPng}><Download /> Export</Button><Button variant="outline" aria-label="Send to post" onClick={()=>void sendToPost("feed")} disabled={uploadAsset.isPending}><ImagePlus /> Post to feed</Button><Button variant="outline" onClick={()=>void sendToPost("story")} disabled={uploadAsset.isPending}><ImagePlus /> Post to story</Button></div><Button variant="outline" className="w-full" onClick={()=>saveDesign.mutate()} disabled={saveDesign.isPending || designs.isError}><Save /> Save editable design</Button></section>}
 
     </div>
   );
@@ -1365,8 +1239,10 @@ function ElementInspector({
               onChange={(event) => onChange({ text: event.target.value })}
             />
           </Field>
-          <Field label="Font"><select className={inputClass} value={element.fontFamily ?? "Inter"} onChange={event=>onChange({fontFamily:event.target.value})}>{["Inter","Arial","Helvetica","Georgia","Courier New"].map(font=><option key={font}>{font}</option>)}</select></Field>
+          <Field label="Font"><select className={inputClass} value={element.fontFamily ?? "Inter"} onChange={event=>onChange({fontFamily:event.target.value})}>{["Inter","Arial","Helvetica","Georgia","Times New Roman","Impact","cursive","Courier New"].map(font=><option key={font}>{font}</option>)}</select></Field>
           <div className="grid grid-cols-2 gap-3">
+            <Field label="Line spacing"><input type="number" min={.8} max={2} step={.05} className={inputClass} value={element.lineHeight??1.18} onChange={e=>onChange({lineHeight:clamp(Number(e.target.value),.8,2)})}/></Field>
+            <Field label="Letter spacing"><input type="number" min={0} max={20} className={inputClass} value={element.letterSpacing??0} onChange={e=>onChange({letterSpacing:clamp(Number(e.target.value),0,20)})}/></Field>
             <Field label="Size">
               <input
                 className={inputClass}
@@ -1533,6 +1409,6 @@ const textareaClass =
 
 function DesignThumbnail({document,urls,logo}:{document:DesignDocument;urls:Record<string,string>;logo?:string|null}) {
   const ref=useRef<HTMLCanvasElement>(null);
-  useEffect(()=>{let cancelled=false;const canvas=ref.current;if(!canvas)return;const format=FORMATS[document.format];canvas.width=240;canvas.height=Math.round(240*format.height/format.width);const ctx=canvas.getContext("2d");if(!ctx)return;void (async()=>{ctx.fillStyle=document.background;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.scale(canvas.width/format.width,canvas.height/format.height);for(const element of document.elements){if(cancelled)return;ctx.save();ctx.translate(element.x*format.width,element.y*format.height);ctx.rotate(element.rotation*Math.PI/180);ctx.globalAlpha=element.opacity;if(element.type==="text"){ctx.fillStyle=element.color;ctx.font=`${element.fontWeight} ${element.fontSize}px ${element.fontFamily??"Inter"}`;ctx.textAlign=element.align;ctx.fillText(element.text,0,0,format.width*.88);}else if(element.type==="shape"){ctx.fillStyle=element.color;if(element.shape==="circle"){ctx.beginPath();ctx.ellipse(0,0,element.width/2,element.height/2,0,0,Math.PI*2);ctx.fill();}else ctx.fillRect(-element.width/2,-element.height/2,element.width,element.height);}else{const url=element.sourceType==="workspace-logo"?logo:urls[element.assetId??""];if(url)try{const image=await loadCanvasImage(url);if(cancelled)return;const crop=element.crop??{x:0,y:0,width:1,height:1};ctx.filter=`brightness(${element.brightness??100}%) contrast(${element.contrast??100}%) saturate(${element.saturation??100}%)`;ctx.drawImage(image,image.naturalWidth*crop.x,image.naturalHeight*crop.y,image.naturalWidth*crop.width,image.naturalHeight*crop.height,-element.width/2,-element.height/2,element.width,element.height);}catch{}}ctx.restore();}})();return()=>{cancelled=true;};},[document,urls,logo]);
+  useEffect(()=>{let cancelled=false;const canvas=ref.current;if(!canvas)return;const format=FORMATS[document.format];canvas.width=240;canvas.height=Math.round(240*format.height/format.width);const ctx=canvas.getContext("2d");if(!ctx)return;void (async()=>{ctx.fillStyle=document.background;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.scale(canvas.width/format.width,canvas.height/format.height);for(const element of document.elements){if(cancelled)return;ctx.save();ctx.translate(element.x*format.width,element.y*format.height);ctx.rotate(element.rotation*Math.PI/180);ctx.globalAlpha=element.opacity;if(element.type==="text"){ctx.fillStyle=element.color;ctx.font=`${element.fontWeight} ${element.fontSize}px ${element.fontFamily??"Inter"}`;ctx.textAlign=element.align;ctx.letterSpacing=`${element.letterSpacing??0}px`;const lines=element.text.split("\n");lines.forEach((line,i)=>ctx.fillText(line,0,(i-(lines.length-1)/2)*element.fontSize*(element.lineHeight??1.18),format.width*.88));}else if(element.type==="shape"){ctx.fillStyle=element.color;if(element.shape==="circle"){ctx.beginPath();ctx.ellipse(0,0,element.width/2,element.height/2,0,0,Math.PI*2);ctx.fill();}else ctx.fillRect(-element.width/2,-element.height/2,element.width,element.height);}else{const url=element.sourceType==="workspace-logo"?logo:element.sourceType==="template-photo"?TEMPLATE_PHOTOS[element.templatePhoto??"studio"]:urls[element.assetId??""];if(url)try{const image=await loadCanvasImage(url);if(cancelled)return;const crop=element.crop??{x:0,y:0,width:1,height:1};ctx.filter=`brightness(${element.brightness??100}%) contrast(${element.contrast??100}%) saturate(${element.saturation??100}%)`;ctx.drawImage(image,image.naturalWidth*crop.x,image.naturalHeight*crop.y,image.naturalWidth*crop.width,image.naturalHeight*crop.height,-element.width/2,-element.height/2,element.width,element.height);}catch{}}ctx.restore();}})();return()=>{cancelled=true;};},[document,urls,logo]);
   return <canvas ref={ref} aria-label="Design thumbnail" className="w-full"/>;
 }
