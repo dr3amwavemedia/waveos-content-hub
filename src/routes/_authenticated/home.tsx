@@ -92,7 +92,7 @@ function HomeRoute() {
 function HomeDashboard() {
   const { data: user } = useCurrentUser();
   const { activeWorkspace } = useWorkspace();
-  const { can } = usePermissions();
+  const { can, isStaff } = usePermissions();
   const wsId = activeWorkspace?.id;
   const isPublicOs = activeWorkspace?.data_source === "os_data";
   const branding = useWorkspaceBranding(wsId);
@@ -230,7 +230,7 @@ function HomeDashboard() {
             <h1 className="mt-2 truncate text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
               {greeting}, {firstName}.
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 hidden text-sm text-muted-foreground sm:block">
               Here's what's happening in your workspace.
             </p>
           </div>
@@ -238,7 +238,7 @@ function HomeDashboard() {
         <div className="flex flex-wrap gap-2">
           <Link
             to="/updates"
-            className="inline-flex min-h-11 w-fit items-center gap-2 rounded-full border border-border bg-surface/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-elevated"
+            className="hidden min-h-11 w-fit items-center gap-2 rounded-full border border-border bg-surface/60 px-4 py-2 text-sm font-semibold text-foreground transition hover:bg-elevated sm:inline-flex"
           >
             <Sparkles className="h-4 w-4 text-primary" />
             What&apos;s new
@@ -260,6 +260,7 @@ function HomeDashboard() {
         scheduledCount={stats?.scheduledCount}
         awaitingCount={stats?.awaitingCount}
         approvalsTo={isPublicOs ? "/social" : "/approvals"}
+        role={isStaff ? user?.roles.includes("dream_wave_owner") ? "admin" : "staff" : "user"}
       />
 
       <WhatsNewCard />
