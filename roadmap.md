@@ -12,4 +12,4 @@
 
 - [x] Confirm current main and inspect PR #171 without replacing newer work.
 - [x] Apply the exact GitHub navigation and invoice presentation changes in Preview only.
-- [ ] Verify the admin menu and invoice steps at phone width without saving data.
+- [x] Verify the admin menu and all five invoice steps at phone width without saving data; focused invoice tests passed.
