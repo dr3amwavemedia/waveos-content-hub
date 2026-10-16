@@ -103,7 +103,7 @@ function HomeDashboard() {
     queryKey: ["home-stats", wsId],
     enabled: !!wsId,
     queryFn: async () => {
-      const [assets, members, brand, scheduled, awaiting, published, upcoming] = await Promise.all([
+      const [assets, members, brand, scheduled, awaiting, published, upcoming, drafts, failedPosts] = await Promise.all([
         supabase
           .from("media_assets")
           .select("id", { count: "exact", head: true })
@@ -135,15 +135,25 @@ function HomeDashboard() {
           .eq("status", "published"),
         supabase
           .from("content_items")
-          .select("id,title,scheduled_at,status")
+          .select("id,title,scheduled_at,status,metadata,media_asset_ids")
           .eq("workspace_id", wsId!)
           .in("status", ["scheduled", "approved"])
           .not("scheduled_at", "is", null)
           .gte("scheduled_at", new Date().toISOString())
           .order("scheduled_at", { ascending: true })
-          .limit(3),
+          .limit(5),
+        supabase
+          .from("content_items")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", wsId!)
+          .eq("status", "draft"),
+        supabase
+          .from("content_items")
+          .select("id", { count: "exact", head: true })
+          .eq("workspace_id", wsId!)
+          .eq("status", "failed"),
       ]);
-      const failed = [assets, members, brand, scheduled, awaiting, published, upcoming].find(
+      const failed = [assets, members, brand, scheduled, awaiting, published, upcoming, drafts, failedPosts].find(
         (result) => result.error,
       );
       if (failed?.error) throw failed.error;
@@ -154,11 +164,15 @@ function HomeDashboard() {
         scheduledCount: scheduled.count ?? 0,
         awaitingCount: awaiting.count ?? 0,
         publishedCount: published.count ?? 0,
+        draftCount: drafts.count ?? 0,
+        failedCount: failedPosts.count ?? 0,
         upcoming: (upcoming.data ?? []) as Array<{
           id: string;
           title: string | null;
           scheduled_at: string;
           status: string;
+          metadata: unknown;
+          media_asset_ids: string[] | null;
         }>,
       };
     },
@@ -216,8 +230,22 @@ function HomeDashboard() {
     : null;
 
   return (
-    <div className="space-y-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+    <div className="space-y-5 sm:space-y-8">
+      <header className="sm:hidden">
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event("waveos:open-menu"))}
+          className="flex max-w-full items-center gap-1 text-sm font-semibold text-foreground"
+          aria-label="Switch workspace"
+        >
+          <span className="truncate">{activeWorkspace?.name ?? "WaveOS"}</span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+        <h1 className="mt-0.5 truncate text-2xl font-semibold tracking-tight text-foreground">
+          {greeting}, {firstName} 👋
+        </h1>
+      </header>
+      <header className="hidden gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div className="flex min-w-0 items-center gap-4">
           <WorkspaceBrandmark
             logoUrl={branding.data?.logoUrl}
@@ -257,15 +285,15 @@ function HomeDashboard() {
 
       <MobileCommandCenter
         can={can}
-        scheduledCount={stats?.scheduledCount}
-        awaitingCount={stats?.awaitingCount}
+        workspaceName={activeWorkspace?.name}
+        stats={stats}
+        loading={statsQ.isPending}
         approvalsTo={isPublicOs ? "/social" : "/approvals"}
-        role={isStaff ? user?.roles.includes("dream_wave_owner") ? "admin" : "staff" : "user"}
       />
 
-      <WhatsNewCard />
-
       <MobileRecentMedia workspaceId={wsId} />
+
+      <WhatsNewCard />
 
       {!isPublicOs && <UpcomingShootPanel />}
 
@@ -388,6 +416,7 @@ function HomeDashboard() {
         </div>
       </section>
 
+      <div className="hidden sm:block">
       <Section title="Upcoming content" subtitle="The next few posts scheduled for your brand.">
         {statsQ.isPending ? (
           <div className="grid gap-3 sm:grid-cols-3" aria-label="Loading upcoming content">
