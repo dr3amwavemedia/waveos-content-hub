@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ReceiptText, Plus, FileText, Clock3, ChevronRight, Info } from "lucide-react";
+import { CheckCircle2, ReceiptText, Plus, FileText, Clock3, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Bar,
@@ -514,8 +514,8 @@ function PaymentsPage() {
           </div>
           <div className="grid grid-cols-2 gap-px bg-border/70 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {[
-              ["Outstanding", money(expectedIncoming), "Open invoice balance", "text-warning"],
               ["Cash collected", money(collected), "Posted payments", "text-emerald-400"],
+              ["Outstanding", money(expectedIncoming), "Open invoice balance", "text-warning"],
               ["Refunds", money(refunded), "Money returned", "text-rose-400"],
               [
                 "Net cash + expected",
@@ -578,7 +578,6 @@ function PaymentsPage() {
                         tickLine={false}
                         fontSize={12}
                         width={44}
-                        hide={typeof window !== "undefined" && window.innerWidth < 640}
                         tickFormatter={(value: number) => compactMoney(value)}
                       />
                       <Tooltip
