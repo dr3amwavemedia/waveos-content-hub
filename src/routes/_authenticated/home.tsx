@@ -485,6 +485,7 @@ function HomeDashboard() {
       </Section>
       </div>
 
+      <div className="hidden sm:block">
       <Section
         title="Needs your attention"
         subtitle="Approvals, account connections, and brand setup."
@@ -538,6 +539,7 @@ function HomeDashboard() {
           />
         )}
       </Section>
+      </div>
 
       <Section
         title="Recommended for you"
