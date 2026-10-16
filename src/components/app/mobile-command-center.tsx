@@ -44,7 +44,7 @@ export function MobileCommandCenter({
   approvalsTo: string;
   role?: "admin" | "staff" | "user";
 }) {
-  const roleTiles: Tile[] = role === "admin" ? [...TILES.slice(0, 2), { to: "/clients", label: "Manage Clients", hint: "Users & workspaces", icon: Users, feature: "can_view_profile" }, TILES[2]] : role === "staff" ? [...TILES.slice(0, 2), { to: "/projects", label: "My Projects", hint: "View assignments", icon: FolderOpen, feature: "can_view_profile" }, { to: "/content", label: "Content Library", hint: "Access assets", icon: FolderOpen, feature: "can_view_media_library" }] : TILES;
+  const roleTiles: Tile[] = role === "admin" ? [...TILES.slice(0, 2), { to: "/clients", label: "Manage Clients", hint: "Users & workspaces", icon: Users, feature: "can_view_profile" }, TILES[2]] : role === "staff" ? [...TILES.slice(0, 2), TILES[3], { to: "/content", label: "Content Library", hint: "Access assets", icon: FolderOpen, feature: "can_view_media_library" }] : TILES;
   const tiles = roleTiles.filter((tile) => can(tile.feature)).slice(0, 4);
   const focus = [
     scheduledCount
