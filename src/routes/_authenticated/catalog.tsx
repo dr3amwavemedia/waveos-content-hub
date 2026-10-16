@@ -27,16 +27,16 @@ export const Route = createFileRoute("/_authenticated/catalog")({
   component: CatalogPage,
   head: () => ({
     meta: [
-      { title: "Price List — WaveOS" },
+      { title: "Services & Pricing — WaveOS" },
       {
         name: "description",
         content:
-          "Dream Wave Media 2026 service catalog: retainers, commercial services and wedding packages with their linked agreements.",
+          "Manage reusable services, packages, pricing, and linked agreements in WaveOS.",
       },
-      { property: "og:title", content: "Price List — WaveOS" },
+      { property: "og:title", content: "Services & Pricing — WaveOS" },
       {
         property: "og:description",
-        content: "The 2026 Dream Wave Media service catalog and linked agreement templates.",
+        content: "Reusable Dream Wave Media services, packages, pricing, and linked agreements.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -86,10 +86,9 @@ function CatalogPage() {
   return (
     <div className="w-full space-y-8">
         <header className="border-b border-border pb-6">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Price list</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Services & Pricing</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            The 2026 Dream Wave Media service sheet. Every item defaults to a quantity of one, and
-            ranges or starting-at prices need a final agreed amount before a quote can be sent.
+            Reusable services and packages for quotes and invoices. Keep pricing organized here so billing workflows can pull from one consistent library.
           </p>
         </header>
 
@@ -170,7 +169,7 @@ function CatalogPage() {
             {items.map((item) => (
               <li
                 key={item.id}
-                className="flex flex-col justify-between gap-4 rounded-xl border border-border/60 bg-background/60 p-5"
+                className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-card p-4 sm:p-5"
               >
                 <div className="min-w-0 space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -183,7 +182,7 @@ function CatalogPage() {
                     {pricingBadges(item).map((badge) => (
                       <span
                         key={badge}
-                        className="rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-primary"
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${item.item_type === "package" ? "bg-campaign/10 text-campaign" : "bg-primary/10 text-primary"}`}
                       >
                         {badge}
                       </span>
