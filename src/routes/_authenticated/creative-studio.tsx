@@ -109,6 +109,8 @@ type ShapeElement = {
   type: "shape";
   name: string;
   shape: "rectangle" | "circle";
+  borderColor?: string;
+  borderWidth?: number;
   x: number;
   y: number;
   width: number;
@@ -457,6 +459,12 @@ function CreativeStudioPage() {
               element.width,
               element.height,
             );
+          }
+          if ((element.borderWidth ?? 0) > 0) {
+            context.strokeStyle = element.borderColor ?? element.color;
+            context.lineWidth = element.borderWidth ?? 0;
+            if (element.shape === "circle") {context.beginPath();context.ellipse(0,0,element.width/2,element.height/2,0,0,Math.PI*2);context.stroke();}
+            else context.strokeRect(-element.width/2,-element.height/2,element.width,element.height);
           }
         } else if (element.type === "image") {
           const url =
@@ -1268,7 +1276,7 @@ function CreativeStudioPage() {
 
           {selected?.type === "image" && <section className={cn("space-y-4", !["Crop","Adjust","Looks","Auto"].includes(mobileTool ?? "") && "hidden sm:block")}>
             {mobileTool === "Crop" ? <>
-              <div className="grid grid-cols-3 gap-2">{[{label:"Free",ratio:null},{label:"Original",ratio:null},{label:"1:1",ratio:1},{label:"4:5",ratio:.8},{label:"9:16",ratio:9/16},{label:"16:9",ratio:16/9}].map(({label,ratio})=><Button key={label} variant="outline" onClick={()=>{const asset=mediaAssets.data?.find(item=>item.id===selected.assetId);const sourceRatio=(asset?.width??selected.width)/(asset?.height??selected.height);updateElement(selected.id,{crop:ratioCrop(sourceRatio,ratio),...(ratio?{height:selected.width/ratio}:{})});setCropId(selected.id);setMobileTool(null);}}>{label}</Button>)}</div>
+              <div className="grid grid-cols-3 gap-2">{[{label:"Free",ratio:null},{label:"Original",ratio:null},{label:"1:1",ratio:1},{label:"4:5",ratio:.8},{label:"9:16",ratio:9/16},{label:"16:9",ratio:16/9}].map(({label,ratio})=><Button key={label} variant="outline" onClick={()=>{const asset=mediaAssets.data?.find(item=>item.id===selected.assetId);const sourceRatio=(asset?.width??selected.width)/(asset?.height??selected.height);updateElement(selected.id,{crop:ratioCrop(sourceRatio,ratio),...(ratio?{height:selected.width/ratio}:label==="Original"?{height:selected.width/sourceRatio}:{})});setCropId(selected.id);setMobileTool(null);}}>{label}</Button>)}</div>
               <Button variant="outline" onClick={()=>updateElement(selected.id,{rotation:(selected.rotation+90)%360})}><RotateCw /> Rotate</Button>
             </> : mobileTool === "Looks" ? <div className="flex gap-2 overflow-x-auto">{[{name:"Original",brightness:100,contrast:100,saturation:100},{name:"Clean",brightness:105,contrast:108,saturation:95},{name:"Warm",brightness:104,contrast:103,saturation:115},{name:"Cool",brightness:100,contrast:105,saturation:85},{name:"Bright",brightness:118,contrast:102,saturation:105},{name:"Moody",brightness:85,contrast:120,saturation:80},{name:"Cinematic",brightness:95,contrast:125,saturation:75},{name:"Soft",brightness:108,contrast:88,saturation:92}].map(look=><Button key={look.name} variant="outline" className="h-auto w-20 shrink-0 flex-col p-1" onClick={()=>updateElement(selected.id,{brightness:look.brightness,contrast:look.contrast,saturation:look.saturation})}><img src={selected.sourceType === "workspace-logo" ? branding.data?.logoUrl ?? "" : assetUrls[selected.assetId ?? ""]} alt={look.name} className="aspect-square w-full object-cover" style={{filter:`brightness(${look.brightness}%) contrast(${look.contrast}%) saturate(${look.saturation}%)`}}/><span>{look.name}</span></Button>)}</div>
             : mobileTool === "Auto" ? <><p className="text-sm text-muted-foreground">AI image analysis is temporarily unavailable. These are optional manual presets, not image analysis.</p>{["brightness","contrast","saturation"].map(key=><label key={key} className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={lookChoices.includes(key)} onChange={e=>setLookChoices(v=>e.target.checked?[...v,key]:v.filter(k=>k!==key))}/><span className="capitalize">{key === "brightness" ? "Slight brightness" : key === "contrast" ? "Gentle contrast" : "Subtle saturation"}</span></label>)}<Button onClick={()=>updateElement(selected.id,Object.fromEntries(lookChoices.map(key=>[key,key === "brightness"?108:105])))}>Apply selected presets</Button></>
@@ -1301,7 +1309,7 @@ function CreativeStudioPage() {
 
       {mobileStarted && <div className="studio-context-toolbar sticky bottom-0 z-10 border-t border-border bg-background pb-[max(.5rem,env(safe-area-inset-bottom))] sm:hidden">
         <div className="flex justify-evenly gap-1" aria-label="Editing tools">
-          {(selected?.type === "image" ? selected.sourceType === "workspace-logo" ? ["Replace","Size","Opacity","Position","More"] : ["Auto","Crop","Adjust","Looks","Remove","More"] : selected?.type === "text" ? ["Font","Size","Color","Style","Align","More"] : selected?.type === "shape" ? ["Fill","Opacity","Arrange","More"] : ["Add","Media","Templates","Brand","More"]).map(label=><Button key={label} variant="ghost" className="h-auto min-h-16 min-w-0 flex-1 flex-col gap-1 px-0 text-[10px]" onClick={()=>{if(label === "Remove" && selected){removeElement(selected.id);return;}if(label === "Replace" && selected){setReplaceId(selected.id);setMobileTool("Media");return;}setMobileTool(label);}}>{label === "More" ? <MoreHorizontal /> : label === "Crop" ? <Crop /> : label === "Font" ? <Type /> : label === "Media" || label === "Replace" ? <ImageIcon /> : label === "Color" || label === "Fill" || label === "Looks" ? <Palette /> : label === "Remove" ? <Trash2 /> : label === "Auto" || label === "Brand" ? <WandSparkles /> : <SlidersHorizontal />}{label}</Button>)}
+          {(selected?.type === "image" ? selected.sourceType === "workspace-logo" ? ["Replace","Size","Opacity","Position","More"] : ["Auto","Crop","Adjust","Looks","Remove","More"] : selected?.type === "text" ? ["Font","Size","Color","Style","Align","More"] : selected?.type === "shape" ? ["Fill","Border","Opacity","Arrange","More"] : ["Add","Media","Templates","Brand","More"]).map(label=><Button key={label} variant="ghost" className="h-auto min-h-16 min-w-0 flex-1 flex-col gap-1 px-0 text-[10px]" onClick={()=>{if(label === "Remove" && selected){removeElement(selected.id);return;}if(label === "Replace" && selected){setReplaceId(selected.id);setMobileTool("Media");return;}setMobileTool(label);}}>{label === "More" ? <MoreHorizontal /> : label === "Crop" ? <Crop /> : label === "Font" ? <Type /> : label === "Media" || label === "Replace" ? <ImageIcon /> : label === "Color" || label === "Fill" || label === "Looks" ? <Palette /> : label === "Remove" ? <Trash2 /> : label === "Auto" || label === "Brand" ? <WandSparkles /> : <SlidersHorizontal />}{label}</Button>)}
         </div>
       </div>}
       {!mobileStarted && document.elements.length > 0 && <section className="space-y-3 sm:hidden"><Button className="w-full" onClick={()=>setMobileStarted(true)}>Continue editing</Button><div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>void saveServerDraft()} disabled={workflowDraft.save.isPending}><Save /> Save draft</Button><Button variant="outline" onClick={exportPng}><Download /> Export</Button><Button variant="outline" aria-label="Send to post" onClick={()=>void sendToPost("feed")} disabled={uploadAsset.isPending}><ImagePlus /> Post to feed</Button><Button variant="outline" onClick={()=>void sendToPost("story")} disabled={uploadAsset.isPending}><ImagePlus /> Post to story</Button></div><Button variant="outline" className="w-full" onClick={()=>saveDesign.mutate()} disabled={saveDesign.isPending}><Save /> Save editable design</Button></section>}
@@ -1429,6 +1437,7 @@ function ElementInspector({
           />
         </Field>
       )}
+      {element.type === "shape" && <div className="grid grid-cols-2 gap-3"><Field label="Border color"><input aria-label="Border color" type="color" className={inputClass} value={element.borderColor??element.color} onChange={event=>onChange({borderColor:event.target.value})}/></Field><Field label="Border width"><input aria-label="Border width" type="number" min={0} max={60} className={inputClass} value={element.borderWidth??0} onChange={event=>onChange({borderWidth:clamp(number(event),0,60)})}/></Field></div>}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Opacity">
           <input
