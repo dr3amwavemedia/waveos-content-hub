@@ -390,3 +390,19 @@ select {
 .picker-dialog-content {
   overflow: hidden !important;
 }
+
+/* Focus is presentation-only; artwork and persistence remain shared. */
+@media (max-width: 639px) {
+  body:has([data-studio-focused="true"]) main {
+    padding-bottom: 0;
+  }
+  body:has([data-studio-focused="true"]) main > div:last-child {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  body:has([data-studio-focused="true"]) main ~ nav,
+  body:has([data-studio-focused="true"]) header:has(> a),
+  body:has([data-studio-focused="true"]) header:has(> svg) {
+    display: none;
+  }
+}

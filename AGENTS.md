@@ -11,3 +11,7 @@
 
 Mobile guided workflows wrap existing fields and actions with shared step controls; desktop keeps all fields visible, so presentation changes do not fork business logic.
 Creative Studio uses the same canvas and undo history on every device; mobile tool panels disclose existing tools without changing persistence or publish actions.
+Creative Studio selection and alignment overlays render separately from artwork so exports cannot contain editing decorations.
+Editor viewport transforms stay outside saved documents so workspace zoom never modifies artwork geometry.
+Public competitor research runs through authenticated workspace-entitled server functions and the managed research connector; results retain citations and never infer private platform metrics.
+Analytics historical comparisons require matching provider, calculation, coverage and non-overlapping equal-length periods; unsupported observations remain unavailable.
