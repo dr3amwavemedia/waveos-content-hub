@@ -634,34 +634,36 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
   );
 }
 
-// DWM everyday working tools live under Personal (approved mobile design).
+// Approved DWM mobile grouping:
+// Personal = the signed-in user's everyday workspace tools.
+// Business = Dream Wave Media operations.
+// OS App = WaveOS platform/system data.
+// Keep routes and permissions unchanged; this only controls mobile organization.
 const MOBILE_PERSONAL_PATHS = new Set([
-  "/home", "/social", "/creative-studio", "/campaigns", "/brand-voice",
-  "/analytics", "/feedback", "/settings",
+  "/competitive-intelligence", "/content", "/calendar", "/approvals",
 ]);
-const MOBILE_OS_PATHS = new Set([
-  "/create", "/competitive-intelligence", "/content", "/calendar", "/approvals", "/vision-studio",
+const MOBILE_BUSINESS_PATHS = new Set([
+  "/deliveries", "/videographer", "/projects", "/crm", "/clients", "/templates",
+  "/catalog", "/payments", "/vision-studio", "/tools", "/admin",
 ]);
-const MOBILE_SYSTEM_PATHS = new Set(["/os-data", "/tools", "/admin"]);
-const isPersonalItem = (i: NavItem) =>
-  i.hash === "invoices" || (!i.hash && MOBILE_PERSONAL_PATHS.has(i.to));
+const MOBILE_OS_PATHS = new Set(["/os-data"]);
+const isPersonalItem = (i: NavItem) => !i.hash && MOBILE_PERSONAL_PATHS.has(i.to);
 
 function MobileAdminNav({ items }: { items: NavItem[] }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const groupedPaths = new Set([
+    ...MOBILE_PERSONAL_PATHS,
+    ...MOBILE_BUSINESS_PATHS,
+    ...MOBILE_OS_PATHS,
+  ]);
   const groups = [
+    { label: "Business", items: items.filter((i) => !i.hash && MOBILE_BUSINESS_PATHS.has(i.to)) },
     { label: "Personal", items: items.filter(isPersonalItem) },
-    {
-      label: "Business",
-      items: items.filter(
-        (i) =>
-          !isPersonalItem(i) &&
-          !(MOBILE_PERSONAL_PATHS.has(i.to) && !i.hash) &&
-          !MOBILE_OS_PATHS.has(i.to) &&
-          !MOBILE_SYSTEM_PATHS.has(i.to),
-      ),
-    },
     { label: "OS App", items: items.filter((i) => !i.hash && MOBILE_OS_PATHS.has(i.to)) },
-    { label: "System", items: items.filter((i) => MOBILE_SYSTEM_PATHS.has(i.to)) },
+    {
+      label: "More",
+      items: items.filter((i) => i.hash || !groupedPaths.has(i.to)),
+    },
   ].filter((group) => group.items.length);
 
   return (
