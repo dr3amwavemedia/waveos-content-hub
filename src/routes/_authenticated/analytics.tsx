@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/analytics")({
     </RequireFeature>
   ),
   head: () => ({
-    meta: [{ title: "Analytics Checkup — WaveOS" }, { name: "robots", content: "noindex" }],
+    meta: [{ title: "Analytics — WaveOS" }, { name: "description", content: "Understand sourced social performance and historical growth in your WaveOS workspace." }, { property: "og:title", content: "Analytics — WaveOS" }, { property: "og:description", content: "Understand sourced social performance and historical growth in your WaveOS workspace." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }],
   }),
 });
 
