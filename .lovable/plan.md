@@ -1,39 +1,45 @@
-# PR #116 preview and release plan (Client Admin / Second Account + invoice delivery locks)
+# WaveOS — mobile editing and trustworthy intelligence
 
-## Current status (checked)
-- This project only sees `main` (latest: "Fixed admin workspace routing").
-- Branch `codex/mobile-client-portal-preview` and commit `212b716` are **not visible** here yet. PR #116 hasn't been merged or switched into the editor.
+## Outcome
+Complete the uploaded brief in Preview: natural touch editing, clear growth analytics, and one-link competitor research. Build on the current GitHub implementation rather than replacing working features.
 
-## Step 1 — Make the branch visible (you do this, no live impact)
-Pick one:
-- **Recommended:** in the editor, open the branch switcher (Git/GitHub menu) and select `codex/mobile-client-portal-preview`. The preview then runs that branch. The live site and `main` stay the same.
-- Or merge PR #116 into `main` on GitHub. This brings the code in, but it still won't go live until you publish.
+## 1. Creative Studio
+- Focused phone editor with back, undo, redo and Done; hide normal bottom navigation only while editing and restore it on exit.
+- Contextual tools for images, text, shapes and logos, with compact sheets for secondary controls.
+- Direct selection, drag, proportional corner resize, pinch resize and twist rotation; pinch with nothing selected changes only workspace zoom.
+- Temporary snapping guides; double-tap crop/reposition mode with ratio previews and touch positioning.
+- Visual media picker, replacement picker, templates, layers, brand assets, saved designs and recent media.
+- Touch-friendly adjustments, visual Looks previews, fit/fill/background controls, and reviewable Auto and Brand Look suggestions. Never label a preset or heuristic as AI analysis.
 
-## Step 2 — Code review in the preview (no database changes)
-- Confirm the commit is `212b716` and list every changed file and migration.
-- Review the migration SQL without running it. Check that it only adds things, that existing members and pending invites are grandfathered as Client Admin, that grants and privacy rules are in place, and that it can be rolled back.
-- Check that Second Accounts are blocked from invoices, contracts, autopay and payment documents **on the server side**. Hiding the menu items isn't enough.
-- Check the delivery lock logic for each invoice state: paid, deposit, unpaid, refunded, and no invoice.
-- Run the typecheck and unit tests here.
+## 2. Analytics
+- Growth-first layout with one main interactive graph, swipeable KPI cards, sourced top-content thumbnails and platform/content breakdowns.
+- Display previous-period comparisons and trends only where real historical data exists; preserve missing-data and provider coverage states.
+- Evidence-backed insights and next actions, with optional handoff into content creation.
+- Competitive benchmarks and brand consistency appear only when comparable evidence or a defensible evaluation is available; otherwise show clear availability states, not invented scores.
 
-## Step 3 — Preview walkthrough (read-only)
-- Until the migration runs, the new switches can't save. I'll report which screens depend on it.
-- Screenshot on desktop and phone: Overview, Deliveries, Invoices, Clients (access switches), and Settings → Team.
-- Confirm nothing breaks before the migration: existing clients still see their invoices and deliveries.
+## 3. Competitive Intelligence
+- Preserve the one website/social-profile input and the optional existing manual comparison form.
+- Ground research in publicly accessible sources; follow official linked profiles when accessible and mark missing or blocked information honestly.
+- Present overview, messaging, social strategy, website/SEO signals, strengths, gaps, workspace comparison, opportunities and original content ideas with source evidence.
+- Preserve edit, refresh and compare actions and saved reports; add a qualitative landscape for 2–5 competitors without fake numeric precision.
+- Let users carry supported ideas into content creation without saving or publishing automatically.
 
-## Step 4 — Review report for you
-The report will cover:
-- Pass / Needs attention for each requirement
-- Migration summary and rollback steps
-- Any risk to current client access
+## Safety boundaries
+- No production publishing, migrations, emails, charges, signatures or live-record edits during implementation and verification.
+- Preserve accounts, workspaces, permissions, connections, designs, drafts, reports and all financial workflows.
+- Keep existing desktop functionality and recently approved navigation and Overview designs.
+- Any required external research connection will use its normal connection approval; unavailable research stays explicitly unavailable.
 
-## Step 5 — Production activation (only after your final "approve")
-1. Apply the migration to the live database. Then check that every existing member shows as Client Admin and the counts haven't changed.
-2. You publish (Publish → Update).
-3. Live check with TEST CLIENT: test a second account and a locked delivery, then clean up.
+## Technical approach
+- Reuse the existing canvas model, undo history, queries, mutations and permission checks across devices.
+- Keep mobile focus and panels presentation-only; separate gesture calculations and evidence calculations into small tested helpers.
+- Reuse authenticated server functions for AI and research, retaining workspace isolation and server-only credentials.
+- Reuse existing report storage where compatible; report a genuine schema blocker rather than applying an unapproved migration.
+- Preserve dependency versions and keep package manifests and lockfiles aligned if a required package is added.
 
-## Not doing until approved
-- No publishing
-- No migrations
-- No invitations
-- No changes to client access
+## Verification
+- Check authenticated phone, small-tablet and desktop experiences using temporary editor state, without saving live records.
+- Test gestures, crop, undo/redo, focused navigation restoration, unavailable analytics and research failures.
+- Run relevant unit and existing quality tests; rely on the platform's automatic type/build checks and report failures explicitly.
+- Check clean-install compatibility without disrupting the running preview.
+- Report completed requirements and any blocked capabilities before calling the phase finished.
