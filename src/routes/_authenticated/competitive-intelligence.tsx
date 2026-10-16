@@ -32,6 +32,7 @@ import {
 import { useServerFn } from "@tanstack/react-start";
 import { researchCompetitor } from "@/lib/competitive-research.functions";
 import { researchReportSchema, type ResearchReport } from "@/lib/competitive-research";
+import { researchRecord, researchRecordFromMetrics, researchText } from "@/lib/public-research-record";
 import { isValidHttpsUrl, normalizeHttpsUrl } from "@/lib/url-validation";
 
 export const Route = createFileRoute("/_authenticated/competitive-intelligence")({
@@ -139,6 +140,7 @@ function CompetitiveIntelligencePage() {
   const [researchInput, setResearchInput] = useState("");
   const [showManual, setShowManual] = useState(false);
   const [researchResults, setResearchResults] = useState<PublicResearchResult[]>([]);
+  const [savedResearch,setSavedResearch] = useState<Record<string,string>>({});
   const [openedReport, setOpenedReport] = useState<ReportRow | null>(null);
   const navigate = useNavigate();
   const currentWorkspaceRef = useRef(workspaceId);
@@ -156,7 +158,7 @@ function CompetitiveIntelligencePage() {
     });
   }, onError:error=>toast.error(error instanceof Error?error.message:"Analysis unavailable") });
   useEffect(()=>{
-    setResearchInput(""); setResearchResults([]); setOpenedReport(null); setDraft({...DEFAULT_DRAFT,metrics:DEFAULT_DRAFT.metrics.map(metric=>({...metric}))});setDirty(false);
+    setSavedResearch({}); setResearchInput(""); setResearchResults([]); setOpenedReport(null); setDraft({...DEFAULT_DRAFT,metrics:DEFAULT_DRAFT.metrics.map(metric=>({...metric}))});setDirty(false);
     research.reset();
     if (!workspaceId) return;
     try {
@@ -278,6 +280,32 @@ function CompetitiveIntelligencePage() {
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Comparison could not be saved."),
   });
+
+  const saveResearch = useMutation({mutationFn:async(result:PublicResearchResult)=>{
+    const targetWorkspace=workspaceId;
+    if(!targetWorkspace)throw new Error('Select a workspace first.');
+    const {data:auth,error:authError}=await supabase.auth.getUser();
+    if(authError||!auth.user)throw new Error('Sign in to save research.');
+    let competitorId=competitors.data?.find(item=>item.website_url===(result.report.website??result.inputUrl)||item.social_handles?.research_input===result.inputUrl)?.id;
+    if(!competitorId){
+      const {data,error}=await db.from('competitors').insert({workspace_id:targetWorkspace,created_by:auth.user.id,name:result.report.company?.trim()||new URL(result.inputUrl).hostname,website_url:result.report.website??result.inputUrl,social_handles:{research_input:result.inputUrl,observation_links:result.report.channels.join('\n')}}).select('id').single();
+      if(error)throw error;competitorId=data.id;
+      await queryClient.invalidateQueries({queryKey:['competitors',targetWorkspace]});
+    }
+    const {data,error}=await db.from('competitive_reports').insert({workspace_id:targetWorkspace,competitor_id:competitorId,created_by:auth.user.id,title:`Public research — ${result.report.company??new URL(result.inputUrl).hostname}`,metrics:[researchRecord(result)],score:null,confidence:null,methodology:result.methodology}).select('id').single();
+    if(error)throw error;
+    return {id:data.id,competitorId,targetWorkspace,key:result.inputUrl+result.researchedAt};
+  },onSuccess:async saved=>{
+    if(saved.targetWorkspace!==currentWorkspaceRef.current)return;
+    setSavedResearch(current=>({...current,[saved.key]:saved.id}));
+    setDraft(current=>({...current,selectedCompetitorId:saved.competitorId}));
+    await queryClient.invalidateQueries({queryKey:['competitive-reports',saved.targetWorkspace]});
+    toast.success('Public research saved with citations.');
+  },onError:error=>toast.error(error instanceof Error?error.message:'Research could not be saved.')});
+  function downloadResearch(result:PublicResearchResult){
+    const url=URL.createObjectURL(new Blob([researchText(result)],{type:'text/plain;charset=utf-8'}));
+    const link=window.document.createElement('a');link.href=url;link.download='waveos-public-research.txt';link.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
 
   function update<K extends keyof CompetitiveDraft>(key: K, value: CompetitiveDraft[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -428,7 +456,7 @@ function CompetitiveIntelligencePage() {
 
       {research.isError && <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">{research.error instanceof Error ? research.error.message : "Analysis unavailable"}</p>}
       {researchResults.map(result=><section key={result.inputUrl} className="space-y-5 border-t border-border pt-5">
-        <header className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">{result.report.company ?? "Identity not found"}</h2><p className="mt-1 text-xs text-muted-foreground">Public-source analysis · {new Date(result.researchedAt).toLocaleString()}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>{setResearchInput(result.inputUrl);setShowManual(true);update("competitorName",result.report.company??"");update("websiteUrl",result.report.website??result.inputUrl);}}>Edit</Button><Button variant="outline" disabled={research.isPending} onClick={()=>{setResearchInput(result.inputUrl);runResearch(result.inputUrl);}}>Refresh analysis</Button><Button variant="outline" onClick={()=>window.document.getElementById("competitive-landscape")?.scrollIntoView()}>Compare</Button><Button variant="outline" onClick={()=>{setResearchInput("");window.scrollTo({top:0,behavior:"smooth"});}}>Add another competitor</Button></div></header>
+        <header className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">{result.report.company ?? "Identity not found"}</h2><p className="mt-1 text-xs text-muted-foreground">Public-source analysis · {new Date(result.researchedAt).toLocaleString()}</p></div><div className="flex flex-wrap gap-2"><Button disabled={saveResearch.isPending||Boolean(savedResearch[result.inputUrl+result.researchedAt])} onClick={()=>saveResearch.mutate(result)}><Save/>{savedResearch[result.inputUrl+result.researchedAt]?"Saved":"Save Report"}</Button><Button variant="outline" onClick={()=>downloadResearch(result)}>Export Report</Button><Button variant="outline" onClick={()=>{setResearchInput(result.inputUrl);setShowManual(true);update("competitorName",result.report.company??"");update("websiteUrl",result.report.website??result.inputUrl);}}>Edit</Button><Button variant="outline" disabled={research.isPending} onClick={()=>{setResearchInput(result.inputUrl);runResearch(result.inputUrl);}}>Refresh analysis</Button><Button variant="outline" onClick={()=>window.document.getElementById("competitive-landscape")?.scrollIntoView()}>Compare</Button><Button variant="outline" onClick={()=>{setResearchInput("");window.scrollTo({top:0,behavior:"smooth"});}}>Add another competitor</Button></div></header>
         <dl className="grid grid-cols-2 gap-4 text-sm"><div><dt className="text-muted-foreground">Industry</dt><dd>{result.report.industry??"Not found"}</dd></div><div><dt className="text-muted-foreground">Market</dt><dd>{result.report.market??"Not found"}</dd></div><div className="col-span-2"><dt className="text-muted-foreground">Website</dt><dd className="break-all">{result.report.website?<a href={result.report.website} target="_blank" rel="noopener noreferrer" className="text-primary">{result.report.website}</a>:"Not found"}</dd></div></dl>
         <div className="flex flex-wrap gap-2">{result.report.channels.map(url=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="max-w-full break-all text-xs text-primary">{url}</a>)}</div>
         <div className="grid gap-5 sm:grid-cols-2">{result.report.sections.map(section=><section key={section.title} className="border-t border-border pt-4"><h3 className="font-semibold text-intelligence">{section.title}</h3><ul className="mt-3 space-y-3 text-sm">{section.findings.map((finding,index)=><li key={index}><p>{finding.text}</p><div className="mt-1 flex flex-wrap gap-2">{finding.sources.map((url,i)=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary">Source {i+1}</a>)}</div></li>)}</ul>{!section.findings.length&&<p className="mt-2 text-sm text-muted-foreground">Not found in accessible sources.</p>}</section>)}</div>
@@ -436,6 +464,7 @@ function CompetitiveIntelligencePage() {
         <details className="border-t border-border pt-3 text-xs text-muted-foreground"><summary>Methodology and coverage</summary><p className="mt-2">{result.methodology}</p>{result.report.limitations.map((item,i)=><p key={i} className="mt-2">{item}</p>)}</details>
       </section>)}
       {researchResults.length>=2&&<section id="competitive-landscape" className="space-y-4 border-t border-border pt-5"><h2 className="text-xl font-semibold">Competitive Landscape</h2><p className="text-xs text-muted-foreground">Qualitative comparison of reviewed public sources; not market-share or performance scoring.</p><div className="grid gap-3 sm:grid-cols-2">{researchResults.map(item=><article key={item.inputUrl} className="rounded-lg border border-border p-4"><h3 className="font-semibold">{item.report.company??"Identity not found"}</h3><p className="mt-2 text-sm text-muted-foreground">{item.report.industry??"Industry not found"} · {item.report.market??"Market not found"}</p>{item.report.sections.filter(section=>/Messaging|Strengths|Opportunities|Social/.test(section.title)).map(section=><div key={section.title} className="mt-3"><h4 className="text-xs font-semibold text-intelligence">{section.title}</h4><p className="mt-1 text-xs">{section.findings[0]?.text??"Not found"}</p>{section.findings[0]?.sources.map((url,i)=><a key={url} href={url} className="mr-2 text-xs text-primary" target="_blank" rel="noopener noreferrer">Source {i+1}</a>)}</div>)}</article>)}</div></section>}
+      {draft.selectedCompetitorId&&!showManual&&<section className="border-t border-border pt-4"><h2 className="font-semibold">Saved reports</h2><div className="mt-3 flex flex-wrap gap-2">{(reports.data??[]).map(report=><Button key={report.id} variant="outline" onClick={()=>{const saved=researchRecordFromMetrics(report.metrics);if(saved)setResearchResults(current=>[...current.filter(item=>item.inputUrl!==saved.inputUrl),saved]);else{setOpenedReport(report);setShowManual(true);}}}>{report.title}</Button>)}</div></section>}
       <div className={cn(showManual ? "grid" : "hidden", "gap-5 xl:grid-cols-[15rem_minmax(0,1fr)]")}>
         <aside className="surface-card p-4">
           <div className="flex items-center justify-between gap-2">
@@ -618,7 +647,7 @@ function CompetitiveIntelligencePage() {
             </section>
           )}
 
-          {openedReport && <section className="space-y-3 border-t border-border pt-4"><h3 className="font-semibold">{openedReport.title}</h3><p className="text-xs text-muted-foreground">{openedReport.methodology}</p>{openedReport.metrics.map((metric,index)=><div key={index} className="rounded-lg border border-border p-3 text-sm"><p className="font-semibold">{metric.label}</p><p>Your value: {metric.yourValue??"Unavailable"} · Competitor: {metric.competitorValue??"Unavailable"} {metric.unit}</p><p className="mt-1 text-xs text-muted-foreground">{metric.sourceNote||"Source not recorded"} · {metric.observedAt||"Date not recorded"}</p></div>)}</section>}
+          {openedReport && !researchRecordFromMetrics(openedReport.metrics) && <section className="space-y-3 border-t border-border pt-4"><h3 className="font-semibold">{openedReport.title}</h3><p className="text-xs text-muted-foreground">{openedReport.methodology}</p>{openedReport.metrics.map((metric,index)=><div key={index} className="rounded-lg border border-border p-3 text-sm"><p className="font-semibold">{metric.label}</p><p>Your value: {metric.yourValue??"Unavailable"} · Competitor: {metric.competitorValue??"Unavailable"} {metric.unit}</p><p className="mt-1 text-xs text-muted-foreground">{metric.sourceNote||"Source not recorded"} · {metric.observedAt||"Date not recorded"}</p></div>)}</section>}
           <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-muted-foreground">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             Only enter observations you are permitted to use. Scores are directional planning aids,
