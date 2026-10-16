@@ -16,10 +16,12 @@
 
 # Next UI/UX and intelligence phase
 
-- [ ] Preserve and inspect current Creative Studio, Analytics and Competitive Intelligence foundations.
-- [ ] Complete focused mobile editing and contextual direct-touch manipulation.
-- [ ] Complete visual media, template, layer and saved-design pickers.
-- [ ] Complete evidence-backed growth analytics, historical comparisons and recommendations.
-- [ ] Complete one-input public competitor research, visual reports and landscape comparisons.
-- [ ] Connect supported recommendations to content drafts without automatic publishing.
-- [ ] Verify phone, tablet and desktop workflows and run available quality checks without changing production or live records.
+- [x] Preserve and inspect current Creative Studio, Analytics and Competitive Intelligence foundations.
+- [x] Complete focused mobile editing and contextual direct-touch manipulation; browser touch pinch, twist, undo and viewport zoom checked.
+- [x] Complete visual media, template, layer and saved-design pickers.
+- [x] Add evidence-backed growth analytics and compatible historical comparisons; missing history remains unavailable.
+- [x] Complete one-input public competitor research, cited reports and qualitative landscape comparisons; signed-in research checked.
+- [x] Connect supported research ideas to content drafts without automatic publishing; existing drafts require an explicit append action.
+- [x] Verify phone, tablet and desktop workflows without changing production or live records; 168 unit tests passed.
+- [ ] AI photo analysis and AI analytics: blocked by the required AI package's release-age safeguard; no substitute is presented as AI.
+- [ ] Physical-device gesture feel: requires a real phone/tablet review; browser touch interactions passed.
