@@ -4178,7 +4178,7 @@ function InvoiceForm({
         </div>
       )}
       <div className="space-y-3 sm:hidden"><Field label="Service description"><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className={inputCls} /></Field>
-      <Field label="Manual amount"><input type="number" min="0" step="0.01" value={subtotalAmount} readOnly={items.length > 0} onChange={(event) => setAmount(event.target.value)} className={inputCls} /></Field></div>
+      <Field label="Manual amount"><input aria-label="Manual amount" type="number" min="0" step="0.01" value={subtotalAmount} readOnly={items.length > 0} onChange={(event) => setAmount(event.target.value)} className={inputCls} /></Field></div>
       </MobileWorkflowSection>
       <MobileWorkflowSection active={mobileStep === 2}>
       <div className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-3">
