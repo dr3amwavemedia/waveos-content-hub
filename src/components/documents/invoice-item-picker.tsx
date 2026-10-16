@@ -27,11 +27,7 @@ export function InvoiceItemPicker({
   );
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
-      <p className="text-sm font-medium text-foreground">Add from DOCUMENTS</p>
-      <p className="text-xs text-muted-foreground">
-        Choose an item by title. Its full description and price are copied into this invoice.
-        Item templates currently use USD.
-      </p>
+      <p className="text-sm font-medium text-foreground">Saved Items</p>
       {currency.toUpperCase() !== "USD" && (
         <p className="text-xs text-destructive">
           Change the invoice currency to USD before adding priced items.
