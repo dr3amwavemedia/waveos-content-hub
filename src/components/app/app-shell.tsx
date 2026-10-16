@@ -21,7 +21,6 @@ import {
   Plus,
   Upload,
   Wand2,
-  Megaphone,
   X,
   FileText,
   User,
