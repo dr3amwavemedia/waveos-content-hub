@@ -13,6 +13,8 @@ import {
   Sparkles,
   Target,
   ArrowRight,
+  Globe2,
+  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequireFeature } from "@/components/app/require-feature";
@@ -34,7 +36,7 @@ export const Route = createFileRoute("/_authenticated/competitive-intelligence")
     <RequireFeature
       feature="can_use_competitive_intelligence"
       title="Competitive Intelligence isn't included in this plan"
-      description="Manual competitor tracking is available with Current, Tidal, Full Retainer, and Social Management access."
+      description="Competitor research is available with Current, Tidal, Full Retainer, and Social Management access."
     >
       <CompetitiveIntelligencePage />
     </RequireFeature>
@@ -45,7 +47,7 @@ export const Route = createFileRoute("/_authenticated/competitive-intelligence")
       {
         name: "description",
         content:
-          "Document and compare manually observed competitive signals with transparent scoring.",
+          "Research competitors from a public website or social profile, with optional documented manual comparisons.",
       },
       { name: "robots", content: "noindex" },
     ],
@@ -121,6 +123,8 @@ function CompetitiveIntelligencePage() {
   const [draft, setDraft] = useState<CompetitiveDraft>(DEFAULT_DRAFT);
   const [dirty, setDirty] = useState(false);
   const [screen, setScreen] = useState<"overview" | "editor">("overview");
+  const [researchInput, setResearchInput] = useState("");
+  const [showManual, setShowManual] = useState(false);
   const workflowDraft = useWorkflowDraft<CompetitiveDraft>({
     workspaceId,
     workflowKey: "competitive-intelligence",
@@ -308,10 +312,9 @@ function CompetitiveIntelligencePage() {
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <button type="button" onClick={() => setScreen("overview")} className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-intelligence"><ArrowRight className="h-4 w-4 rotate-180" /> Competitive overview</button>
-          <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Competitive Intelligence</h1>
+          <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Research a competitor</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Record observations you collected lawfully, cite where they came from, and compare them
-            with a visible formula. WaveOS does not scrape competitor accounts.
+            Paste their website or public social profile and WaveOS will use it as the starting point for competitive research.
           </p>
         </div>
         <Button
@@ -350,7 +353,42 @@ function CompetitiveIntelligencePage() {
         </div>
       )}
 
-      <div className="grid gap-5 xl:grid-cols-[15rem_minmax(0,1fr)]">
+      <section className="overflow-hidden rounded-2xl border border-intelligence/30 bg-gradient-to-br from-intelligence/15 via-card to-primary/5 p-5 sm:p-7">
+        <div className="flex items-center gap-2 text-sm font-semibold text-intelligence"><Sparkles className="h-4 w-4" /> WaveOS Intelligence</div>
+        <h2 className="mt-3 text-xl font-semibold sm:text-2xl">Find the useful signals without filling out a report</h2>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Start with one public link. Website and social discovery, positioning, services, messaging, content signals, strengths, gaps, and opportunities are the target research outputs.</p>
+        <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+          <label className="relative flex-1">
+            <Globe2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <input
+              className="min-h-14 w-full rounded-xl border border-border bg-background pl-12 pr-4 text-base outline-none focus:border-intelligence focus:ring-2 focus:ring-intelligence/20"
+              inputMode="url"
+              placeholder="Website or social profile"
+              value={researchInput}
+              onChange={(event) => setResearchInput(event.target.value)}
+            />
+          </label>
+          <Button
+            className="min-h-14 rounded-xl px-6"
+            disabled={!researchInput.trim()}
+            onClick={() => {
+              const value = researchInput.trim();
+              const looksLikeWebsite = !value.includes("@") && !/instagram\.com|facebook\.com|tiktok\.com|linkedin\.com|youtube\.com|x\.com/i.test(value);
+              if (looksLikeWebsite) update("websiteUrl", value);
+              else update("observationLinks", value);
+              toast.message("Competitor link captured", { description: "Automated public-source analysis will be connected in the next implementation step. You can add optional details now." });
+            }}
+          >
+            <Search /> Analyze Competitor
+          </Button>
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">One input is enough to start. If WaveOS cannot confidently determine something, it should show “Not found” instead of blocking the analysis.</p>
+        <button type="button" onClick={() => setShowManual((value) => !value)} className="mt-4 min-h-10 text-sm font-semibold text-intelligence">
+          {showManual ? "Hide manual details" : "Add details manually"}
+        </button>
+      </section>
+
+      <div className={cn(showManual ? "grid" : "hidden", "gap-5 xl:grid-cols-[15rem_minmax(0,1fr)]")}>
         <aside className="surface-card p-4">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-semibold">Competitors</h2>
@@ -539,6 +577,17 @@ function CompetitiveIntelligencePage() {
           </div>
         </div>
       </div>
+
+      {!showManual && (
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {["Competitor Overview", "Brand & Messaging", "Website & SEO", "Opportunities"].map((label) => (
+            <div key={label} className="rounded-2xl border border-border bg-surface/60 p-4">
+              <div className="flex items-center gap-2 font-semibold"><Sparkles className="h-4 w-4 text-intelligence" /> {label}</div>
+              <p className="mt-2 text-xs text-muted-foreground">Results will populate here after public-source analysis is connected.</p>
+            </div>
+          ))}
+        </section>
+      )}
     </div>
   );
 }
