@@ -68,6 +68,8 @@
 }
 
 :root {
+  --studio-artwork-background: #101418;
+  --studio-artwork-ink: #ffffff;
   --radius: 0.75rem;
 
   /* Backgrounds — deep, near-black navy */
