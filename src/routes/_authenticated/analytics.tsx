@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, TrendingUp } from "lucide-react";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { RequireFeature } from "@/components/app/require-feature";
@@ -71,11 +71,13 @@ function AnalyticsPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-6">
       <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Phase 1</p>
-        <h1 className="mt-1 text-2xl font-semibold text-foreground">Analytics checkup</h1>
+        <div className="flex items-center gap-2 text-emerald-300">
+          <TrendingUp className="h-4 w-4" />
+          <p className="text-xs font-semibold uppercase tracking-[0.18em]">Performance & growth</p>
+        </div>
+        <h1 className="mt-1 text-2xl font-semibold text-foreground sm:text-3xl">Analytics</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Inspect available performance data, missing-source states, and calculation provenance for{" "}
-          {activeWorkspace.name}.
+          See how {activeWorkspace.name} is performing, where attention is growing, and which real provider metrics are available.
         </p>
       </div>
       <AnalyticsCheckup
