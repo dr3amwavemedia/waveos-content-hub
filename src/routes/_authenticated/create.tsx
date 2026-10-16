@@ -150,7 +150,7 @@ function CreatePost() {
       const restored = attachStudioResult(snapshot,search.media);
       handoffApplied.current=search.handoff;
       setTitle(restored.title);setCaption(restored.caption);setPickedMedia(restored.pickedMedia);setSelectedMedia(search.media);setScheduledAt(restored.scheduledAt);
-      setPlatforms(restored.platforms.filter((p): p is SocialPlatform=>ALL_PLATFORMS.includes(p as SocialPlatform)));setActivePlatform(restored.activePlatform as SocialPlatform);setDraftPlatformOptions(restored.platformOptions);
+      setPlatforms(restored.platforms.filter((p): p is SocialPlatform=>ALL_PLATFORMS.includes(p as SocialPlatform)));setActivePlatform(restored.activePlatform as SocialPlatform);setDraftPlatformOptions(restored.platformOptions as Partial<Record<SocialPlatform, { contentType?: "story" }>>);
       toast.success('Design attached to the same post. Review and save when ready.');
     } catch { toast.error('Your original draft is unchanged; the Studio return could not be restored.'); }
   },[search.handoff,search.media,workspaceId,editingId,existing.data?.item?.id]);
@@ -180,7 +180,7 @@ function CreatePost() {
   }, [search.brief, search.briefWorkspace, workspaceId, editingId]);
 
   useEffect(() => {
-    if (!draftStorageKey || savedId) return;
+    if (!draftStorageKey || savedId || (search.handoff && handoffApplied.current === search.handoff)) return;
 
     const storedDraft = window.localStorage.getItem(draftStorageKey);
 
@@ -739,8 +739,8 @@ function CreatePost() {
             </div>
             <MediaPreviewRow workspaceId={workspaceId} picked={pickedMedia} selected={selectedMedia} onSelect={setSelectedMedia} onRemove={id=>setPickedMedia(current=>current.filter(item=>item!==id))}/>
             <div className="mt-3 grid grid-cols-3 gap-2">
-              <Button variant="outline" disabled={locked||!pickedMedia.length} onClick={()=>openStudio(true)}><PenSquare/>Edit</Button>
-              <Button variant="outline" disabled={locked} onClick={()=>openStudio(false)}><Sparkles/>Design</Button>
+              <Button variant="outline" disabled={locked||!pickedMedia.length||!can("can_use_creative_studio")} onClick={()=>openStudio(true)}><PenSquare/>Edit</Button>
+              <Button variant="outline" disabled={locked||!can("can_use_creative_studio")} onClick={()=>openStudio(false)}><Sparkles/>Design</Button>
               <Button variant="outline" disabled={locked} className="whitespace-normal" onClick={()=>setShowLibrary(true)}><Plus/>Add Media</Button>
             </div>
           </section>

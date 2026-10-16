@@ -24,6 +24,9 @@ import {
   type ContractField,
   type ContractValues,
 } from "@/lib/contract-variables";
+import { Button } from "@/components/ui/button";
+import { invoiceScope, serviceScope } from "@/lib/quick-contract";
+import { CatalogItemPicker } from "./catalog-item-picker";
 import { TemplatePicker, type TemplateRow } from "./template-picker";
 
 type ContractRow = Database["public"]["Tables"]["client_contracts"]["Row"];
@@ -67,34 +70,18 @@ footer{border-top:1px solid #ccc;margin-top:48px;padding-top:14px;font:12px syst
 <div class="body">${escapeHtml(content)}</div><footer>${escapeHtml(businessFooterLine)}</footer></body></html>`;
 }
 
-function invoiceServiceText(invoice: {
-  line_items: unknown;
-  description: string | null;
-  amount_cents: number | null;
-  currency: string;
-}): string {
-  const items = invoiceItemsFromJson(invoice.line_items);
-  if (!items.length)
-    return invoice.description
-      ? `${invoice.description} — ${formatMoney(invoice.amount_cents, invoice.currency)}`
-      : "";
-  return items
-    .map(
-      (item) =>
-        `${item.title ?? item.description}: ${item.description} — ${item.quantity} × ${formatMoney(item.unitCents, invoice.currency)} = ${formatMoney(item.quantity * item.unitCents, invoice.currency)}`,
-    )
-    .join("\n");
-}
+const invoiceServiceText = invoiceScope;
 
 export function ContractBuilder({
   workspaceId,
   clientLabel,
   draft,
-  onDone,
+  onDone, quick = false,
 }: {
   workspaceId: string;
   clientLabel: string;
   draft?: Draft | null;
+  quick?: boolean;
   onDone: () => void;
 }) {
   const snapshot = (draft?.contract_data ?? {}) as Snapshot;
@@ -114,6 +101,7 @@ export function ContractBuilder({
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateRow | null>(null);
   const [sourceInvoiceId, setSourceInvoiceId] = useState(snapshot.sourceInvoiceId ?? "");
   const [sourceProjectId, setSourceProjectId] = useState(snapshot.sourceProjectId ?? "");
+  const [quickSource,setQuickSource] = useState<"invoice"|"catalog"|"blank">("invoice");
   const contextApplied = useRef(Boolean(draft));
 
   const context = useQuery({
@@ -147,7 +135,7 @@ export function ContractBuilder({
           .limit(1),
         supabase
           .from("client_invoices")
-          .select("id,number,description,amount_cents,currency,line_items,status")
+          .select("id,number,description,amount_cents,currency,line_items,status,due_at,discount_type,discount_value,checkout_payment_cents,checkout_payment_type,payment_plan")
           .eq("workspace_id", workspaceId)
           .order("issued_at", { ascending: false })
           .order("created_at", { ascending: false }),
@@ -318,7 +306,9 @@ export function ContractBuilder({
     const invoice = context.data?.invoices.find((row) => row.id === id);
     if (invoice) updateValue("services", invoiceServiceText(invoice));
   };
-  const rendered = renderContract(templateText, { ...values, ...businessContractValues });
+  const linkedInvoice=context.data?.invoices.find(invoice=>invoice.id===sourceInvoiceId);
+  const effectiveValues=linkedInvoice?{...values,services:invoiceServiceText(linkedInvoice)}:values;
+  const rendered = renderContract(templateText, { ...effectiveValues, ...businessContractValues });
   const requiredFields = useMemo(() => contractFieldsForTemplate(templateText), [templateText]);
   const guidancePrompts = contractGuidancePrompts(templateText);
   const canSave =
@@ -335,7 +325,9 @@ export function ContractBuilder({
       if (authError || !auth.user) throw new Error("Your session expired. Please sign in again.");
       const contractData = {
         templateText,
-        values,
+        values: effectiveValues,
+        quickContract: quick,
+        sourceInvoiceSnapshot: linkedInvoice ?? null,
         sourceInvoiceId: sourceInvoiceId || null,
         sourceProjectId: sourceProjectId || null,
       };
@@ -417,7 +409,7 @@ export function ContractBuilder({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold">
-            {draft ? "Edit private contract draft" : "Create contract"}
+            {draft ? "Edit private contract draft" : quick ? "Quick Contract" : "Custom / Full Contract"}
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Assigned to {clientLabel}. Review the filled details before saving. Nothing is sent.
@@ -429,6 +421,7 @@ export function ContractBuilder({
           onPick={chooseTemplate}
         />
       </div>
+      {quick && <div className="space-y-3"><div className="flex flex-wrap gap-2">{([['invoice','Existing Invoice'],['catalog','A-la-carte Services'],['blank','Blank']] as const).map(([key,label])=><Button type="button" key={key} variant={quickSource===key?'secondary':'outline'} onClick={()=>{setQuickSource(key);if(key!=='invoice'){setSourceInvoiceId('');updateValue('services','');}}}>{label}</Button>)}</div>{quickSource==='catalog'&&<CatalogItemPicker currency="USD" onAdd={item=>{setSourceInvoiceId('');updateValue('services',[values.services,serviceScope([item],'USD')].filter(Boolean).join('\n\n'));}}/>}<p className="text-xs text-muted-foreground">Choose an approved agreement template. Production legal terms should be reviewed by qualified counsel.</p></div>}
       {context.isLoading && (
         <p className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading this client's details…
@@ -513,7 +506,7 @@ export function ContractBuilder({
           </div>
           {context.data?.invoices.length ? (
             <label className="block text-xs font-medium">
-              Copy purchased items from invoice
+              Invoice · Services & Deliverables
               <select
                 value={sourceInvoiceId}
                 onChange={(event) => chooseInvoice(event.target.value)}
@@ -533,7 +526,8 @@ export function ContractBuilder({
             <label className="block text-xs font-medium">
               Services / purchased items
               <textarea
-                value={values.services ?? ""}
+                value={effectiveValues.services ?? ""}
+                readOnly={Boolean(linkedInvoice)}
                 onChange={(event) => updateValue("services", event.target.value)}
                 placeholder="Paste the agreed items or copy them from an invoice above"
                 className="mt-1 min-h-36 w-full rounded-lg border border-border bg-background p-3 text-sm outline-none focus:border-primary"
