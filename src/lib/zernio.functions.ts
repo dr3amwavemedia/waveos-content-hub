@@ -76,6 +76,20 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
       fromDate: requestedRangeStart,
       toDate: requestedRangeEnd,
     });
+
+    // Analytics should reflect the connected social accounts, including posts
+    // published directly on the networks. Ask the provider to refresh its
+    // account/post cache before reading metrics. This is intentionally
+    // best-effort: older provider deployments may not expose the refresh
+    // endpoint, and analytics should still fall back to the latest available
+    // provider snapshot instead of failing the whole screen.
+    try {
+      await zernioRequest<Record<string, unknown>>("/analytics/sync", { method: "POST" });
+    } catch {
+      // Non-fatal. The source reads below retain their existing availability
+      // and provenance handling when a live refresh is unavailable.
+    }
+
     const loadSource = async (key: AnalyticsSourceKey, path: string): Promise<AnalyticsSource> => {
       try {
         const payload = await zernioRequest<Record<string, unknown>>(path);
