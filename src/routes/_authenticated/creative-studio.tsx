@@ -149,22 +149,7 @@ const DEFAULT_DOCUMENT: DesignDocument = {
   version: 1,
   format: "square",
   background: "#0b1220",
-  elements: [
-    {
-      id: "headline",
-      type: "text",
-      name: "Headline",
-      text: "Make a wave.",
-      x: 0.5,
-      y: 0.48,
-      color: "#ffffff",
-      fontSize: 86,
-      fontWeight: 700,
-      align: "center",
-      opacity: 1,
-      rotation: 0,
-    },
-  ],
+  elements: [],
 };
 
 const TEMPLATE_NAMES = [
@@ -221,20 +206,7 @@ function templateDocument(
         opacity: 1,
         rotation: 0,
       },
-      {
-        id: crypto.randomUUID(),
-        type: "text",
-        name: "Details",
-        text: "Add your details here",
-        x: 0.5,
-        y: 0.78,
-        color: "#07111f",
-        fontSize: 42,
-        fontWeight: 600,
-        align: "center",
-        opacity: 1,
-        rotation: 0,
-      },
+
     ],
   };
 }
@@ -280,7 +252,7 @@ function CreativeStudioPage() {
   const [designId, setDesignId] = useState<string | null>(null);
   const [history, setHistory] = useState<DesignDocument[]>([cloneDocument(DEFAULT_DOCUMENT)]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>("headline");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [mobileStarted, setMobileStarted] = useState(false);
@@ -1130,8 +1102,9 @@ function CreativeStudioPage() {
           </section>
         </MobileToolPanel>
 
-        <section className="flex min-h-64 items-center justify-center overflow-hidden sm:surface-card sm:min-h-[30rem] sm:p-6">
+        <section className="relative flex min-h-64 items-center justify-center overflow-hidden sm:surface-card sm:min-h-[30rem] sm:p-6">
           <div className="w-full max-w-3xl">
+            {document.elements.length === 0 && <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center"><div className="rounded-full border border-border/80 bg-background/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">Tap Add, Media, or Templates to start creating</div></div>}
             <canvas
               ref={canvasRef}
               aria-label={`${name} design preview`}

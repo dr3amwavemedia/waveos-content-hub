@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, ReceiptText, Plus, FileText, Clock3 } from "lucide-react";
+import { CheckCircle2, ReceiptText, Plus, FileText, Clock3, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Bar,
@@ -479,8 +479,8 @@ function PaymentsPage() {
         </header>
         <section className="space-y-4 sm:hidden">
           <div className="grid grid-cols-2 gap-3">
-            <Button asChild className="min-h-24 flex-col gap-2 rounded-xl"><Link to="/clients"><Plus />Create Invoice</Link></Button>
-            {[{key:"draft",label:"View Drafts",icon:FileText},{key:"outstanding",label:"Outstanding",icon:Clock3},{key:"paid",label:"Paid",icon:CheckCircle2}].map(({key,label,icon:Icon}) => <Button key={key} variant="outline" aria-pressed={mobileView === key} className={`min-h-24 flex-col gap-2 rounded-xl ${mobileView === key ? "border-primary bg-primary/10 text-primary" : ""}`} onClick={() => setMobileView((current) => current === key ? null : key as "draft" | "outstanding" | "paid")}><Icon />{label}</Button>)}
+            <Button asChild className="min-h-14 flex-row gap-2 rounded-xl"><Link to="/clients"><Plus />Create Invoice</Link></Button>
+            {[{key:"draft",label:"View Drafts",icon:FileText},{key:"outstanding",label:"Outstanding",icon:Clock3},{key:"paid",label:"Paid",icon:CheckCircle2}].map(({key,label,icon:Icon}) => <Button key={key} variant="outline" aria-pressed={mobileView === key} className={`min-h-14 flex-row gap-2 rounded-xl ${mobileView === key ? "border-primary bg-primary/10 text-primary" : ""}`} onClick={() => setMobileView((current) => current === key ? null : key as "draft" | "outstanding" | "paid")}><Icon />{label}</Button>)}
           </div>
           {mobileView && <div className="space-y-2">
             {salesInvoices.filter((invoice) => mobileView === "outstanding" ? OPEN_INVOICE_STATUSES.has(invoice.status) : invoice.status === mobileView).map((invoice) => <Link key={invoice.id} to="/clients" className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-border bg-surface p-3"><span className="min-w-0"><span className="block truncate text-sm font-semibold">{invoice.number || "Invoice"}</span><span className="block truncate text-xs text-muted-foreground">{invoice.description || invoice.status}</span></span><span className="shrink-0 text-sm text-primary">{invoice.currency} {((invoice.amount_cents ?? 0) / 100).toFixed(2)}</span></Link>)}
@@ -512,10 +512,10 @@ function PaymentsPage() {
               ))}
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-px bg-border/70 lg:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-px bg-border/70 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
             {[
-              ["Net sales", money(netSales), "Issued invoices less refunds", "text-sky-400"],
               ["Cash collected", money(collected), "Posted payments", "text-emerald-400"],
+              ["Outstanding", money(expectedIncoming), "Open invoice balance", "text-warning"],
               ["Refunds", money(refunded), "Money returned", "text-rose-400"],
               [
                 "Net cash + expected",
@@ -523,12 +523,7 @@ function PaymentsPage() {
                 `Includes ${money(expectedIncoming)} still expected`,
                 "text-violet-300",
               ],
-              [
-                "Bloom imported",
-                money(bloomImported),
-                "Completed Bloom payments",
-                "text-violet-400",
-              ],
+              ["Net sales", money(netSales), "Issued invoices less refunds", "text-sky-400"],
             ].map(([label, value, detail, color]) => (
               <div key={label} className="min-w-0 bg-card/95 p-4 sm:p-5">
                 <p className="text-sm text-muted-foreground">{label}</p>
@@ -560,10 +555,10 @@ function PaymentsPage() {
             </div>
             {chartData.length ? (
               <div
-                className="w-full min-w-0 max-w-full overflow-x-auto pb-2"
+                className="w-full min-w-0 max-w-full overflow-hidden pb-2"
                 aria-label="Cash collected, refunds, and expected incoming chart"
               >
-                <div className="h-72 min-w-[42rem] sm:h-80 sm:min-w-0">
+                <div className="h-56 w-full min-w-0 sm:h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={chartData} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
                       <CartesianGrid
@@ -582,7 +577,7 @@ function PaymentsPage() {
                         axisLine={false}
                         tickLine={false}
                         fontSize={12}
-                        width={64}
+                        width={44}
                         tickFormatter={(value: number) => compactMoney(value)}
                       />
                       <Tooltip
@@ -594,7 +589,7 @@ function PaymentsPage() {
                           borderRadius: 12,
                         }}
                       />
-                      <Legend iconType="circle" />
+                      <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
                       <Bar
                         dataKey="collected"
                         name="Collected"
@@ -617,12 +612,7 @@ function PaymentsPage() {
                 No posted payments in this period.
               </p>
             )}
-            <p className="mt-4 text-xs text-muted-foreground">
-              Net sales includes issued WaveOS invoices, including unpaid and partially paid
-              invoices, less refunds. Net cash + expected combines posted payments with the
-              remaining balance on sent, unpaid, deposit and overdue invoices, then subtracts
-              refunds. Draft and void invoices are excluded.
-            </p>
+            <details className="mt-3 rounded-xl border border-border/70 bg-background/40 p-3 text-xs text-muted-foreground"><summary className="flex cursor-pointer items-center gap-2 font-medium text-foreground"><Info className="h-3.5 w-3.5" /> How these totals are calculated</summary><p className="mt-2">Net sales includes issued WaveOS invoices, including unpaid and partially paid invoices, less refunds. Net cash + expected combines posted payments with the remaining balance on sent, unpaid, deposit and overdue invoices, then subtracts refunds. Draft and void invoices are excluded. Bloom imports are included in posted payments when applicable.</p></details>
           </div>
         </section>
         <section className="overflow-hidden rounded-2xl border border-border bg-card sm:rounded-3xl">
@@ -630,10 +620,7 @@ function PaymentsPage() {
             <div>
               <p className="text-sm font-medium text-emerald-400">Latest activity</p>
               <h2 className="mt-1 text-xl font-semibold">Recent invoice payments</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Every recorded transaction — card payments, automatic charges, deposits,
-                installments, imports and refunds — appears here automatically.
-              </p>
+              <p className="mt-1 hidden text-sm text-muted-foreground sm:block">Every recorded transaction appears here automatically.</p>
             </div>
             <div className="inline-flex w-fit items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-sm font-medium text-emerald-400">
               <CheckCircle2 className="h-4 w-4" /> {recentTransactions.length} recent

@@ -8,9 +8,11 @@ import {
   Loader2,
   Plus,
   Save,
-  Scale,
   ShieldAlert,
   Trash2,
+  Sparkles,
+  Target,
+  ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequireFeature } from "@/components/app/require-feature";
@@ -118,6 +120,7 @@ function CompetitiveIntelligencePage() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<CompetitiveDraft>(DEFAULT_DRAFT);
   const [dirty, setDirty] = useState(false);
+  const [screen, setScreen] = useState<"overview" | "editor">("overview");
   const workflowDraft = useWorkflowDraft<CompetitiveDraft>({
     workspaceId,
     workflowKey: "competitive-intelligence",
@@ -271,14 +274,40 @@ function CompetitiveIntelligencePage() {
 
   if (!activeWorkspace) return null;
 
+  if (screen === "overview") {
+    const tracked = competitors.data ?? [];
+    return (
+      <div className="space-y-5 pb-10">
+        <header className="flex items-start justify-between gap-4">
+          <div><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-intelligence"><Sparkles className="h-4 w-4" /> WaveOS Intelligence</div><h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Competitive Intelligence</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Track competitors, compare documented signals, and turn your research into clearer content opportunities.</p></div>
+          <Button className="hidden sm:inline-flex" onClick={() => setScreen("editor")}><Plus /> Add observation</Button>
+        </header>
+        <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-background/60 p-1 text-xs sm:w-fit">
+          <button className="min-h-10 rounded-lg bg-intelligence/15 px-3 font-semibold text-intelligence">Overview</button><button className="min-h-10 rounded-lg px-3 text-muted-foreground" onClick={() => document.getElementById("tracked-competitors")?.scrollIntoView({behavior:"smooth"})}>Competitors</button><button className="min-h-10 rounded-lg px-3 text-muted-foreground" onClick={() => document.getElementById("opportunities")?.scrollIntoView({behavior:"smooth"})}>Opportunities</button>
+        </div>
+        <section className="rounded-2xl border border-intelligence/30 bg-gradient-to-br from-intelligence/20 via-card to-primary/5 p-5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-intelligence"><Sparkles className="h-4 w-4" /> WaveOS Intelligence</div>
+          <h2 className="mt-3 text-xl font-semibold">{tracked.length ? "Your competitive workspace is ready" : "Start building your competitive picture"}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">{tracked.length ? `${tracked.length} competitor${tracked.length === 1 ? "" : "s"} tracked. Add documented comparisons to surface evidence-backed gaps and opportunities.` : "Add a competitor and record public observations. WaveOS will organize the evidence without scraping accounts or inventing metrics."}</p>
+          <Button variant="outline" className="mt-4 border-intelligence/30" onClick={() => setScreen("editor")}>{tracked.length ? "Add observation" : "Add first competitor"} <ArrowRight /></Button>
+        </section>
+        <section className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4"><div className="text-3xl font-bold text-primary">{tracked.length}</div><div className="mt-1 text-xs text-muted-foreground">Competitors tracked</div></div>
+          <div className="rounded-2xl border border-intelligence/20 bg-intelligence/10 p-4"><div className="text-3xl font-bold text-intelligence">{tracked.filter((c) => c.notes || c.website_url).length}</div><div className="mt-1 text-xs text-muted-foreground">With documented context</div></div>
+        </section>
+        <section id="tracked-competitors" className="surface-card p-4 sm:p-5"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Tracked competitors</p><h2 className="mt-1 text-lg font-semibold">Competitors</h2></div><Button size="sm" variant="outline" onClick={() => setScreen("editor")}><Plus /> Add</Button></div><div className="mt-4 grid gap-3 sm:grid-cols-2">{tracked.map((competitor) => <button key={competitor.id} type="button" onClick={() => {selectCompetitor(competitor.id);setScreen("editor");}} className="rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary/40"><div className="font-semibold">{competitor.name}</div><div className="mt-1 truncate text-xs text-muted-foreground">{competitor.website_url || "No website added"}</div><div className="mt-3 text-xs text-primary">Open research →</div></button>)}{!competitors.isLoading && !tracked.length && <div className="col-span-full rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No competitors yet. Add your first public observation to begin.</div>}</div></section>
+        <section id="opportunities" className="surface-card p-5"><div className="flex items-center gap-2 font-semibold"><Target className="h-4 w-4 text-campaign" /> Opportunities</div><p className="mt-2 text-sm text-muted-foreground">{tracked.length ? "WaveOS only surfaces opportunities from comparisons you document. Open a competitor to add metrics and source notes." : "Opportunities will appear after you document comparable competitor signals."}</p><Button variant="ghost" className="mt-2 px-0 text-intelligence" onClick={() => setScreen("editor")}>Document a comparison <ArrowRight /></Button></section>
+        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-xs text-muted-foreground">Competitive Intelligence uses only observations you enter and sources you cite. WaveOS does not scrape competitor accounts or fabricate performance data.</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <UnsavedChangesGuard dirty={dirty} subject="this comparison" />
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-            <Scale className="h-4 w-4" /> Manual intelligence
-          </div>
+          <button type="button" onClick={() => setScreen("overview")} className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-intelligence"><ArrowRight className="h-4 w-4 rotate-180" /> Competitive overview</button>
           <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Competitive Intelligence</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
             Record observations you collected lawfully, cite where they came from, and compare them
