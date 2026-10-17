@@ -51,6 +51,7 @@ import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authe
 import { Route as AuthenticatedStaffEmailRouteImport } from './routes/_authenticated/staff-email'
 import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authenticated/templates'
 import { Route as AuthenticatedToolsRouteImport } from './routes/_authenticated/tools'
+import { Route as AuthenticatedTrendingNowRouteImport } from './routes/_authenticated/trending-now'
 import { Route as AuthenticatedUpdatesRouteImport } from './routes/_authenticated/updates'
 import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
 import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
@@ -298,6 +299,12 @@ const AuthenticatedToolsRoute = AuthenticatedToolsRouteImport.update({
   path: '/tools',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTrendingNowRoute =
+  AuthenticatedTrendingNowRouteImport.update({
+    id: '/trending-now',
+    path: '/trending-now',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedUpdatesRoute = AuthenticatedUpdatesRouteImport.update({
   id: '/updates',
   path: '/updates',
@@ -509,6 +516,7 @@ export interface FileRoutesByFullPath {
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/templates': typeof AuthenticatedTemplatesRoute
   '/tools': typeof AuthenticatedToolsRoute
+  '/trending-now': typeof AuthenticatedTrendingNowRoute
   '/updates': typeof AuthenticatedUpdatesRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
@@ -583,6 +591,7 @@ export interface FileRoutesByTo {
   '/staff-email': typeof AuthenticatedStaffEmailRoute
   '/templates': typeof AuthenticatedTemplatesRoute
   '/tools': typeof AuthenticatedToolsRoute
+  '/trending-now': typeof AuthenticatedTrendingNowRoute
   '/updates': typeof AuthenticatedUpdatesRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
@@ -659,6 +668,7 @@ export interface FileRoutesById {
   '/_authenticated/staff-email': typeof AuthenticatedStaffEmailRoute
   '/_authenticated/templates': typeof AuthenticatedTemplatesRoute
   '/_authenticated/tools': typeof AuthenticatedToolsRoute
+  '/_authenticated/trending-now': typeof AuthenticatedTrendingNowRoute
   '/_authenticated/updates': typeof AuthenticatedUpdatesRoute
   '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
   '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
@@ -735,6 +745,7 @@ export interface FileRouteTypes {
     | '/staff-email'
     | '/templates'
     | '/tools'
+    | '/trending-now'
     | '/updates'
     | '/videographer'
     | '/vision-board'
@@ -809,6 +820,7 @@ export interface FileRouteTypes {
     | '/staff-email'
     | '/templates'
     | '/tools'
+    | '/trending-now'
     | '/updates'
     | '/videographer'
     | '/vision-board'
@@ -884,6 +896,7 @@ export interface FileRouteTypes {
     | '/_authenticated/staff-email'
     | '/_authenticated/templates'
     | '/_authenticated/tools'
+    | '/_authenticated/trending-now'
     | '/_authenticated/updates'
     | '/_authenticated/videographer'
     | '/_authenticated/vision-board'
@@ -1248,6 +1261,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedToolsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/trending-now': {
+      id: '/_authenticated/trending-now'
+      path: '/trending-now'
+      fullPath: '/trending-now'
+      preLoaderRoute: typeof AuthenticatedTrendingNowRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/updates': {
       id: '/_authenticated/updates'
       path: '/updates'
@@ -1514,6 +1534,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedStaffEmailRoute: typeof AuthenticatedStaffEmailRoute
   AuthenticatedTemplatesRoute: typeof AuthenticatedTemplatesRoute
   AuthenticatedToolsRoute: typeof AuthenticatedToolsRoute
+  AuthenticatedTrendingNowRoute: typeof AuthenticatedTrendingNowRoute
   AuthenticatedUpdatesRoute: typeof AuthenticatedUpdatesRoute
   AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
   AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRouteWithChildren
@@ -1554,6 +1575,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedStaffEmailRoute: AuthenticatedStaffEmailRoute,
   AuthenticatedTemplatesRoute: AuthenticatedTemplatesRoute,
   AuthenticatedToolsRoute: AuthenticatedToolsRoute,
+  AuthenticatedTrendingNowRoute: AuthenticatedTrendingNowRoute,
   AuthenticatedUpdatesRoute: AuthenticatedUpdatesRoute,
   AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
   AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRouteWithChildren,
