@@ -1,5 +1,9 @@
 # Approved mobile refinement
 
+# SaaS Dashboard
+- [x] Add owner-authorized read-only OS SaaS metrics and navigation without billing/data changes; exact files and sources documented in docs/saas-dashboard.md.
+- [x] Verify real owner data/all tabs, role-denial unit tests, mobile/desktop layout, 205 passing tests and preview build OK; no billing/data writes.
+
 # October 17 subscription preservation and missing foundations
 - [x] Keep live subscriptions enabled and verify subscription-only gating without changing Stripe behavior; six focused tests pass.
 - [x] Add eleven required missing feature tables and new-table policies; existing billing, client records and memberships unchanged.
