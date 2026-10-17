@@ -35,6 +35,7 @@ import {
   Megaphone,
   Palette,
   Radar,
+  Flame,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clearAuthenticatedBrowserState } from "@/lib/auth-session-state";
@@ -73,6 +74,7 @@ interface NavItem {
 }
 
 const CLIENT_NAV: NavItem[] = [
+  { to: "/trending-now", label: "Trending Now", icon: Flame, feature: "can_use_competitive_intelligence" },
   { to: "/home", label: "Overview", icon: Home },
   { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
@@ -115,6 +117,7 @@ const CLIENT_NAV: NavItem[] = [
 ];
 
 const PUBLIC_OS_NAV: NavItem[] = [
+  { to: "/trending-now", label: "Trending Now", icon: Flame, feature: "can_use_competitive_intelligence" },
   { to: "/home", label: "Overview", icon: Home },
   { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
   { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
@@ -677,7 +680,7 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
 // Routes and permissions stay unchanged; this only controls mobile organization.
 const MOBILE_PERSONAL_PATHS = new Set([
   "/home", "/create", "/social", "/creative-studio", "/campaigns", "/analytics",
-  "/competitive-intelligence", "/brand-voice", "/content", "/calendar", "/approvals", "/deliveries",
+  "/competitive-intelligence", "/trending-now", "/brand-voice", "/content", "/calendar", "/approvals", "/deliveries",
 ]);
 const MOBILE_BUSINESS_PATHS = new Set([
   "/clients", "/projects", "/crm", "/payments", "/templates", "/catalog",
