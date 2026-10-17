@@ -1,10 +1,13 @@
 # Approved mobile refinement
 
 # October 16 redesign handoff
-- [ ] Simplify media-first Create Post and clear mobile header/navigation.
-- [ ] Add video-first social discovery, natural-language search, filters, evidence and brand handoff.
-- [ ] Add non-destructive Apply Brand choices and logo-safe rendering with one-step undo.
-- [ ] Verify signed-in mobile/desktop flows and focused tests without live saves or publishing.
+- [x] Simplify media-first Create Post and clear mobile header/navigation; signed-in photo preview and local-draft return checked.
+- [x] Add video-first discovery, natural-language search, compact filters, supporting evidence and explicit original-concept handoff without database changes.
+- [x] Add non-destructive Apply Brand choices and proportional logo rendering with one-step undo; signed-in mobile choice/undo checked.
+- [x] Verify signed-in mobile/desktop layouts and 192 passing unit tests without live saves or publishing; preview build OK.
+- [ ] Verify live video playback and evidence-to-post flow: research returned no dated original videos for the tested cinematic real-estate query; no samples substituted.
+- [ ] Verify exported artwork returning to the originating post: export attachment uses existing media upload and requires an approved live-record write; no upload performed during verification.
+- [ ] Deeper AI synthesis: current implementation provides sourced search plus original reviewable concept outlines; model-generated brand-specific hook/caption synthesis remains unfinished.
 
 - [x] Preserve existing synced navigation; no branch switching or main-sync claim.
 - [x] Polish role-aware Home and Social Media mobile screens.

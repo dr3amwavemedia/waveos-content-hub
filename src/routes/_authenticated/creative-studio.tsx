@@ -486,7 +486,6 @@ function CreativeStudioPage() {
         folderId: null,
         tags: ["creative-studio"],
       });
-      if(postSearch.post && postSearch.workspace===workspaceId){returnToPost(asset.id);return;}
       const url = await getMediaPreviewUrl(asset, 60 * 60 * 6);
       if (!url) throw new Error("The uploaded image does not have a preview URL.");
       setAssetUrls((current) => ({ ...current, [asset.id]: url }));
@@ -600,6 +599,7 @@ function CreativeStudioPage() {
         folderId: null,
         tags: ["creative-studio", "export"],
       });
+      if(postSearch.post && postSearch.workspace===workspaceId){returnToPost(asset.id);return;}
       toast.success(
         destination === "story"
           ? "Design saved. Opening an Instagram Story draft…"
