@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pickOneTimeUpdate } from "../../src/lib/product-release-audience.ts";
+import { readFileSync } from "node:fs";
+import ts from "typescript";
+const mod = {};
+new Function("exports", ts.transpileModule(readFileSync("src/lib/product-release-audience.ts", "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(mod);
+const { pickOneTimeUpdate } = mod;
 
 const r = (id, state = null) => ({ id, state });
 const seen = { viewed_at: "2026-10-17", dismissed_at: null, acknowledged_at: null };
