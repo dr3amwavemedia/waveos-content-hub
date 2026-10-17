@@ -65,3 +65,7 @@
 - [x] Run tests and preview checks; 180 unit tests passed; no migrations or publishing.
 - [ ] Durable sync diagnostics, historical snapshots and saved trends: database approval required; requirements in docs/phase2/pack-v3-schema-approval.md.
 - [ ] External workspace photo editing: current selected external content fails to load; source reconnection/access remedy required. Loadable sample replacement and failure preservation verified.
+
+# One-time New Update
+- [x] Show each published release once per user for WaveOS SaaS (os_data) workspaces; stored per user/release in the database, closing records dismissal.
+- [ ] Publish the first release entry — waits on owner approval (no release rows exist yet).

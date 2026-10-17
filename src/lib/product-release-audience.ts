@@ -60,3 +60,22 @@ export function safeReleaseLink(value: string | null) {
     return null;
   }
 }
+
+export interface ReleaseSeenState {
+  viewed_at: string | null;
+  dismissed_at: string | null;
+  acknowledged_at: string | null;
+}
+
+/**
+ * One-time "New Update" popup: only WaveOS SaaS (os_data) workspaces, and only a
+ * release this user has no stored state for. Any stored row (viewed, dismissed or
+ * acknowledged) permanently suppresses auto-show for that user + release.
+ */
+export function pickOneTimeUpdate<T extends { state: ReleaseSeenState | null }>(
+  releases: T[],
+  dataSource: string | null | undefined,
+): T | null {
+  if (dataSource !== "os_data") return null;
+  return releases.find((release) => !release.state) ?? null;
+}
