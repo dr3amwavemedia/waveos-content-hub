@@ -1,8 +1,8 @@
 # Approved mobile refinement
 
 # SaaS Dashboard
-- [ ] Add owner-authorized read-only OS SaaS metrics and navigation without billing/data changes.
-- [ ] Verify real data, denied access, mobile/desktop layout and focused tests.
+- [x] Add owner-authorized read-only OS SaaS metrics and navigation without billing/data changes; exact files and sources documented in docs/saas-dashboard.md.
+- [x] Verify real owner data/all tabs, role-denial unit tests, mobile/desktop layout, 205 passing tests and preview build OK; no billing/data writes.
 
 # October 17 subscription preservation and missing foundations
 - [x] Keep live subscriptions enabled and verify subscription-only gating without changing Stripe behavior; six focused tests pass.
