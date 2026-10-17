@@ -27,7 +27,8 @@
 - [ ] Physical-device gesture feel: requires a real phone/tablet review; browser touch interactions passed.
 # Approved template reference replacement
 
-- [ ] Replace legacy blue-bar templates with native layered reference-inspired designs and real previews.
-- [ ] Preserve editor/export/history; add format variants and available workspace brand application.
-- [ ] Verify signed-in mobile Templates, layer editing, undo and export without saving live records.
-- [ ] Run focused tests; report missing brand-font storage separately, without migrations.
+- [x] Replace legacy blue-bar templates with native layered reference-inspired designs and real previews.
+- [x] Preserve editor/export/history; add format variants and available workspace brand application.
+- [x] Verify signed-in mobile Templates, layer editing, undo and export without saving live records.
+- [x] Run focused tests; 7 focused and 171 total passed with command-scoped live-subscription flag false; harness build OK. No migrations.
+- [ ] Saved brand-font and secondary-logo application: current Brand Profile exposes neither; requires separately approved storage/field support. Existing accent/logo application and font-preservation behavior are implemented.
