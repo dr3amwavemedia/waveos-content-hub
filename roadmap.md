@@ -35,6 +35,10 @@
 
 # Graphics and Feature Pack v3
 
+# Competitive citation repair
+- [ ] Normalize public source URLs before report validation, preserve consulted-source matching and hide technical errors.
+- [ ] Test malformed/mixed citations and verify signed-in one-input mobile research without database writes.
+
 - [x] Add direct template background/media-slot replacement preserving composition and crop; mobile sample replacement passed; unavailable external images leave artwork unchanged.
 - [x] Expand Brand Assist using available real workspace fields; unsupported saved fonts and secondary logos remain approval-blocked.
 - [x] Recreate real-estate reference designs as native editable format-aware templates; mobile finished thumbnails verified.
