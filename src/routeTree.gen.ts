@@ -45,6 +45,7 @@ import { Route as AuthenticatedPaymentReturnRouteImport } from './routes/_authen
 import { Route as AuthenticatedPaymentsRouteImport } from './routes/_authenticated/payments'
 import { Route as AuthenticatedPostsRouteImport } from './routes/_authenticated/posts'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
+import { Route as AuthenticatedSaasDashboardRouteImport } from './routes/_authenticated/saas-dashboard'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedSocialRouteImport } from './routes/_authenticated/social'
 import { Route as AuthenticatedSocialAccountsRouteImport } from './routes/_authenticated/social-accounts'
@@ -268,6 +269,12 @@ const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
   path: '/projects',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSaasDashboardRoute =
+  AuthenticatedSaasDashboardRouteImport.update({
+    id: '/saas-dashboard',
+    path: '/saas-dashboard',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -510,6 +517,7 @@ export interface FileRoutesByFullPath {
   '/payments': typeof AuthenticatedPaymentsRoute
   '/posts': typeof AuthenticatedPostsRoute
   '/projects': typeof AuthenticatedProjectsRoute
+  '/saas-dashboard': typeof AuthenticatedSaasDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social': typeof AuthenticatedSocialRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
@@ -585,6 +593,7 @@ export interface FileRoutesByTo {
   '/payments': typeof AuthenticatedPaymentsRoute
   '/posts': typeof AuthenticatedPostsRoute
   '/projects': typeof AuthenticatedProjectsRoute
+  '/saas-dashboard': typeof AuthenticatedSaasDashboardRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/social': typeof AuthenticatedSocialRoute
   '/social-accounts': typeof AuthenticatedSocialAccountsRoute
@@ -662,6 +671,7 @@ export interface FileRoutesById {
   '/_authenticated/payments': typeof AuthenticatedPaymentsRoute
   '/_authenticated/posts': typeof AuthenticatedPostsRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
+  '/_authenticated/saas-dashboard': typeof AuthenticatedSaasDashboardRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/social': typeof AuthenticatedSocialRoute
   '/_authenticated/social-accounts': typeof AuthenticatedSocialAccountsRoute
@@ -739,6 +749,7 @@ export interface FileRouteTypes {
     | '/payments'
     | '/posts'
     | '/projects'
+    | '/saas-dashboard'
     | '/settings'
     | '/social'
     | '/social-accounts'
@@ -814,6 +825,7 @@ export interface FileRouteTypes {
     | '/payments'
     | '/posts'
     | '/projects'
+    | '/saas-dashboard'
     | '/settings'
     | '/social'
     | '/social-accounts'
@@ -890,6 +902,7 @@ export interface FileRouteTypes {
     | '/_authenticated/payments'
     | '/_authenticated/posts'
     | '/_authenticated/projects'
+    | '/_authenticated/saas-dashboard'
     | '/_authenticated/settings'
     | '/_authenticated/social'
     | '/_authenticated/social-accounts'
@@ -1219,6 +1232,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProjectsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/saas-dashboard': {
+      id: '/_authenticated/saas-dashboard'
+      path: '/saas-dashboard'
+      fullPath: '/saas-dashboard'
+      preLoaderRoute: typeof AuthenticatedSaasDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
       path: '/settings'
@@ -1528,6 +1548,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedPaymentsRoute: typeof AuthenticatedPaymentsRoute
   AuthenticatedPostsRoute: typeof AuthenticatedPostsRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
+  AuthenticatedSaasDashboardRoute: typeof AuthenticatedSaasDashboardRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSocialRoute: typeof AuthenticatedSocialRoute
   AuthenticatedSocialAccountsRoute: typeof AuthenticatedSocialAccountsRoute
@@ -1569,6 +1590,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPaymentsRoute: AuthenticatedPaymentsRoute,
   AuthenticatedPostsRoute: AuthenticatedPostsRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
+  AuthenticatedSaasDashboardRoute: AuthenticatedSaasDashboardRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSocialRoute: AuthenticatedSocialRoute,
   AuthenticatedSocialAccountsRoute: AuthenticatedSocialAccountsRoute,
