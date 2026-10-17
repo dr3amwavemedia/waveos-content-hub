@@ -54,8 +54,10 @@ import { STUDIO_FORMATS as FORMATS, STUDIO_FONTS, applyStudioBrand, type BrandAp
 import { TEMPLATE_LIBRARY, createStudioTemplate } from "@/lib/studio-template-library";
 import { loadStudioImage, renderStudioArtwork, studioImageUrl } from "@/lib/studio-artwork-renderer";
 import { replaceStudioMedia, studioMediaSlots, supportedBrandFont } from "@/lib/studio-media";
+import { studioPostKey,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
 
 export const Route = createFileRoute("/_authenticated/creative-studio")({
+  validateSearch:(s:Record<string,unknown>)=>({post:typeof s.post==='string'?s.post:undefined,workspace:typeof s.workspace==='string'?s.workspace:undefined,media:typeof s.media==='string'?s.media:undefined,photo:s.photo===true}),
   component: () => (
     <RequireFeature
       feature="can_use_creative_studio"
@@ -119,6 +121,8 @@ function normalizeDocument(document: DesignDocument): DesignDocument {
 }
 
 function CreativeStudioPage() {
+  const postSearch=Route.useSearch();
+  const incoming=useRef<string|null>(null);
   const navigate = useNavigate();
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id ?? null;
@@ -421,6 +425,15 @@ function CreativeStudioPage() {
     setMobileStarted(true);
     setMobileTool(null);
   }
+  useEffect(()=>{if(!postSearch.post||postSearch.workspace!==workspaceId||!postSearch.media||incoming.current===postSearch.post||!mediaAssets.data)return;
+    incoming.current=postSearch.post;setPhotoMode(postSearch.photo);void addImage(postSearch.media);
+  },[postSearch.post,postSearch.workspace,postSearch.media,workspaceId,mediaAssets.data]);
+  function returnToPost(assetId?:string){
+    if(!workspaceId||!postSearch.post||postSearch.workspace!==workspaceId)return;
+    try{const snapshot=JSON.parse(sessionStorage.getItem(studioPostKey(workspaceId,postSearch.post))??'null') as StudioPostSnapshot|null;if(!snapshot||snapshot.workspaceId!==workspaceId)return;
+      setDirty(false);void navigate({to:'/create',search:{id:snapshot.id,studio:postSearch.post,media:assetId}});
+    }catch{toast.error('The originating post is unavailable. Your saved posts are unchanged.');}
+  }
 
   function addWorkspaceLogo() {
     if (!branding.data?.logoUrl) {
@@ -473,6 +486,7 @@ function CreativeStudioPage() {
         folderId: null,
         tags: ["creative-studio"],
       });
+      if(postSearch.post && postSearch.workspace===workspaceId){returnToPost(asset.id);return;}
       const url = await getMediaPreviewUrl(asset, 60 * 60 * 6);
       if (!url) throw new Error("The uploaded image does not have a preview URL.");
       setAssetUrls((current) => ({ ...current, [asset.id]: url }));
@@ -738,7 +752,7 @@ function CreativeStudioPage() {
         <h1 className="min-w-0 flex-1 text-sm font-semibold">Creative Studio</h1>
         <Button size="icon" variant="ghost" aria-label="Undo" disabled={historyIndex === 0} onClick={() => {setHistoryIndex(i=>Math.max(0,i-1));setDirty(true);}}><Undo2 /></Button>
         <Button size="icon" variant="ghost" aria-label="Redo" disabled={historyIndex === history.length-1} onClick={() => {setHistoryIndex(i=>Math.min(history.length-1,i+1));setDirty(true);}}><Redo2 /></Button>
-        <Button variant="ghost" onClick={() => { setMobileStarted(false); setMobileTool(null); setCropId(null); }}>Done</Button>
+        <Button variant="ghost" disabled={uploadAsset.isPending} onClick={() => { if(postSearch.post)void sendToPost();else {setMobileStarted(false);setMobileTool(null);setCropId(null);} }}>Done</Button>
       </header>}
       <header className={cn("flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", mobileStarted ? "hidden sm:flex" : "flex")}>
         <div>

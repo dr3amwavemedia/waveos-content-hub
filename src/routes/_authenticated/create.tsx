@@ -118,6 +118,7 @@ function CreatePost() {
   const editingId = search.id ?? savedId ?? null;
   const existing = useContentItem(editingId);
   const socialConnections = useSocialConnections(workspaceId);
+  const composerAssets=useMediaAssets(workspaceId,{});
   const create = useCreateContentItem(workspaceId);
   const update = useUpdateContentItem();
   const updateVariant = useUpdateVariant();
@@ -593,6 +594,15 @@ function CreatePost() {
     toast.success("New post ready. Your previous saved draft is still available under Posts.");
   }
 
+  function openStudio(assetId:string,photo=false){
+    if(!workspaceId)return;
+    const asset=composerAssets.data?.find(item=>item.id===assetId);
+    if(!asset?.mime_type.startsWith('image/')){toast.error('Creative Studio currently supports photos. Video editing is unavailable.');return;}
+    const token=crypto.randomUUID();
+    sessionStorage.setItem(studioPostKey(workspaceId,token),JSON.stringify({workspaceId,id:savedId??undefined,title,caption,platforms,pickedMedia,scheduledAt,platformOptions:draftPlatformOptions}));
+    void navigate({to:'/creative-studio',search:{post:token,workspace:workspaceId,media:assetId,photo}});
+  }
+
   return (
     <div className="space-y-4 pb-24 lg:space-y-6 lg:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -725,7 +735,7 @@ function CreatePost() {
               picked={pickedMedia}
               onRemove={(id) => setPickedMedia((cur) => cur.filter((x) => x !== id))}
             />
-            {pickedMedia.length>0 && <div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0])}><PenSquare/>Edit</Button><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0])}><Sparkles/>Design</Button><Button variant="ghost" disabled={locked} onClick={()=>setShowLibrary(true)}><ImagePlus/>Replace</Button></div>}
+            {pickedMedia.length>0 && <div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0],true)}><PenSquare/>Edit</Button><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0])}><Sparkles/>Design</Button><Button variant="ghost" disabled={locked} onClick={()=>setShowLibrary(true)}><ImagePlus/>Replace</Button></div>}
             <PlatformMediaGuide platforms={platforms} />
           </div>
 
@@ -1255,14 +1265,14 @@ function MediaPreviewRow({
 
   if (!picked.length) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-elevated/30 p-6 text-center text-sm text-muted-foreground">
-        No media selected yet.
+      <div className="flex min-h-52 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-elevated/30 p-6 text-center text-sm text-muted-foreground">
+        <ImagePlus className="size-8"/>Add a photo or video
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {picked.map((id) => {
         const a = map.get(id);
         return <MediaThumb key={id} asset={a} onRemove={() => onRemove(id)} />;
@@ -1279,9 +1289,9 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
   }, [asset?.id]);
   if (!asset) return <div className="aspect-square rounded-lg border border-border bg-elevated" />;
   return (
-    <div className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-elevated">
+    <div className="group relative aspect-[4/3] max-h-96 overflow-hidden rounded-lg border border-border bg-elevated">
       {url && (asset.source_provider === "google_drive" || asset.mime_type.startsWith("image/")) ? (
-        <img src={url} alt={asset.name} className="h-full w-full object-cover" loading="lazy" />
+        <img src={url} alt={asset.name} className="h-full w-full object-contain" loading="lazy" />
       ) : url && asset.mime_type.startsWith("video/") ? (
         <video src={url} className="h-full w-full object-cover" muted />
       ) : (
@@ -1291,7 +1301,7 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
       )}
       <button
         onClick={onRemove}
-        className="absolute right-1 top-1 rounded-full bg-background/80 p-1 text-foreground opacity-0 backdrop-blur transition-opacity group-hover:opacity-100"
+        className="absolute right-2 top-2 rounded-full bg-background/80 p-2 text-foreground backdrop-blur"
         aria-label="Remove"
       >
         <X className="h-3 w-3" />
