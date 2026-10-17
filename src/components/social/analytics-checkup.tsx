@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, BarChart3, CheckCircle2, Database, Loader2, Sparkles, Eye, Heart, Users, MousePointerClick, MessageCircle, TrendingUp, ArrowUpRight } from "lucide-react";
+import { AlertTriangle, BarChart3, CheckCircle2, Database, Loader2, Sparkles, Eye, Heart, Users, MousePointerClick, MessageCircle, TrendingUp, ArrowUpRight, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -92,6 +92,7 @@ export function AnalyticsCheckup({
   const [days, setDays] = useState<7|30|90>(30);
   const [graphMetric, setGraphMetric] = useState("reach");
   const [mode, setMode] = useState<AnalyticsMode>("combined");
+  const [refreshing,setRefreshing]=useState(false);
   const analytics = useQuery({
     queryKey: ["analytics-checkup", workspaceId, days],
     queryFn: () => analyticsFn({ data: { workspaceId, days } }),
@@ -128,6 +129,8 @@ export function AnalyticsCheckup({
     <div className="space-y-6">
       <section className="space-y-5">
         <header className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-analytics">Performance & growth</p><h2 className="mt-1 text-xl font-semibold">Your business at a glance</h2></div><label className="text-xs text-muted-foreground"><span className="sr-only">Performance period</span><select aria-label="Performance period" className="min-h-11 rounded-lg border border-border bg-surface px-3 text-foreground" value={days} onChange={event=>setDays(Number(event.target.value) as 7|30|90)}>{[7,30,90].map(value=><option key={value} value={value}>Last {value} days</option>)}</select></label></header>
+        <div className="flex flex-wrap items-center gap-3"><Button variant="outline" disabled={refreshing||analytics.isFetching} onClick={async()=>{setRefreshing(true);try{await analyticsFn({data:{workspaceId,days,refresh:true}});await analytics.refetch();}finally{setRefreshing(false);}}}>{refreshing?<Loader2 className="animate-spin"/>:<RefreshCw/>}{refreshing?"Refreshing…":"Refresh analytics"}</Button><span className="text-xs text-muted-foreground">Last provider sync: {formatDateTime(analytics.data?.sync.lastSuccessAt)}</span></div>
+        {analytics.data?.sync.state!=="available" && analytics.data?.sync && <p role="status" className="border-l-2 border-warning pl-3 text-sm">{analytics.data.sync.message}</p>}
         <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">{(["combined","organic","paid"] as AnalyticsMode[]).map(value=><Button key={value} variant={mode===value?"secondary":"ghost"} className="min-w-0 flex-1 capitalize" onClick={()=>setMode(value)}>{value}</Button>)}</div>
         <section className="border-y border-border py-5">
           <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">Growth over time</h3><p className="mt-1 text-xs text-muted-foreground">{series.length?`${series[0].range_start} – ${series.at(-1)?.range_end} · ${series.at(-1)?.provider}`:"Awaiting sourced historical observations"}</p></div>{comparison?.change!==null&&comparison?.change!==undefined&&<span className={cn("text-lg font-semibold",comparison.change>=0?"text-success":"text-destructive")}>{comparison.change>=0?"+":""}{comparison.change.toFixed(1)}%</span>}</div>
