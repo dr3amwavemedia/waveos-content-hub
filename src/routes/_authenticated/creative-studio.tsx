@@ -51,7 +51,7 @@ import { Slider } from "@/components/ui/slider";
 import { clamp, containsPoint, cornerHit, snapPosition, ratioCrop, zoomCrop } from "@/lib/studio-geometry";
 import { STUDIO_FORMATS as FORMATS, STUDIO_FONTS, applyStudioBrand, type DesignFormat, type DesignDocument, type DesignElement, type TextElement, type ShapeElement, type ImageElement } from "@/lib/studio-template-model";
 import { TEMPLATE_LIBRARY, createStudioTemplate } from "@/lib/studio-template-library";
-import { renderStudioArtwork, studioImageUrl } from "@/lib/studio-artwork-renderer";
+import { loadStudioImage, renderStudioArtwork, studioImageUrl } from "@/lib/studio-artwork-renderer";
 import { replaceStudioMedia, studioMediaSlots, supportedBrandFont } from "@/lib/studio-media";
 
 export const Route = createFileRoute("/_authenticated/creative-studio")({
@@ -382,8 +382,14 @@ function CreativeStudioPage() {
     setSelectedId(element.id);
   }
 
-  function addImage(assetId: string) {
+  async function addImage(assetId: string) {
     const asset = mediaAssets.data?.find((candidate) => candidate.id === assetId);
+    try {
+      const url=assetUrls[assetId] ?? (asset ? await getMediaPreviewUrl(asset,60*60*6):null);
+      if(!url)throw new Error("Image unavailable");
+      await loadStudioImage(url);
+      setAssetUrls(current=>({...current,[assetId]:url}));
+    }catch{toast.error("This photo cannot be loaded for editing. The existing design is unchanged. Try another image or reconnect its media source.");return;}
     if (replaceId) {
       changeDocument(current => replaceStudioMedia(current, replaceId, {assetId}));
       setSelectedId(replaceId);
@@ -465,7 +471,7 @@ function CreativeStudioPage() {
       const url = await getMediaPreviewUrl(asset, 60 * 60 * 6);
       if (!url) throw new Error("The uploaded image does not have a preview URL.");
       setAssetUrls((current) => ({ ...current, [asset.id]: url }));
-      addImage(asset.id);
+      await addImage(asset.id);
       toast.success("Image uploaded to the Media Library and added to this design.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Image could not be uploaded.");
@@ -928,6 +934,7 @@ function CreativeStudioPage() {
             <div className="mt-2 flex gap-1">{["All","Uploads","Brand","Recent"].map(tab=><Button key={tab} size="sm" variant={mediaTab === tab ? "secondary" : "ghost"} onClick={()=>setMediaTab(tab)}>{tab}</Button>)}</div>
             {mediaTab === "Brand" && branding.data?.logoUrl && <Button variant="outline" className="mt-3 h-20 w-full" onClick={addWorkspaceLogo}><img src={branding.data.logoUrl} alt="Workspace logo" className="max-h-14 max-w-full object-contain" /></Button>}
             <Button variant="outline" className="mt-3 min-h-11 w-full sm:hidden" onClick={() => uploadInputRef.current?.click()}><Upload /> Upload image</Button>
+            {replaceId && <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Sample photography · generated, not business-owned</summary><div className="mt-2 grid grid-cols-3 gap-2">{Array.from(new Set(TEMPLATE_LIBRARY.map(item=>item.photo))).map((url,index)=><Button key={url} variant="outline" className="aspect-square h-auto overflow-hidden p-0" aria-label={`Replace with sample photo ${index+1}`} onClick={()=>{if(replaceId){changeDocument(current=>replaceStudioMedia(current,replaceId,{assetId:null,templateUrl:url}));setSelectedId(replaceId);setReplaceId(null);setMobileTool(null);}}}><img src={url} alt={`Sample photo ${index+1}`} className="h-full w-full object-cover"/></Button>)}</div></details>}
             <div className="mt-3 grid max-h-[55dvh] grid-cols-3 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-2">
               {(mediaAssets.data ?? []).filter(asset => mediaTab === "All" || mediaTab === "Uploads" || (mediaTab === "Recent" && document.elements.some(item => item.type === "image" && item.assetId === asset.id)) || (mediaTab === "Brand" && asset.tags?.includes("brand"))).map((asset) => (
                 <button
