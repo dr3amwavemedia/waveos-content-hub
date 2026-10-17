@@ -125,15 +125,18 @@ function FrameioCard({ file }: { file: FrameioProviderFile }) {
   const isImage = file.mediaType.startsWith("image/");
   const isVideo = file.mediaType.startsWith("video/");
   const KindIcon = isVideo ? Video : isImage ? ImageIcon : File;
+  // Frame.io thumbnail links are signed and can expire; fall back to the icon.
+  const [thumbFailed, setThumbFailed] = useState(false);
   return (
     <article className="surface-card overflow-hidden">
       <div className="relative aspect-square bg-elevated">
-        {isValidHttpsUrl(file.thumbnailUrl) ? (
+        {isValidHttpsUrl(file.thumbnailUrl) && !thumbFailed ? (
           <img
             src={file.thumbnailUrl!}
             alt={file.name}
             className="h-full w-full object-cover"
             loading="lazy"
+            onError={() => setThumbFailed(true)}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted-foreground">
