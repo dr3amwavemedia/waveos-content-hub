@@ -32,3 +32,12 @@
 - [x] Verify signed-in mobile Templates, layer editing, undo and export without saving live records.
 - [x] Run focused tests; 7 focused and 171 total passed with command-scoped live-subscription flag false; harness build OK. No migrations.
 - [ ] Saved brand-font and secondary-logo application: current Brand Profile exposes neither; requires separately approved storage/field support. Existing accent/logo application and font-preservation behavior are implemented.
+
+# Graphics and Feature Pack v3
+
+- [ ] Add direct template background/media-slot replacement preserving composition and crop; verify on mobile.
+- [ ] Expand Brand Assist using available real workspace fields and report unsupported fields.
+- [ ] Recreate real-estate reference designs as native editable format-aware templates.
+- [ ] Add sourced Trending Now discovery, evidence/licensing states and explicit Create Post handoff.
+- [ ] Diagnose provider mapping/analytics contract, expose meaningful sync state and verify real connected workspace.
+- [ ] Run focused tests and preview checks; report exact schema requirements and stop before migrations.
