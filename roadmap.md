@@ -1,5 +1,11 @@
 # Approved mobile refinement
 
+# October 16 redesign handoff
+- [ ] Simplify media-first Create Post and clear mobile header/navigation.
+- [ ] Add video-first social discovery, natural-language search, filters, evidence and brand handoff.
+- [ ] Add non-destructive Apply Brand choices and logo-safe rendering with one-step undo.
+- [ ] Verify signed-in mobile/desktop flows and focused tests without live saves or publishing.
+
 - [x] Preserve existing synced navigation; no branch switching or main-sync claim.
 - [x] Polish role-aware Home and Social Media mobile screens.
 - [x] Make Social Analytics visual with sourced data only.
