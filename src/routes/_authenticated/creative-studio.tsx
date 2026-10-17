@@ -49,6 +49,9 @@ import { cn } from "@/lib/utils";
 import { MobileToolPanel } from "@/components/app/mobile-tool-panel";
 import { Slider } from "@/components/ui/slider";
 import { clamp, containsPoint, cornerHit, snapPosition, ratioCrop, zoomCrop } from "@/lib/studio-geometry";
+import { STUDIO_FORMATS as FORMATS, STUDIO_FONTS, applyStudioBrand, type DesignFormat, type DesignDocument, type DesignElement, type TextElement, type ShapeElement, type ImageElement } from "@/lib/studio-template-model";
+import { TEMPLATE_LIBRARY, createStudioTemplate } from "@/lib/studio-template-library";
+import { renderStudioArtwork, studioImageUrl } from "@/lib/studio-artwork-renderer";
 
 export const Route = createFileRoute("/_authenticated/creative-studio")({
   component: () => (
@@ -61,6 +64,7 @@ export const Route = createFileRoute("/_authenticated/creative-studio")({
     </RequireFeature>
   ),
   head: () => ({
+    links: [{ rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Caveat:wght@400;600;700&family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;600;700&family=Manrope:wght@400;600;700&display=swap" }],
     meta: [
       { title: "Creative Studio — WaveOS" },
       {
@@ -81,73 +85,6 @@ const db = supabase as unknown as {
   from: (table: string) => any;
 };
 
-const FORMATS = {
-  square: { label: "Square", width: 1080, height: 1080 },
-  portrait: { label: "Portrait", width: 1080, height: 1350 },
-  story: { label: "Story", width: 1080, height: 1920 },
-  landscape: { label: "Landscape", width: 1200, height: 628 },
-} as const;
-
-type DesignFormat = keyof typeof FORMATS;
-type TextElement = {
-  id: string;
-  type: "text";
-  name: string;
-  text: string;
-  x: number;
-  y: number;
-  color: string;
-  fontSize: number;
-  fontFamily?: string;
-  fontWeight: 400 | 600 | 700;
-  align: CanvasTextAlign;
-  opacity: number;
-  rotation: number;
-};
-type ShapeElement = {
-  id: string;
-  type: "shape";
-  name: string;
-  shape: "rectangle" | "circle";
-  borderColor?: string;
-  borderWidth?: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  color: string;
-  opacity: number;
-  rotation: number;
-};
-type ImageElement = {
-  id: string;
-  type: "image";
-  name: string;
-  sourceType: "media" | "workspace-logo";
-  assetId: string | null;
-  brightness?: number;
-  contrast?: number;
-  saturation?: number;
-  warmth?: number;
-  highlights?: number;
-  shadows?: number;
-  sharpness?: number;
-  crop?: { x: number; y: number; width: number; height: number };
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  opacity: number;
-  rotation: number;
-};
-type DesignElement = TextElement | ShapeElement | ImageElement;
-type DesignDocument = {
-  version: 1;
-  format: DesignFormat;
-  background: string;
-  elements: DesignElement[];
-};
-
 interface DesignRow {
   id: string;
   name: string;
@@ -162,65 +99,6 @@ const DEFAULT_DOCUMENT: DesignDocument = {
   background: "#0b1220",
   elements: [],
 };
-
-const TEMPLATE_NAMES = [
-  "Sale",
-  "Grand Opening",
-  "New Product",
-  "Testimonial",
-  "Event",
-  "Weekend Special",
-  "Announcement",
-  "Holiday",
-  "Before / After",
-] as const;
-
-function templateDocument(
-  template: (typeof TEMPLATE_NAMES)[number],
-  accent: string,
-): DesignDocument {
-  const headline =
-    template === "Testimonial"
-      ? "“An experience worth sharing.”"
-      : template === "Before / After"
-        ? "Before → After"
-        : template;
-  return {
-    version: 1,
-    format: template === "Event" ? "portrait" : "square",
-    background: "#0b1220",
-    elements: [
-      {
-        id: crypto.randomUUID(),
-        type: "shape",
-        name: "Brand block",
-        shape: "rectangle",
-        x: 0.5,
-        y: 0.78,
-        width: 900,
-        height: 210,
-        color: accent,
-        opacity: 1,
-        rotation: 0,
-      },
-      {
-        id: crypto.randomUUID(),
-        type: "text",
-        name: "Headline",
-        text: headline,
-        x: 0.5,
-        y: 0.43,
-        color: "#ffffff",
-        fontSize: template === "Testimonial" ? 68 : 96,
-        fontWeight: 700,
-        align: "center",
-        opacity: 1,
-        rotation: 0,
-      },
-
-    ],
-  };
-}
 
 function cloneDocument(document: DesignDocument): DesignDocument {
   return JSON.parse(JSON.stringify(document)) as DesignDocument;
@@ -238,22 +116,15 @@ function normalizeDocument(document: DesignDocument): DesignDocument {
   };
 }
 
-function loadCanvasImage(url: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("image_load_failed"));
-    image.src = url;
-  });
-}
-
 function CreativeStudioPage() {
   const navigate = useNavigate();
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id ?? null;
   const branding = useWorkspaceBranding(activeWorkspace?.id);
   const palette = workspacePalette(branding.data?.accentColor);
+  const [templateFormat, setTemplateFormat] = useState<DesignFormat>("story");
+  const brandProfile = useQuery({ queryKey: ["studio-brand-profile", workspaceId], enabled: Boolean(workspaceId), queryFn: async () => { if (!workspaceId) return null; const {data,error} = await supabase.from("brand_profiles").select("*").eq("workspace_id", workspaceId).maybeSingle(); if(error) throw error; return data; } });
+  const templates = useMemo(() => TEMPLATE_LIBRARY.map(template => ({...template,document:createStudioTemplate(template,templateFormat)})), [templateFormat]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const transactionRef = useRef<DesignDocument | null>(null);
@@ -428,99 +299,13 @@ function CreativeStudioPage() {
     if (!canvas) return;
     setRenderReady(false);
     const artwork = window.document.createElement("canvas");
-    artwork.width = format.width;
-    artwork.height = format.height;
-    const context = artwork.getContext("2d");
-    if (!context) return;
-
-    async function paint(canvas: HTMLCanvasElement, context: CanvasRenderingContext2D) {
-      let missingImage = false;
-      context.clearRect(0, 0, canvas.width, canvas.height);
-      context.fillStyle = document.background;
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      for (const element of document.elements) {
-        if (cancelled) return;
-        context.save();
-        const x = element.x * canvas.width;
-        const y = element.y * canvas.height;
-        context.translate(x, y);
-        context.rotate(((element.rotation ?? 0) * Math.PI) / 180);
-        if (element.type === "shape") {
-          context.globalAlpha = element.opacity;
-          context.fillStyle = element.color;
-          if (element.shape === "circle") {
-            context.beginPath();
-            context.ellipse(0, 0, element.width / 2, element.height / 2, 0, 0, Math.PI * 2);
-            context.fill();
-          } else {
-            context.fillRect(
-              -element.width / 2,
-              -element.height / 2,
-              element.width,
-              element.height,
-            );
-          }
-          if ((element.borderWidth ?? 0) > 0) {
-            context.strokeStyle = element.borderColor ?? element.color;
-            context.lineWidth = element.borderWidth ?? 0;
-            if (element.shape === "circle") {context.beginPath();context.ellipse(0,0,element.width/2,element.height/2,0,0,Math.PI*2);context.stroke();}
-            else context.strokeRect(-element.width/2,-element.height/2,element.width,element.height);
-          }
-        } else if (element.type === "image") {
-          const url =
-            element.sourceType === "workspace-logo"
-              ? branding.data?.logoUrl
-              : element.assetId
-                ? assetUrls[element.assetId]
-                : null;
-          if (url) {
-            try {
-              const image = await loadCanvasImage(url);
-              if (cancelled) return;
-              context.globalAlpha = element.opacity;
-              context.filter = `brightness(${element.brightness ?? 100}%) contrast(${element.contrast ?? 100}%) saturate(${element.saturation ?? 100}%)`;
-              const crop = element.crop ?? { x: 0, y: 0, width: 1, height: 1 };
-              context.drawImage(
-                image,
-                image.naturalWidth * crop.x,
-                image.naturalHeight * crop.y,
-                image.naturalWidth * crop.width,
-                image.naturalHeight * crop.height,
-                -element.width / 2,
-                -element.height / 2,
-                element.width,
-                element.height,
-              );
-            } catch {
-              missingImage = true;
-            }
-          } else {
-            missingImage = true;
-          }
-        } else {
-          context.globalAlpha = element.opacity ?? 1;
-          context.fillStyle = element.color;
-          context.font = `${element.fontWeight} ${element.fontSize}px ${element.fontFamily ?? "Inter"}, Arial, sans-serif`;
-          context.textAlign = element.align;
-          context.textBaseline = "middle";
-          const maxWidth = canvas.width * 0.88;
-          const lines = element.text.split("\n").slice(0, 8);
-          const lineHeight = element.fontSize * 1.18;
-          const startY = -((lines.length - 1) * lineHeight) / 2;
-          lines.forEach((line, index) => {
-            context.fillText(line, 0, startY + index * lineHeight, maxWidth);
-          });
-        }
-        context.restore();
-      }
+    void renderStudioArtwork(artwork, document, assetUrls, branding.data?.logoUrl).then(ready => {
       if (cancelled) return;
-      const displayed = canvasRef.current;
-      if (!displayed) return;
-      displayed.width = canvas.width; displayed.height = canvas.height;
-      displayed.getContext("2d")?.drawImage(canvas, 0, 0);
-      setRenderReady(!missingImage);
-    }
-    void paint(artwork, context);
+      const displayed=canvasRef.current;if(!displayed)return;
+      displayed.width=artwork.width;displayed.height=artwork.height;
+      displayed.getContext("2d")?.drawImage(artwork,0,0);
+      setRenderReady(ready);
+    });
     return () => {
       cancelled = true;
     };
@@ -597,7 +382,7 @@ function CreativeStudioPage() {
   function addImage(assetId: string) {
     const asset = mediaAssets.data?.find((candidate) => candidate.id === assetId);
     if (replaceId) {
-      updateElement(replaceId, { assetId, sourceType: "media", name: asset?.name ?? "Media image", crop: undefined });
+      updateElement(replaceId, { assetId, sourceType: "media", name: asset?.name ?? "Media image", templateUrl: undefined, crop: undefined });
       setReplaceId(null); setMobileTool(null); return;
     }
     const sourceWidth = asset?.width ?? 800;
@@ -647,35 +432,15 @@ function CreativeStudioPage() {
   }
 
   function applyBrand() {
-    changeDocument((current) => {
-      const hasLogo = current.elements.some(
-        (element) => element.type === "image" && element.sourceType === "workspace-logo",
-      );
-      const elements = current.elements.map((element) =>
-        element.type === "shape"
-          ? { ...element, color: palette.primary }
-          : element.type === "text"
-            ? { ...element, color: "#ffffff" }
-            : element,
-      ) as DesignElement[];
-      if (!hasLogo && branding.data?.logoUrl) {
-        elements.push({
-          id: crypto.randomUUID(),
-          type: "image",
-          name: "Workspace logo",
-          sourceType: "workspace-logo",
-          assetId: null,
-          x: 0.5,
-          y: 0.14,
-          width: Math.round(FORMATS[current.format].width * 0.28),
-          height: Math.round(FORMATS[current.format].height * 0.1),
-          opacity: 1,
-          rotation: 0,
-        });
-      }
-      return { ...current, background: "#0b1220", elements };
+    // Current Brand Profile exposes no saved-font fields. Use them only if present in an expanded profile; never invent a font.
+    const profile = brandProfile.data as unknown as Record<string,unknown> | null;
+    const font = (key:string) => typeof profile?.[key] === "string" ? String(profile[key]) : undefined;
+    changeDocument(current => {
+      const next=applyStudioBrand(current,{primary:branding.data?.accentColor??palette.primary,secondary:font("secondary_color"),logoUrl:branding.data?.logoUrl,headingFont:font("heading_font"),bodyFont:font("body_font"),accentFont:font("accent_font")});
+      if(branding.data?.logoUrl && !next.elements.some(e=>e.brandRole === "logo" || e.type === "image" && e.sourceType === "workspace-logo")) next.elements.push({id:crypto.randomUUID(),type:"image",name:"Workspace logo",sourceType:"workspace-logo",assetId:null,x:.86,y:.08,width:140,height:80,opacity:1,rotation:0,brandRole:"logo"});
+      return next;
     });
-    toast.success("Workspace colors applied. Undo restores the previous design.");
+    toast.success("Available workspace branding applied. Undo restores the previous design.");
   }
 
   async function uploadImage(file: File | undefined) {
@@ -1126,26 +891,18 @@ function CreativeStudioPage() {
             </div>
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}>
-            <h2 className="text-sm font-semibold">Templates</h2>
-            <div className="mt-3 grid max-h-[45dvh] grid-cols-2 gap-2 overflow-y-auto">
-              {TEMPLATE_NAMES.map((template) => (
-                <button
-                  key={template}
-                  type="button"
-                  className="min-h-10 w-full overflow-hidden rounded-lg border border-border text-left text-xs text-muted-foreground hover:bg-elevated hover:text-foreground"
-                  onClick={() => {
-                    const next = templateDocument(template, palette.primary);
-                    setMobileTool(null);
-                    commit(next);
-                    setName(`${template} graphic`);
-                    setDesignId(null);
-                    setSelectedId(next.elements.at(-1)?.id ?? null);
-                  }}
-                >
-                  <DesignThumbnail document={templateDocument(template, palette.primary)} urls={assetUrls} logo={branding.data?.logoUrl} />
-                  <span className="block p-2">{template}</span>
-                </button>
-              ))}
+            <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">Templates</h2><Button size="sm" variant="outline" onClick={applyBrand}><WandSparkles /> Apply My Brand</Button></div>
+            <div className="mt-3 flex gap-1" role="group" aria-label="Template format">
+              {(["story","square","portrait"] as const).map(value=><Button key={value} size="sm" variant={templateFormat===value?"secondary":"ghost"} onClick={()=>setTemplateFormat(value)}>{value==="story"?"9:16":value==="square"?"1:1":"4:5"}</Button>)}
+            </div>
+            <div className="mt-3 grid grid-cols-2 items-start gap-3" aria-label="Template library">
+              {templates.map(template => <Button key={template.id} variant="outline" aria-label={`Use ${template.name} template`} className="h-auto min-w-0 w-full flex-col items-stretch gap-0 overflow-hidden p-0 text-left" onClick={()=>{
+                const next=cloneDocument(template.document);next.elements=next.elements.map(e=>({...e,id:crypto.randomUUID()}));
+                setMobileTool(null);setMobileStarted(true);commit(next);setName(template.name);setDesignId(null);setSelectedId(null);
+              }}>
+                <DesignThumbnail document={template.document} urls={assetUrls} logo={branding.data?.logoUrl} />
+                <span className="block whitespace-normal px-2 pt-2 text-xs font-semibold">{template.name}</span><span className="block whitespace-normal px-2 pb-2 pt-1 text-[10px] text-muted-foreground">{template.category}</span>
+              </Button>)}
             </div>
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Media" && "hidden sm:block")}>
@@ -1278,7 +1035,7 @@ function CreativeStudioPage() {
             {mobileTool === "Crop" ? <>
               <div className="grid grid-cols-3 gap-2">{[{label:"Free",ratio:null},{label:"Original",ratio:null},{label:"1:1",ratio:1},{label:"4:5",ratio:.8},{label:"9:16",ratio:9/16},{label:"16:9",ratio:16/9}].map(({label,ratio})=><Button key={label} variant="outline" onClick={()=>{const asset=mediaAssets.data?.find(item=>item.id===selected.assetId);const sourceRatio=(asset?.width??selected.width)/(asset?.height??selected.height);updateElement(selected.id,{crop:ratioCrop(sourceRatio,ratio),...(ratio?{height:selected.width/ratio}:label==="Original"?{height:selected.width/sourceRatio}:{})});setCropId(selected.id);setMobileTool(null);}}>{label}</Button>)}</div>
               <Button variant="outline" onClick={()=>updateElement(selected.id,{rotation:(selected.rotation+90)%360})}><RotateCw /> Rotate</Button>
-            </> : mobileTool === "Looks" ? <div className="flex gap-2 overflow-x-auto">{[{name:"Original",brightness:100,contrast:100,saturation:100},{name:"Clean",brightness:105,contrast:108,saturation:95},{name:"Warm",brightness:104,contrast:103,saturation:115},{name:"Cool",brightness:100,contrast:105,saturation:85},{name:"Bright",brightness:118,contrast:102,saturation:105},{name:"Moody",brightness:85,contrast:120,saturation:80},{name:"Cinematic",brightness:95,contrast:125,saturation:75},{name:"Soft",brightness:108,contrast:88,saturation:92}].map(look=><Button key={look.name} variant="outline" className="h-auto w-20 shrink-0 flex-col p-1" onClick={()=>updateElement(selected.id,{brightness:look.brightness,contrast:look.contrast,saturation:look.saturation})}><img src={selected.sourceType === "workspace-logo" ? branding.data?.logoUrl ?? "" : assetUrls[selected.assetId ?? ""]} alt={look.name} className="aspect-square w-full object-cover" style={{filter:`brightness(${look.brightness}%) contrast(${look.contrast}%) saturate(${look.saturation}%)`}}/><span>{look.name}</span></Button>)}</div>
+            </> : mobileTool === "Looks" ? <div className="flex gap-2 overflow-x-auto">{[{name:"Original",brightness:100,contrast:100,saturation:100},{name:"Clean",brightness:105,contrast:108,saturation:95},{name:"Warm",brightness:104,contrast:103,saturation:115},{name:"Cool",brightness:100,contrast:105,saturation:85},{name:"Bright",brightness:118,contrast:102,saturation:105},{name:"Moody",brightness:85,contrast:120,saturation:80},{name:"Cinematic",brightness:95,contrast:125,saturation:75},{name:"Soft",brightness:108,contrast:88,saturation:92}].map(look=><Button key={look.name} variant="outline" className="h-auto w-20 shrink-0 flex-col p-1" onClick={()=>updateElement(selected.id,{brightness:look.brightness,contrast:look.contrast,saturation:look.saturation})}><img src={studioImageUrl(selected,assetUrls,branding.data?.logoUrl)??""} alt={look.name} className="aspect-square w-full object-cover" style={{filter:`brightness(${look.brightness}%) contrast(${look.contrast}%) saturate(${look.saturation}%)`}}/><span>{look.name}</span></Button>)}</div>
             : mobileTool === "Auto" ? <><p className="text-sm text-muted-foreground">AI image analysis is temporarily unavailable. These are optional manual presets, not image analysis.</p>{["brightness","contrast","saturation"].map(key=><label key={key} className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={lookChoices.includes(key)} onChange={e=>setLookChoices(v=>e.target.checked?[...v,key]:v.filter(k=>k!==key))}/><span className="capitalize">{key === "brightness" ? "Slight brightness" : key === "contrast" ? "Gentle contrast" : "Subtle saturation"}</span></label>)}<Button onClick={()=>updateElement(selected.id,Object.fromEntries(lookChoices.map(key=>[key,key === "brightness"?108:105])))}>Apply selected presets</Button></>
             : <><div className="flex flex-wrap gap-1">{[{key:"brightness",label:"Exposure"},{key:"contrast",label:"Contrast"},{key:"saturation",label:"Saturation"}].map(item=><Button key={item.key} size="sm" variant={adjustment===item.key?"secondary":"ghost"} onClick={()=>setAdjustment(item.key)}>{item.label}</Button>)}</div><label className="block space-y-4"><span className="flex justify-between text-sm capitalize">{adjustment}<span>{selected[adjustment as "brightness"|"contrast"|"saturation"]??100}%</span></span><Slider aria-label={adjustment} value={[selected[adjustment as "brightness"|"contrast"|"saturation"]??100]} min={0} max={200} onValueChange={([value])=>updateElement(selected.id,{[adjustment]:value})}/></label></>}
           </section>}
@@ -1287,6 +1044,7 @@ function CreativeStudioPage() {
           <div className={cn(!["Edit","More","Font","Size","Color","Style","Align","Fill","Border","Opacity","Arrange","Position"].includes(mobileTool ?? "") && "hidden sm:block")}>
           {selected ? (
             <ElementInspector
+              availableFonts={STUDIO_FONTS}
               element={selected}
               canvasWidth={format.width}
               canvasHeight={format.height}
@@ -1319,6 +1077,7 @@ function CreativeStudioPage() {
 }
 
 function ElementInspector({
+  availableFonts,
   element,
   canvasWidth,
   canvasHeight,
@@ -1330,6 +1089,7 @@ function ElementInspector({
   onMoveBack,
   onMoveFront,
 }: {
+  availableFonts: string[];
   element: DesignElement;
   canvasWidth: number;
   canvasHeight: number;
@@ -1365,7 +1125,8 @@ function ElementInspector({
               onChange={(event) => onChange({ text: event.target.value })}
             />
           </Field>
-          <Field label="Font"><select className={inputClass} value={element.fontFamily ?? "Inter"} onChange={event=>onChange({fontFamily:event.target.value})}>{["Inter","Arial","Helvetica","Georgia","Courier New"].map(font=><option key={font}>{font}</option>)}</select></Field>
+          <Field label="Font"><select aria-label="Font" className={inputClass} value={element.fontFamily ?? "Inter"} onChange={event=>onChange({fontFamily:event.target.value})}>{Array.from(new Set([...availableFonts,element.fontFamily??"Inter"])).map(font=><option key={font}>{font}</option>)}</select></Field>
+          <Field label="Letter spacing"><input aria-label="Letter spacing" className={inputClass} type="number" min={0} max={30} value={element.letterSpacing??0} onChange={event=>onChange({letterSpacing:Math.max(0,number(event))})}/></Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Size">
               <input
@@ -1533,6 +1294,7 @@ const textareaClass =
 
 function DesignThumbnail({document,urls,logo}:{document:DesignDocument;urls:Record<string,string>;logo?:string|null}) {
   const ref=useRef<HTMLCanvasElement>(null);
-  useEffect(()=>{let cancelled=false;const canvas=ref.current;if(!canvas)return;const format=FORMATS[document.format];canvas.width=240;canvas.height=Math.round(240*format.height/format.width);const ctx=canvas.getContext("2d");if(!ctx)return;void (async()=>{ctx.fillStyle=document.background;ctx.fillRect(0,0,canvas.width,canvas.height);ctx.scale(canvas.width/format.width,canvas.height/format.height);for(const element of document.elements){if(cancelled)return;ctx.save();ctx.translate(element.x*format.width,element.y*format.height);ctx.rotate(element.rotation*Math.PI/180);ctx.globalAlpha=element.opacity;if(element.type==="text"){ctx.fillStyle=element.color;ctx.font=`${element.fontWeight} ${element.fontSize}px ${element.fontFamily??"Inter"}`;ctx.textAlign=element.align;ctx.fillText(element.text,0,0,format.width*.88);}else if(element.type==="shape"){ctx.fillStyle=element.color;if(element.shape==="circle"){ctx.beginPath();ctx.ellipse(0,0,element.width/2,element.height/2,0,0,Math.PI*2);ctx.fill();}else ctx.fillRect(-element.width/2,-element.height/2,element.width,element.height);}else{const url=element.sourceType==="workspace-logo"?logo:urls[element.assetId??""];if(url)try{const image=await loadCanvasImage(url);if(cancelled)return;const crop=element.crop??{x:0,y:0,width:1,height:1};ctx.filter=`brightness(${element.brightness??100}%) contrast(${element.contrast??100}%) saturate(${element.saturation??100}%)`;ctx.drawImage(image,image.naturalWidth*crop.x,image.naturalHeight*crop.y,image.naturalWidth*crop.width,image.naturalHeight*crop.height,-element.width/2,-element.height/2,element.width,element.height);}catch{}}ctx.restore();}})();return()=>{cancelled=true;};},[document,urls,logo]);
-  return <canvas ref={ref} aria-label="Design thumbnail" className="w-full"/>;
+  useEffect(()=>{let cancelled=false;const target=ref.current;if(!target)return;const artwork=window.document.createElement("canvas");void renderStudioArtwork(artwork,document,urls,logo,320).then(()=>{if(cancelled)return;target.width=artwork.width;target.height=artwork.height;target.getContext("2d")?.drawImage(artwork,0,0);});return()=>{cancelled=true;};},[document,urls,logo]);
+  const size=FORMATS[document.format];
+  return <canvas ref={ref} width={320} height={Math.round(320*size.height/size.width)} aria-label="Design thumbnail" className="block w-full"/>;
 }

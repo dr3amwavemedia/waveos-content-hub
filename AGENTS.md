@@ -16,3 +16,5 @@ Editor viewport transforms stay outside saved documents so workspace zoom never 
 Public competitor research runs through authenticated workspace-entitled server functions and the managed research connector; results retain citations and never infer private platform metrics.
 Research results are scoped to the active workspace in session storage and included only in explicit existing workflow-draft saves, so navigation does not authorize live-record writes.
 Analytics historical comparisons require matching provider, calculation, coverage and non-overlapping equal-length periods; unsupported observations remain unavailable.
+
+Creative Studio templates produce native document layers and share one artwork renderer with editor, thumbnails and export, so previews never diverge from editable artwork.

@@ -25,3 +25,10 @@
 - [x] Verify phone, tablet and desktop workflows without changing production or live records; 168 unit tests passed.
 - [ ] AI photo analysis and AI analytics: blocked by the required AI package's release-age safeguard; no substitute is presented as AI.
 - [ ] Physical-device gesture feel: requires a real phone/tablet review; browser touch interactions passed.
+# Approved template reference replacement
+
+- [x] Replace legacy blue-bar templates with native layered reference-inspired designs and real previews.
+- [x] Preserve editor/export/history; add format variants and available workspace brand application.
+- [x] Verify signed-in mobile Templates, layer editing, undo and export without saving live records.
+- [x] Run focused tests; 7 focused and 171 total passed with command-scoped live-subscription flag false; harness build OK. No migrations.
+- [ ] Saved brand-font and secondary-logo application: current Brand Profile exposes neither; requires separately approved storage/field support. Existing accent/logo application and font-preservation behavior are implemented.
