@@ -596,6 +596,7 @@ function CreatePost() {
 
   function openStudio(assetId:string,photo=false){
     if(!workspaceId)return;
+    if(!can("can_use_creative_studio")){toast.error("Creative Studio is not included in this plan.");return;}
     const asset=composerAssets.data?.find(item=>item.id===assetId);
     if(!asset?.mime_type.startsWith('image/')){toast.error('Creative Studio currently supports photos. Video editing is unavailable.');return;}
     const token=crypto.randomUUID();
@@ -736,7 +737,7 @@ function CreatePost() {
               onRemove={(id) => setPickedMedia((cur) => cur.filter((x) => x !== id))}
             />
             {pickedMedia.length>0 && <div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0],true)}><PenSquare/>Edit</Button><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0])}><Sparkles/>Design</Button><Button variant="ghost" disabled={locked} onClick={()=>setShowLibrary(true)}><ImagePlus/>Replace</Button></div>}
-            <PlatformMediaGuide platforms={platforms} />
+            <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Media format & export guidance</summary><PlatformMediaGuide platforms={platforms} /></details>
           </div>
 
           <details className="order-3 border-b border-border pb-5" open={undefined}>

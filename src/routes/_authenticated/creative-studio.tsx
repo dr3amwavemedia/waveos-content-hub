@@ -461,7 +461,7 @@ function CreativeStudioPage() {
     setSelectedId(element.id);
   }
 
-  function applyBrand() { setBrandChoices(true); }
+  function applyBrand() { setMobileTool(null);setBrandChoices(true); }
   function confirmBrand() {
     const extended = profile as unknown as Record<string,unknown> | null;
     const font = (key:string) => supportedBrandFont(extended?.[key]);
