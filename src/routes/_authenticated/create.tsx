@@ -1,5 +1,6 @@
 import { RequireFeature } from "@/components/app/require-feature";
 import { Button } from "@/components/ui/button";
+import { studioPostKey,studioReturnedMedia,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -87,7 +88,8 @@ export const Route = createFileRoute("/_authenticated/create")({
   ),
   validateSearch: (
     s: Record<string, unknown>,
-  ): { id?: string; media?: string; destination?: "feed" | "story"; brief?: string; briefWorkspace?: string } => ({
+  ): { id?: string; media?: string; studio?:string; destination?: "feed" | "story"; brief?: string; briefWorkspace?: string } => ({
+    ...(typeof s.studio === "string" ? {studio:s.studio}:{}),
     ...(typeof s.brief === "string" && s.brief.length <= 6000 ? { brief: s.brief } : {}),
     ...(typeof s.briefWorkspace === "string" ? { briefWorkspace: s.briefWorkspace } : {}),
     ...(typeof s.id === "string" ? { id: s.id } : {}),
@@ -116,6 +118,7 @@ function CreatePost() {
   const editingId = search.id ?? savedId ?? null;
   const existing = useContentItem(editingId);
   const socialConnections = useSocialConnections(workspaceId);
+  const composerAssets=useMediaAssets(workspaceId,{});
   const create = useCreateContentItem(workspaceId);
   const update = useUpdateContentItem();
   const updateVariant = useUpdateVariant();
@@ -135,9 +138,10 @@ function CreatePost() {
     Partial<Record<SocialPlatform, { contentType?: "story" }>>
   >({});
   const [showLibrary, setShowLibrary] = useState(false);
+  const restoredStudio=useRef<string|null>(null);
 
   useEffect(() => {
-    if (!search.media || editingId || pickedMedia.length) return;
+    if (search.studio || !search.media || editingId || pickedMedia.length) return;
     setPickedMedia([search.media]);
     if (search.destination === "story") {
       setPlatforms(["instagram"]);
@@ -161,7 +165,7 @@ function CreatePost() {
   }, [search.brief, search.briefWorkspace, workspaceId, editingId]);
 
   useEffect(() => {
-    if (!draftStorageKey || savedId) return;
+    if (search.studio || !draftStorageKey || savedId) return;
 
     const storedDraft = window.localStorage.getItem(draftStorageKey);
 
@@ -258,6 +262,7 @@ function CreatePost() {
     draftPlatformOptions,
   ]);
   useEffect(() => {
+    if(search.studio)return;
     if (!existing.data?.item) return;
     const it = existing.data.item;
     setTitle(it.title ?? "");
@@ -271,6 +276,16 @@ function CreatePost() {
     }
     setSavedId(it.id);
   }, [existing.data?.item?.id]);
+  useEffect(()=>{
+    if(!search.studio || !workspaceId || restoredStudio.current===search.studio)return;
+    try{const raw=sessionStorage.getItem(studioPostKey(workspaceId,search.studio));if(!raw)return;
+      const snapshot=JSON.parse(raw) as StudioPostSnapshot;
+      if(snapshot.workspaceId!==workspaceId || snapshot.id!==search.id)return;
+      setTitle(snapshot.title);setCaption(snapshot.caption);setPlatforms(snapshot.platforms.filter((p):p is SocialPlatform=>ALL_PLATFORMS.includes(p as SocialPlatform)));
+      setPickedMedia(studioReturnedMedia(snapshot,search.media));setScheduledAt(snapshot.scheduledAt);setDraftPlatformOptions(snapshot.platformOptions);setSavedId(snapshot.id??null);
+      restoredStudio.current=search.studio;
+    }catch{toast.error("The originating post could not be restored. Your saved posts are unchanged.");}
+  },[search.studio,search.media,workspaceId,search.id]);
 
   const publishFn = useServerFn(publishContentItem);
   const assist = useServerFn(waveAssist);
@@ -579,8 +594,18 @@ function CreatePost() {
     toast.success("New post ready. Your previous saved draft is still available under Posts.");
   }
 
+  function openStudio(assetId:string,photo=false){
+    if(!workspaceId)return;
+    if(!can("can_use_creative_studio")){toast.error("Creative Studio is not included in this plan.");return;}
+    const asset=composerAssets.data?.find(item=>item.id===assetId);
+    if(!asset?.mime_type.startsWith('image/')){toast.error('Creative Studio currently supports photos. Video editing is unavailable.');return;}
+    const token=crypto.randomUUID();
+    sessionStorage.setItem(studioPostKey(workspaceId,token),JSON.stringify({workspaceId,id:savedId??undefined,title,caption,platforms,pickedMedia,scheduledAt,platformOptions:draftPlatformOptions}));
+    void navigate({to:'/creative-studio',search:{post:token,workspace:workspaceId,media:assetId,photo}});
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 pb-24 lg:space-y-6 lg:pb-0">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
@@ -620,7 +645,7 @@ function CreatePost() {
           <button
             disabled={locked || create.isPending || update.isPending || publishing !== null}
             onClick={handleSaveDraft}
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-elevated px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2 disabled:opacity-50"
+            className="hidden items-center gap-2 rounded-full border border-border bg-elevated px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2 disabled:opacity-50 lg:inline-flex"
           >
             {(create.isPending || update.isPending) && publishing === null ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -639,7 +664,7 @@ function CreatePost() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="space-y-6">
+        <div className="flex min-w-0 flex-col gap-4 lg:gap-6">
           {locked && (
             <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4 text-sm text-amber-100">
               {status === "published"
@@ -649,7 +674,7 @@ function CreatePost() {
                   : "This post is currently in client review. Editing is paused until the review is completed or changes are requested."}
             </div>
           )}
-          <div className="surface-card space-y-4 p-5">
+          <div className="order-2 space-y-3 border-b border-border pb-5">
             <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Internal title
             </label>
@@ -670,7 +695,7 @@ function CreatePost() {
               autoCorrect="on"
               spellCheck
               enterKeyHint="done"
-              rows={5}
+              rows={3}
               placeholder="Write the base caption. You can tailor per platform below."
               className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60"
             />
@@ -692,7 +717,7 @@ function CreatePost() {
             </div>
           </div>
 
-          <div className="surface-card p-5">
+          <div className="order-1 min-w-0 border-b border-border pb-5">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <div className="text-sm font-semibold text-foreground">Media</div>
@@ -700,22 +725,23 @@ function CreatePost() {
                   Choose from your library. Same media applies to all platforms.
                 </div>
               </div>
-              <button
+              <Button variant="outline"
                 onClick={() => setShowLibrary(true)}
-                className="inline-flex items-center gap-2 rounded-full border border-border bg-elevated px-3 py-2 text-xs font-medium hover:bg-surface-2"
               >
-                <ImagePlus className="h-4 w-4" /> Pick media
-              </button>
+                <ImagePlus className="h-4 w-4" /> Add Media
+              </Button>
             </div>
             <MediaPreviewRow
               workspaceId={workspaceId}
               picked={pickedMedia}
               onRemove={(id) => setPickedMedia((cur) => cur.filter((x) => x !== id))}
             />
-            <PlatformMediaGuide platforms={platforms} />
+            {pickedMedia.length>0 && <div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0],true)}><PenSquare/>Edit</Button><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0])}><Sparkles/>Design</Button><Button variant="ghost" disabled={locked} onClick={()=>setShowLibrary(true)}><ImagePlus/>Replace</Button></div>}
+            <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Media format & export guidance</summary><PlatformMediaGuide platforms={platforms} /></details>
           </div>
 
-          <div className="surface-card p-5">
+          <details className="order-3 border-b border-border pb-5" open={undefined}>
+            <summary className="cursor-pointer py-2 text-sm font-semibold">Platform settings · {platforms.join(", ")}</summary>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-foreground">Per-platform captions</div>
@@ -782,11 +808,11 @@ function CreatePost() {
                 </p>
               )}
             </div>
-          </div>
+          </details>
         </div>
 
         <aside className="space-y-6">
-          <div className="surface-card space-y-3 p-5">
+          <div id="post-schedule" className="surface-card space-y-3 p-5">
             <div className="text-sm font-semibold text-foreground">Schedule</div>
             <label className="block text-xs uppercase tracking-wider text-muted-foreground">
               Publish at ({activeWorkspace.timezone})
@@ -808,7 +834,7 @@ function CreatePost() {
             </p>
           </div>
 
-          <div className="surface-card space-y-4 p-5">
+          <div className="surface-card hidden space-y-4 p-5 lg:block">
             <div>
               <div className="text-sm font-semibold text-foreground">Publish</div>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -857,6 +883,11 @@ function CreatePost() {
             <CheckRow line={!!savedId} label="Draft saved" />
           </div>
         </aside>
+      </div>
+      <div className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 grid grid-cols-3 gap-2 border-y border-border bg-background px-3 py-3 lg:hidden" aria-label="Post actions">
+        <Button variant="outline" disabled={locked||create.isPending||update.isPending||publishing!==null} onClick={handleSaveDraft}><FileText className="size-4"/>Save Draft</Button>
+        <Button variant="secondary" disabled={locked||publishing!==null||!canSchedule} onClick={()=>{if(scheduledAt)void handleScheduleLater();else window.document.getElementById('post-schedule')?.scrollIntoView({behavior:'smooth',block:'center'});}}><CalendarClock className="size-4"/>Schedule</Button>
+        <Button disabled={locked||publishing!==null||!caption.trim()||!platforms.length} onClick={handlePublishNow}><Send className="size-4"/>Publish</Button>
       </div>
 
       {showLibrary && (
@@ -1235,14 +1266,14 @@ function MediaPreviewRow({
 
   if (!picked.length) {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-elevated/30 p-6 text-center text-sm text-muted-foreground">
-        No media selected yet.
+      <div className="flex min-h-52 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-elevated/30 p-6 text-center text-sm text-muted-foreground">
+        <ImagePlus className="size-8"/>Add a photo or video
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {picked.map((id) => {
         const a = map.get(id);
         return <MediaThumb key={id} asset={a} onRemove={() => onRemove(id)} />;
@@ -1259,9 +1290,9 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
   }, [asset?.id]);
   if (!asset) return <div className="aspect-square rounded-lg border border-border bg-elevated" />;
   return (
-    <div className="group relative aspect-square overflow-hidden rounded-lg border border-border bg-elevated">
+    <div className="group relative aspect-[4/3] max-h-96 overflow-hidden rounded-lg border border-border bg-elevated">
       {url && (asset.source_provider === "google_drive" || asset.mime_type.startsWith("image/")) ? (
-        <img src={url} alt={asset.name} className="h-full w-full object-cover" loading="lazy" />
+        <img src={url} alt={asset.name} className="h-full w-full object-contain" loading="lazy" />
       ) : url && asset.mime_type.startsWith("video/") ? (
         <video src={url} className="h-full w-full object-cover" muted />
       ) : (
@@ -1271,7 +1302,7 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
       )}
       <button
         onClick={onRemove}
-        className="absolute right-1 top-1 rounded-full bg-background/80 p-1 text-foreground opacity-0 backdrop-blur transition-opacity group-hover:opacity-100"
+        className="absolute right-2 top-2 rounded-full bg-background/80 p-2 text-foreground backdrop-blur"
         aria-label="Remove"
       >
         <X className="h-3 w-3" />

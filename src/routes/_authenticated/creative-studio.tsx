@@ -41,6 +41,7 @@ import { RequireFeature } from "@/components/app/require-feature";
 import { UnsavedChangesGuard } from "@/components/app/unsaved-changes-guard";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useWorkflowDraft } from "@/hooks/use-workflow-draft";
 import { getMediaPreviewUrl, useMediaAssets, useUploadAsset } from "@/hooks/use-media";
 import { useWorkspaceBranding, workspacePalette } from "@/hooks/use-workspace-branding";
@@ -49,12 +50,14 @@ import { cn } from "@/lib/utils";
 import { MobileToolPanel } from "@/components/app/mobile-tool-panel";
 import { Slider } from "@/components/ui/slider";
 import { clamp, containsPoint, cornerHit, snapPosition, ratioCrop, zoomCrop } from "@/lib/studio-geometry";
-import { STUDIO_FORMATS as FORMATS, STUDIO_FONTS, applyStudioBrand, type DesignFormat, type DesignDocument, type DesignElement, type TextElement, type ShapeElement, type ImageElement } from "@/lib/studio-template-model";
+import { STUDIO_FORMATS as FORMATS, STUDIO_FONTS, applyStudioBrand, type BrandApplyMode, type DesignFormat, type DesignDocument, type DesignElement, type TextElement, type ShapeElement, type ImageElement } from "@/lib/studio-template-model";
 import { TEMPLATE_LIBRARY, createStudioTemplate } from "@/lib/studio-template-library";
 import { loadStudioImage, renderStudioArtwork, studioImageUrl } from "@/lib/studio-artwork-renderer";
 import { replaceStudioMedia, studioMediaSlots, supportedBrandFont } from "@/lib/studio-media";
+import { studioPostKey,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
 
 export const Route = createFileRoute("/_authenticated/creative-studio")({
+  validateSearch:(s:Record<string,unknown>)=>({post:typeof s.post==='string'?s.post:undefined,workspace:typeof s.workspace==='string'?s.workspace:undefined,media:typeof s.media==='string'?s.media:undefined,photo:s.photo===true}),
   component: () => (
     <RequireFeature
       feature="can_use_creative_studio"
@@ -118,12 +121,16 @@ function normalizeDocument(document: DesignDocument): DesignDocument {
 }
 
 function CreativeStudioPage() {
+  const postSearch=Route.useSearch();
+  const incoming=useRef<string|null>(null);
   const navigate = useNavigate();
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id ?? null;
   const branding = useWorkspaceBranding(activeWorkspace?.id);
   const palette = workspacePalette(branding.data?.accentColor);
   const [templateFormat, setTemplateFormat] = useState<DesignFormat>("story");
+  const [brandChoices,setBrandChoices]=useState(false);
+  const [brandMode,setBrandMode]=useState<BrandApplyMode>("light");
   const brandProfile = useQuery({ queryKey: ["studio-brand-profile", workspaceId], enabled: Boolean(workspaceId), queryFn: async () => { if (!workspaceId) return null; const {data,error} = await supabase.from("brand_profiles").select("*").eq("workspace_id", workspaceId).maybeSingle(); if(error) throw error; return data; } });
   const templates = useMemo(() => TEMPLATE_LIBRARY.map(template => ({...template,document:createStudioTemplate(template,templateFormat)})), [templateFormat]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -418,6 +425,15 @@ function CreativeStudioPage() {
     setMobileStarted(true);
     setMobileTool(null);
   }
+  useEffect(()=>{if(!postSearch.post||postSearch.workspace!==workspaceId||!postSearch.media||incoming.current===postSearch.post||!mediaAssets.data)return;
+    incoming.current=postSearch.post;setPhotoMode(postSearch.photo);void addImage(postSearch.media);
+  },[postSearch.post,postSearch.workspace,postSearch.media,workspaceId,mediaAssets.data]);
+  function returnToPost(assetId?:string){
+    if(!workspaceId||!postSearch.post||postSearch.workspace!==workspaceId)return;
+    try{const snapshot=JSON.parse(sessionStorage.getItem(studioPostKey(workspaceId,postSearch.post))??'null') as StudioPostSnapshot|null;if(!snapshot||snapshot.workspaceId!==workspaceId)return;
+      setDirty(false);void navigate({to:'/create',search:{id:snapshot.id,studio:postSearch.post,media:assetId}});
+    }catch{toast.error('The originating post is unavailable. Your saved posts are unchanged.');}
+  }
 
   function addWorkspaceLogo() {
     if (!branding.data?.logoUrl) {
@@ -445,15 +461,17 @@ function CreativeStudioPage() {
     setSelectedId(element.id);
   }
 
-  function applyBrand() {
+  function applyBrand() { setMobileTool(null);setBrandChoices(true); }
+  function confirmBrand() {
     const extended = profile as unknown as Record<string,unknown> | null;
     const font = (key:string) => supportedBrandFont(extended?.[key]);
     changeDocument(current => {
-      const next=applyStudioBrand(current,{primary:branding.data?.accentColor??palette.primary,secondary:typeof extended?.secondary_color === "string" ? extended.secondary_color : undefined,logoUrl:branding.data?.logoUrl,headingFont:font("heading_font"),bodyFont:font("body_font"),accentFont:font("accent_font"),businessName:profile?.business_name??activeWorkspace?.name,cta:profile?.default_ctas?.[0],website:profile?.website??undefined,services:profile?.primary_services??undefined,serviceArea:profile?.service_area??undefined});
-      if(branding.data?.logoUrl && !next.elements.some(e=>e.brandRole === "logo" || e.type === "image" && e.sourceType === "workspace-logo")) next.elements.push({id:crypto.randomUUID(),type:"image",name:"Workspace logo",sourceType:"workspace-logo",assetId:null,x:.86,y:.08,width:140,height:80,opacity:1,rotation:0,brandRole:"logo"});
+      const next=applyStudioBrand(current,{primary:branding.data?.accentColor??palette.primary,secondary:typeof extended?.secondary_color === "string" ? extended.secondary_color : undefined,logoUrl:branding.data?.logoUrl,headingFont:font("heading_font"),bodyFont:font("body_font"),accentFont:font("accent_font"),businessName:profile?.business_name??activeWorkspace?.name,cta:profile?.default_ctas?.[0],website:profile?.website??undefined,services:profile?.primary_services??undefined,serviceArea:profile?.service_area??undefined},brandMode);
+      if(brandMode==="full" && branding.data?.logoUrl && !next.elements.some(e=>e.brandRole === "logo" || e.type === "image" && (e.sourceType === "workspace-logo" || e.mediaRole === "logo"))) {const bounds=FORMATS[current.format];next.elements.push({id:crypto.randomUUID(),type:"image",name:"Workspace logo",sourceType:"workspace-logo",assetId:null,x:.80,y:.12,width:bounds.width*.24,height:bounds.height*.12,opacity:1,rotation:0,brandRole:"logo",mediaRole:"logo"});}
       return next;
     });
     toast.success("Available workspace branding applied. Undo restores the previous design.");
+    setBrandChoices(false);setMobileTool(null);
   }
 
   async function uploadImage(file: File | undefined) {
@@ -581,6 +599,7 @@ function CreativeStudioPage() {
         folderId: null,
         tags: ["creative-studio", "export"],
       });
+      if(postSearch.post && postSearch.workspace===workspaceId){returnToPost(asset.id);return;}
       toast.success(
         destination === "story"
           ? "Design saved. Opening an Instagram Story draft…"
@@ -726,13 +745,15 @@ function CreativeStudioPage() {
 
   return (
     <div className="space-y-5" data-studio-focused={mobileStarted ? "true" : "false"}>
+      <Dialog open={brandChoices} onOpenChange={setBrandChoices}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Apply My Brand</DialogTitle></DialogHeader><div className="grid grid-cols-2 gap-2" role="group" aria-label="Brand application mode">{([['colors','Colors only'],['fonts','Colors + fonts'],['light','Light Apply'],['full','Full Apply'],['logo','Replace existing logo']] as const).map(([value,label])=><Button key={value} className="h-auto min-h-11 whitespace-normal" variant={brandMode===value?'secondary':'outline'} aria-pressed={brandMode===value} onClick={()=>setBrandMode(value)}>{label}</Button>)}</div><div className="flex items-center gap-2 text-sm"><Layers3 className="size-4 text-primary"/>Keep current layout</div><Button onClick={confirmBrand} disabled={brandMode==='logo'&&!branding.data?.logoUrl}><WandSparkles/>Apply</Button></DialogContent></Dialog>
       <UnsavedChangesGuard dirty={dirty} subject="this design" />
+      {postSearch.post&&<div className="flex gap-2"><Button variant="ghost" onClick={()=>returnToPost()}><ArrowLeft/>Back to post</Button><Button disabled={uploadAsset.isPending||!renderReady} onClick={()=>void sendToPost()}><ImagePlus/>Done — Add to post</Button></div>}
       {mobileStarted && <header className="studio-focus-header sticky top-0 z-20 flex items-center gap-1 border-b border-border bg-background py-2 sm:hidden">
         <Button size="icon" variant="ghost" aria-label="Leave focused editor" onClick={() => { setMobileStarted(false); setMobileTool(null); setCropId(null); }}><ArrowLeft /></Button>
         <h1 className="min-w-0 flex-1 text-sm font-semibold">Creative Studio</h1>
         <Button size="icon" variant="ghost" aria-label="Undo" disabled={historyIndex === 0} onClick={() => {setHistoryIndex(i=>Math.max(0,i-1));setDirty(true);}}><Undo2 /></Button>
         <Button size="icon" variant="ghost" aria-label="Redo" disabled={historyIndex === history.length-1} onClick={() => {setHistoryIndex(i=>Math.min(history.length-1,i+1));setDirty(true);}}><Redo2 /></Button>
-        <Button variant="ghost" onClick={() => { setMobileStarted(false); setMobileTool(null); setCropId(null); }}>Done</Button>
+        <Button variant="ghost" disabled={uploadAsset.isPending} onClick={() => { if(postSearch.post)void sendToPost();else {setMobileStarted(false);setMobileTool(null);setCropId(null);} }}>Done</Button>
       </header>}
       <header className={cn("flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", mobileStarted ? "hidden sm:flex" : "flex")}>
         <div>

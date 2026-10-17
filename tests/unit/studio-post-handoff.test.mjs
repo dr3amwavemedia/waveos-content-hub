@@ -1,0 +1,4 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {studioReturnedMedia,studioPostKey} from '../../src/lib/studio-post-handoff.ts';
+test('Returning Studio artwork preserves the originating media without duplicate attachments',()=>{const snapshot={pickedMedia:['photo','video']};assert.deepEqual(studioReturnedMedia(snapshot,'design'),['photo','video','design']);assert.deepEqual(studioReturnedMedia(snapshot,'photo'),['photo','video']);assert.deepEqual(snapshot.pickedMedia,['photo','video']);});
+test('Originating draft handoffs are isolated by workspace and token',()=>{assert.notEqual(studioPostKey('workspace-a','token'),studioPostKey('workspace-b','token'));assert.notEqual(studioPostKey('workspace-a','one'),studioPostKey('workspace-a','two'));});
