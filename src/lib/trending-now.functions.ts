@@ -9,7 +9,7 @@ export const discoverTrends=createServerFn({method:"POST"}).middleware([requireS
   const {requireWorkspaceFeatureAccess}=await import("./zernio.server");
   await requireWorkspaceFeatureAccess(context.supabase,context.userId,data.workspaceId,"can_use_competitive_intelligence");
   const key=process.env.PARALLEL_API_KEY,appKey=process.env.LOVABLE_API_KEY;
-  if(!key||!appKey)return {trends:[],message:"Trend research connection is unavailable.",observedAt:new Date().toISOString()};
+  if(!key||!appKey)return {trends:[],message:"Trend research connection is unavailable.",observedAt:new Date().toISOString()};\n  const connectionKey:string=key;
   const connectionKey:string=key;
   const {data:brand,error}=await context.supabase.from("brand_profiles").select("business_name,industry,primary_services,service_area,target_audience").eq("workspace_id",data.workspaceId).maybeSingle();
   if(error)throw new Error("Workspace brand context could not be read.");
