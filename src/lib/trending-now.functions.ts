@@ -10,6 +10,7 @@ export const discoverTrends=createServerFn({method:"POST"}).middleware([requireS
   await requireWorkspaceFeatureAccess(context.supabase,context.userId,data.workspaceId,"can_use_competitive_intelligence");
   const key=process.env.PARALLEL_API_KEY,appKey=process.env.LOVABLE_API_KEY;
   if(!key||!appKey)return {trends:[],message:"Trend research connection is unavailable.",observedAt:new Date().toISOString()};
+  const connectionKey:string=key;
   const {data:brand,error}=await context.supabase.from("brand_profiles").select("business_name,industry,primary_services,service_area,target_audience").eq("workspace_id",data.workspaceId).maybeSingle();
   if(error)throw new Error("Workspace brand context could not be read.");
   const observedAt=new Date().toISOString(),cutoff=new Date(Date.now()-(data.filters?.days??7)*86400000).toISOString().slice(0,10);
@@ -17,7 +18,7 @@ export const discoverTrends=createServerFn({method:"POST"}).middleware([requireS
   const terms=(data.query||data.filters?.niche||brand?.industry||'business').split(/\s+/).slice(0,3).join(' ');
   const platforms=data.filters?.platform==='TikTok'?['TikTok']:data.filters?.platform==='Instagram'?['Instagram Reels']:data.filters?.platform==='YouTube'?['YouTube Shorts']:['TikTok','Instagram Reels','YouTube Shorts'];
   async function runSearch(searchQueries:string[],objective:string,maxResults=20){
-   const response=await fetch("https://connector-gateway.lovable.dev/parallel/v1/search",{method:"POST",headers:{Authorization:`Bearer ${appKey}`,"X-Connection-Api-Key":key,"Content-Type":"application/json"},body:JSON.stringify({mode:"advanced",objective,search_queries:searchQueries,advanced_settings:{max_results:maxResults,source_policy:{after_date:cutoff}}})});
+   const response=await fetch("https://connector-gateway.lovable.dev/parallel/v1/search",{method:"POST",headers:{Authorization:`Bearer ${appKey}`,"X-Connection-Api-Key":connectionKey,"Content-Type":"application/json"},body:JSON.stringify({mode:"advanced",objective,search_queries:searchQueries,advanced_settings:{max_results:maxResults,source_policy:{after_date:cutoff}}})});
    if(!response.ok){console.warn("Trend research failed",response.status);return [] as unknown[];}
    const payload=await response.json() as {results?:unknown[];warnings?:unknown[]};
    if(payload.warnings?.length)console.warn('Trend search returned warnings',payload.warnings);
