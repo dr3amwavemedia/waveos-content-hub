@@ -1,5 +1,10 @@
 # Approved mobile refinement
 
+# October 17 subscription preservation and missing foundations
+- [x] Keep live subscriptions enabled and verify subscription-only gating without changing Stripe behavior; six focused tests pass.
+- [x] Add eleven required missing feature tables and new-table policies; existing billing, client records and memberships unchanged.
+- [x] Verify signed-in feature-table reads return 200, all tables have RLS/no anonymous grants, 202 unit tests pass and preview build OK; save/reload writes not exercised.
+
 # October 16 redesign handoff
 - [x] Simplify media-first Create Post and clear mobile header/navigation; signed-in photo preview and local-draft return checked.
 - [x] Add video-first discovery, natural-language search, compact filters, supporting evidence and explicit original-concept handoff without database changes.

@@ -25,3 +25,4 @@ Trending Now separates original short-video URLs from supporting articles and us
 Create Post and Creative Studio exchange workspace-keyed session snapshots through explicit return tokens, so unsaved originating fields survive without implicit live-record writes.
 Brand application commits one document revision and preserves geometry; the shared artwork renderer contains logos proportionally, so preview and export cannot stretch them.
 Analytics parses one provider post/ad rollup per record and counts follower inventory only once; explicit refresh uses documented account-scoped external-post sync and preserves safe diagnostic state independently of metric reads.
+Missing feature storage is recovered through standalone additive Drizzle migrations and new-table-only authorization helpers; do not replay historical security migrations or replace existing entitlements, because deployed client access and billing must remain unchanged.
