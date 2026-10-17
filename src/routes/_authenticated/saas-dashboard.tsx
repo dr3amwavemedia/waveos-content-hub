@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 const dashboardQuery = queryOptions({queryKey:['owner-saas-dashboard'],queryFn:()=>getSaaSDashboard(),staleTime:60000});
-export const Route = createFileRoute('/_authenticated/saas-dashboard')({
+export const Route = createFileRoute("/_authenticated/saas-dashboard")({
   beforeLoad: async () => {
     const {data} = await supabase.auth.getUser();
     if (!data.user) throw redirect({to:'/auth'});
