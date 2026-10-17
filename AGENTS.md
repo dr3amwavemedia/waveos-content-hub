@@ -21,4 +21,7 @@ Analytics historical comparisons require matching provider, calculation, coverag
 Creative Studio templates produce native document layers and share one artwork renderer with editor, thumbnails and export, so previews never diverge from editable artwork.
 Creative Studio replaceable media slots use image-layer metadata and document commits, preserving geometry, crop and undo history when media sources change.
 Trending Now uses authenticated workspace-entitled research with dated source validation, session-scoped observations and explicit existing Create Post brief handoff, avoiding unapproved database writes and automatic publishing.
+Trending Now separates original short-video URLs from supporting articles and uses allowlisted preview URLs, so evidence is not misrepresented as playable content.
+Create Post and Creative Studio exchange workspace-keyed session snapshots through explicit return tokens, so unsaved originating fields survive without implicit live-record writes.
+Brand application commits one document revision and preserves geometry; the shared artwork renderer contains logos proportionally, so preview and export cannot stretch them.
 Analytics parses one provider post/ad rollup per record and counts follower inventory only once; explicit refresh uses documented account-scoped external-post sync and preserves safe diagnostic state independently of metric reads.
