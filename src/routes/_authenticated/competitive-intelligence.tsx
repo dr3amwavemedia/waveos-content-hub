@@ -31,7 +31,7 @@ import {
 } from "@/lib/phase-one-planning";
 import { useServerFn } from "@tanstack/react-start";
 import { researchCompetitor } from "@/lib/competitive-research.functions";
-import { researchReportSchema, type ResearchReport } from "@/lib/competitive-research";
+import { researchReportSchema, RESEARCH_FAILURE_MESSAGE, RESEARCH_SOURCE_WARNING, type ResearchReport } from "@/lib/competitive-research";
 import { isValidHttpsUrl, normalizeHttpsUrl } from "@/lib/url-validation";
 
 export const Route = createFileRoute("/_authenticated/competitive-intelligence")({
@@ -149,12 +149,13 @@ function CompetitiveIntelligencePage() {
     return {...result,workspaceId:input.workspaceId};
   }, onSuccess: result => {
     if (result.workspaceId !== currentWorkspaceRef.current) return;
+    if (result.sourcesFiltered) toast.warning(RESEARCH_SOURCE_WARNING);
     setResearchResults(current=>{
       const next=[...current.filter(item=>item.inputUrl!==result.inputUrl),result].slice(-5);
       window.sessionStorage.setItem(`waveos-research-${result.workspaceId}`,JSON.stringify(next));
       return next;
     });
-  }, onError:error=>toast.error(error instanceof Error?error.message:"Analysis unavailable") });
+  }, onError:()=>toast.error(RESEARCH_FAILURE_MESSAGE) });
   useEffect(()=>{
     setResearchInput(""); setResearchResults([]); setOpenedReport(null); setDraft({...DEFAULT_DRAFT,metrics:DEFAULT_DRAFT.metrics.map(metric=>({...metric}))});setDirty(false);
     research.reset();
@@ -426,7 +427,7 @@ function CompetitiveIntelligencePage() {
         </button>
       </section>
 
-      {research.isError && <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">{research.error instanceof Error ? research.error.message : "Analysis unavailable"}</p>}
+      {research.isError && <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">{RESEARCH_FAILURE_MESSAGE}</p>}
       {researchResults.map(result=><section key={result.inputUrl} className="space-y-5 border-t border-border pt-5">
         <header className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">{result.report.company ?? "Identity not found"}</h2><p className="mt-1 text-xs text-muted-foreground">Public-source analysis · {new Date(result.researchedAt).toLocaleString()}</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>{setResearchInput(result.inputUrl);setShowManual(true);update("competitorName",result.report.company??"");update("websiteUrl",result.report.website??result.inputUrl);}}>Edit</Button><Button variant="outline" disabled={research.isPending} onClick={()=>{setResearchInput(result.inputUrl);runResearch(result.inputUrl);}}>Refresh analysis</Button><Button variant="outline" onClick={()=>window.document.getElementById("competitive-landscape")?.scrollIntoView()}>Compare</Button><Button variant="outline" onClick={()=>{setResearchInput("");window.scrollTo({top:0,behavior:"smooth"});}}>Add another competitor</Button></div></header>
         <dl className="grid grid-cols-2 gap-4 text-sm"><div><dt className="text-muted-foreground">Industry</dt><dd>{result.report.industry??"Not found"}</dd></div><div><dt className="text-muted-foreground">Market</dt><dd>{result.report.market??"Not found"}</dd></div><div className="col-span-2"><dt className="text-muted-foreground">Website</dt><dd className="break-all">{result.report.website?<a href={result.report.website} target="_blank" rel="noopener noreferrer" className="text-primary">{result.report.website}</a>:"Not found"}</dd></div></dl>

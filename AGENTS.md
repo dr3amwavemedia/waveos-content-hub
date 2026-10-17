@@ -14,6 +14,7 @@ Creative Studio uses the same canvas and undo history on every device; mobile to
 Creative Studio selection and alignment overlays render separately from artwork so exports cannot contain editing decorations.
 Editor viewport transforms stay outside saved documents so workspace zoom never modifies artwork geometry.
 Public competitor research runs through authenticated workspace-entitled server functions and the managed research connector; results retain citations and never infer private platform metrics.
+Competitor report URL fields share pre-validation sanitation and consulted-source matching; malformed citations cannot invalidate supported findings, and customer errors never expose provider or validation payloads.
 Research results are scoped to the active workspace in session storage and included only in explicit existing workflow-draft saves, so navigation does not authorize live-record writes.
 Analytics historical comparisons require matching provider, calculation, coverage and non-overlapping equal-length periods; unsupported observations remain unavailable.
 
