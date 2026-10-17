@@ -23,6 +23,7 @@ try {
   assert.equal(exports.stripeModeMatches(true), false);
 
   delete process.env.WAVEOS_STRIPE_TEST_SECRET_KEY;
+  delete process.env.WAVEOS_ENABLE_LIVE_SUBSCRIPTIONS;
   assert.equal(exports.stripeIsTestMode(), false);
   assert.equal(exports.stripePublicSubscriptionsEnabled(), false);
   process.env.WAVEOS_ENABLE_LIVE_SUBSCRIPTIONS = "true";
