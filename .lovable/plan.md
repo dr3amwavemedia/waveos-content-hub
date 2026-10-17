@@ -1,21 +1,33 @@
-# Trending Now zero-results diagnosis and minimal fix
+# Trending Now previews: research findings and proposed approach
 
-## Findings (live research service calls, same request shape as the app)
-- "Filmmaker" + TikTok (7-day cutoff) returned HTTP 200 with many valid original videos, e.g. `tiktok.com/@hutch.on.film/video/7696386731351870742`, `@bri_breezi/video/...`, `@tashidelekp/video/...`.
-- Every social result had `publish_date: null`. Only articles (e.g. nofilmschool.com, 2021) carried dates.
-- The date cutoff (`after_date`) does not remove undated results at the source, so the videos come back.
-- `trendVideoSource` accepts these URLs (TikTok `/@user/video/ID`, Instagram `/reel/ID/`). That check is not the problem.
-- Root cause: `normalizeTrendResults` drops any result without `publish_date` (the "undated pages are not evidence" rule). Every video is removed before `videoTrendResults` runs, so the feed is empty. The broader retry hits the same filter.
-- Other results are correctly excluded: tag/discover pages, `instagram.com/popular/...`, YouTube channels and `watch?v=` links.
-- Some excerpts contain a date in plain text ("Video by Thomas Goh on July 27, 2026"). TikTok video IDs also contain the upload time (the top 32 bits are Unix seconds).
+## Findings (live checks only, nothing changed)
 
-## Minimal fix (in `src/lib/trending-now.ts` only)
-1. In `normalizeTrendResults`, set `publishedAt` in this order:
-   - the `publish_date` from the research service, if present;
-   - for TikTok `/video/ID` URLs, the date decoded from the ID (`BigInt(id) >> 32n`);
-   - an Instagram excerpt that says "on <Month D, YYYY>".
-2. Undated original-video URLs stay in results with `publishedAt: null`, labelled "Date not reported". They are never shown as current or used to rank. Undated articles are still dropped.
-3. Keep the cutoff check for any date that was found or decoded.
-4. Unit tests: decoding the TikTok ID date; undated original videos are kept but marked unverified; undated articles are still dropped; videos older than the cutoff are dropped.
+**Research search results**
+- Each result returns only `url`, `title`, `publish_date` and `excerpts`. There is no thumbnail, image, author, duration or video ID. The response also has `search_id`, `warnings`, `usage`, `metadata` and `session_id`.
+- In both "Filmmaker" runs, `publish_date` was null on every social result.
+- Results are mixed: TikTok `/@user/video/ID` and Instagram `/reel/ID/` links, but also tag, discover and "popular" pages, channels, playlists and `watch?v=` links.
+- No YouTube `/shorts/` link came back for "Filmmaker", so YouTube may often show nothing for this kind of search.
+- Author names appear only inside excerpt text ("TikTok video from X (@x)"), which is unreliable to parse.
 
-No changes to the server request, the database, publishing or deployment.
+**TikTok oEmbed, called server-side**
+- Four real returned videos all came back HTTP 200 with `title`, `author_name`, `author_unique_id`, `author_url`, `thumbnail_url`, thumbnail width and height, and `embed_product_id`.
+- Two fake or non-existent video IDs came back HTTP 400 ("Something went wrong"), so dead links were rejected cleanly.
+- The thumbnail links are signed and expire after about 47 hours, so they must not be stored long-term.
+- Only six links were tested, so this is a strong sign, not proof that every removed or private video is rejected.
+
+**YouTube thumbnails**
+- `i.ytimg.com/vi/{ID}/hqdefault.jpg` works without a key and returns 404 for an invalid ID, so it also works as a check that a video exists.
+- `maxresdefault` exists only for some videos.
+- `oardefault` (the vertical Shorts image) gave 404 for a regular video. It could not be tested on a real Shorts ID because none came back in the search.
+
+## Proposed approach (needs approval before any code changes)
+1. Add a server-side step that checks each TikTok video through oEmbed, with a short timeout and a few checks running at once.
+   - Keep a video only on HTTP 200; drop it on 400 or 404.
+   - Attach `thumbnail`, `creator` and the oEmbed title.
+   - Cache results only for this session.
+2. For YouTube Shorts, set the thumbnail to `https://i.ytimg.com/vi/{ID}/hqdefault.jpg` and hide the card if the image fails to load.
+3. Instagram has no public oEmbed without a Meta app token, so Reels keep the plain card with the "Watch on Instagram" link.
+4. Allow only image addresses from `*.tiktokcdn*.com` and `i.ytimg.com`.
+5. Unit tests: a 200 is kept with its thumbnail; a 400 is dropped; the YouTube thumbnail address is built correctly.
+
+No database, deploy or publish changes.
