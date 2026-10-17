@@ -1,33 +1,56 @@
-# Trending Now previews: research findings and proposed approach
+# WaveOS pre-publish audit at GitHub commit 46ae5443, and fix plan
 
-## Findings (live checks only, nothing changed)
+The working tree matches 46ae54430ddc90fea153dfbad9d6c5e96dd71b71 exactly, with no local changes.
 
-**Research search results**
-- Each result returns only `url`, `title`, `publish_date` and `excerpts`. There is no thumbnail, image, author, duration or video ID. The response also has `search_id`, `warnings`, `usage`, `metadata` and `session_id`.
-- In both "Filmmaker" runs, `publish_date` was null on every social result.
-- Results are mixed: TikTok `/@user/video/ID` and Instagram `/reel/ID/` links, but also tag, discover and "popular" pages, channels, playlists and `watch?v=` links.
-- No YouTube `/shorts/` link came back for "Filmmaker", so YouTube may often show nothing for this kind of search.
-- Author names appear only inside excerpt text ("TikTok video from X (@x)"), which is unreliable to parse.
+## BLOCKER
+1. **The production build fails, and Trending Now crashes in the preview.**
+   - Where: `src/lib/trending-now.functions.ts` line 12, column 127.
+   - The commit contains a literal `\n` (backslash plus "n") instead of a real line break, before `const connectionKey:string=key;`.
+   - Effects:
+     - The type check fails (TS1127 "Invalid character").
+     - The production build fails with "Expecting Unicode escape sequence".
+     - `/trending-now` shows "WaveOS could not open this screen".
+   - Fix: replace that `\n` with a real line break. No other change.
 
-**TikTok oEmbed, called server-side**
-- Four real returned videos all came back HTTP 200 with `title`, `author_name`, `author_unique_id`, `author_url`, `thumbnail_url`, thumbnail width and height, and `embed_product_id`.
-- Two fake or non-existent video IDs came back HTTP 400 ("Something went wrong"), so dead links were rejected cleanly.
-- The thumbnail links are signed and expire after about 47 hours, so they must not be stored long-term.
-- Only six links were tested, so this is a strong sign, not proof that every removed or private video is rejected.
+## HIGH
+2. **Several tables in the database change files do not exist in the live database.**
+   - `supabase/migrations/20261014121000_phase1_foundation_tables.sql` (and the 20261014120000 file before it) create these tables, all absent live: `workflow_drafts`, `creative_designs`, `competitors`, `product_releases`, `release_user_states`, `social_intelligence_profiles`, `campaign_plans`.
+   - The app already reads them:
+     - `src/routes/_authenticated/creative-studio.tsx` lines 196, 221 and 231
+     - `src/hooks/use-workflow-draft.ts` lines 39 and 59
+     - `src/hooks/use-product-releases.ts`
+   - Effects:
+     - Home and Creative Studio show 404 errors in the console.
+     - Saving designs or drafts and showing release notes cannot work after publishing.
+   - The database's change log lists 44 applied changes, while the project has 137 change files. Before applying anything, each pending file needs reviewing to check it is additive only.
+   - Fix: needs your approval. Review and apply only the two Oct 14 files, as additive changes. Alternatively, keep those features hidden or failing gracefully until they are applied.
+3. **The test Stripe key is missing** (`WAVEOS_STRIPE_TEST_SECRET_KEY`). The live `STRIPE_SECRET_KEY` and the webhook secret are both set.
+   - Safe-mode payments that expect the test key may fall back to the live key or fail.
+   - Fix: confirm which key safe mode should use before publishing. No code change until confirmed.
 
-**YouTube thumbnails**
-- `i.ytimg.com/vi/{ID}/hqdefault.jpg` works without a key and returns 404 for an invalid ID, so it also works as a check that a video exists.
-- `maxresdefault` exists only for some videos.
-- `oardefault` (the vertical Shorts image) gave 404 for a regular video. It could not be tested on a real Shorts ID because none came back in the search.
+## MEDIUM
+4. **Social** (`/social`): one "Failed to fetch" error from the database connection while the page loads. The page still rendered. Likely a cancelled or failed background request; needs a retry check, not a blocker.
+5. **Deliveries** (`/deliveries`): one 401 (unauthorized) response while loading. The page rendered "Your Content". Likely a permission-checked request for content this account cannot see; check that the screen handles it quietly.
+6. **Live Trending Now smoke test**: it couldn't run against the app at this commit because of the blocker. At 87bb8456 plus the type fix, the same search kept 12 usable TikTok videos, all with thumbnails, and dropped no links. Dead links were confirmed to return 400 from TikTok. Re-run after fixing the blocker.
 
-## Proposed approach (needs approval before any code changes)
-1. Add a server-side step that checks each TikTok video through oEmbed, with a short timeout and a few checks running at once.
-   - Keep a video only on HTTP 200; drop it on 400 or 404.
-   - Attach `thumbnail`, `creator` and the oEmbed title.
-   - Cache results only for this session.
-2. For YouTube Shorts, set the thumbnail to `https://i.ytimg.com/vi/{ID}/hqdefault.jpg` and hide the card if the image fails to load.
-3. Instagram has no public oEmbed without a Meta app token, so Reels keep the plain card with the "Watch on Instagram" link.
-4. Allow only image addresses from `*.tiktokcdn*.com` and `i.ytimg.com`.
-5. Unit tests: a 200 is kept with its thumbnail; a 400 is dropped; the YouTube thumbnail address is built correctly.
+## LOW
+7. The Content Security Policy notice about "upgrade-insecure-requests" being ignored appears on every page. This is harmless noise.
+8. The saved browser keys are scoped to the workspace or session (`waveos.active-workspace`, `waveos-research-<workspace>`, `waveos.gallery.layout`, `waveos:pending-social-oauth`). None would hide new screens. No stale-key problem found.
 
-No database, deploy or publish changes.
+## Passed
+- All 195 unit tests pass.
+- The phone layout at 430×786 was checked on Home, Create Post, Creative Studio, Social, Analytics, Deliveries and Payments:
+  - no sideways scrolling;
+  - the header and bottom bar are present;
+  - no fixed buttons overlap the bottom bar.
+- Connection keys present: research, AI, Zernio, live Stripe, Stripe webhook, SignWell.
+- No production-write paths were triggered during the audit.
+
+## Not fully covered (say if you want these done)
+- Role-by-role permission checks for admin, staff, DWM, public, client and wedding accounts. Only the signed-in owner account was exercised. This needs test accounts for each role.
+- Safe-area insets were checked visually only, not on a real device.
+
+## Proposed next steps (after approval)
+1. Fix the BLOCKER: one character change at line 12. Then re-run the type check, production build, unit tests and the live Trending Now smoke test, including the thumbnail and dead-link counts.
+2. Report the exact pending database changes for item 2 and wait for separate approval before applying any.
+3. No publishing, deploying or database writes as part of this plan.
