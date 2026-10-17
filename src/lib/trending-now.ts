@@ -14,18 +14,27 @@ export function videoTrendResults(trends:Trend[],platform='All videos'){
 }
 export const TREND_VIEWS=["For You","Trending Audio","Viral Formats","Trending Hooks","Industry Ideas","Saved Trends"] as const;
 export type TrendView=typeof TREND_VIEWS[number];
+export function tiktokPublishedAt(raw:string):string|null{
+ try{const url=new URL(raw),host=url.hostname.replace(/^www\./,'');if(host!=='tiktok.com')return null;const match=url.pathname.match(/\/video\/(\d+)/);if(!match)return null;const seconds=Number(BigInt(match[1])>>32n);if(!Number.isFinite(seconds)||seconds<=0)return null;const date=new Date(seconds*1000);return Number.isNaN(date.getTime())?null:date.toISOString();}catch{return null;}
+}
+function excerptPublishedAt(excerpt:string):string|null{
+ const match=excerpt.match(/\bon\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})\b/);if(!match)return null;const parsed=Date.parse(match[1]);return Number.isNaN(parsed)?null:new Date(parsed).toISOString();
+}
 export function normalizeTrendResults(results:unknown[],observedAt:string,type:Trend["type"],cutoff:string):Trend[]{
  return results.flatMap(item=>{
   if(!item || typeof item!=="object")return [];const row=item as Record<string,unknown>;
   if(typeof row.url!=="string"||typeof row.title!=="string")return [];
   let url:string;try{const parsed=new URL(row.url);if(parsed.protocol!=="https:"||parsed.username||parsed.password||parsed.port||!parsed.hostname.includes(".")||/^\d+\.\d+\.\d+\.\d+$/.test(parsed.hostname)||/(^|\.)(localhost|local|internal|test|invalid)$/.test(parsed.hostname))return [];url=parsed.href;}catch{return [];}
-  const publishedAt=typeof row.publish_date==="string"&&!Number.isNaN(Date.parse(row.publish_date))?row.publish_date:null;
-  // Undated pages are not evidence of current trends. Never fill a feed
-  // with old rankings just because they were fetched today.
-  if(!publishedAt||Date.parse(publishedAt)<Date.parse(cutoff)||Date.parse(publishedAt)>Date.parse(observedAt))return [];
   const excerpts=Array.isArray(row.excerpts)?row.excerpts.filter((text):text is string=>typeof text==="string").join("\n"):"";
-  // A dated unrelated article is not a social trend observation.
-  if(!trendVideoSource(url)&&!/social media|instagram|tiktok|reels|youtube shorts|trending audio|viral format/i.test(`${row.title} ${excerpts}`))return [];
+  const videoSource=trendVideoSource(url);
+  const reportedDate=typeof row.publish_date==="string"&&!Number.isNaN(Date.parse(row.publish_date))?row.publish_date:null;
+  const publishedAt=reportedDate??tiktokPublishedAt(url)??excerptPublishedAt(excerpts);
+  // Dated observations still have to fall inside the requested window.
+  if(publishedAt&&(Date.parse(publishedAt)<Date.parse(cutoff)||Date.parse(publishedAt)>Date.parse(observedAt)))return [];
+  // Undated original social videos are useful inspiration but are never
+  // represented as verified current trends. Undated non-video pages stay out.
+  if(!publishedAt&&!videoSource)return [];
+  if(!videoSource&&!/social media|instagram|tiktok|reels|youtube shorts|trending audio|viral format/i.test(`${row.title} ${excerpts}`))return [];
   return [{id:url,title:row.title,url,source:new URL(url).hostname,excerpt:excerpts,publishedAt,observedAt,type,status:"unknown" as const,licensing:type==="audio"?"unknown" as const:"not_applicable" as const}];
  });
 }
