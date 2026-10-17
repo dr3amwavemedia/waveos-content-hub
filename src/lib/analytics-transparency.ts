@@ -74,7 +74,7 @@ const SOURCE_REFERENCES: Record<AnalyticsSourceKey, string> = {
   paid: "publishing-provider ads endpoint",
 };
 
-export const ANALYTICS_CALCULATION_VERSION = "waveos-provider-direct-v1";
+export const ANALYTICS_CALCULATION_VERSION = "waveos-provider-post-records-v2";
 
 function emptyMetrics(
   availability: Exclude<AnalyticsAvailability, "available" | "true_zero">,
@@ -110,6 +110,16 @@ function hasMetric(row: Record<string, unknown>) {
  * traversal, which can count the same rollup and child records more than once.
  */
 function metricRows(payload: Record<string, unknown>) {
+  // Zernio overview contains counts, not metrics. Read one per-post rollup;
+  // platforms[].analytics repeats that rollup and must not be added again.
+  if(Array.isArray(payload.posts)) return payload.posts.flatMap(item=>{
+    const post=record(item);if(!post)return [];
+    const analytics=record(post.analytics);return analytics && hasMetric(analytics)?[analytics]:hasMetric(post)?[post]:[];
+  });
+  if(Array.isArray(payload.ads)) return payload.ads.flatMap(item=>{
+    const ad=record(item);if(!ad)return [];
+    const metrics=record(ad.metrics);return metrics && hasMetric(metrics)?[metrics]:[];
+  });
   const preferred = [
     payload.analytics,
     payload.overview,
@@ -188,6 +198,13 @@ export function parseAnalyticsPayload(input: {
       ];
     }),
   ) as Record<AnalyticsMetricKey, AnalyticsMetric>;
+  // Account follower totals are an inventory, not per-post metrics. Include
+  // once in the network source so Combined cannot double-count accounts.
+  if(input.key === "external" && Array.isArray(input.payload.accounts)) {
+    const seen=new Set<string>();
+    const followers=input.payload.accounts.flatMap(item=>{const account=record(item);if(!account)return [];const id=String(account._id??account.id??"");if(!id||seen.has(id))return [];seen.add(id);const value=numericMetric({...account,followers:account.followersCount},"followers");return value===null?[]:[value];});
+    if(followers.length){const value=followers.reduce((sum,current)=>sum+current,0);metrics.followers={value,availability:value===0?"true_zero":"available"};}
+  }
   const availableMetrics = Object.values(metrics).filter((metric) => metric.value !== null);
 
   if (!availableMetrics.length) {

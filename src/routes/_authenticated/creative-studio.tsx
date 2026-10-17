@@ -51,7 +51,8 @@ import { Slider } from "@/components/ui/slider";
 import { clamp, containsPoint, cornerHit, snapPosition, ratioCrop, zoomCrop } from "@/lib/studio-geometry";
 import { STUDIO_FORMATS as FORMATS, STUDIO_FONTS, applyStudioBrand, type DesignFormat, type DesignDocument, type DesignElement, type TextElement, type ShapeElement, type ImageElement } from "@/lib/studio-template-model";
 import { TEMPLATE_LIBRARY, createStudioTemplate } from "@/lib/studio-template-library";
-import { renderStudioArtwork, studioImageUrl } from "@/lib/studio-artwork-renderer";
+import { loadStudioImage, renderStudioArtwork, studioImageUrl } from "@/lib/studio-artwork-renderer";
+import { replaceStudioMedia, studioMediaSlots, supportedBrandFont } from "@/lib/studio-media";
 
 export const Route = createFileRoute("/_authenticated/creative-studio")({
   component: () => (
@@ -167,6 +168,8 @@ function CreativeStudioPage() {
   const format = FORMATS[document.format];
   const mediaAssets = useMediaAssets(workspaceId, { kind: "image" });
   const uploadAsset = useUploadAsset(workspaceId);
+  const mediaSlots = studioMediaSlots(document);
+  const profile = brandProfile.data;
 
   const workflowDraft = useWorkflowDraft<{
     name: string;
@@ -379,10 +382,17 @@ function CreativeStudioPage() {
     setSelectedId(element.id);
   }
 
-  function addImage(assetId: string) {
+  async function addImage(assetId: string) {
     const asset = mediaAssets.data?.find((candidate) => candidate.id === assetId);
+    try {
+      const url=assetUrls[assetId] ?? (asset ? await getMediaPreviewUrl(asset,60*60*6):null);
+      if(!url)throw new Error("Image unavailable");
+      await loadStudioImage(url);
+      setAssetUrls(current=>({...current,[assetId]:url}));
+    }catch{toast.error("This photo cannot be loaded for editing. The existing design is unchanged. Try another image or reconnect its media source.");return;}
     if (replaceId) {
-      updateElement(replaceId, { assetId, sourceType: "media", name: asset?.name ?? "Media image", templateUrl: undefined, crop: undefined });
+      changeDocument(current => replaceStudioMedia(current, replaceId, {assetId}));
+      setSelectedId(replaceId);
       setReplaceId(null); setMobileTool(null); return;
     }
     const sourceWidth = asset?.width ?? 800;
@@ -414,6 +424,10 @@ function CreativeStudioPage() {
       toast.error("Add a workspace logo in Settings before placing it here.");
       return;
     }
+    if(replaceId) {
+      changeDocument(current => replaceStudioMedia(current,replaceId,{assetId:null,sourceType:"workspace-logo"}));
+      setSelectedId(replaceId);setReplaceId(null);setMobileTool(null);return;
+    }
     const element: ImageElement = {
       id: crypto.randomUUID(),
       type: "image",
@@ -432,11 +446,10 @@ function CreativeStudioPage() {
   }
 
   function applyBrand() {
-    // Current Brand Profile exposes no saved-font fields. Use them only if present in an expanded profile; never invent a font.
-    const profile = brandProfile.data as unknown as Record<string,unknown> | null;
-    const font = (key:string) => typeof profile?.[key] === "string" ? String(profile[key]) : undefined;
+    const extended = profile as unknown as Record<string,unknown> | null;
+    const font = (key:string) => supportedBrandFont(extended?.[key]);
     changeDocument(current => {
-      const next=applyStudioBrand(current,{primary:branding.data?.accentColor??palette.primary,secondary:font("secondary_color"),logoUrl:branding.data?.logoUrl,headingFont:font("heading_font"),bodyFont:font("body_font"),accentFont:font("accent_font")});
+      const next=applyStudioBrand(current,{primary:branding.data?.accentColor??palette.primary,secondary:typeof extended?.secondary_color === "string" ? extended.secondary_color : undefined,logoUrl:branding.data?.logoUrl,headingFont:font("heading_font"),bodyFont:font("body_font"),accentFont:font("accent_font"),businessName:profile?.business_name??activeWorkspace?.name,cta:profile?.default_ctas?.[0],website:profile?.website??undefined,services:profile?.primary_services??undefined,serviceArea:profile?.service_area??undefined});
       if(branding.data?.logoUrl && !next.elements.some(e=>e.brandRole === "logo" || e.type === "image" && e.sourceType === "workspace-logo")) next.elements.push({id:crypto.randomUUID(),type:"image",name:"Workspace logo",sourceType:"workspace-logo",assetId:null,x:.86,y:.08,width:140,height:80,opacity:1,rotation:0,brandRole:"logo"});
       return next;
     });
@@ -458,7 +471,7 @@ function CreativeStudioPage() {
       const url = await getMediaPreviewUrl(asset, 60 * 60 * 6);
       if (!url) throw new Error("The uploaded image does not have a preview URL.");
       setAssetUrls((current) => ({ ...current, [asset.id]: url }));
-      addImage(asset.id);
+      await addImage(asset.id);
       toast.success("Image uploaded to the Media Library and added to this design.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Image could not be uploaded.");
@@ -890,6 +903,16 @@ function CreativeStudioPage() {
               <ToolButton icon={WandSparkles} label="Apply my brand" onClick={applyBrand} />
             </div>
           </section>
+          <section className={cn("surface-card p-4", mobileTool !== "Brand" && "hidden sm:block")}>
+            <h2 className="text-sm font-semibold">Brand Assist</h2>
+            <p className="mt-2 text-sm font-medium">{profile?.business_name ?? activeWorkspace?.name}</p>
+            <Button className="mt-3 w-full" variant="outline" onClick={applyBrand}><WandSparkles /> Apply My Brand</Button>
+            <dl className="mt-3 space-y-2 text-xs"><div><dt className="text-muted-foreground">Preferred CTA</dt><dd className="break-words">{profile?.default_ctas?.[0] ?? "Not saved"}</dd></div><div><dt className="text-muted-foreground">Website</dt><dd className="break-words">{profile?.website ?? "Not saved"}</dd></div><div><dt className="text-muted-foreground">Brand voice</dt><dd>{profile?.tone_traits?.join(" · ") || "Not saved"}</dd></div><div><dt className="text-muted-foreground">Saved fonts</dt><dd>Not available — template fonts preserved</dd></div></dl>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {branding.data?.logoUrl && <Button variant="outline" className="h-20" onClick={()=>{const slot=mediaSlots.find(item=>item.role==="logo");if(slot){changeDocument(current=>replaceStudioMedia(current,slot.layer.id,{assetId:null,sourceType:"workspace-logo"}));}else addWorkspaceLogo();}}><img src={branding.data.logoUrl} alt="Primary logo" className="max-h-14 max-w-full object-contain" /></Button>}
+              {(mediaAssets.data??[]).filter(asset=>asset.tags?.some(tag=>["brand","product","team","background"].includes(tag))).map(asset=><Button key={asset.id} variant="outline" className="h-20 overflow-hidden p-0" aria-label={`Use brand photo ${asset.name}`} onClick={()=>{const slot=selectedId?mediaSlots.find(item=>item.layer.id===selectedId):mediaSlots.find(item=>item.role==="background");if(slot){changeDocument(current=>replaceStudioMedia(current,slot.layer.id,{assetId:asset.id}));}else addImage(asset.id);}}>{assetUrls[asset.id]?<img src={assetUrls[asset.id]} alt={asset.name} className="h-full w-full object-cover"/>:<ImageIcon/>}</Button>)}
+            </div>
+          </section>
           <section className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}>
             <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">Templates</h2><Button size="sm" variant="outline" onClick={applyBrand}><WandSparkles /> Apply My Brand</Button></div>
             <div className="mt-3 flex gap-1" role="group" aria-label="Template format">
@@ -907,9 +930,11 @@ function CreativeStudioPage() {
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Media" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">{replaceId ? "Replace image" : "Media Library"}</h2>
+            {mediaSlots.length>0 && <div className="mt-3 space-y-2" aria-label="Replaceable media slots">{mediaSlots.map(({layer,role})=><div key={layer.id} className="flex min-w-0 items-center gap-2"><Button variant={replaceId===layer.id?"secondary":"outline"} className="min-h-11 min-w-0 flex-1 justify-start whitespace-normal text-left text-xs" aria-label={role==="background"?"Replace Background":`Replace ${layer.name}`} onClick={()=>{setReplaceId(layer.id);setSelectedId(layer.id);setMediaTab("All");}}><ImageIcon className="shrink-0"/>{role==="background"?"Replace Background":role==="logo"?"Replace Logo":`Replace ${layer.name}`}</Button><Button size="icon" variant="ghost" aria-label={`Edit ${layer.name}`} onClick={()=>{setSelectedId(layer.id);setCropId(role==="logo"?null:layer.id);setMobileTool(role==="logo"?"Edit":"Crop");}}><Crop/></Button></div>)}{replaceId && <Button variant="ghost" size="sm" onClick={()=>setReplaceId(null)}>Cancel replacement</Button>}</div>}
             <div className="mt-2 flex gap-1">{["All","Uploads","Brand","Recent"].map(tab=><Button key={tab} size="sm" variant={mediaTab === tab ? "secondary" : "ghost"} onClick={()=>setMediaTab(tab)}>{tab}</Button>)}</div>
             {mediaTab === "Brand" && branding.data?.logoUrl && <Button variant="outline" className="mt-3 h-20 w-full" onClick={addWorkspaceLogo}><img src={branding.data.logoUrl} alt="Workspace logo" className="max-h-14 max-w-full object-contain" /></Button>}
             <Button variant="outline" className="mt-3 min-h-11 w-full sm:hidden" onClick={() => uploadInputRef.current?.click()}><Upload /> Upload image</Button>
+            {replaceId && <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Sample photography · generated, not business-owned</summary><div className="mt-2 grid grid-cols-3 gap-2">{Array.from(new Set(TEMPLATE_LIBRARY.map(item=>item.photo))).map((url,index)=><Button key={url} variant="outline" className="aspect-square h-auto overflow-hidden p-0" aria-label={`Replace with sample photo ${index+1}`} onClick={()=>{if(replaceId){changeDocument(current=>replaceStudioMedia(current,replaceId,{assetId:null,templateUrl:url}));setSelectedId(replaceId);setReplaceId(null);setMobileTool(null);}}}><img src={url} alt={`Sample photo ${index+1}`} className="h-full w-full object-cover"/></Button>)}</div></details>}
             <div className="mt-3 grid max-h-[55dvh] grid-cols-3 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-2">
               {(mediaAssets.data ?? []).filter(asset => mediaTab === "All" || mediaTab === "Uploads" || (mediaTab === "Recent" && document.elements.some(item => item.type === "image" && item.assetId === asset.id)) || (mediaTab === "Brand" && asset.tags?.includes("brand"))).map((asset) => (
                 <button

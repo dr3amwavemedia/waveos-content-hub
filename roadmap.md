@@ -32,3 +32,14 @@
 - [x] Verify signed-in mobile Templates, layer editing, undo and export without saving live records.
 - [x] Run focused tests; 7 focused and 171 total passed with command-scoped live-subscription flag false; harness build OK. No migrations.
 - [ ] Saved brand-font and secondary-logo application: current Brand Profile exposes neither; requires separately approved storage/field support. Existing accent/logo application and font-preservation behavior are implemented.
+
+# Graphics and Feature Pack v3
+
+- [x] Add direct template background/media-slot replacement preserving composition and crop; mobile sample replacement passed; unavailable external images leave artwork unchanged.
+- [x] Expand Brand Assist using available real workspace fields; unsupported saved fonts and secondary logos remain approval-blocked.
+- [x] Recreate real-estate reference designs as native editable format-aware templates; mobile finished thumbnails verified.
+- [x] Add sourced Trending Now discovery, evidence/licensing states and explicit Create Post handoff; signed-in source/brief check passed.
+- [x] Diagnose provider mapping/analytics contract and explicit account-scoped refresh; real connected workspace metrics and refresh checked.
+- [x] Run tests and preview checks; 180 unit tests passed; no migrations or publishing.
+- [ ] Durable sync diagnostics, historical snapshots and saved trends: database approval required; requirements in docs/phase2/pack-v3-schema-approval.md.
+- [ ] External workspace photo editing: current selected external content fails to load; source reconnection/access remedy required. Loadable sample replacement and failure preservation verified.

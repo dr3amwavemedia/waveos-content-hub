@@ -22,6 +22,7 @@ type ZernioProfileRow = {
 const workspaceAnalyticsInput = z.object({
   workspaceId: z.string().uuid(),
   days: z.union([z.literal(7), z.literal(30), z.literal(90)]).default(30),
+  refresh: z.boolean().default(false),
 });
 
 const workspaceInput = z.object({ workspaceId: z.string().uuid() });
@@ -69,7 +70,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
           safeMessage: "No publishing-provider profile is connected to this workspace.",
         }),
       );
-      return { sources, requestedRangeStart, requestedRangeEnd };
+      return { sources, requestedRangeStart, requestedRangeEnd, sync: {state:"profile_missing",message:"No provider profile is mapped to this workspace.",lastSuccessAt:null as string|null,accounts:0} };
     }
     const base = new URLSearchParams({
       profileId: profile.profile_id,
@@ -77,22 +78,37 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
       toDate: requestedRangeEnd,
     });
 
-    // Analytics should reflect the connected social accounts, including posts
-    // published directly on the networks. Ask the provider to refresh its
-    // account/post cache before reading metrics. This is intentionally
-    // best-effort: older provider deployments may not expose the refresh
-    // endpoint, and analytics should still fall back to the latest available
-    // provider snapshot instead of failing the whole screen.
+    const sync={state:"available",message:"Provider metrics read successfully.",lastSuccessAt:null as string|null,accounts:0};
     try {
-      await zernioRequest<Record<string, unknown>>("/analytics/sync", { method: "POST" });
-    } catch {
-      // Non-fatal. The source reads below retain their existing availability
-      // and provenance handling when a live refresh is unavailable.
+      const response=await zernioRequest<{accounts?:Array<{_id?:string;profileId?:string|{_id?:string};isActive?:boolean;needsReconnection?:boolean}>}>(`/accounts?profileId=${encodeURIComponent(profile.profile_id)}`);
+      const accounts=(response.accounts??[]).filter(account=>(typeof account.profileId === "string"?account.profileId:account.profileId?._id)===profile.profile_id);
+      sync.accounts=accounts.length;
+      if(!accounts.length){sync.state="not_synced";sync.message="No accounts resolve to this provider profile. Check Social Media accounts.";}
+      if(data.refresh) {
+        const outcomes=await Promise.all(accounts.map(async account=>{
+          if(!account._id)return {availability:"sync_failed",safeMessage:"A provider account identifier is missing."};
+          if(account.needsReconnection || account.isActive===false)return {availability:"connection_expired",safeMessage:"Reconnect this account in Social Media before refreshing."};
+          try{await zernioRequest("/posts/sync-external",{method:"POST",body:JSON.stringify({accountId:account._id})});return null;}
+          catch(reason){return classifyAnalyticsError(reason);}
+        }));
+        const failure=outcomes.find(result=>result!==null);if(failure){sync.state=failure.availability;sync.message=failure.safeMessage;}
+      }
+    } catch(reason) {
+      const failure=classifyAnalyticsError(reason);sync.state=failure.availability;sync.message=failure.safeMessage;
     }
 
     const loadSource = async (key: AnalyticsSourceKey, path: string): Promise<AnalyticsSource> => {
       try {
         const payload = await zernioRequest<Record<string, unknown>>(path);
+        const pagination=payload.pagination as {pages?:number}|undefined;
+        const field=key==="paid"?"ads":"posts";
+        if(Array.isArray(payload[field]) && pagination?.pages && pagination.pages>1){
+          const rows=[...payload[field] as unknown[]];
+          for(let page=2;page<=pagination.pages;page++){const next=await zernioRequest<Record<string,unknown>>(`${path}&page=${page}`);if(Array.isArray(next[field]))rows.push(...next[field] as unknown[]);}
+          payload[field]=rows;
+        }
+        const overview=payload.overview as {lastSync?:string}|undefined;
+        if(overview?.lastSync && (!sync.lastSuccessAt || overview.lastSync>sync.lastSuccessAt))sync.lastSuccessAt=overview.lastSync;
         return parseAnalyticsPayload({
           key,
           payload,
@@ -115,7 +131,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
       loadSource("external", `/analytics?${base}&source=external`),
       loadSource("paid", `/ads?${base}`),
     ]);
-    return { sources, requestedRangeStart, requestedRangeEnd };
+    return { sources, requestedRangeStart, requestedRangeEnd, sync };
   });
 
 export const getSocialIntelligenceProfile = createServerFn({ method: "POST" })
