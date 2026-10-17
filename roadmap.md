@@ -1,9 +1,9 @@
 # Approved mobile refinement
 
 # October 17 subscription preservation and missing foundations
-- [ ] Keep live subscriptions enabled and verify subscription-only gating without changing Stripe behavior.
-- [ ] Add only required missing feature tables and new-table policies; preserve existing records and workspace access.
-- [ ] Verify schema access and run subscription/full unit tests; inspect preview build results.
+- [x] Keep live subscriptions enabled and verify subscription-only gating without changing Stripe behavior; six focused tests pass.
+- [x] Add eleven required missing feature tables and new-table policies; existing billing, client records and memberships unchanged.
+- [x] Verify signed-in feature-table reads return 200, all tables have RLS/no anonymous grants, 202 unit tests pass and preview build OK; save/reload writes not exercised.
 
 # October 16 redesign handoff
 - [x] Simplify media-first Create Post and clear mobile header/navigation; signed-in photo preview and local-draft return checked.
