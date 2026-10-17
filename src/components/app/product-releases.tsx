@@ -52,6 +52,8 @@ export function ProductReleaseProvider({
     setOpenReleaseId(nextRelease.id);
     // Viewing once is enough to prevent the same announcement from auto-opening
     // on a later login. Close/minimize can still record dismissal for history.
+    // Persist immediately on display so a refresh, another device or a later login
+    // can never auto-show this exact release again; closing then records dismissal.
     void center.markState({ release: nextRelease, action: "view" }).catch(() => {
       // The announcement remains usable even if the view receipt cannot be saved.
     });
@@ -67,7 +69,10 @@ export function ProductReleaseProvider({
     setOpenReleaseId(null);
     if (!current || current.state?.dismissed_at || current.state?.acknowledged_at) return;
     try {
-      await center.markState({ release: current, action: "dismiss" });
+      await center.markState({
+        release: { ...current, state: current.state ?? null },
+        action: "dismiss",
+      });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "This update could not be dismissed.");
     }
@@ -110,7 +115,7 @@ export function ProductReleaseProvider({
             <DialogHeader className="pr-9 text-left">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
-                  <Sparkles className="h-3.5 w-3.5" /> What&apos;s new
+                  <Sparkles className="h-3.5 w-3.5" /> New update
                 </span>
                 <span className="text-xs text-muted-foreground">Version {release.version}</span>
               </div>
@@ -147,7 +152,7 @@ export function ProductReleaseProvider({
                 disabled={center.statePending}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 text-sm font-semibold text-primary hover:bg-primary/15 disabled:opacity-60"
               >
-                View updates <ArrowRight className="h-4 w-4" />
+                See what&apos;s new <ArrowRight className="h-4 w-4" />
               </button>
               <button
                 type="button"

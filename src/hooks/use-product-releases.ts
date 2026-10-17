@@ -5,6 +5,7 @@ import { usePermissions } from "@/hooks/use-permissions";
 import { useCurrentUser } from "@/hooks/use-waveos";
 import { supabase } from "@/integrations/supabase/client";
 import {
+  pickOneTimeUpdate,
   releaseMatchesAudience,
   type ProductRelease,
   type ReleaseAudience,
@@ -153,23 +154,20 @@ export function useProductReleases() {
         ...(action === "acknowledge" ? { acknowledged_at: now } : {}),
         ...(action === "dismiss" ? { dismissed_at: now } : {}),
       };
-      if (release.state) {
-        const { error } = await releaseDb
-          .from("release_user_states")
-          .update(patch)
-          .eq("release_id", release.id)
-          .eq("user_id", auth.user.id);
-        if (error) throw error;
-      } else {
-        const { error } = await releaseDb.from("release_user_states").insert({
+      // One row per (release_id, user_id) primary key; upsert never duplicates and
+      // keeps earlier timestamps when the cached state already has them.
+      const { error } = await releaseDb.from("release_user_states").upsert(
+        {
           release_id: release.id,
           user_id: auth.user.id,
           viewed_at: patch.viewed_at,
-          acknowledged_at: action === "acknowledge" ? now : null,
-          dismissed_at: action === "dismiss" ? now : null,
-        });
-        if (error) throw error;
-      }
+          acknowledged_at:
+            action === "acknowledge" ? now : (release.state?.acknowledged_at ?? null),
+          dismissed_at: action === "dismiss" ? now : (release.state?.dismissed_at ?? null),
+        },
+        { onConflict: "release_id,user_id" },
+      );
+      if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["product-releases"] }),
   });
@@ -199,7 +197,7 @@ export function useProductReleases() {
     unreadReleases: releases.filter((release) => !release.state?.acknowledged_at),
     // Announcements are intentionally one-view. A release only becomes a popup when
     // it was explicitly published and this user has never viewed it before.
-    popupRelease: releases.find((release) => !release.state?.viewed_at) ?? null,
+    popupRelease: pickOneTimeUpdate(releases, activeWorkspace?.data_source),
     autoShow: query.data?.autoShow ?? true,
     markState: stateMutation.mutateAsync,
     statePending: stateMutation.isPending,
