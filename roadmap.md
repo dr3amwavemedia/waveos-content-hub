@@ -25,3 +25,9 @@
 - [x] Verify phone, tablet and desktop workflows without changing production or live records; 168 unit tests passed.
 - [ ] AI photo analysis and AI analytics: blocked by the required AI package's release-age safeguard; no substitute is presented as AI.
 - [ ] Physical-device gesture feel: requires a real phone/tablet review; browser touch interactions passed.
+# Approved template reference replacement
+
+- [ ] Replace legacy blue-bar templates with native layered reference-inspired designs and real previews.
+- [ ] Preserve editor/export/history; add format variants and available workspace brand application.
+- [ ] Verify signed-in mobile Templates, layer editing, undo and export without saving live records.
+- [ ] Run focused tests; report missing brand-font storage separately, without migrations.
