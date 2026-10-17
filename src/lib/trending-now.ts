@@ -1,4 +1,3 @@
-import { publicResearchUrl } from "./competitive-research";
 export type Trend = {id:string;title:string;url:string;source:string;excerpt:string;publishedAt:string|null;observedAt:string;type:"audio"|"format"|"hook"|"topic";status:"unknown";licensing:"unknown"|"not_applicable"};
 export const TREND_VIEWS=["For You","Trending Audio","Viral Formats","Trending Hooks","Industry Ideas","Saved Trends"] as const;
 export type TrendView=typeof TREND_VIEWS[number];
@@ -6,12 +5,15 @@ export function normalizeTrendResults(results:unknown[],observedAt:string,type:T
  return results.flatMap(item=>{
   if(!item || typeof item!=="object")return [];const row=item as Record<string,unknown>;
   if(typeof row.url!=="string"||typeof row.title!=="string")return [];
-  let url:string;try{url=publicResearchUrl(row.url);}catch{return [];}
+  let url:string;try{const parsed=new URL(row.url);if(parsed.protocol!=="https:"||parsed.username||parsed.password||parsed.port||!parsed.hostname.includes(".")||/^\d+\.\d+\.\d+\.\d+$/.test(parsed.hostname)||/(^|\.)(localhost|local|internal|test|invalid)$/.test(parsed.hostname))return [];url=parsed.href;}catch{return [];}
   const publishedAt=typeof row.publish_date==="string"&&!Number.isNaN(Date.parse(row.publish_date))?row.publish_date:null;
   // Undated pages are not evidence of current trends. Never fill a feed
   // with old rankings just because they were fetched today.
   if(!publishedAt||Date.parse(publishedAt)<Date.parse(cutoff)||Date.parse(publishedAt)>Date.parse(observedAt))return [];
-  return [{id:url,title:row.title,url,source:new URL(url).hostname,excerpt:Array.isArray(row.excerpts)?row.excerpts.filter((text):text is string=>typeof text==="string").join("\n"):"",publishedAt,observedAt,type,status:"unknown" as const,licensing:type==="audio"?"unknown" as const:"not_applicable" as const}];
+  const excerpts=Array.isArray(row.excerpts)?row.excerpts.filter((text):text is string=>typeof text==="string").join("\n"):"";
+  // A dated unrelated article is not a social trend observation.
+  if(!/social media|instagram|tiktok|reels|trending audio|viral format/i.test(`${row.title} ${excerpts}`))return [];
+  return [{id:url,title:row.title,url,source:new URL(url).hostname,excerpt:excerpts,publishedAt,observedAt,type,status:"unknown" as const,licensing:type==="audio"?"unknown" as const:"not_applicable" as const}];
  });
 }
 export function trendIsStale(trend:Trend,now=Date.now()){return !trend.publishedAt || now-Date.parse(trend.publishedAt)>7*86400000;}
