@@ -1,4 +1,4 @@
-import { STUDIO_FORMATS, type DesignDocument, type ImageElement } from "./studio-template-model";
+import { STUDIO_FORMATS, logoContainSize, type DesignDocument, type ImageElement } from "./studio-template-model";
 const imageCache = new Map<string,Promise<HTMLImageElement>>();
 export function loadStudioImage(url:string) {
   const cached=imageCache.get(url);if(cached)return cached;
@@ -14,7 +14,7 @@ export async function renderStudioArtwork(canvas:HTMLCanvasElement,document:Desi
   for(const element of document.elements){ctx.save();ctx.translate(element.x*format.width,element.y*format.height);ctx.rotate((element.rotation??0)*Math.PI/180);ctx.globalAlpha=element.opacity??1;
     if(element.type === "shape"){ctx.fillStyle=element.color;if(element.shape === "circle"){ctx.beginPath();ctx.ellipse(0,0,element.width/2,element.height/2,0,0,Math.PI*2);ctx.fill();}else ctx.fillRect(-element.width/2,-element.height/2,element.width,element.height);if((element.borderWidth??0)>0){ctx.strokeStyle=element.borderColor??element.color;ctx.lineWidth=element.borderWidth??0;if(element.shape === "circle")ctx.stroke();else ctx.strokeRect(-element.width/2,-element.height/2,element.width,element.height);}}
     else if(element.type === "text"){ctx.fillStyle=element.color;ctx.font=`${element.fontWeight} ${element.fontSize}px "${element.fontFamily??"Inter"}"`;ctx.textAlign=element.align;ctx.textBaseline="middle";ctx.letterSpacing=`${element.letterSpacing??0}px`;const lines=element.text.split("\n").slice(0,8),lineHeight=element.fontSize*1.18;lines.forEach((line,i)=>ctx.fillText(line,0,(i-(lines.length-1)/2)*lineHeight,format.width*.88));}
-    else{const url=studioImageUrl(element,urls,logo);if(url)try{const image=await loadStudioImage(url);ctx.filter=`brightness(${element.brightness??100}%) contrast(${element.contrast??100}%) saturate(${element.saturation??100}%)`;const crop=element.crop??{x:0,y:0,width:1,height:1};ctx.drawImage(image,image.naturalWidth*crop.x,image.naturalHeight*crop.y,image.naturalWidth*crop.width,image.naturalHeight*crop.height,-element.width/2,-element.height/2,element.width,element.height);}catch{ready=false;}else ready=false;}
+    else{const url=studioImageUrl(element,urls,logo);if(url)try{const image=await loadStudioImage(url);ctx.filter=`brightness(${element.brightness??100}%) contrast(${element.contrast??100}%) saturate(${element.saturation??100}%)`;const isLogo=element.brandRole==="logo"||element.mediaRole==="logo"||element.sourceType==="workspace-logo";const crop=isLogo?{x:0,y:0,width:1,height:1}:element.crop??{x:0,y:0,width:1,height:1};const size=isLogo?logoContainSize(element.width,element.height,image.naturalWidth,image.naturalHeight):element;ctx.drawImage(image,image.naturalWidth*crop.x,image.naturalHeight*crop.y,image.naturalWidth*crop.width,image.naturalHeight*crop.height,-size.width/2,-size.height/2,size.width,size.height);}catch{ready=false;}else ready=false;}
     ctx.restore();
   }
   return ready;
