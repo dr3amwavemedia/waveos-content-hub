@@ -35,9 +35,11 @@
 
 # Graphics and Feature Pack v3
 
-- [ ] Add direct template background/media-slot replacement preserving composition and crop; verify on mobile.
-- [ ] Expand Brand Assist using available real workspace fields and report unsupported fields.
-- [ ] Recreate real-estate reference designs as native editable format-aware templates.
-- [ ] Add sourced Trending Now discovery, evidence/licensing states and explicit Create Post handoff.
-- [ ] Diagnose provider mapping/analytics contract, expose meaningful sync state and verify real connected workspace.
-- [ ] Run focused tests and preview checks; report exact schema requirements and stop before migrations.
+- [x] Add direct template background/media-slot replacement preserving composition and crop; mobile sample replacement passed; unavailable external images leave artwork unchanged.
+- [x] Expand Brand Assist using available real workspace fields; unsupported saved fonts and secondary logos remain approval-blocked.
+- [x] Recreate real-estate reference designs as native editable format-aware templates; mobile finished thumbnails verified.
+- [x] Add sourced Trending Now discovery, evidence/licensing states and explicit Create Post handoff; signed-in source/brief check passed.
+- [x] Diagnose provider mapping/analytics contract and explicit account-scoped refresh; real connected workspace metrics and refresh checked.
+- [x] Run tests and preview checks; 180 unit tests passed; no migrations or publishing.
+- [ ] Durable sync diagnostics, historical snapshots and saved trends: database approval required; requirements in docs/phase2/pack-v3-schema-approval.md.
+- [ ] External workspace photo editing: current selected external content fails to load; source reconnection/access remedy required. Loadable sample replacement and failure preservation verified.
