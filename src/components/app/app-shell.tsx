@@ -167,6 +167,7 @@ const STAFF_NAV: NavItem[] = [
     : []),
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true, ownerOnly: true },
   { to: "/os-data", label: "OS Data", icon: Database, staffOnly: true, ownerOnly: true },
+  { to: "/saas-dashboard", label: "SaaS Dashboard", icon: BarChart3, staffOnly: true, ownerOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
   { to: "/templates", label: "DOCUMENTS", icon: FileStack, staffOnly: true, ownerOnly: true },
@@ -427,7 +428,8 @@ function Shell({ children }: { children: ReactNode }) {
               <div className="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Dream Wave Media
               </div>
-              <NavGroup items={staffNav} />
+              <NavGroup items={staffNav.filter(item => item.to !== '/saas-dashboard')} />
+              {isOwner && <><div className="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">WaveOS App</div><NavGroup items={staffNav.filter(item => item.to === '/saas-dashboard')} /></>}
             </>
           )}
         </nav>
@@ -686,7 +688,7 @@ const MOBILE_BUSINESS_PATHS = new Set([
   "/clients", "/projects", "/crm", "/payments", "/templates", "/catalog",
   "/videographer", "/vision-studio", "/admin", "/tools",
 ]);
-const MOBILE_OS_PATHS = new Set(["/os-data"]);
+const MOBILE_OS_PATHS = new Set(["/os-data", "/saas-dashboard"]);
 
 function MobileAdminNav({ items }: { items: NavItem[] }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
