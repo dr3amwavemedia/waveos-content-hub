@@ -1,0 +1,8 @@
+import {test} from 'node:test';import assert from 'node:assert/strict';
+import {normalizeTrendResults,trendIsStale,trendDraftBrief} from '../../src/lib/trending-now.ts';
+test('current trends require dated public sources and never infer metrics or licensing',()=>{
+ const rows=[{url:'https://example.com/recent',title:'Recent format',publish_date:'2026-10-16',excerpts:['Source reports a format']},{url:'https://example.com/old',title:'Old',publish_date:'2025-01-01'},{url:'https://example.com/undated',title:'No date'}];
+ const trends=normalizeTrendResults(rows,'2026-10-17T00:00:00Z','audio','2026-10-10');assert.equal(trends.length,1);assert.equal(trends[0].status,'unknown');assert.equal(trends[0].licensing,'unknown');assert.equal('metrics' in trends[0],false);
+});
+test('stale observations cannot remain silently current',()=>{const trend={publishedAt:'2026-10-01'};assert.equal(trendIsStale(trend,Date.parse('2026-10-17')),true);assert.equal(trendIsStale({publishedAt:'2026-10-16'},Date.parse('2026-10-17')),false);});
+test('draft adaptation retains sources and does not imply audio clearance',()=>{const text=trendDraftBrief({title:'Format',url:'https://example.com/format',publishedAt:'2026-10-16',observedAt:'2026-10-17',type:'audio'},'Dream Wave Media');assert.ok(text.includes('https://example.com/format'));assert.ok(text.includes('Audio rights are unverified'));assert.ok(text.includes('Dream Wave Media'));});
