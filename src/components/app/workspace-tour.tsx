@@ -131,7 +131,18 @@ export function WorkspaceTour({
       } catch {
         // A local first-run guide is preferable to blocking the portal.
       }
-      if (active) setOpen(true);
+      const openWhenUpdateIsClear = () => {
+        if (!active) return;
+        if (document.querySelector("[data-waveos-product-release]")) {
+          window.setTimeout(openWhenUpdateIsClear, 200);
+          return;
+        }
+        setOpen(true);
+      };
+      // Give the one-time product update first priority on a first login.
+      // This avoids stacking two dialogs and starts the guide only after the
+      // update has been dismissed.
+      window.setTimeout(openWhenUpdateIsClear, 250);
     }
     void checkFirstLogin();
     const reopen = () => {
@@ -209,7 +220,7 @@ export function WorkspaceTour({
             type="button"
             disabled={index === 0}
             className="min-h-11 rounded-lg border border-border px-3 text-sm disabled:opacity-40"
-            onClick={() => save(index - 1, true)}
+            onClick={() => save(index - 1)}
           >
             Back
           </button>
@@ -220,7 +231,7 @@ export function WorkspaceTour({
               if (index === steps.length - 1) {
                 save(index, true);
                 setOpen(false);
-              } else save(index + 1, true);
+              } else save(index + 1);
             }}
           >
             {index === steps.length - 1 ? "Done" : "Next"}
