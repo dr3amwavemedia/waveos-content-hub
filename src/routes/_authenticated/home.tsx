@@ -246,7 +246,7 @@ function HomeDashboard() {
           {greeting}, {firstName} 👋
         </h1>
       </header>
-      <header className="hidden gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+      <header className="hidden gap-4 sm:flex sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div className="flex min-w-0 items-center gap-4">
           <WorkspaceBrandmark
             logoUrl={branding.data?.logoUrl}
