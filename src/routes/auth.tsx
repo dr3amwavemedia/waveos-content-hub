@@ -271,8 +271,13 @@ function AuthPage() {
 
     try {
       sessionStorage.setItem(POST_AUTH_NEXT_KEY, nextPath);
-      if (mode === "signup") sessionStorage.setItem(PUBLIC_SIGNUP_KEY, "1");
-      else sessionStorage.removeItem(PUBLIC_SIGNUP_KEY);
+      if (mode === "signup") {
+        sessionStorage.setItem(PUBLIC_SIGNUP_KEY, "1");
+        sessionStorage.setItem(PUBLIC_SIGNUP_PLAN_KEY, signupPlan);
+      } else {
+        sessionStorage.removeItem(PUBLIC_SIGNUP_KEY);
+        sessionStorage.removeItem(PUBLIC_SIGNUP_PLAN_KEY);
+      }
 
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: `${window.location.origin}/auth-callback${mode === "signup" ? "?public_signup=1" : ""}`,
