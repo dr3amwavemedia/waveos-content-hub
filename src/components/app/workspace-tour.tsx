@@ -216,7 +216,7 @@ export function WorkspaceTour({
           max={steps.length}
           className="h-2 w-full accent-primary"
         />
-        {steps.length > 3 && <label className="text-sm">
+        <label className="text-sm">
           Jump to a topic
           <select
             value={index}
@@ -229,7 +229,7 @@ export function WorkspaceTour({
               </option>
             ))}
           </select>
-        </label>}
+        </label>
         <Link
           to={current.to}
           hash={current.hash}
