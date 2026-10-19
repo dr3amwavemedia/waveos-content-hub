@@ -36,6 +36,7 @@ import {
   Palette,
   Radar,
   Flame,
+  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clearAuthenticatedBrowserState } from "@/lib/auth-session-state";
@@ -81,7 +82,7 @@ const CLIENT_NAV: NavItem[] = [
   { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
   {
     to: "/analytics",
-    label: "Analytics Checkup",
+    label: "Analytics",
     icon: BarChart3,
     feature: "can_view_analytics_checkup",
   },
@@ -123,7 +124,7 @@ const PUBLIC_OS_NAV: NavItem[] = [
   { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
   {
     to: "/analytics",
-    label: "Analytics Checkup",
+    label: "Analytics",
     icon: BarChart3,
     feature: "can_view_analytics_checkup",
   },
@@ -206,6 +207,12 @@ const PUBLIC_OS_MOBILE_NAV: NavItem[] = [
   { to: "/settings", label: "More", icon: Settings },
 ];
 
+const PUBLIC_OS_UPSELL_FEATURES = new Set<FeatureKey>([
+  "can_use_creative_studio",
+  "can_use_campaign_manager",
+  "can_use_competitive_intelligence",
+]);
+
 // Layer 1 (project_client) client-facing nav. All entries reuse existing
 // routes — no new routes are created. "Your Content" and "Invoices & Payments"
 // scroll to the corresponding section of the Overview.
@@ -213,7 +220,7 @@ const LAYER1_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
   {
     to: "/analytics",
-    label: "Analytics Checkup",
+    label: "Analytics",
     icon: BarChart3,
     feature: "can_view_analytics_checkup",
   },
@@ -245,7 +252,7 @@ const WEDDING_NAV: NavItem[] = [
   { to: "/wedding-content", label: "Deliveries", icon: Images },
   {
     to: "/analytics",
-    label: "Analytics Checkup",
+    label: "Analytics",
     icon: BarChart3,
     feature: "can_view_analytics_checkup",
   },
@@ -312,6 +319,7 @@ function Shell({ children }: { children: ReactNode }) {
       if (i.staffOnly) return isStaff;
       if (!i.feature) return true;
       if (permsLoading) return false;
+      if (!isStaff && isPublicOs && PUBLIC_OS_UPSELL_FEATURES.has(i.feature)) return true;
       return isStaff ? can(i.feature) : visibility(i.feature) !== "hidden";
     });
 
@@ -640,6 +648,7 @@ function ManagedClientBanner() {
 
 function NavGroup({ items, className }: { items: NavItem[]; className?: string }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const { can, isLoading } = usePermissions();
   return (
     <ul className={cn("space-y-0.5", className)}>
       {items.map((item) => {
@@ -663,7 +672,10 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
                   active ? "text-primary" : "text-muted-foreground group-hover:text-foreground",
                 )}
               />
-              {item.label}
+              <span className="min-w-0 flex-1">{item.label}</span>
+              {!isLoading && item.feature && !can(item.feature) && (
+                <Lock className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Upgrade required" />
+              )}
               {active && (
                 <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px] shadow-primary" />
               )}

@@ -71,7 +71,7 @@ export const Route = createFileRoute("/_authenticated/payments")({
       .select("role")
       .eq("user_id", data.user.id);
     if (!(roles ?? []).some((role) => role.role === "dream_wave_owner"))
-      throw redirect({ to: "/home" });
+      throw redirect({ to: "/settings" });
   },
   component: PaymentsPage,
   head: () => ({ meta: [{ title: "Payments — WaveOS" }, { name: "description", content: "Review invoice progress and payment activity in WaveOS." }, { property: "og:title", content: "Payments — WaveOS" }, { property: "og:description", content: "Review invoice progress and payment activity." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }] }),

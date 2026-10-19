@@ -199,6 +199,7 @@ export function useProductReleases() {
     // it was explicitly published and this user has never viewed it before.
     popupRelease: pickOneTimeUpdate(releases, activeWorkspace?.data_source),
     autoShow: query.data?.autoShow ?? true,
+    audience,
     markState: stateMutation.mutateAsync,
     statePending: stateMutation.isPending,
     setAutoShow: preferenceMutation.mutateAsync,

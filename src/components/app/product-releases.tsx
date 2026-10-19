@@ -43,6 +43,8 @@ export function ProductReleaseProvider({
   const [openReleaseId, setOpenReleaseId] = useState<string | null>(null);
   const autoOpened = useRef(new Set<string>());
   const release = center.releases.find((item) => item.id === openReleaseId) ?? null;
+  const publicPlan = center.audience?.publicPlan ?? null;
+  const displayBody = release ? releaseBodyForPlan(release.body, publicPlan) : "";
 
   useEffect(() => {
     if (!autoOpen || !center.popupRelease) return;
@@ -111,13 +113,18 @@ export function ProductReleaseProvider({
         }}
       >
         {release && (
-          <DialogContent className="max-h-[min(42rem,calc(100dvh-2rem))] w-[calc(100%-1.5rem)] max-w-xl overflow-y-auto rounded-2xl border-border p-5 sm:p-6">
+          <DialogContent data-waveos-product-release className="max-h-[min(42rem,calc(100dvh-2rem))] w-[calc(100%-1.5rem)] max-w-xl overflow-y-auto rounded-2xl border-border p-5 sm:p-6">
             <DialogHeader className="pr-9 text-left">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
                   <Sparkles className="h-3.5 w-3.5" /> New update
                 </span>
                 <span className="text-xs text-muted-foreground">Version {release.version}</span>
+                {publicPlan && (
+                  <span className="rounded-full border border-border bg-elevated px-2 py-1 text-[11px] font-semibold text-muted-foreground">
+                    Your plan: {publicPlanName(publicPlan)}
+                  </span>
+                )}
               </div>
               <DialogTitle className="text-2xl leading-tight">{release.title}</DialogTitle>
               <DialogDescription className="pt-1 text-sm leading-6">
@@ -125,9 +132,15 @@ export function ProductReleaseProvider({
               </DialogDescription>
             </DialogHeader>
 
-            {release.body.trim() && (
-              <div className="whitespace-pre-line rounded-xl border border-border bg-surface/55 p-4 text-sm leading-6 text-foreground/90">
-                {release.body}
+            {displayBody.trim() && (
+              <div className="max-h-40 overflow-hidden whitespace-pre-line rounded-xl border border-border bg-surface/55 p-4 text-sm leading-6 text-foreground/90 sm:max-h-none">
+                {displayBody}
+              </div>
+            )}
+            {(publicPlan === "standard" || publicPlan === "trial") && (
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-5 text-muted-foreground">
+                <span className="font-semibold text-foreground">Also available on Current & Tidal:</span>{" "}
+                Creative Studio, Campaign Manager and Trending Now.
               </div>
             )}
 
@@ -238,4 +251,26 @@ export function ReleaseStatus({ release }: { release: ApplicableRelease }) {
     return <span className="text-xs font-medium text-emerald-300">Read</span>;
   }
   return <span className="text-xs font-medium text-primary">New</span>;
+}
+
+
+function publicPlanName(plan: string) {
+  if (plan === "standard") return "Ripple";
+  if (plan === "full") return "Current";
+  if (plan === "expanded") return "Tidal";
+  if (plan === "trial") return "Promo trial";
+  return plan;
+}
+
+function releaseBodyForPlan(body: string, plan: string | null) {
+  if (plan !== "standard" && plan !== "trial") return body;
+  return body
+    .split("\n")
+    .filter(
+      (line) =>
+        !/creative studio|campaign manager|trending now|competitive intelligence/i.test(line),
+    )
+    .slice(0, 8)
+    .join("\n")
+    .trim();
 }

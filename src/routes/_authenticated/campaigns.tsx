@@ -33,8 +33,8 @@ export const Route = createFileRoute("/_authenticated/campaigns")({
   component: () => (
     <RequireFeature
       feature="can_use_campaign_manager"
-      title="Campaign Manager isn't included in this plan"
-      description="Internal campaign planning is available with Current, Tidal, Full Retainer, and Social Management access."
+      title="Campaign Manager is available with Current or Tidal"
+      description="Upgrade your WaveOS plan to build and organize multi-post campaigns."
     >
       <CampaignManagerPage />
     </RequireFeature>

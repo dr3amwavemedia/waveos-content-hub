@@ -61,8 +61,8 @@ export const Route = createFileRoute("/_authenticated/creative-studio")({
   component: () => (
     <RequireFeature
       feature="can_use_creative_studio"
-      title="Creative Studio isn't included in this plan"
-      description="Static image design is available with Current, Tidal, Full Retainer, and Social Management access."
+      title="Creative Studio is available with Current or Tidal"
+      description="Upgrade your WaveOS plan to use branded design tools and templates."
     >
       <CreativeStudioPage />
     </RequireFeature>

@@ -392,7 +392,7 @@ function CreatePost() {
     if (!workspaceId) return;
     if (!canUseAiAssist) return toast.error("AI Assist is available on Current and Tidal plans.");
     const brief = caption.trim() || title.trim();
-    if (!brief) return toast.error("Add a short post idea or internal title first.");
+    if (!brief) return toast.error("Add a short post idea or post title first.");
     setAssisting(true);
     try {
       const result = await assist({
@@ -676,7 +676,7 @@ function CreatePost() {
           )}
           <div className="order-2 space-y-3 border-b border-border pb-5">
             <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Internal title
+              Post title
             </label>
             <input
               value={title}
@@ -686,7 +686,7 @@ function CreatePost() {
             />
 
             <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Primary caption
+              Caption
             </label>
             <textarea
               value={caption}
