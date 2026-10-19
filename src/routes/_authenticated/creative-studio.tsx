@@ -1083,7 +1083,7 @@ function CreativeStudioPage() {
               <Button variant="outline" onClick={()=>updateElement(selected.id,{rotation:(selected.rotation+90)%360})}><RotateCw /> Rotate</Button>
             </> : mobileTool === "Looks" ? <div className="flex gap-2 overflow-x-auto">{[{name:"Original",brightness:100,contrast:100,saturation:100},{name:"Clean",brightness:105,contrast:108,saturation:95},{name:"Warm",brightness:104,contrast:103,saturation:115},{name:"Cool",brightness:100,contrast:105,saturation:85},{name:"Bright",brightness:118,contrast:102,saturation:105},{name:"Moody",brightness:85,contrast:120,saturation:80},{name:"Cinematic",brightness:95,contrast:125,saturation:75},{name:"Soft",brightness:108,contrast:88,saturation:92}].map(look=><Button key={look.name} variant="outline" className="h-auto w-20 shrink-0 flex-col p-1" onClick={()=>updateElement(selected.id,{brightness:look.brightness,contrast:look.contrast,saturation:look.saturation})}><img src={studioImageUrl(selected,assetUrls,branding.data?.logoUrl)??""} alt={look.name} className="aspect-square w-full object-cover" style={{filter:`brightness(${look.brightness}%) contrast(${look.contrast}%) saturate(${look.saturation}%)`}}/><span>{look.name}</span></Button>)}</div>
             : mobileTool === "Auto" ? <><p className="text-sm text-muted-foreground">AI image analysis is temporarily unavailable. These are optional manual presets, not image analysis.</p>{["brightness","contrast","saturation"].map(key=><label key={key} className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={lookChoices.includes(key)} onChange={e=>setLookChoices(v=>e.target.checked?[...v,key]:v.filter(k=>k!==key))}/><span className="capitalize">{key === "brightness" ? "Slight brightness" : key === "contrast" ? "Gentle contrast" : "Subtle saturation"}</span></label>)}<Button onClick={()=>updateElement(selected.id,Object.fromEntries(lookChoices.map(key=>[key,key === "brightness"?108:105])))}>Apply selected presets</Button></>
-            : <><div className="flex flex-wrap gap-1">{[{key:"brightness",label:"Exposure"},{key:"contrast",label:"Contrast"},{key:"saturation",label:"Saturation"}].map(item=><Button key={item.key} size="sm" variant={adjustment===item.key?"secondary":"ghost"} onClick={()=>setAdjustment(item.key)}>{item.label}</Button>)}</div><label className="block space-y-4"><span className="flex justify-between text-sm capitalize">{adjustment}<span>{selected[adjustment as "brightness"|"contrast"|"saturation"]??100}%</span></span><Slider aria-label={adjustment} value={[selected[adjustment as "brightness"|"contrast"|"saturation"]??100]} min={0} max={200} onValueChange={([value])=>updateElement(selected.id,{[adjustment]:value})}/></label></>}
+            : <PhotoAdjustments selected={selected} adjustment={adjustment} setAdjustment={setAdjustment} onChange={(patch)=>updateElement(selected.id,patch)} />}
           </section>}
           {mobileTool === "More" && <div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>setMobileTool("Layers")}><Layers3 /> Layers</Button><Button variant="outline" onClick={()=>setMobileTool("Canvas")}><Square /> Canvas</Button>{selected?.type === "image" && <Button variant="outline" onClick={()=>{setReplaceId(selected.id);setMobileTool("Media");}}><ImageIcon /> Replace</Button>}<Button variant="outline" onClick={exportPng}><Download /> Export</Button></div>}
 
@@ -1112,13 +1112,75 @@ function CreativeStudioPage() {
       </div>
 
       {mobileStarted && <div className="studio-context-toolbar sticky bottom-0 z-10 border-t border-border bg-background pb-[max(.5rem,env(safe-area-inset-bottom))] sm:hidden">
-        <div className="flex justify-evenly gap-1" aria-label="Editing tools">
-          {(selected?.type === "image" ? selected.sourceType === "workspace-logo" ? ["Replace","Size","Opacity","Position","More"] : ["Auto","Crop","Adjust","Looks","Remove","More"] : selected?.type === "text" ? ["Font","Size","Color","Style","Align","More"] : selected?.type === "shape" ? ["Fill","Border","Opacity","Arrange","More"] : ["Add","Media","Templates","Brand","More"]).map(label=><Button key={label} variant="ghost" className="h-auto min-h-16 min-w-0 flex-1 flex-col gap-1 px-0 text-[10px]" onClick={()=>{if(label === "Remove" && selected){removeElement(selected.id);return;}if(label === "Replace" && selected){setReplaceId(selected.id);setMobileTool("Media");return;}setMobileTool(label);}}>{label === "More" ? <MoreHorizontal /> : label === "Crop" ? <Crop /> : label === "Font" ? <Type /> : label === "Media" || label === "Replace" ? <ImageIcon /> : label === "Color" || label === "Fill" || label === "Looks" ? <Palette /> : label === "Remove" ? <Trash2 /> : label === "Auto" || label === "Brand" ? <WandSparkles /> : <SlidersHorizontal />}{label}</Button>)}
+        {photoMode && !document.elements.some(element => element.type === "image" && element.sourceType !== "workspace-logo") && (
+          <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-foreground">Choose a photo to edit</p>
+              <p className="truncate text-[10px] text-muted-foreground">You can add text or shapes anytime, but photo controls appear after media is added.</p>
+            </div>
+            <Button size="sm" variant="secondary" onClick={()=>setMobileTool("Media")}><ImagePlus/>Choose media</Button>
+          </div>
+        )}
+        <div className="flex items-center gap-1 overflow-x-auto px-1" aria-label="Editing tools">
+          <Button variant="ghost" className="h-auto min-h-16 min-w-[4.5rem] flex-col gap-1 px-1 text-[10px]" onClick={()=>{setSelectedId(null);setReplaceId(null);setCropId(null);setMobileTool(null);}}><ArrowLeft />Tools</Button>
+          <Button variant="ghost" className="h-auto min-h-16 min-w-[4.5rem] flex-col gap-1 px-1 text-[10px]" onClick={()=>{if(selected?.type==="image"){setReplaceId(selected.id);}setMobileTool("Media");}}><ImageIcon />Media</Button>
+          {(selected?.type === "image" ? selected.sourceType === "workspace-logo" ? ["Replace","Size","Opacity","Position","More"] : ["Auto","Crop","Adjust","Looks","Remove","More"] : selected?.type === "text" ? ["Font","Size","Color","Style","Align","More"] : selected?.type === "shape" ? ["Fill","Border","Opacity","Arrange","More"] : ["Add","Templates","Brand","More"]).map(label=><Button key={label} variant="ghost" className="h-auto min-h-16 min-w-[4.5rem] flex-col gap-1 px-1 text-[10px]" onClick={()=>{if(label === "Remove" && selected){removeElement(selected.id);return;}if(label === "Replace" && selected){setReplaceId(selected.id);setMobileTool("Media");return;}setMobileTool(label);}}>{label === "More" ? <MoreHorizontal /> : label === "Crop" ? <Crop /> : label === "Font" ? <Type /> : label === "Replace" ? <ImageIcon /> : label === "Color" || label === "Fill" || label === "Looks" ? <Palette /> : label === "Remove" ? <Trash2 /> : label === "Auto" || label === "Brand" ? <WandSparkles /> : <SlidersHorizontal />}{label}</Button>)}
         </div>
       </div>}
       {!mobileStarted && document.elements.length > 0 && <section className="space-y-3 sm:hidden"><Button className="w-full" onClick={()=>setMobileStarted(true)}>Continue editing</Button><div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>void saveServerDraft()} disabled={workflowDraft.save.isPending}><Save /> Save draft</Button><Button variant="outline" onClick={exportPng}><Download /> Export</Button><Button variant="outline" aria-label="Send to post" onClick={()=>void sendToPost("feed")} disabled={uploadAsset.isPending}><ImagePlus /> Post to feed</Button><Button variant="outline" onClick={()=>void sendToPost("story")} disabled={uploadAsset.isPending}><ImagePlus /> Post to story</Button></div><Button variant="outline" className="w-full" onClick={()=>saveDesign.mutate()} disabled={saveDesign.isPending}><Save /> Save editable design</Button></section>}
 
     </div>
+  );
+}
+
+function PhotoAdjustments({
+  selected,
+  adjustment,
+  setAdjustment,
+  onChange,
+}: {
+  selected: ImageElement;
+  adjustment: string;
+  setAdjustment: (value: string) => void;
+  onChange: (patch: Partial<ImageElement>) => void;
+}) {
+  const controls = [
+    { key: "brightness", label: "Exposure", min: 0, max: 200, neutral: 100, suffix: "%" },
+    { key: "contrast", label: "Contrast", min: 0, max: 200, neutral: 100, suffix: "%" },
+    { key: "saturation", label: "Saturation", min: 0, max: 200, neutral: 100, suffix: "%" },
+    { key: "warmth", label: "Warmth", min: -100, max: 100, neutral: 0, suffix: "" },
+    { key: "highlights", label: "Highlights", min: -100, max: 100, neutral: 0, suffix: "" },
+    { key: "shadows", label: "Shadows", min: -100, max: 100, neutral: 0, suffix: "" },
+  ] as const;
+  const control = controls.find(item => item.key === adjustment) ?? controls[0];
+  const value = selected[control.key] ?? control.neutral;
+  return (
+    <>
+      <div className="flex gap-1 overflow-x-auto pb-1">
+        {controls.map(item => (
+          <Button key={item.key} size="sm" variant={adjustment===item.key?"secondary":"ghost"} className="shrink-0" onClick={()=>setAdjustment(item.key)}>
+            {item.label}
+          </Button>
+        ))}
+      </div>
+      <label className="block space-y-4">
+        <span className="flex justify-between text-sm">
+          {control.label}
+          <span>{value}{control.suffix}</span>
+        </span>
+        <Slider
+          aria-label={control.label}
+          value={[value]}
+          min={control.min}
+          max={control.max}
+          onValueChange={([next])=>onChange({[control.key]:next})}
+        />
+      </label>
+      <div className="flex justify-between gap-2">
+        <Button variant="ghost" size="sm" onClick={()=>onChange({[control.key]:control.neutral})}>Reset {control.label}</Button>
+        <Button variant="ghost" size="sm" onClick={()=>onChange({brightness:100,contrast:100,saturation:100,warmth:0,highlights:0,shadows:0})}>Reset photo</Button>
+      </div>
+    </>
   );
 }
 
