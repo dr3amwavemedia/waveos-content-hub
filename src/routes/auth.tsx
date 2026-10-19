@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Check, Loader2, Sparkles, Users2, WandSparkles } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { sendAccountSupportRequest, tryEmail } from "@/lib/transactional-email";
@@ -19,6 +19,63 @@ type PublicSignupPlan =
   | "full_annual"
   | "expanded_monthly"
   | "expanded_annual";
+
+const SIGNUP_PLAN_FEATURES = {
+  standard: {
+    label: "Ripple",
+    eyebrow: "Core publishing",
+    monthly: "$39.99 / month",
+    annual: "$479.88 / year",
+    accounts: "3 connected social accounts",
+    summary: "Create, publish, organize, and understand your content.",
+    features: [
+      "Create Post with platform-specific captions",
+      "Publish content now",
+      "Social account connections",
+      "Analytics + Analytics Checkup",
+      "Media Library and uploads",
+      "Brand Voice profile",
+      "Content Calendar",
+      "Workspace activity and account settings",
+    ],
+  },
+  full: {
+    label: "Current",
+    eyebrow: "Creation + planning",
+    monthly: "$69.99 / month",
+    annual: "$797.89 / year · save 5%",
+    accounts: "4 connected social accounts",
+    summary: "Everything in Ripple, plus the full creative and planning toolkit.",
+    features: [
+      "Everything included in Ripple",
+      "AI Assist for content creation",
+      "Post scheduling",
+      "Creative Studio with templates and photo editing",
+      "Crop, exposure, contrast, saturation, warmth, highlights, and shadows",
+      "Campaign Manager",
+      "Trending Now trend discovery",
+      "Competitive Intelligence research",
+    ],
+  },
+  expanded: {
+    label: "Tidal",
+    eyebrow: "Team + scale",
+    monthly: "$119.99 / month",
+    annual: "$1,295.89 / year · save 10%",
+    accounts: "8 connected social accounts",
+    summary: "Everything in Current, with more account capacity and team access.",
+    features: [
+      "Everything included in Current",
+      "8 connected social accounts",
+      "Invite team members to your WaveOS workspace",
+      "AI Assist and post scheduling",
+      "Creative Studio + photo editor",
+      "Campaign Manager",
+      "Trending Now + Competitive Intelligence",
+      "Best fit for growing multi-account teams",
+    ],
+  },
+} as const;
 
 export const Route = createFileRoute("/auth")({
   component: AuthPage,
@@ -214,8 +271,13 @@ function AuthPage() {
 
     try {
       sessionStorage.setItem(POST_AUTH_NEXT_KEY, nextPath);
-      if (mode === "signup") sessionStorage.setItem(PUBLIC_SIGNUP_KEY, "1");
-      else sessionStorage.removeItem(PUBLIC_SIGNUP_KEY);
+      if (mode === "signup") {
+        sessionStorage.setItem(PUBLIC_SIGNUP_KEY, "1");
+        sessionStorage.setItem(PUBLIC_SIGNUP_PLAN_KEY, signupPlan);
+      } else {
+        sessionStorage.removeItem(PUBLIC_SIGNUP_KEY);
+        sessionStorage.removeItem(PUBLIC_SIGNUP_PLAN_KEY);
+      }
 
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: `${window.location.origin}/auth-callback${mode === "signup" ? "?public_signup=1" : ""}`,
@@ -251,7 +313,7 @@ function AuthPage() {
   return (
     <div className="relative flex min-h-screen items-center justify-center px-3 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] sm:px-4 sm:py-12">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_50%_0%,color-mix(in_oklab,var(--color-primary)_18%,transparent),transparent_70%)]" />
-      <div className="relative w-full max-w-md">
+      <div className={`relative w-full ${mode === "signup" ? "max-w-5xl" : "max-w-md"}`}>
         <div className="mb-8 flex justify-center">
           <Link to="/" className="inline-flex min-h-11 items-center" aria-label="WaveOS home">
             <WaveLogo />
@@ -329,84 +391,65 @@ function AuthPage() {
                     Annual
                   </div>
                 </div>
-                {(
-                  [
-                    [
-                      "standard",
-                      "Ripple",
-                      annualBilling ? "$479.88 / year" : "$39.99 / month",
-                      "3 accounts · core tools",
-                      [
-                        "3 connected social accounts",
-                        "Create and publish content",
-                        "Analytics and media library",
-                      ],
-                    ],
-                    [
-                      "full",
-                      "Current",
-                      annualBilling ? "$797.89 / year · save 5%" : "$69.99 / month",
-                      "4 accounts · AI Assist + scheduling",
-                      [
-                        "Everything in Ripple",
-                        "4 connected social accounts",
-                        "Generative AI Assist",
-                        "Post scheduling",
-                      ],
-                    ],
-                    [
-                      "expanded",
-                      "Tidal",
-                      annualBilling ? "$1,295.89 / year · save 10%" : "$119.99 / month",
-                      "8 accounts · AI Assist + scheduling",
-                      [
-                        "Everything in Current",
-                        "8 connected social accounts",
-                        "Best for growing teams",
-                      ],
-                    ],
-                  ] as const
-                ).map(([plan, label, price, detail, features]) => {
-                  const value =
-                    `${plan}_${annualBilling ? "annual" : "monthly"}` as PublicSignupPlan;
-                  const selected = signupPlan === value;
-                  return (
-                    <button
-                      type="button"
-                      key={plan}
-                      onClick={() => setSignupPlan(value)}
-                      aria-pressed={selected}
-                      className={`min-h-12 w-full rounded-xl border px-3 py-3 text-left text-sm transition-all duration-200 active:scale-[0.98] ${selected ? "-translate-y-0.5 border-primary bg-primary/10 shadow-lg shadow-primary/10" : "border-border bg-surface/50 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-elevated"}`}
-                    >
-                      <span className="flex flex-col items-start gap-2 min-[380px]:flex-row min-[380px]:justify-between min-[380px]:gap-3">
-                        <span className="flex items-center gap-2">
-                          <span
-                            aria-hidden="true"
-                            className={`h-3.5 w-3.5 rounded-full border ${selected ? "border-primary bg-primary ring-2 ring-primary/20" : "border-border"}`}
-                          />
-                          <span>
-                            <span className="block font-semibold text-foreground">{label}</span>
-                            <span className="block text-[11px] text-muted-foreground">
-                              {detail}
+                <div className="grid gap-3 lg:grid-cols-3">
+                  {(Object.entries(SIGNUP_PLAN_FEATURES) as Array<
+                    [keyof typeof SIGNUP_PLAN_FEATURES, (typeof SIGNUP_PLAN_FEATURES)[keyof typeof SIGNUP_PLAN_FEATURES]]
+                  >).map(([plan, details]) => {
+                    const value =
+                      `${plan}_${annualBilling ? "annual" : "monthly"}` as PublicSignupPlan;
+                    const selected = signupPlan === value;
+                    const Icon =
+                      plan === "expanded" ? Users2 : plan === "full" ? WandSparkles : Sparkles;
+                    return (
+                      <button
+                        type="button"
+                        key={plan}
+                        onClick={() => setSignupPlan(value)}
+                        aria-pressed={selected}
+                        className={`relative flex h-full min-h-12 w-full flex-col rounded-2xl border p-4 text-left text-sm transition-all duration-200 active:scale-[0.99] ${selected ? "-translate-y-0.5 border-primary bg-primary/10 shadow-lg shadow-primary/10" : "border-border bg-surface/50 hover:-translate-y-0.5 hover:border-primary/40 hover:bg-elevated"}`}
+                      >
+                        {plan === "full" && (
+                          <span className="absolute right-3 top-3 rounded-full border border-primary/25 bg-primary/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-primary">
+                            Most popular
+                          </span>
+                        )}
+                        <span className="flex items-start gap-3 pr-16">
+                          <span className={`mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl border ${selected ? "border-primary/40 bg-primary/15 text-primary" : "border-border bg-elevated text-muted-foreground"}`}>
+                            <Icon className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                              {details.eyebrow}
+                            </span>
+                            <span className="mt-0.5 block text-lg font-semibold text-foreground">
+                              {details.label}
                             </span>
                           </span>
                         </span>
-                        <span className="shrink-0 text-xs font-semibold text-foreground">
-                          {price}
+                        <span className="mt-4 block text-xl font-semibold text-foreground">
+                          {annualBilling ? details.annual : details.monthly}
                         </span>
-                      </span>
-                      {selected && (
-                        <span className="mt-3 grid gap-1 border-t border-primary/20 pt-3 text-[11px] text-muted-foreground">
-                          {features.map((feature) => (
-                            <span key={feature} className="flex items-center gap-2">
-                              <span className="text-primary">✓</span> {feature}
+                        <span className="mt-1 block text-xs font-semibold text-primary">
+                          {details.accounts}
+                        </span>
+                        <span className="mt-2 block text-xs leading-5 text-muted-foreground">
+                          {details.summary}
+                        </span>
+                        <span className="mt-4 grid flex-1 gap-2 border-t border-border/80 pt-4 text-[11px] leading-4 text-muted-foreground">
+                          {details.features.map((feature) => (
+                            <span key={feature} className="flex items-start gap-2">
+                              <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                              <span>{feature}</span>
                             </span>
                           ))}
                         </span>
-                      )}
-                    </button>
-                  );
-                })}
+                        <span className={`mt-4 inline-flex min-h-9 items-center justify-center rounded-lg border px-3 text-xs font-semibold ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground"}`}>
+                          {selected ? "Selected" : `Choose ${details.label}`}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
                 <p className="text-[11px] leading-4 text-muted-foreground">
                   After confirming your email, Stripe will securely collect payment. Workspace tools
                   unlock only after payment succeeds.
