@@ -1,4 +1,5 @@
 import { Lock, Sparkles } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { FeatureKey } from "@/lib/permissions";
@@ -37,10 +38,14 @@ export function LockedPreview({
   title = "Available with a Full Retainer",
   description = "Upgrade to a 6- or 12-month Dream Wave Media retainer to unlock this workspace tool.",
   children,
+  ctaLabel = "View account options",
+  ctaTo = "/settings",
 }: {
   title?: string;
   description?: string;
   children?: ReactNode;
+  ctaLabel?: string;
+  ctaTo?: "/settings" | "/home";
 }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-b from-surface/60 to-surface/20 p-6">
@@ -51,15 +56,12 @@ export function LockedPreview({
         </div>
         <h3 className="text-lg font-semibold text-foreground">{title}</h3>
         <p className="max-w-lg text-sm text-muted-foreground">{description}</p>
-        <button
-          type="button"
-          className="mt-2 inline-flex items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
-          onClick={() => {
-            window.location.href = "mailto:jessehayes@dwmsrq.com?subject=Upgrade%20my%20WaveOS%20access";
-          }}
+        <Link
+          to={ctaTo}
+          className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
         >
-          <Sparkles className="h-4 w-4" /> Learn about full access
-        </button>
+          <Sparkles className="h-4 w-4" /> {ctaLabel}
+        </Link>
       </div>
     </div>
   );
