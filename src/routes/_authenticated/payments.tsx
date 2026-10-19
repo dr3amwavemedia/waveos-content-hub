@@ -2,6 +2,9 @@ import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { CheckCircle2, ReceiptText, Plus, FileText, Clock3, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { LockedPreview } from "@/components/app/feature-gate";
+import { useCurrentUser } from "@/hooks/use-waveos";
+import { useWorkspace } from "@/components/app/workspace-context";
 import {
   Bar,
   BarChart,
@@ -66,16 +69,51 @@ export const Route = createFileRoute("/_authenticated/payments")({
   beforeLoad: async () => {
     const { data } = await supabase.auth.getUser();
     if (!data.user) throw redirect({ to: "/auth" });
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", data.user.id);
-    if (!(roles ?? []).some((role) => role.role === "dream_wave_owner"))
-      throw redirect({ to: "/settings" });
   },
-  component: PaymentsPage,
+  component: PaymentsRoute,
   head: () => ({ meta: [{ title: "Payments — WaveOS" }, { name: "description", content: "Review invoice progress and payment activity in WaveOS." }, { property: "og:title", content: "Payments — WaveOS" }, { property: "og:description", content: "Review invoice progress and payment activity." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }] }),
 });
+
+function PaymentsRoute() {
+  const { data: user, isLoading } = useCurrentUser();
+  const { activeWorkspace } = useWorkspace();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
+        Loading payments…
+      </div>
+    );
+  }
+
+  if (!user?.isDreamWaveOwner) {
+    const isWaveOsAccount = activeWorkspace?.data_source === "os_data";
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <LockedPreview
+          title={isWaveOsAccount ? "Payments is a Dream Wave business tool" : "Payments access is restricted"}
+          description={
+            isWaveOsAccount
+              ? "Your WaveOS subscription billing and plan options live in Settings. The Payments dashboard is reserved for Dream Wave Media business administration."
+              : "The Payments dashboard contains Dream Wave Media business records and is available only to authorized owners."
+          }
+          ctaLabel={isWaveOsAccount ? "View billing & plans" : "Back to account settings"}
+          ctaTo="/settings"
+        />
+        <div className="text-center">
+          <Link
+            to="/home"
+            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-border bg-surface/60 px-4 text-sm text-foreground hover:bg-elevated"
+          >
+            Back to overview
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return <PaymentsPage />;
+}
 
 function dateKey(value: string): string {
   return new Intl.DateTimeFormat("en-CA", {

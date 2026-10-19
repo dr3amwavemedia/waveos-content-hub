@@ -1,7 +1,7 @@
 import { RequireFeature } from "@/components/app/require-feature";
 import { Button } from "@/components/ui/button";
 import { studioPostKey,studioReturnedMedia,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -390,7 +390,7 @@ function CreatePost() {
 
   async function handleCaptionAssist() {
     if (!workspaceId) return;
-    if (!canUseAiAssist) return toast.error("AI Assist is available on Current and Tidal plans.");
+    if (!canUseAiAssist) return toast.info("AI Assist is included with Current and Tidal. Your Ripple draft is still ready to edit manually.");
     const brief = caption.trim() || title.trim();
     if (!brief) return toast.error("Add a short post idea or post title first.");
     setAssisting(true);
@@ -428,7 +428,7 @@ function CreatePost() {
 
   async function handleScheduleLater() {
     if (!workspaceId) return;
-    if (!canSchedule) return toast.error("Scheduling is available on Current and Tidal plans.");
+    if (!canSchedule) return toast.info("Scheduling is included with Current and Tidal. You can still publish this post now on Ripple.");
     if (!caption.trim()) return toast.error("Add a caption before scheduling");
     if (!platforms.length) return toast.error("Pick at least one platform");
     const missingDestination = platforms.find((selectedPlatform) => {
@@ -830,8 +830,16 @@ function CreatePost() {
             <p className="text-[11px] text-muted-foreground">
               {canSchedule
                 ? "Leave empty when you want to publish immediately."
-                : "Upgrade to Current or Tidal to schedule posts."}
+                : "Scheduling is included with Current and Tidal. Ripple can still publish immediately."}
             </p>
+            {!canSchedule && (
+              <Link
+                to="/settings"
+                className="inline-flex min-h-10 items-center text-xs font-semibold text-primary hover:underline"
+              >
+                Compare WaveOS plans
+              </Link>
+            )}
           </div>
 
           <div className="surface-card hidden space-y-4 p-5 lg:block">
@@ -840,7 +848,7 @@ function CreatePost() {
               <p className="mt-1 text-xs text-muted-foreground">
                 {canSchedule
                   ? "Post immediately or choose a future date and time."
-                  : "Post now is included. Upgrade to Current or Tidal to schedule ahead."}
+                  : "Post now works on Ripple. Current and Tidal also include scheduling."}
               </p>
             </div>
 
@@ -850,7 +858,7 @@ function CreatePost() {
                   locked || publishing !== null || !caption.trim() || !scheduledAt || !canSchedule
                 }
                 onClick={handleScheduleLater}
-                title={canSchedule ? "Schedule this post" : "Upgrade to schedule posts"}
+                title={canSchedule ? "Schedule this post" : "Scheduling is included with Current and Tidal"}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
               >
                 {publishing === "schedule" ? (
