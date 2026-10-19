@@ -10,7 +10,7 @@ test("first-login guide disappears and can be reopened from settings on mobile",
   await expect(dialog.getByRole("heading", { name: "Invoices" })).toBeVisible();
   await dialog.getByLabel("Jump to a topic").selectOption("1");
   await expect(dialog.getByRole("heading", { name: "Contracts" })).toBeVisible();
-  await dialog.getByRole("button", { name: "Close guide" }).click();
+  await dialog.getByRole("button", { name: "Skip tour" }).click();
   await page.reload();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: "Open guide from settings" }).click();
