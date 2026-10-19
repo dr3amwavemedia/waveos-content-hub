@@ -10,7 +10,7 @@ test("first-login guide disappears and can be reopened from settings on mobile",
   await expect(dialog.getByRole("heading", { name: "Invoices" })).toBeVisible();
   await dialog.getByLabel("Jump to a topic").selectOption("1");
   await expect(dialog.getByRole("heading", { name: "Contracts" })).toBeVisible();
-  await dialog.getByRole("button", { name: "Close guide" }).click();
+  await dialog.getByRole("button", { name: "Skip tour" }).click();
   await page.reload();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.getByRole("button", { name: "Open guide from settings" }).click();
@@ -21,7 +21,7 @@ test("document drafts validate input, download editable data and protect navigat
   page,
 }) => {
   await page.goto("/tools");
-  await page.getByRole("dialog").getByRole("button", { name: "Close guide" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Skip tour" }).click();
   await page.getByRole("button", { name: "Prepare vendor or white-label documents" }).click();
   const print = page.getByRole("button", { name: "Print draft / Save PDF" });
   await expect(print).toBeDisabled();
@@ -55,7 +55,7 @@ for (const width of [320, 375, 430])
   test(`draft preview, services and focused form fit ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/tools");
-    await page.getByRole("dialog").getByRole("button", { name: "Close guide" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Skip tour" }).click();
     await page.getByRole("button", { name: "Prepare vendor or white-label documents" }).click();
     await page.getByLabel("Recipient / vendor", { exact: true }).fill("LongClientName".repeat(18));
     await page.getByRole("button", { name: "Add service", exact: true }).click();
@@ -81,7 +81,7 @@ test("saved import preserves fields, replacement confirms all changes and reset 
   page,
 }) => {
   await page.goto("/tools");
-  await page.getByRole("dialog").getByRole("button", { name: "Close guide" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Skip tour" }).click();
   await page.getByRole("button", { name: "Prepare vendor or white-label documents" }).click();
   await page.getByLabel("Reference number").fill("Unsaved reference only");
   const file = {

@@ -412,6 +412,46 @@ function Shell({ children }: { children: ReactNode }) {
   );
   // Staff get Documents and Services & Pricing in the grouped phone menu; client menus
   // stay task-focused.
+  const publicPlanName =
+    subscription?.plan === "standard"
+      ? "Ripple"
+      : subscription?.plan === "full"
+        ? "Current"
+        : subscription?.plan === "expanded"
+          ? "Tidal"
+          : subscription?.plan === "trial"
+            ? "Promo trial"
+            : undefined;
+
+  const guideDestinations = (() => {
+    const available = [
+      ...nav.filter((item) => !item.feature || can(item.feature)),
+      ...(!isStaff && !isWeddingClient
+        ? [{ to: "/home", hash: "contracts", label: "Contracts" } as NavItem]
+        : []),
+    ];
+
+    if (!isPublicOs) return available;
+
+    const priority = [
+      "Overview",
+      "Create Post",
+      "Social Media",
+      "Analytics",
+      "Creative Studio",
+      "Media Library",
+      "Campaign Manager",
+      "Trending Now",
+      "Calendar",
+      "Brand Voice",
+      "Settings",
+    ];
+    return priority
+      .map((label) => available.find((item) => item.label === label))
+      .filter((item): item is NavItem => Boolean(item))
+      .slice(0, 6);
+  })();
+
   const mobileDrawerNav = isStaff
     ? [...nav, ...filterByFeature([{ to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" }])].filter(
         (item, index, items) => items.findIndex((candidate) => candidate.to === item.to && candidate.hash === item.hash) === index,
@@ -508,13 +548,9 @@ function Shell({ children }: { children: ReactNode }) {
               key={`${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
               userId={user.userId}
               storageKey={`waveos.tour.v1:${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
-              audience={isStaff ? "your team" : isWeddingClient ? "your wedding" : "your projects"}
-              destinations={[
-                ...nav.filter((item) => !item.feature || can(item.feature)),
-                ...(!isStaff && !isWeddingClient
-                  ? [{ to: "/home", hash: "contracts", label: "Contracts" }]
-                  : []),
-              ]}
+              audience={isPublicOs ? "the WaveOS tools included with your plan" : isWeddingClient ? "your wedding" : "your projects"}
+              planName={isPublicOs ? publicPlanName : undefined}
+              destinations={guideDestinations}
             />
           )}
           {userError || workspaceError ? (

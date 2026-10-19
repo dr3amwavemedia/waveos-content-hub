@@ -11,6 +11,26 @@ export function openWorkspaceTour() {
 }
 
 function explanation(item: Destination) {
+  if (/overview/i.test(item.label))
+    return "Start here for a quick view of your workspace, recent activity, and the next things that need your attention.";
+  if (/create post/i.test(item.label))
+    return "Build a post, add media, choose your platforms, save a draft, or publish now when your plan supports it.";
+  if (/social media/i.test(item.label))
+    return "Connect and review your social accounts, publishing setup, and recent post activity in one place.";
+  if (/analytics/i.test(item.label))
+    return "See performance insights after you connect a social account. WaveOS will tell you when more data is needed.";
+  if (/creative studio/i.test(item.label))
+    return "Design branded graphics and edit photos with templates, media, crop, adjustments, text, layers, and brand tools.";
+  if (/campaign/i.test(item.label))
+    return "Organize a campaign around a goal, content plan, and review workflow before you start publishing.";
+  if (/trending/i.test(item.label))
+    return "Explore sourced social trends and adapt useful ideas into original content for your brand.";
+  if (/media library/i.test(item.label))
+    return "Keep your images and videos organized here so they are ready for Create Post and Creative Studio.";
+  if (/calendar/i.test(item.label))
+    return "Review scheduled content and upcoming publishing activity without digging through individual posts.";
+  if (/brand voice/i.test(item.label))
+    return "Set the tone, business details, and reusable brand context that WaveOS uses across your content tools.";
   if (/invoice|payment/i.test(item.label))
     return "Find your invoices, payment details and recorded payment status here.";
   if (/contract/i.test(item.label))
@@ -34,11 +54,13 @@ export function WorkspaceTour({
   storageKey,
   destinations,
   audience = "your workspace",
+  planName,
 }: {
   userId: string;
   storageKey: string;
   destinations: Destination[];
   audience?: string;
+  planName?: string;
 }) {
   const steps = destinations.filter(
     (item, index, items) =>
@@ -169,11 +191,25 @@ export function WorkspaceTour({
       }}
     >
       <DialogContent className="w-[calc(100%-2rem)] max-w-lg rounded-xl">
-        <p className="text-xs text-muted-foreground">
-          Step {index + 1} of {steps.length}
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Step {index + 1} of {steps.length}
+          </p>
+          {planName && (
+            <span className="rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary">
+              {planName}
+            </span>
+          )}
+        </div>
         <DialogTitle>{current.label}</DialogTitle>
-        <DialogDescription>{explanation(current)}</DialogDescription>
+        <DialogDescription>
+          {explanation(current)}
+          {index === 0 && (
+            <span className="mt-2 block text-xs text-muted-foreground">
+              This is a short tour of {audience}. You can close it anytime and reopen it later from Settings.
+            </span>
+          )}
+        </DialogDescription>
         <progress
           aria-label="Guide progress"
           value={index + 1}
@@ -214,7 +250,7 @@ export function WorkspaceTour({
               setOpen(false);
             }}
           >
-            Close guide
+            Skip tour
           </button>
           <button
             type="button"
