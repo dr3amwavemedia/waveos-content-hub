@@ -38,8 +38,8 @@ export const Route = createFileRoute("/_authenticated/competitive-intelligence")
   component: () => (
     <RequireFeature
       feature="can_use_competitive_intelligence"
-      title="Competitive Intelligence isn't included in this plan"
-      description="Competitor research is available with Current, Tidal, Full Retainer, and Social Management access."
+      title="Competitive Intelligence is available with Current or Tidal"
+      description="Upgrade your WaveOS plan to research competitors with sourced public information."
     >
       <CompetitiveIntelligencePage />
     </RequireFeature>
