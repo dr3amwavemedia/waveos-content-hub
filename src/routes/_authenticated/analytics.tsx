@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { BarChart3, TrendingUp } from "lucide-react";
 
 import { EmptyState } from "@/components/app/empty-state";
@@ -11,8 +11,8 @@ export const Route = createFileRoute("/_authenticated/analytics")({
   component: () => (
     <RequireFeature
       feature="can_view_analytics_checkup"
-      title="Analytics checkup isn't available for this workspace"
-      description="Analytics checkup is available to active WaveOS and Dream Wave Media client workspaces."
+      title="Analytics isn't available for this workspace"
+      description="Analytics is available to active WaveOS and Dream Wave Media client workspaces."
     >
       <AnalyticsPage />
     </RequireFeature>
@@ -50,7 +50,7 @@ function AnalyticsPage() {
       <EmptyState
         icon={BarChart3}
         title="No workspace"
-        body="Select a workspace to view the analytics checkup."
+        body="Select a workspace to view the analytics."
       />
     );
   }
@@ -80,6 +80,24 @@ function AnalyticsPage() {
           See how {activeWorkspace.name} is performing, where attention is growing, and which real provider metrics are available.
         </p>
       </div>
+      {!connections.isPending &&
+        !connections.error &&
+        (connections.data?.filter((connection) => connection.connected).length ?? 0) === 0 && (
+          <section className="rounded-2xl border border-primary/25 bg-primary/5 p-5 sm:flex sm:items-center sm:justify-between sm:gap-4">
+            <div>
+              <h2 className="font-semibold text-foreground">Connect a social account to start seeing performance insights</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Once an account is connected and synced, WaveOS can begin showing the provider metrics available for this workspace.
+              </p>
+            </div>
+            <Link
+              to="/social-accounts"
+              className="mt-4 inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground sm:mt-0"
+            >
+              Connect account
+            </Link>
+          </section>
+        )}
       <AnalyticsCheckup
         workspaceId={activeWorkspace.id}
         publishedPosts={publishedPosts}
