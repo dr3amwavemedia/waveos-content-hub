@@ -51,10 +51,27 @@ export function RequireFeature({ feature, title, description, children }: Requir
 
   if (can(feature)) return <>{children}</>;
 
-  const publicPaymentLock =
-    activeWorkspace.data_source === "os_data" && !publicSubscriptionActive(subscription);
+  const isPublicOs = activeWorkspace.data_source === "os_data";
+  const publicPaymentLock = isPublicOs && !publicSubscriptionActive(subscription);
   const failedTwice =
     Boolean(subscription?.service_locked_at) || (subscription?.payment_failure_count ?? 0) >= 2;
+
+  const publicPlanName =
+    subscription?.plan === "standard"
+      ? "Ripple"
+      : subscription?.plan === "full"
+        ? "Current"
+        : subscription?.plan === "expanded"
+          ? "Tidal"
+          : subscription?.plan === "trial"
+            ? "Promo trial"
+            : "your current plan";
+  const upgradePlan =
+    feature === "can_use_creative_studio" ||
+    feature === "can_use_campaign_manager" ||
+    feature === "can_use_competitive_intelligence"
+      ? "Current or Tidal"
+      : "a higher WaveOS plan";
 
   // Staff should always be able to reach this (retainer_full by default), so
   // hitting this branch means staff is impersonating a client tier without the
@@ -63,23 +80,29 @@ export function RequireFeature({ feature, title, description, children }: Requir
     <div className="space-y-4">
       <LockedPreview
         title={
-          title ??
-          (publicPaymentLock
-            ? failedTwice
-              ? "Subscription payment needs attention"
-              : "Subscription required"
-            : "Not included in your plan")
+          isPublicOs && !publicPaymentLock
+            ? title ?? `Available with ${upgradePlan}`
+            : title ??
+              (publicPaymentLock
+                ? failedTwice
+                  ? "Subscription payment needs attention"
+                  : "Subscription required"
+                : "Not included in your plan")
         }
         description={
-          description ??
-          (publicPaymentLock
-            ? failedTwice
-              ? "Two payment attempts were unsuccessful. Update billing to restore WaveOS social tools. Your connected accounts and content remain safely stored."
-              : "Choose a WaveOS plan and complete secure payment to unlock this workspace."
-            : access?.status === "expired"
-              ? "Your Dream Wave Media agreement has expired. Contact your account manager to renew and restore access to this tool."
-              : "This workspace tool is included with 6- and 12-month Dream Wave Media retainers. Contact your account manager to upgrade.")
+          isPublicOs && !publicPaymentLock
+            ? `You're on ${publicPlanName}. This tool is included with ${upgradePlan}.`
+            : description ??
+              (publicPaymentLock
+                ? failedTwice
+                  ? "Two payment attempts were unsuccessful. Update billing to restore WaveOS social tools. Your connected accounts and content remain safely stored."
+                  : "Choose a WaveOS plan and complete secure payment to unlock this workspace."
+                : access?.status === "expired"
+                  ? "Your Dream Wave Media agreement has expired. Contact your account manager to renew and restore access to this tool."
+                  : "This workspace tool is included with 6- and 12-month Dream Wave Media retainers. Contact your account manager to upgrade.")
         }
+        ctaLabel={isPublicOs ? (publicPaymentLock ? "Update billing" : "View plans") : "View account options"}
+        ctaTo="/settings"
       />
       <div className="text-center">
         <Link
