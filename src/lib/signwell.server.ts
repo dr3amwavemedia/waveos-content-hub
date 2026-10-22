@@ -33,10 +33,11 @@ async function signwellRequest<T>(path: string, body: Record<string, unknown>): 
   return json;
 }
 
-async function signwellGet<T>(path: string): Promise<T> {
+async function signwellGet<T>(path: string, timeoutMs = 10_000): Promise<T> {
   const response = await fetch(`${SIGNWELL_API}${path}`, {
     method: "GET",
     headers: { "X-Api-Key": signwellKey(), Accept: "application/json" },
+    signal: AbortSignal.timeout(timeoutMs),
   });
   const json = (await response.json().catch(() => ({}))) as T & { message?: string };
   if (!response.ok) {
@@ -49,9 +50,18 @@ async function signwellGet<T>(path: string): Promise<T> {
 export type SignwellDocument = {
   id: string;
   status?: string;
+  metadata?: Record<string, string> | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
   embedded_edit_url?: string | null;
   embedded_signing_url?: string | null;
-  recipients?: Array<{ id: string; email?: string; embedded_signing_url?: string | null }>;
+  recipients?: Array<{
+    id: string;
+    email?: string;
+    status?: string | null;
+    completed_at?: string | null;
+    embedded_signing_url?: string | null;
+  }>;
 };
 
 /** Create an editable SignWell draft from raw HTML contract contents. */
@@ -89,6 +99,12 @@ export async function createSignwellDocument(input: {
 }
 
 /** Retrieve a fresh embedded signing URL. SignWell links can expire after use. */
-export async function getSignwellDocument(documentId: string): Promise<SignwellDocument> {
-  return signwellGet<SignwellDocument>(`/documents/${encodeURIComponent(documentId)}`);
+export async function getSignwellDocument(
+  documentId: string,
+  options?: { timeoutMs?: number },
+): Promise<SignwellDocument> {
+  return signwellGet<SignwellDocument>(
+    `/documents/${encodeURIComponent(documentId)}`,
+    options?.timeoutMs,
+  );
 }

@@ -625,6 +625,7 @@ export type Database = {
           id: string
           provider: string
           provider_document_id: string | null
+          provider_status_checked_at: string | null
           published_at: string | null
           sent_at: string | null
           signed_at: string | null
@@ -647,6 +648,7 @@ export type Database = {
           id?: string
           provider?: string
           provider_document_id?: string | null
+          provider_status_checked_at?: string | null
           published_at?: string | null
           sent_at?: string | null
           signed_at?: string | null
@@ -669,6 +671,7 @@ export type Database = {
           id?: string
           provider?: string
           provider_document_id?: string | null
+          provider_status_checked_at?: string | null
           published_at?: string | null
           sent_at?: string | null
           signed_at?: string | null
@@ -3577,6 +3580,56 @@ export type Database = {
           },
         ]
       }
+      signwell_completion_jobs: {
+        Row: {
+          archive_completed_at: string | null
+          attempts: number
+          contract_id: string
+          created_at: string
+          email_completed_at: string | null
+          last_error: string | null
+          locked_at: string | null
+          next_attempt_at: string
+          provider_document_id: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          archive_completed_at?: string | null
+          attempts?: number
+          contract_id: string
+          created_at?: string
+          email_completed_at?: string | null
+          last_error?: string | null
+          locked_at?: string | null
+          next_attempt_at?: string
+          provider_document_id: string
+          state?: string
+          updated_at?: string
+        }
+        Update: {
+          archive_completed_at?: string | null
+          attempts?: number
+          contract_id?: string
+          created_at?: string
+          email_completed_at?: string | null
+          last_error?: string | null
+          locked_at?: string | null
+          next_attempt_at?: string
+          provider_document_id?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signwell_completion_jobs_contract_id_fkey"
+            columns: ["contract_id"]
+            isOneToOne: true
+            referencedRelation: "client_contracts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       social_connections: {
         Row: {
           avatar_url: string | null
@@ -4860,6 +4913,22 @@ export type Database = {
           _source: string
         }
         Returns: boolean
+      }
+      claim_signwell_completion_jobs: {
+        Args: { _limit?: number }
+        Returns: {
+          archive_completed_at: string | null
+          attempts: number
+          contract_id: string
+          created_at: string
+          email_completed_at: string | null
+          last_error: string | null
+          locked_at: string | null
+          next_attempt_at: string
+          provider_document_id: string
+          state: string
+          updated_at: string
+        }[]
       }
       client_can_view_financials: {
         Args: { _user_id: string; _workspace_id: string }

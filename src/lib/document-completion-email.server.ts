@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import { businessProfile } from "@/lib/business-profile";
 import {
   paymentReceiptEmail,
@@ -39,7 +40,7 @@ async function workspaceRecipients(
   extraRecipient?: string | null | Array<string | null | undefined>,
 ) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const [{ data: settings }, { data: members }] = await Promise.all([
+  const [settingsResult, membersResult] = await Promise.all([
     supabaseAdmin
       .from("email_automation_settings" as never)
       .select("client_notifications_enabled")
@@ -47,6 +48,11 @@ async function workspaceRecipients(
       .maybeSingle(),
     supabaseAdmin.from("workspace_members").select("user_id").eq("workspace_id", workspaceId),
   ]);
+  if (settingsResult.error) throw new Error("email_settings_lookup_failed");
+  if (membersResult.error) throw new Error("workspace_members_lookup_failed");
+
+  const settings = settingsResult.data;
+  const members = membersResult.data;
   const clientNotificationsEnabled =
     (settings as { client_notifications_enabled?: boolean } | null)
       ?.client_notifications_enabled !== false;
@@ -55,6 +61,7 @@ async function workspaceRecipients(
         (members ?? []).map(({ user_id }) => supabaseAdmin.auth.admin.getUserById(user_id)),
       )
     : [];
+  if (users.some(({ error }) => error)) throw new Error("workspace_recipient_lookup_failed");
   const extras = Array.isArray(extraRecipient) ? extraRecipient : [extraRecipient];
   return [
     ...new Set(
@@ -75,50 +82,69 @@ async function deliver(
   workspaceId: string,
   copy: CompletionEmail,
   extraRecipient?: string | null | Array<string | null | undefined>,
+  options?: { idempotencyKey?: string },
 ) {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const recipients = await workspaceRecipients(workspaceId, extraRecipient);
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.TRANSACTIONAL_EMAIL_FROM ?? "Jean <jean@dwmsrq.com>";
-  for (const recipient of recipients) {
-    let status: "sent" | "failed" | "skipped" = apiKey ? "failed" : "skipped";
-    let providerMessageId: string | null = null;
-    let errorMessage: string | null = null;
-    if (apiKey) {
-      try {
-        const response = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            from,
-            to: [recipient],
-            subject: copy.subject,
-            html: emailHtml(copy),
-          }),
-        });
-        const result = (await response.json().catch(() => ({}))) as {
-          id?: string;
-          message?: string;
-        };
-        status = response.ok ? "sent" : "failed";
-        providerMessageId = response.ok && typeof result.id === "string" ? result.id : null;
-        errorMessage = response.ok
-          ? null
-          : (result.message ?? `Email provider error (${response.status})`).slice(0, 500);
-      } catch {
-        errorMessage = "Email provider request failed";
+  const outcomes = await Promise.all(
+    recipients.map(async (recipient) => {
+      let status: "sent" | "failed" | "skipped" = apiKey ? "failed" : "skipped";
+      let providerMessageId: string | null = null;
+      let errorMessage: string | null = null;
+      if (apiKey) {
+        try {
+          const response = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            signal: AbortSignal.timeout(5_000),
+            headers: {
+              Authorization: `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              ...(options?.idempotencyKey
+                ? {
+                    "Idempotency-Key": `${copy.eventType}/${options.idempotencyKey}/${createHash("sha256").update(recipient).digest("hex").slice(0, 32)}`,
+                  }
+                : {}),
+            },
+            body: JSON.stringify({
+              from,
+              to: [recipient],
+              subject: copy.subject,
+              html: emailHtml(copy),
+            }),
+          });
+          const result = (await response.json().catch(() => ({}))) as {
+            id?: string;
+            message?: string;
+          };
+          status = response.ok ? "sent" : "failed";
+          providerMessageId = response.ok && typeof result.id === "string" ? result.id : null;
+          errorMessage = response.ok
+            ? null
+            : (result.message ?? `Email provider error (${response.status})`).slice(0, 500);
+        } catch {
+          errorMessage = "Email provider request failed";
+        }
       }
-    }
-    await supabaseAdmin.from("transactional_email_log").insert({
-      workspace_id: workspaceId,
-      event_type: copy.eventType,
-      recipient_email: recipient,
-      provider_message_id: providerMessageId,
-      status,
-      error_message: errorMessage,
-    });
-  }
-  return { attempted: recipients.length };
+      const logged = await supabaseAdmin.from("transactional_email_log").insert({
+        workspace_id: workspaceId,
+        event_type: copy.eventType,
+        recipient_email: recipient,
+        provider_message_id: providerMessageId,
+        status,
+        error_message: errorMessage,
+      });
+      if (logged.error) throw new Error("completion_email_log_failed");
+      return status;
+    }),
+  );
+  return {
+    attempted: recipients.length,
+    sent: outcomes.filter((status) => status === "sent").length,
+    failed: outcomes.filter((status) => status === "failed").length,
+    skipped: outcomes.filter((status) => status === "skipped").length,
+  };
 }
 
 export const sendPaymentReceiptEmail = (
@@ -130,5 +156,9 @@ export const sendPaymentReceiptEmail = (
 export const sendSignedContractCopyEmail = (
   workspaceId: string,
   input: SignedContractEmailInput,
-  signerEmail?: string | null,
-) => deliver(workspaceId, signedContractEmail(input), signerEmail);
+  signerEmail?: string | null | Array<string | null | undefined>,
+  idempotencyKey?: string,
+) =>
+  deliver(workspaceId, signedContractEmail(input), signerEmail, {
+    idempotencyKey,
+  });

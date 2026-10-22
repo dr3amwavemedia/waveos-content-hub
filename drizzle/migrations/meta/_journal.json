@@ -183,6 +183,13 @@
       "when": 1792209198492,
       "tag": "0025_recover_missing_waveos_feature_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792712352867,
+      "tag": "0026_signwell_completion_jobs",
+      "breakpoints": true
     }
   ]
 }

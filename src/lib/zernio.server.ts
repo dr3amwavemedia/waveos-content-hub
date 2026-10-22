@@ -40,6 +40,7 @@ export async function zernioRequest<T>(path: string, init: RequestInit = {}): Pr
   if (!apiKey) throw new Error("Zernio is not configured. Add ZERNIO_API_KEY first.");
   const response = await fetch(`${ZERNIO_BASE_URL}${path}`, {
     ...init,
+    signal: init.signal ?? AbortSignal.timeout(15_000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       Accept: "application/json",
