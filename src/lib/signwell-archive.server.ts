@@ -1,10 +1,11 @@
 /**
  * Private archival of a completed SignWell agreement.
  *
- * Runs only from the verified `document_completed` webhook. It stores the final
- * PDF in a private bucket and records the evidence needed to prove what was
- * signed: provider document id, immutable value + template-version snapshot,
- * SHA-256 content hash, byte size, audit trail and completion time.
+ * Runs only from a leased completion job after the authenticated SignWell API
+ * confirms a completed document. It stores the final PDF in a private bucket
+ * and records the evidence needed to prove what was signed: provider document
+ * id, immutable value + template-version snapshot, SHA-256 content hash, byte
+ * size, audit trail and completion time.
  *
  * Nothing here is ever logged, emailed, exported or exposed as a permanent URL.
  * Retrieval happens through a short-lived authorized link only.
@@ -17,7 +18,10 @@ export const CONTRACT_ARCHIVE_BUCKET = "contract-archive";
 async function signwellGet(path: string): Promise<Response> {
   const key = process.env.SIGNWELL_API_KEY;
   if (!key) throw new Error("signwell_not_configured");
-  return fetch(`${SIGNWELL_API}${path}`, { headers: { "X-Api-Key": key } });
+  return fetch(`${SIGNWELL_API}${path}`, {
+    headers: { "X-Api-Key": key },
+    signal: AbortSignal.timeout(10_000),
+  });
 }
 
 export type ArchiveOutcome =
@@ -26,7 +30,7 @@ export type ArchiveOutcome =
 
 /**
  * Fetch, store and record the completed document. Returns a reason instead of
- * throwing so a storage/schema gap can never make us drop a verified webhook.
+ * throwing so a storage/schema gap becomes a retryable durable job failure.
  */
 export async function archiveCompletedContract(input: {
   contractId: string;

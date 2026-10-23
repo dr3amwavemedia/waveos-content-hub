@@ -19,6 +19,24 @@ export const Route = createFileRoute("/api/public/hooks/publish-due")({
           return new Response("unauthorized", { status: 401 });
         }
 
+        // The webhook only invalidates this authenticated status check, so run
+        // bounded SignWell reconciliation before unrelated publishing work.
+        // Completion processing claims one leased job and uses provider
+        // timeouts, keeping this shared cron predictable.
+        let signwellCompletions: unknown = null;
+        try {
+          const { processSignwellCompletionJobs, reconcileSignwellContractStatuses } =
+            await import("@/lib/signwell-completion-worker.server");
+          signwellCompletions = {
+            statuses: await reconcileSignwellContractStatuses(),
+            jobs: await processSignwellCompletionJobs(),
+          };
+        } catch (error) {
+          signwellCompletions = {
+            error: error instanceof Error ? error.message : "signwell_completion_worker_failed",
+          };
+        }
+
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
         const { data: due, error } = await supabaseAdmin
           .from("content_items")
@@ -42,6 +60,7 @@ export const Route = createFileRoute("/api/public/hooks/publish-due")({
             });
           }
         }
+
         let maintenance: unknown = null;
         try {
           const maintenanceUrl = new URL(
@@ -51,12 +70,13 @@ export const Route = createFileRoute("/api/public/hooks/publish-due")({
           const response = await fetch(maintenanceUrl, {
             method: "POST",
             headers: { "x-cron-secret": cronSecret },
+            signal: AbortSignal.timeout(15_000),
           });
           maintenance = response.ok ? await response.json() : { error: `HTTP ${response.status}` };
         } catch (error) {
           maintenance = { error: error instanceof Error ? error.message : "maintenance_failed" };
         }
-        return Response.json({ processed, failed, maintenance });
+        return Response.json({ processed, failed, maintenance, signwellCompletions });
       },
     },
   },

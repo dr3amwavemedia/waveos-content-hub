@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
@@ -8,6 +9,14 @@ import {
 } from "../../src/lib/document-completion-email.ts";
 import { contractFieldsForTemplate } from "../../src/lib/contract-variables.ts";
 import { invoiceDiscount } from "../../src/lib/invoice-discount.ts";
+import {
+  isTerminalSignwellContractStatus,
+  minimalSignwellEventPayload,
+  nextSignwellContractStatus,
+  signwellEventExternalId,
+  signwellTransitionSources,
+  verifySignwellEvent,
+} from "../../src/lib/signwell-webhook.ts";
 
 test("payment receipt email includes the received, paid, and remaining amounts", () => {
   const copy = paymentReceiptEmail({
@@ -51,21 +60,103 @@ test("photography agreement exposes client and shoot details but hides Dream Wav
   assert.match(content, /\{\{dwm_signer_name\}\}, \{\{dwm_signer_title\}\}/);
 });
 
-test("webhooks trigger completion email delivery only after verified provider events", () => {
+test("SignWell verification enforces the five-minute boundary", () => {
+  const webhookId = "webhook-test-id";
+  const now = Date.UTC(2026, 9, 22, 20, 0, 0);
+  const verifyAt = (secondsAgo, providedHash) => {
+    const eventTime = String(now / 1000 - secondsAgo);
+    const hash =
+      providedHash ??
+      createHmac("sha256", webhookId).update(`document_completed@${eventTime}`).digest("hex");
+    return verifySignwellEvent({
+      eventType: "document_completed",
+      eventTime,
+      providedHash: hash,
+      webhookId,
+      now,
+    });
+  };
+  assert.equal(verifyAt(0), "valid");
+  assert.equal(verifyAt(300), "valid");
+  assert.equal(verifyAt(-300), "valid");
+  assert.equal(verifyAt(301), "stale_event");
+  assert.equal(verifyAt(-301), "stale_event");
+  assert.equal(verifyAt(0, "0".repeat(64)), "invalid_signature");
+});
+
+test("SignWell authoritative status transitions never regress or rewrite terminals", () => {
+  assert.equal(nextSignwellContractStatus("draft", "sending"), "sent");
+  assert.equal(nextSignwellContractStatus("sent", "viewed"), "viewed");
+  assert.equal(nextSignwellContractStatus("viewed", "sent"), "viewed");
+  assert.equal(nextSignwellContractStatus("viewed", "completed"), "signed");
+  assert.equal(nextSignwellContractStatus("signed", "viewed"), "signed");
+  assert.equal(nextSignwellContractStatus("declined", "completed"), "declined");
+  assert.equal(nextSignwellContractStatus("expired", "sent"), "expired");
+  assert.equal(nextSignwellContractStatus("void", "completed"), "void");
+  assert.equal(nextSignwellContractStatus("sent", "canceled"), "void");
+  assert.equal(nextSignwellContractStatus("sent", "created"), null);
+  assert.deepEqual(signwellTransitionSources("signed"), ["draft", "sent", "viewed"]);
+  assert.deepEqual(signwellTransitionSources("sent"), ["draft", "sent"]);
+  assert.ok(!signwellTransitionSources("viewed").includes("signed"));
+  assert.equal(isTerminalSignwellContractStatus("signed"), true);
+  assert.equal(isTerminalSignwellContractStatus("viewed"), false);
+});
+
+test("SignWell durable claims contain no webhook metadata or recipient PII", () => {
+  const payload = minimalSignwellEventPayload({
+    eventType: "document_completed",
+    eventTime: "1792699200",
+    documentId: "doc_123",
+  });
+  assert.deepEqual(payload, {
+    event: { type: "document_completed", time: "1792699200" },
+    data: { object: { id: "doc_123" } },
+  });
+  assert.equal(
+    signwellEventExternalId({
+      eventType: "document_completed",
+      eventTime: "1792699200",
+      documentId: "doc_123",
+    }),
+    "document_completed@1792699200:doc_123",
+  );
+});
+
+test("webhooks promptly queue authoritative SignWell checks and defer side effects", () => {
   const stripe = readFileSync("src/routes/api/public/hooks/stripe.ts", "utf8");
   const recorder = readFileSync("src/lib/stripe-invoice-payment.server.ts", "utf8");
   const signwell = readFileSync("src/routes/api/public/hooks/signwell.ts", "utf8");
+  const worker = readFileSync("src/lib/signwell-completion-worker.server.ts", "utf8");
+  const migration = readFileSync(
+    "supabase/migrations/20261022200000_signwell_completion_jobs.sql",
+    "utf8",
+  );
   assert.match(stripe, /String\(object\.payment_status \?\? ""\) !== "paid"/);
   assert.match(stripe, /applyStripeCheckoutPayment/);
   assert.match(recorder, /sendPaymentReceiptEmail/);
-  assert.match(signwell, /eventType === "document_completed"/);
-  assert.match(signwell, /sendSignedContractCopyEmail/);
+  assert.match(signwell, /verifySignwellEvent/);
   assert.match(signwell, /claimWebhookEvent/);
-  assert.match(signwell, /if \(!claim\.claimed\) return new Response\("duplicate_ignored"/);
-  assert.match(signwell, /contract_update_failed/);
-  assert.match(signwell, /outcome\.reason !== "already_archived"/);
-  assert.match(signwell, /return retryableFailure\("contract_archive_failed"\)/);
-  assert.match(signwell, /if \(!contract\) return retryableFailure\("contract_not_found"\)/);
+  assert.ok(
+    signwell.indexOf('.eq("provider_document_id", documentId)') <
+      signwell.indexOf("const claim = await claimWebhookEvent"),
+  );
+  assert.doesNotMatch(signwell, /object\.metadata/);
+  assert.doesNotMatch(signwell, /getSignwellDocument/);
+  assert.doesNotMatch(signwell, /archiveCompletedContract/);
+  assert.doesNotMatch(signwell, /sendSignedContractCopyEmail/);
+  assert.match(signwell, /update\(\{ provider_status_checked_at: null \}\)/);
+  assert.match(signwell, /status_check_queue_failed/);
+  assert.match(signwell, /return new Response\("document_ignored", \{ status: 200 \}\)/);
+  assert.match(signwell, /return new Response\("stale_ignored", \{ status: 200 \}\)/);
+  assert.match(worker, /archiveCompletedContract/);
+  assert.match(worker, /sendSignedContractCopyEmail/);
+  assert.match(worker, /reconcileSignwellContractStatuses/);
+  assert.match(worker, /provider_status_checked_at/);
+  assert.match(worker, /delivery\.attempted === 0/);
+  assert.match(worker, /`\$\{contract\.id\}\/\$\{job\.provider_document_id\}`/);
+  assert.match(migration, /FOR UPDATE SKIP LOCKED/);
+  assert.match(migration, /enqueue_signwell_completion_job/);
+  assert.match(migration, /REVOKE ALL ON public\.signwell_completion_jobs/);
 });
 
 test("DWM invoice payments notify both designated administrators", () => {

@@ -1,19 +1,29 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { createHmac, timingSafeEqual } from "crypto";
 import { claimWebhookEvent } from "@/lib/webhook-claim.server";
+import {
+  isTerminalSignwellContractStatus,
+  minimalSignwellEventPayload,
+  signwellEventExternalId,
+  verifySignwellEvent,
+} from "@/lib/signwell-webhook";
+
+const lifecycleEvents = new Set([
+  "document_sent",
+  "document_viewed",
+  "document_in_progress",
+  "document_signed",
+  "document_completed",
+  "document_declined",
+  "document_expired",
+  "document_canceled",
+]);
 
 /**
- * SignWell webhook receiver.
- *
- * SignWell signs events with the registered webhook's ID (not a secret we
- * choose): hash = HMAC-SHA256(webhook_id, `${event.type}@${event.time}`).
- * See https://www.signwell.com/resources/?p=4887
- *
- * A document is only treated as fully signed on `document_completed`; a
- * single `document_signed` event just means one recipient finished.
+ * SignWell signs only `event.type@event.time`; the document body is not covered
+ * by the HMAC. Use the body ID solely to find an existing WaveOS mapping, then
+ * queue an authenticated API status check. The five-minute reconciler applies
+ * the authoritative provider state and enqueues slow archive/email work.
  */
-const REPLAY_TOLERANCE_SECONDS = 300;
-
 export const Route = createFileRoute("/api/public/hooks/signwell")({
   server: {
     handlers: {
@@ -24,171 +34,108 @@ export const Route = createFileRoute("/api/public/hooks/signwell")({
           return new Response("webhook_not_configured", { status: 503 });
         }
 
-        const raw = await request.text();
         let event: {
-          event?: { type?: string; time?: string; hash?: string; id?: string };
+          event?: { type?: string; time?: string; hash?: string };
           data?: { object?: Record<string, unknown> };
         } = {};
         try {
-          event = JSON.parse(raw);
+          event = JSON.parse(await request.text());
         } catch {
           return new Response("invalid_payload", { status: 400 });
         }
 
         const eventType = String(event.event?.type ?? "");
         const eventTime = String(event.event?.time ?? "");
-        const provided = String(event.event?.hash ?? "");
-        if (!eventType || !eventTime || !provided) {
+        const verification = verifySignwellEvent({
+          eventType,
+          eventTime,
+          providedHash: String(event.event?.hash ?? ""),
+          webhookId,
+        });
+        if (verification === "invalid_signature") {
           return new Response("invalid_signature", { status: 401 });
         }
-
-        const expected = createHmac("sha256", webhookId)
-          .update(`${eventType}@${eventTime}`)
-          .digest("hex");
-        const a = Buffer.from(provided, "utf8");
-        const b = Buffer.from(expected, "utf8");
-        if (a.length !== b.length || !timingSafeEqual(a, b)) {
-          return new Response("invalid_signature", { status: 401 });
+        if (verification === "stale_event") {
+          // Acknowledge authenticated historical retries; periodic
+          // reconciliation recovers provider state without replaying them.
+          return new Response("stale_ignored", { status: 200 });
         }
-
-        // Replay safety: reject stale timestamps as well as repeated ids.
-        const sentAt = Number.isFinite(Number(eventTime))
-          ? Number(eventTime) * 1000
-          : Date.parse(eventTime);
-        if (
-          !Number.isFinite(sentAt) ||
-          Math.abs(Date.now() - sentAt) > REPLAY_TOLERANCE_SECONDS * 1000
-        ) {
-          return new Response("stale_event", { status: 400 });
+        if (!lifecycleEvents.has(eventType)) {
+          return new Response("event_ignored", { status: 200 });
         }
 
         const object = (event.data?.object ?? {}) as Record<string, unknown>;
-        const metadata = (object.metadata ?? {}) as Record<string, string>;
-        const documentId = String(object.id ?? "");
-        const eventId = String(event.event?.id ?? `${eventType}@${eventTime}:${documentId}`);
+        const documentId = String(object.id ?? "").trim();
+        if (!documentId) return new Response("document_ignored", { status: 200 });
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const contractResult = await supabaseAdmin
+          .from("client_contracts")
+          .select("id,status")
+          .eq("provider", "signwell")
+          .eq("provider_document_id", documentId)
+          .maybeSingle();
+        if (contractResult.error) {
+          console.error("[signwell webhook] contract lookup failed", contractResult.error.code);
+          return new Response("contract_lookup_failed", { status: 503 });
+        }
+        const contract = contractResult.data;
+        if (!contract) {
+          // Account-level hooks include documents created outside WaveOS. They
+          // are expected traffic and must not poison the provider retry queue.
+          console.info("[signwell webhook] verified non-WaveOS document ignored", {
+            eventType,
+            documentId,
+          });
+          return new Response("document_ignored", { status: 200 });
+        }
+        if (isTerminalSignwellContractStatus(contract.status)) {
+          return new Response("terminal_ignored", { status: 200 });
+        }
 
+        const eventId = signwellEventExternalId({ eventType, eventTime, documentId });
         const claim = await claimWebhookEvent(supabaseAdmin, {
           source: "signwell",
           eventType,
           externalId: eventId,
-          payload: event,
+          // The body ID is only a scheduling hint. Never persist unsigned
+          // recipient, metadata, or status fields from the webhook payload.
+          payload: minimalSignwellEventPayload({ eventType, eventTime, documentId }),
         });
         if (claim.error) return new Response("event_store_failed", { status: 503 });
-        if (!claim.claimed) return new Response("duplicate_ignored", { status: 200 });
 
         const retryableFailure = async (message: string) => {
-          await supabaseAdmin
-            .from("webhook_events")
-            .delete()
-            .eq("source", "signwell")
-            .eq("external_id", eventId);
+          if (claim.claimed) {
+            const released = await supabaseAdmin
+              .from("webhook_events")
+              .delete()
+              .eq("source", "signwell")
+              .eq("external_id", eventId);
+            if (released.error) {
+              console.error(
+                "[signwell webhook] failed to release event claim",
+                released.error.code,
+              );
+            }
+          }
           return new Response(message, { status: 503 });
         };
 
-        const status =
-          eventType === "document_completed"
-            ? "signed"
-            : eventType === "document_sent"
-              ? "sent"
-              : eventType === "document_signed"
-                ? "sent" // one recipient signed; the document is not complete yet
-                : eventType === "document_viewed"
-                  ? "viewed"
-                  : eventType === "document_declined"
-                    ? "declined"
-                    : eventType === "document_expired"
-                      ? "expired"
-                      : null;
-        if (!status) return new Response("ok", { status: 200 });
-
-        const completedAt = new Date().toISOString();
-        const patch = {
-          status,
-          ...(status === "sent" ? { sent_at: completedAt, published_at: completedAt } : {}),
-          ...(status === "signed" ? { signed_at: completedAt } : {}),
-        };
-
-        const locate = supabaseAdmin
+        // NULL sorts first in the reconciler, so a current webhook gets the
+        // next available authenticated provider check without doing network,
+        // Storage, or email work on SignWell's request.
+        const queued = await supabaseAdmin
           .from("client_contracts")
-          .select(
-            "id,workspace_id,title,description,signer_email,contract_data,source_template_version,provider_document_id",
-          );
-        const contractResult = metadata.contract_id
-          ? await locate.eq("id", metadata.contract_id).maybeSingle()
-          : documentId
-            ? await locate.eq("provider_document_id", documentId).maybeSingle()
-            : { data: null, error: null };
-        if (contractResult.error) return retryableFailure("contract_lookup_failed");
-        const contract = contractResult.data;
-
-        if (!contract) return retryableFailure("contract_not_found");
-
-        const updated = await supabaseAdmin
-          .from("client_contracts")
-          .update(patch)
+          .update({ provider_status_checked_at: null })
           .eq("id", contract.id)
+          .eq("provider", "signwell")
+          .eq("provider_document_id", documentId)
+          .in("status", ["draft", "sent", "viewed"])
           .select("id");
-        if (updated.error || !updated.data?.length) {
-          return retryableFailure("contract_update_failed");
-        }
+        if (queued.error) return retryableFailure("status_check_queue_failed");
+        if (!queued.data?.length) return new Response("state_changed", { status: 200 });
 
-        // Only a verified completion produces the private signed archive.
-        if (status === "signed") {
-          const providerDocumentId = contract.provider_document_id ?? documentId;
-          if (providerDocumentId) {
-            try {
-              const { archiveCompletedContract } = await import("@/lib/signwell-archive.server");
-              const outcome = await archiveCompletedContract({
-                contractId: contract.id,
-                workspaceId: contract.workspace_id,
-                providerDocumentId,
-                completedAt,
-                templateVersion: contract.source_template_version ?? null,
-                contractData: contract.contract_data ?? {},
-                renderedText: contract.description ?? null,
-                auditEvidence: {
-                  event_type: eventType,
-                  event_id: eventId,
-                  event_time: eventTime,
-                  provider: "signwell",
-                  recipients: Array.isArray(object.recipients)
-                    ? (object.recipients as Array<Record<string, unknown>>).map((r) => ({
-                        id: r.id ?? null,
-                        status: r.status ?? null,
-                        completed_at: r.completed_at ?? null,
-                      }))
-                    : [],
-                },
-              });
-              // A completed PDF can take a few seconds to become available.
-              // Release the event claim and ask SignWell to retry transient
-              // archive failures instead of permanently losing the signed copy.
-              if (!outcome.archived && outcome.reason !== "already_archived") {
-                console.error("[signwell webhook] archive retry required:", outcome.reason);
-                return retryableFailure("contract_archive_failed");
-              }
-            } catch {
-              console.error("[signwell webhook] archive failed for contract", contract.id);
-              return retryableFailure("contract_archive_failed");
-            }
-          }
-          try {
-            const { sendSignedContractCopyEmail } =
-              await import("@/lib/document-completion-email.server");
-            await sendSignedContractCopyEmail(
-              contract.workspace_id,
-              { contractTitle: contract.title },
-              contract.signer_email,
-            );
-          } catch {
-            // The verified signature state must not be rolled back by an email outage.
-            console.error("[signwell webhook] completion email failed for contract", contract.id);
-          }
-        }
-
-        return new Response("ok", { status: 200 });
+        return new Response(claim.claimed ? "queued" : "duplicate_queued", { status: 200 });
       },
     },
   },
