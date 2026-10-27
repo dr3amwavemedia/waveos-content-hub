@@ -485,9 +485,10 @@ function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <header data-global-mobile-header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/90 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur lg:hidden">
-        <WaveLogo compact />
-        <div className="flex items-center gap-2">
+      <header data-global-mobile-header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur lg:hidden">
+        <div className="flex min-h-14 items-center justify-between px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
+          <WaveLogo compact />
+          <div className="flex items-center gap-2">
           <NotificationsBell />
           <button
             onClick={() => setMobileOpen(true)}
@@ -496,6 +497,7 @@ function Shell({ children }: { children: ReactNode }) {
           >
             <Menu className="h-5 w-5" />
           </button>
+          </div>
         </div>
       </header>
 
