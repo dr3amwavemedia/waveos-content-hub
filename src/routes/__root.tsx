@@ -253,7 +253,12 @@ function RootComponent() {
       <Toaster
         theme="dark"
         position="top-right"
-        offset="calc(env(safe-area-inset-top) + 12px)"
+        offset="12px"
+        mobileOffset={{
+          top: "calc(env(safe-area-inset-top) + 4.75rem)",
+          right: "12px",
+          left: "12px",
+        }}
         toastOptions={{
           style: {
             background: "var(--color-surface-2)",
