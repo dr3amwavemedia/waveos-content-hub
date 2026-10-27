@@ -527,15 +527,24 @@ export const inviteComplimentaryOsAccount = createServerFn({ method: "POST" })
     if (invite.error || !invite.data.user) throw invite.error ?? new Error("WaveOS invitation could not be created.");
 
     const userId = invite.data.user.id;
-    const membership = await admin
+    const memberships = await admin
       .from("workspace_members")
-      .select("workspace_id,workspaces!inner(data_source)")
-      .eq("user_id", userId)
-      .eq("workspaces.data_source", "os_data")
-      .limit(1)
-      .maybeSingle();
-    if (membership.error) throw membership.error;
-    const workspaceId = (membership.data as { workspace_id?: string } | null)?.workspace_id;
+      .select("workspace_id")
+      .eq("user_id", userId);
+    if (memberships.error) throw memberships.error;
+    const membershipIds = (memberships.data ?? []).map((row) => row.workspace_id);
+    const osWorkspace = membershipIds.length
+      ? await admin
+          .from("workspaces")
+          .select("id")
+          .in("id", membershipIds)
+          .eq("data_source", "os_data")
+          .eq("is_archived", false)
+          .limit(1)
+          .maybeSingle()
+      : { data: null, error: null };
+    if (osWorkspace.error) throw osWorkspace.error;
+    const workspaceId = osWorkspace.data?.id;
     if (!workspaceId) {
       // Auth invitation already exists, so leave a clear audit trail rather
       // than guessing at billing state.
