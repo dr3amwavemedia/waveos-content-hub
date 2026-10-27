@@ -27,7 +27,7 @@ assert.doesNotMatch(campaign, /waveAssist|publishContentItem|stripe/i);
 
 const competitive = read("src/routes/_authenticated/competitive-intelligence.tsx");
 assert.match(competitive, /Research a competitor/);
-assert.match(competitive, /Website or social profile/);
+assert.match(competitive, /Competitor website, Google listing or social profile/);
 assert.match(competitive, /Analyze Competitor/);
 assert.match(competitive, /Add details manually/);
 assert.match(competitive, /WaveOS-defined manual comparison/);
