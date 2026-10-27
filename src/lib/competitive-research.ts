@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-export const RESEARCH_FAILURE_MESSAGE = "Competitive research couldn’t be completed from the available public sources. Try the website or public social profile again.";
-export const RESEARCH_SOURCE_WARNING = "Some research sources could not be verified. WaveOS kept the valid public sources and excluded invalid citations.";
+export const RESEARCH_FAILURE_MESSAGE = "WaveOS couldn’t identify enough verified public information for this competitor. Try the official website, business name, Google listing, or another public profile.";
+export const RESEARCH_SOURCE_WARNING = "A source could not be verified directly. WaveOS kept the verified public sources and continued the analysis where possible.";
 
 export function normalizeResearchSource(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
