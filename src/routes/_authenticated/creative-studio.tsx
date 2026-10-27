@@ -50,7 +50,7 @@ import { cn } from "@/lib/utils";
 import { MobileToolPanel } from "@/components/app/mobile-tool-panel";
 import { Slider } from "@/components/ui/slider";
 import { clamp, containsPoint, cornerHit, snapPosition, ratioCrop, zoomCrop } from "@/lib/studio-geometry";
-import { STUDIO_FORMATS as FORMATS, STUDIO_FONTS, applyStudioBrand, type BrandApplyMode, type DesignFormat, type DesignDocument, type DesignElement, type TextElement, type ShapeElement, type ImageElement } from "@/lib/studio-template-model";
+import { STUDIO_FORMATS as FORMATS, STUDIO_FONTS, applyStudioBrand, studioDocumentSize, type BrandApplyMode, type DesignFormat, type DesignDocument, type DesignElement, type TextElement, type ShapeElement, type ImageElement } from "@/lib/studio-template-model";
 import { TEMPLATE_LIBRARY, createStudioTemplate } from "@/lib/studio-template-library";
 import { loadStudioImage, renderStudioArtwork, studioImageUrl } from "@/lib/studio-artwork-renderer";
 import { replaceStudioMedia, studioMediaSlots, supportedBrandFont } from "@/lib/studio-media";
@@ -122,6 +122,17 @@ function normalizeDocument(document: DesignDocument): DesignDocument {
 
 /** Media picker page size: preview URLs are signed only for tiles on screen. */
 const MEDIA_PICKER_PAGE = 24;
+const PHOTO_EDITOR_MAX_EDGE = 2160;
+
+function nativePhotoCanvasSize(sourceWidth: number, sourceHeight: number) {
+  const safeWidth = Math.max(1, sourceWidth);
+  const safeHeight = Math.max(1, sourceHeight);
+  const scale = Math.min(1, PHOTO_EDITOR_MAX_EDGE / Math.max(safeWidth, safeHeight));
+  return {
+    width: Math.max(1, Math.round(safeWidth * scale)),
+    height: Math.max(1, Math.round(safeHeight * scale)),
+  };
+}
 
 function CreativeStudioPage() {
   const postSearch=Route.useSearch();
@@ -178,7 +189,7 @@ function CreativeStudioPage() {
   const [mobileTool, setMobileTool] = useState<string | null>(null);
   const [photoMode, setPhotoMode] = useState(false);
   const document = history[historyIndex];
-  const format = FORMATS[document.format];
+  const format = studioDocumentSize(document);
   const mediaAssets = useMediaAssets(workspaceId, { kind: "image" });
   const uploadAsset = useUploadAsset(workspaceId);
   const mediaSlots = studioMediaSlots(document);
@@ -419,12 +430,13 @@ function CreativeStudioPage() {
     setSelectedId(element.id);
   }
 
-  async function addImage(assetId: string) {
+  async function addImage(assetId: string, options?: { photoEditor?: boolean }) {
     const asset = mediaAssets.data?.find((candidate) => candidate.id === assetId);
+    let loadedImage: HTMLImageElement;
     try {
       const url=assetUrls[assetId] ?? (asset ? await getMediaPreviewUrl(asset,60*60*6):null);
       if(!url)throw new Error("Image unavailable");
-      await loadStudioImage(url);
+      loadedImage = await loadStudioImage(url);
       setAssetUrls(current=>({...current,[assetId]:url}));
     }catch{toast.error("This photo cannot be loaded for editing. The existing design is unchanged. Try another image or reconnect its media source.");return;}
     if (replaceId) {
@@ -432,10 +444,15 @@ function CreativeStudioPage() {
       setSelectedId(replaceId);
       setReplaceId(null); setMobileTool(null); return;
     }
-    const sourceWidth = asset?.width ?? 800;
-    const sourceHeight = asset?.height ?? 800;
-    const maxWidth = format.width * 0.72;
-    const maxHeight = format.height * 0.58;
+    const sourceWidth = asset?.width ?? loadedImage.naturalWidth ?? 800;
+    const sourceHeight = asset?.height ?? loadedImage.naturalHeight ?? 800;
+    const useNativePhotoCanvas = (options?.photoEditor ?? photoMode) && !document.elements.some(
+      (item) => item.type === "image" && item.sourceType !== "workspace-logo",
+    );
+    const photoCanvas = nativePhotoCanvasSize(sourceWidth, sourceHeight);
+    const workingFormat = useNativePhotoCanvas ? photoCanvas : format;
+    const maxWidth = workingFormat.width * 0.72;
+    const maxHeight = workingFormat.height * 0.58;
     const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight, 1);
     const element: ImageElement = {
       id: crypto.randomUUID(),
@@ -445,18 +462,27 @@ function CreativeStudioPage() {
       assetId,
       x: 0.5,
       y: 0.5,
-      width: Math.max(80, Math.round(sourceWidth * scale)),
-      height: Math.max(80, Math.round(sourceHeight * scale)),
+      width: useNativePhotoCanvas ? photoCanvas.width : Math.max(80, Math.round(sourceWidth * scale)),
+      height: useNativePhotoCanvas ? photoCanvas.height : Math.max(80, Math.round(sourceHeight * scale)),
       opacity: 1,
       rotation: 0,
+      ...(useNativePhotoCanvas ? { mediaRole: "background" as const, crop: { x: 0, y: 0, width: 1, height: 1 } } : {}),
     };
-    changeDocument((current) => ({ ...current, elements: [...current.elements, element] }));
+    changeDocument((current) => useNativePhotoCanvas
+      ? {
+          ...current,
+          customWidth: photoCanvas.width,
+          customHeight: photoCanvas.height,
+          background: "#000000",
+          elements: [...current.elements, element],
+        }
+      : { ...current, elements: [...current.elements, element] });
     setSelectedId(element.id);
     setMobileStarted(true);
     setMobileTool(null);
   }
   useEffect(()=>{if(!postSearch.post||postSearch.workspace!==workspaceId||!postSearch.media||incoming.current===postSearch.post||!mediaAssets.data)return;
-    incoming.current=postSearch.post;setPhotoMode(postSearch.photo);void addImage(postSearch.media);
+    incoming.current=postSearch.post;setPhotoMode(postSearch.photo);void addImage(postSearch.media,{photoEditor:postSearch.photo});
   },[postSearch.post,postSearch.workspace,postSearch.media,workspaceId,mediaAssets.data]);
   function returnToPost(assetId?:string){
     if(!workspaceId||!postSearch.post||postSearch.workspace!==workspaceId)return;
@@ -497,7 +523,7 @@ function CreativeStudioPage() {
     const font = (key:string) => supportedBrandFont(extended?.[key]);
     changeDocument(current => {
       const next=applyStudioBrand(current,{primary:branding.data?.accentColor??palette.primary,secondary:typeof extended?.secondary_color === "string" ? extended.secondary_color : undefined,logoUrl:branding.data?.logoUrl,headingFont:font("heading_font"),bodyFont:font("body_font"),accentFont:font("accent_font"),businessName:profile?.business_name??activeWorkspace?.name,cta:profile?.default_ctas?.[0],website:profile?.website??undefined,services:profile?.primary_services??undefined,serviceArea:profile?.service_area??undefined},brandMode);
-      if(brandMode==="full" && branding.data?.logoUrl && !next.elements.some(e=>e.brandRole === "logo" || e.type === "image" && (e.sourceType === "workspace-logo" || e.mediaRole === "logo"))) {const bounds=FORMATS[current.format];next.elements.push({id:crypto.randomUUID(),type:"image",name:"Workspace logo",sourceType:"workspace-logo",assetId:null,x:.80,y:.12,width:bounds.width*.24,height:bounds.height*.12,opacity:1,rotation:0,brandRole:"logo",mediaRole:"logo"});}
+      if(brandMode==="full" && branding.data?.logoUrl && !next.elements.some(e=>e.brandRole === "logo" || e.type === "image" && (e.sourceType === "workspace-logo" || e.mediaRole === "logo"))) {const bounds=studioDocumentSize(current);next.elements.push({id:crypto.randomUUID(),type:"image",name:"Workspace logo",sourceType:"workspace-logo",assetId:null,x:.80,y:.12,width:bounds.width*.24,height:bounds.height*.12,opacity:1,rotation:0,brandRole:"logo",mediaRole:"logo"});}
       return next;
     });
     toast.success("Available workspace branding applied. Undo restores the previous design.");
@@ -935,14 +961,22 @@ function CreativeStudioPage() {
         <Field label="Format">
           <select
             className={inputClass}
-            value={document.format}
-            onChange={(event) =>
+            value={document.customWidth && document.customHeight ? "original" : document.format}
+            onChange={(event) => {
+              if (event.target.value === "original") return;
               changeDocument((current) => ({
                 ...current,
                 format: event.target.value as DesignFormat,
-              }))
-            }
+                customWidth: undefined,
+                customHeight: undefined,
+              }));
+            }}
           >
+            {document.customWidth && document.customHeight && (
+              <option value="original">
+                Original photo · {document.customWidth}×{document.customHeight}
+              </option>
+            )}
             {Object.entries(FORMATS).map(([value, item]) => (
               <option key={value} value={value}>
                 {item.label} · {item.width}×{item.height}
