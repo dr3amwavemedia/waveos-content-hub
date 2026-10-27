@@ -1622,6 +1622,6 @@ const textareaClass =
 function DesignThumbnail({document,urls,logo}:{document:DesignDocument;urls:Record<string,string>;logo?:string|null}) {
   const ref=useRef<HTMLCanvasElement>(null);
   useEffect(()=>{let cancelled=false;const target=ref.current;if(!target)return;const artwork=window.document.createElement("canvas");void renderStudioArtwork(artwork,document,urls,logo,320).then(()=>{if(cancelled)return;target.width=artwork.width;target.height=artwork.height;target.getContext("2d")?.drawImage(artwork,0,0);});return()=>{cancelled=true;};},[document,urls,logo]);
-  const size=FORMATS[document.format];
+  const size=studioDocumentSize(document);
   return <canvas ref={ref} width={320} height={Math.round(320*size.height/size.width)} aria-label="Design thumbnail" className="block w-full"/>;
 }
