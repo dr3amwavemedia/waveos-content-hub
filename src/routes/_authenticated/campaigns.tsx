@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -27,6 +28,7 @@ import {
   type CampaignPlanningItem,
 } from "@/lib/phase-one-planning";
 import { cn } from "@/lib/utils";
+import { generateCampaignDirection } from "@/lib/campaign-ideas.functions";
 import { MobileWorkflowSteps, MobileWorkflowSection, MobileWorkflowFooter } from "@/components/app/mobile-workflow";
 
 export const Route = createFileRoute("/_authenticated/campaigns")({
@@ -102,6 +104,15 @@ function CampaignManagerPage() {
   const [preview, setPreview] = useState<CampaignPlanningItem[]>([]);
   const [dirty, setDirty] = useState(false);
   const [mobileStep, setMobileStep] = useState(0);
+  const campaignDirectionFn = useServerFn(generateCampaignDirection);
+  const [campaignDirection, setCampaignDirection] = useState<{
+    angle:string;
+    audienceInsight:string;
+    pillars:Array<{name:string;purpose:string;examples:string[]}>;
+    hooks:string[];
+    notes:string[];
+  } | null>(null);
+  const [directionBusy, setDirectionBusy] = useState(false);
   const mobileSteps = ["Campaign name", "Your goal", "Platforms", "Posting frequency", "Planning schedule", "Review campaign"];
   const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
     workspaceId,
@@ -201,6 +212,27 @@ function CampaignManagerPage() {
     );
   }
 
+  async function generateDirection() {
+    if (!workspaceId || !input.platforms.length || directionBusy) return;
+    setDirectionBusy(true);
+    try {
+      const direction = await campaignDirectionFn({
+        data: {
+          workspaceId,
+          name: input.name,
+          goal: input.goal,
+          platforms: input.platforms,
+        },
+      });
+      setCampaignDirection(direction);
+      toast.success("Organic campaign direction is ready.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Campaign direction could not be generated.");
+    } finally {
+      setDirectionBusy(false);
+    }
+  }
+
   async function saveServerDraft() {
     try {
       await workflowDraft.save.mutateAsync(input);
@@ -250,11 +282,39 @@ function CampaignManagerPage() {
             {workflowDraft.save.isPending ? <Loader2 className="animate-spin" /> : <Save />}
             Save draft
           </Button>
+          <Button variant="outline" onClick={() => void generateDirection()} disabled={!input.platforms.length || directionBusy}>
+            {directionBusy ? <Loader2 className="animate-spin" /> : <Sparkles />} AI direction
+          </Button>
           <Button className="hidden sm:inline-flex" onClick={generatePlan} disabled={errors.length > 0}>
             <Sparkles /> Build plan
           </Button>
         </div>
       </header>
+
+      {campaignDirection && (
+        <details className="rounded-xl border border-primary/25 bg-primary/5 p-4" open>
+          <summary className="cursor-pointer list-none">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-primary" />
+              <span className="font-semibold">AI campaign direction</span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">{campaignDirection.angle}</p>
+          </summary>
+          <div className="mt-4 space-y-4 border-t border-border pt-4">
+            <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Audience insight</p><p className="mt-1 text-sm">{campaignDirection.audienceInsight}</p></div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {campaignDirection.pillars.map((pillar) => (
+                <div key={pillar.name} className="rounded-xl border border-border bg-background/50 p-3">
+                  <p className="font-semibold">{pillar.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{pillar.purpose}</p>
+                  <ul className="mt-2 space-y-1 text-sm">{pillar.examples.map((example,index)=><li key={index}>• {example}</li>)}</ul>
+                </div>
+              ))}
+            </div>
+            <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hooks to explore</p><div className="mt-2 flex flex-wrap gap-2">{campaignDirection.hooks.map((hook,index)=><span key={index} className="rounded-full border border-border bg-background px-3 py-1.5 text-xs">{hook}</span>)}</div></div>
+          </div>
+        </details>
+      )}
 
       {workflowDraft.data?.payload && (
         <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
@@ -432,7 +492,7 @@ function CampaignManagerPage() {
               <li>• Internal plan only; no automatic publishing.</li>
               <li>• Times are user-selected planning windows, not performance claims.</li>
               <li>• Approval status is preserved on every generated item.</li>
-              <li>• AI and ad-spend actions are intentionally excluded.</li>
+              <li>• AI suggestions are creative direction only; they never schedule or publish.</li>
             </ul>
           </section>
 
