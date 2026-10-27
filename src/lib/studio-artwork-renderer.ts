@@ -1,5 +1,44 @@
 import { STUDIO_FORMATS, logoContainSize, type DesignDocument, type ImageElement } from "./studio-template-model";
+import { applyPhotoFilterPixels, isIdentityPhotoFilter, photoFilterCss, type PhotoFilterParams } from "./studio-photo-filter";
 const imageCache = new Map<string,Promise<HTMLImageElement>>();
+
+// Safari/WebKit exposes ctx.filter but ignores it when drawing, so detect real support once by reading back a pixel.
+let canvasFilterSupport: boolean | null = null;
+function canvasFilterWorks() {
+  if (canvasFilterSupport !== null) return canvasFilterSupport;
+  try {
+    const probe = window.document.createElement("canvas"); probe.width = probe.height = 1;
+    const p = probe.getContext("2d", { willReadFrequently: true });
+    if (!p || !("filter" in p)) return (canvasFilterSupport = false);
+    p.filter = "brightness(200%)"; p.fillStyle = "rgb(100,100,100)"; p.fillRect(0, 0, 1, 1);
+    canvasFilterSupport = p.getImageData(0, 0, 1, 1).data[0] > 150;
+  } catch { canvasFilterSupport = false; }
+  return canvasFilterSupport;
+}
+
+const MAX_FILTER_PIXELS = 2400;
+const filteredCache = new Map<string, HTMLCanvasElement>();
+function drawFilteredPixels(ctx: CanvasRenderingContext2D, image: HTMLImageElement, sx: number, sy: number, sw: number, sh: number, dw: number, dh: number, filter: PhotoFilterParams) {
+  const t = ctx.getTransform(); const scale = Math.max(Math.hypot(t.a, t.b), 0.01);
+  const fit = Math.min(1, MAX_FILTER_PIXELS / Math.max(dw * scale, dh * scale, 1));
+  const w = Math.max(1, Math.round(dw * scale * fit)), h = Math.max(1, Math.round(dh * scale * fit));
+  const key = [image.src, sx, sy, sw, sh, w, h, photoFilterCss(filter)].join("|");
+  let off = filteredCache.get(key);
+  if (!off) {
+    off = window.document.createElement("canvas"); off.width = w; off.height = h;
+    const o = off.getContext("2d", { willReadFrequently: true });
+    if (!o) { ctx.drawImage(image, sx, sy, sw, sh, -dw / 2, -dh / 2, dw, dh); return; }
+    o.drawImage(image, sx, sy, sw, sh, 0, 0, w, h);
+    try {
+      const pixels = o.getImageData(0, 0, w, h);
+      applyPhotoFilterPixels(pixels.data, filter);
+      o.putImageData(pixels, 0, 0);
+    } catch { /* Image without CORS access: draw unadjusted rather than fail. */ }
+    filteredCache.set(key, off);
+    if (filteredCache.size > 12) filteredCache.delete(filteredCache.keys().next().value as string);
+  }
+  ctx.drawImage(off, -dw / 2, -dh / 2, dw, dh);
+}
 export function loadStudioImage(url:string) {
   const cached=imageCache.get(url);if(cached)return cached;
   const pending=new Promise<HTMLImageElement>((resolve,reject)=>{const image=new Image();image.crossOrigin="anonymous";image.onload=()=>resolve(image);image.onerror=()=>{imageCache.delete(url);reject(new Error("Image could not load"));};image.src=url;});
@@ -22,7 +61,11 @@ export async function renderStudioArtwork(canvas:HTMLCanvasElement,document:Desi
       const warmSepia=Math.max(0,warmth)/160;
       const warmHue=warmth>0?Math.min(10,warmth*.10):0;
       const coolHue=warmth<0?Math.min(22,Math.abs(warmth)*.22):0;
-      ctx.filter=`brightness(${effectiveBrightness}%) contrast(${effectiveContrast}%) saturate(${effectiveSaturation}%) sepia(${warmSepia}) hue-rotate(${warmHue-coolHue}deg)`;const isLogo=element.brandRole==="logo"||element.mediaRole==="logo"||element.sourceType==="workspace-logo";const crop=isLogo?{x:0,y:0,width:1,height:1}:element.crop??{x:0,y:0,width:1,height:1};const size=isLogo?logoContainSize(element.width,element.height,image.naturalWidth,image.naturalHeight):element;ctx.drawImage(image,image.naturalWidth*crop.x,image.naturalHeight*crop.y,image.naturalWidth*crop.width,image.naturalHeight*crop.height,-size.width/2,-size.height/2,size.width,size.height);}catch{ready=false;}else ready=false;}
+      const filter:PhotoFilterParams={brightness:effectiveBrightness,contrast:effectiveContrast,saturation:effectiveSaturation,sepia:warmSepia,hueRotate:warmHue-coolHue};
+      const isLogo=element.brandRole==="logo"||element.mediaRole==="logo"||element.sourceType==="workspace-logo";const crop=isLogo?{x:0,y:0,width:1,height:1}:element.crop??{x:0,y:0,width:1,height:1};const size=isLogo?logoContainSize(element.width,element.height,image.naturalWidth,image.naturalHeight):element;
+      const sx=image.naturalWidth*crop.x,sy=image.naturalHeight*crop.y,sw=image.naturalWidth*crop.width,sh=image.naturalHeight*crop.height;
+      if(isIdentityPhotoFilter(filter)||canvasFilterWorks()){ctx.filter=photoFilterCss(filter);ctx.drawImage(image,sx,sy,sw,sh,-size.width/2,-size.height/2,size.width,size.height);}
+      else drawFilteredPixels(ctx,image,sx,sy,sw,sh,size.width,size.height,filter);}catch{ready=false;}else ready=false;}
     ctx.restore();
   }
   return ready;
