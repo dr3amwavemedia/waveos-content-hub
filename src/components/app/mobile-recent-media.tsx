@@ -33,11 +33,11 @@ export function MobileRecentMedia({ workspaceId }: { workspaceId: string | undef
           <span className="text-sm text-muted-foreground">No recent content yet</span>
         </Link>
       ) : (
-        <div className="-mx-3 flex snap-x gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]">
+        <div className="grid grid-cols-4 gap-2">
           {(previews.data ?? recent.map((asset) => ({ asset, url: null as string | null }))).map(({ asset, url }) => (
-            <Link key={asset.id} to="/content" className="w-20 shrink-0 snap-start">
-              <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-border bg-elevated">
-                {url ? <img src={url} alt={asset.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="grid h-full place-items-center"><Image className="size-4 text-muted-foreground" /></div>}
+            <Link key={asset.id} to="/content" className="min-w-0">
+              <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border bg-elevated">
+                {url ? <img src={url} alt={asset.name} className="h-full w-full object-cover" loading="lazy" /> : <div className="grid h-full place-items-center p-1 text-center"><Image className="size-4 text-muted-foreground" /></div>}
               </div>
               <p className="mt-1 truncate text-[10px] text-muted-foreground">{asset.name}</p>
             </Link>
