@@ -2,12 +2,12 @@ import { useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Database, PauseCircle, PlayCircle, Search, ShieldCheck, X } from "lucide-react";
+import { Database, Gift, Loader2, Mail, PauseCircle, PlayCircle, Search, ShieldCheck, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { OsDataPanel } from "@/routes/_authenticated/clients";
 import { supabase } from "@/integrations/supabase/client";
-import { getOsOperationsStatus, setGlobalPublishingPause } from "@/lib/os-accounts.functions";
+import { getOsOperationsStatus, inviteComplimentaryOsAccount, setGlobalPublishingPause } from "@/lib/os-accounts.functions";
 
 export const Route = createFileRoute("/_authenticated/os-data")({
   beforeLoad: async () => {
@@ -74,10 +74,114 @@ function OsDataPage() {
         )}
       </div>
 
+      <ComplimentaryAccessPanel />
       <OperationsSafetyPanel />
 
       <OsDataPanel search={search} />
     </div>
+  );
+}
+
+function ComplimentaryAccessPanel() {
+  const inviteFn = useServerFn(inviteComplimentaryOsAccount);
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [plan, setPlan] = useState<"standard" | "full" | "expanded">("standard");
+  const invite = useMutation({
+    mutationFn: () =>
+      inviteFn({ data: { email, firstName, lastName, workspaceName, plan } }),
+    onSuccess: (result) => {
+      toast.success(`Complimentary ${result.plan === "standard" ? "Ripple" : result.plan === "full" ? "Current" : "Tidal"} invitation sent to ${result.email}.`);
+      setEmail("");
+      setFirstName("");
+      setLastName("");
+      setWorkspaceName("");
+      setPlan("standard");
+      setOpen(false);
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Complimentary invite could not be sent."),
+  });
+
+  return (
+    <section className="rounded-2xl border border-emerald-400/25 bg-emerald-500/5 p-4 sm:p-5">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex w-full items-center justify-between gap-4 text-left"
+        aria-expanded={open}
+      >
+        <span>
+          <span className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Gift className="h-4 w-4 text-emerald-300" /> Complimentary WaveOS access
+          </span>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            Invite a new user with a selected tier and no card requirement. Existing paid accounts are protected from this flow.
+          </span>
+        </span>
+        <span className="shrink-0 rounded-full border border-emerald-400/30 px-3 py-1 text-[10px] font-bold uppercase text-emerald-300">
+          Owner only
+        </span>
+      </button>
+      {open && (
+        <form
+          className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!email.trim()) return;
+            invite.mutate();
+          }}
+        >
+          <label className="sm:col-span-2">
+            <span className="text-xs font-medium text-muted-foreground">Email</span>
+            <div className="relative mt-1">
+              <Mail className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+              <input
+                required
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="person@company.com"
+                className="min-h-11 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
+              />
+            </div>
+          </label>
+          <label>
+            <span className="text-xs font-medium text-muted-foreground">First name</span>
+            <input value={firstName} onChange={(event)=>setFirstName(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" />
+          </label>
+          <label>
+            <span className="text-xs font-medium text-muted-foreground">Last name</span>
+            <input value={lastName} onChange={(event)=>setLastName(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" />
+          </label>
+          <label>
+            <span className="text-xs font-medium text-muted-foreground">Workspace / business name</span>
+            <input value={workspaceName} onChange={(event)=>setWorkspaceName(event.target.value)} placeholder="Optional" className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" />
+          </label>
+          <label>
+            <span className="text-xs font-medium text-muted-foreground">Complimentary tier</span>
+            <select value={plan} onChange={(event)=>setPlan(event.target.value as "standard"|"full"|"expanded")} className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm">
+              <option value="standard">Ripple</option>
+              <option value="full">Current</option>
+              <option value="expanded">Tidal</option>
+            </select>
+          </label>
+          <div className="sm:col-span-2 rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
+            <strong className="text-foreground">No credit card:</strong> this invitation uses WaveOS internal complimentary access and does not create a Stripe subscription. The user receives an email invite and sets their password/profile on their end.
+          </div>
+          <div className="flex gap-2 sm:col-span-2">
+            <button type="button" onClick={()=>setOpen(false)} className="min-h-11 rounded-xl border border-border px-4 text-sm font-semibold">Cancel</button>
+            <button type="submit" disabled={invite.isPending || !email.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-slate-950 disabled:opacity-50">
+              {invite.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+              Send complimentary invite
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
   );
 }
 

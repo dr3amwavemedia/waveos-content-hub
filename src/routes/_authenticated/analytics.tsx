@@ -1,10 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BarChart3, TrendingUp } from "lucide-react";
+import { useState } from "react";
+import { BarChart3, Search, TrendingUp } from "lucide-react";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { RequireFeature } from "@/components/app/require-feature";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { AnalyticsCheckup, type ObservedCount } from "@/components/social/analytics-checkup";
+import { SeoGrowthPanel } from "@/components/social/seo-growth-panel";
+import { Button } from "@/components/ui/button";
 import { useContentItems, useSocialConnections } from "@/hooks/use-content";
 
 export const Route = createFileRoute("/_authenticated/analytics")({
@@ -42,6 +45,7 @@ function queryCount(input: {
 function AnalyticsPage() {
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id ?? null;
+  const [view, setView] = useState<"social" | "seo">("social");
   const items = useContentItems(workspaceId, ["published"]);
   const connections = useSocialConnections(workspaceId);
 
@@ -80,7 +84,26 @@ function AnalyticsPage() {
           See how {activeWorkspace.name} is performing, where attention is growing, and which real provider metrics are available.
         </p>
       </div>
-      {!connections.isPending &&
+      <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-surface/60 p-1 sm:w-fit">
+        <Button
+          type="button"
+          variant={view === "social" ? "secondary" : "ghost"}
+          className="min-h-10"
+          onClick={() => setView("social")}
+        >
+          <BarChart3 className="h-4 w-4" /> Social Analytics
+        </Button>
+        <Button
+          type="button"
+          variant={view === "seo" ? "secondary" : "ghost"}
+          className="min-h-10"
+          onClick={() => setView("seo")}
+        >
+          <Search className="h-4 w-4" /> SEO Growth
+        </Button>
+      </div>
+
+      {view === "social" && !connections.isPending &&
         !connections.error &&
         (connections.data?.filter((connection) => connection.connected).length ?? 0) === 0 && (
           <section className="rounded-2xl border border-primary/25 bg-primary/5 p-5 sm:flex sm:items-center sm:justify-between sm:gap-4">
@@ -98,11 +121,15 @@ function AnalyticsPage() {
             </Link>
           </section>
         )}
-      <AnalyticsCheckup
-        workspaceId={activeWorkspace.id}
-        publishedPosts={publishedPosts}
-        connectedChannels={connectedChannels}
-      />
+      {view === "social" ? (
+        <AnalyticsCheckup
+          workspaceId={activeWorkspace.id}
+          publishedPosts={publishedPosts}
+          connectedChannels={connectedChannels}
+        />
+      ) : (
+        <SeoGrowthPanel workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} />
+      )}
     </div>
   );
 }

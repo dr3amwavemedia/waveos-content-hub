@@ -1,10 +1,11 @@
-export type Trend = {id:string;title:string;url:string;source:string;excerpt:string;publishedAt:string|null;observedAt:string;type:"audio"|"format"|"hook"|"topic";status:"unknown";licensing:"unknown"|"not_applicable";platform?:"TikTok"|"Instagram"|"YouTube";embedUrl?:string;thumbnail?:string;creator?:string;searchContext?:string};
+export type Trend = {id:string;title:string;url:string;source:string;excerpt:string;publishedAt:string|null;observedAt:string;type:"audio"|"format"|"hook"|"topic";status:"unknown";licensing:"unknown"|"not_applicable";platform?:"TikTok"|"Instagram"|"YouTube"|"Facebook";embedUrl?:string;thumbnail?:string;creator?:string;searchContext?:string;engagementEvidence?:string;viralStrength?:number};
 export type TrendFilters={platform:string;style:string;language:string;market:string;niche:string;businessType:string;audience:string;days:number;kind:string};
 export const DEFAULT_TREND_FILTERS:TrendFilters={platform:"All videos",style:"Any style",language:"Any language",market:"",niche:"",businessType:"",audience:"",days:7,kind:"Any type"};
 export function trendVideoSource(raw:string):{platform:Trend["platform"];embedUrl?:string}|null{
  try{const url=new URL(raw),host=url.hostname.replace(/^www\./,'');
  if(host==='tiktok.com'&&/^\/@[^/]+\/video\/\d+\/?$/.test(url.pathname))return {platform:'TikTok'};
  if(host==='instagram.com'&&/^\/reels?\/[A-Za-z0-9_-]+\/?$/.test(url.pathname))return {platform:'Instagram'};
+ if((host==='facebook.com'||host==='m.facebook.com')&&(/^\/reel\/\d+\/?$/.test(url.pathname)||/\/videos\/\d+\/?$/.test(url.pathname)||url.pathname==='/watch/'))return {platform:'Facebook'};
  const id=host==='youtube.com'&&/^\/shorts\/[A-Za-z0-9_-]{11}\/?$/.test(url.pathname)?url.pathname.split('/')[2]:undefined;
  if(id)return {platform:'YouTube',embedUrl:`https://www.youtube-nocookie.com/embed/${id}`};
  }catch{/* Invalid source. */}return null;
@@ -35,7 +36,18 @@ export function normalizeTrendResults(results:unknown[],observedAt:string,type:T
   // represented as verified current trends. Undated non-video pages stay out.
   if(!publishedAt&&!videoSource)return [];
   if(!videoSource&&!/social media|instagram|tiktok|reels|youtube shorts|trending audio|viral format/i.test(`${row.title} ${excerpts}`))return [];
-  return [{id:url,title:row.title,url,source:new URL(url).hostname,excerpt:excerpts,publishedAt,observedAt,type,status:"unknown" as const,licensing:type==="audio"?"unknown" as const:"not_applicable" as const}];
+  const thumbnailCandidate=[row.thumbnail_url,row.thumbnail,row.image_url,row.image].find(value=>typeof value==="string"&&/^https:\/\//i.test(value as string));
+  const metricText=`${row.title} ${excerpts}`;
+  const metricMatches=[...metricText.matchAll(/(\d+(?:\.\d+)?)\s*([KMB])?\s*(views?|likes?|plays?)/gi)];
+  const units:Record<string,number>={K:1_000,M:1_000_000,B:1_000_000_000};
+  let viralStrength=0;const evidence:string[]=[];
+  for(const match of metricMatches){
+    const value=Number(match[1])*(match[2]?units[match[2].toUpperCase()]??1:1);
+    const kind=match[3].toLowerCase(); evidence.push(`${match[1]}${match[2]??""} ${match[3]}`);
+    if(kind.startsWith("view")||kind.startsWith("play")) viralStrength=Math.max(viralStrength,value>=1_000_000?4:value>=250_000?3:value>=50_000?2:value>=10_000?1:0);
+    if(kind.startsWith("like")) viralStrength=Math.max(viralStrength,value>=50_000?4:value>=10_000?3:value>=2_000?2:value>=500?1:0);
+  }
+  return [{id:url,title:row.title,url,source:new URL(url).hostname,excerpt:excerpts,publishedAt,observedAt,type,status:"unknown" as const,licensing:type==="audio"?"unknown" as const:"not_applicable" as const,thumbnail:typeof thumbnailCandidate==="string"?thumbnailCandidate:undefined,engagementEvidence:evidence.slice(0,3).join(" · ")||undefined,viralStrength}];
  });
 }
 export function trendIsStale(trend:Trend,now=Date.now()){return !trend.publishedAt || now-Date.parse(trend.publishedAt)>7*86400000;}

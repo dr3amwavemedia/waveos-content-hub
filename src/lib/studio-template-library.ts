@@ -30,6 +30,10 @@ export const TEMPLATE_LIBRARY = [
   {id:"buyer",name:"Buyer tips",category:"Real estate / Editorial",photo:interior,style:"buyer"},
   {id:"staging",name:"Home staging",category:"Real estate / Editorial",photo:interior,style:"staging"},
   {id:"sold",name:"Just sold",category:"Real estate",photo:property,style:"sold"},
+  {id:"after-dark",name:"After Dark",category:"Edgy / Editorial",photo:filmmaker,style:"noir"},
+  {id:"hard-cut",name:"Hard Cut",category:"Edgy / Bold",photo:workshop,style:"hardcut"},
+  {id:"heritage",name:"Heritage",category:"Classic / Editorial",photo:interior,style:"heritage"},
+  {id:"signature",name:"Signature",category:"Classic / Minimal",photo:cafe,style:"signature"},
 ] as const;
 export type StudioTemplate = typeof TEMPLATE_LIBRARY[number];
 export function createStudioTemplate(template:StudioTemplate, format:DesignFormat):DesignDocument {
@@ -40,7 +44,7 @@ export function createStudioTemplate(template:StudioTemplate, format:DesignForma
   const text=(name:string,content:string,x:number,y:number,size:number,font="DM Sans",color=paper,align:CanvasTextAlign="left",weight:TextElement["fontWeight"]=400,role:TextElement["fontRole"]="body",brandRole?:"primary"|"secondary")=>elements.push({...base(name,x,y),type:"text",text:content,fontSize:size*scale,fontFamily:font,fontWeight:weight,align,color,fontRole:role,brandRole});
   const cropWidth=Math.min(1,(w/h)/(2/3));const cropHeight=Math.min(1,(2/3)/(w/h));
   elements.push({...base("Background Photo",.5,.5),type:"image",mediaRole:"background",sourceType:"media",assetId:null,templateUrl:template.photo,width:w,height:h,crop:{x:(1-cropWidth)/2,y:(1-cropHeight)/2,width:cropWidth,height:cropHeight}});
-  const editorial=["quote","beauty","wellness","buyer","staging"].includes(template.style);
+  const editorial=["quote","beauty","wellness","buyer","staging","heritage","signature"].includes(template.style);
   if(editorial){shape("Editorial paper panel",.24,.5,.48,1,paper,.96);text("Brand placeholder","YOUR BRAND",.06,.065,28,"Manrope",ink);}
   else {shape("Cinematic contrast overlay",.5,.5,1,1,ink,.28);shape("Lower photo shade",.5,.84,1,.32,ink,.75);text("Brand placeholder","YOUR BRAND",.07,.065,27,"Manrope");}
   // Logo is an independent editable graphic placeholder; Apply My Brand substitutes the workspace logo.
