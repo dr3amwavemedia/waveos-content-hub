@@ -3596,7 +3596,7 @@ function InvoiceForm({
 }) {
   const qc = useQueryClient();
   const [mobileStep, setMobileStep] = useState(0);
-  const mobileSteps = ["Services", "Pricing", "Payment", "Preview", "Save"];
+  const mobileSteps = ["Invoice", "Pricing", "Payment", "Preview", "Save"];
   const [number, setNumber] = useState(invoice?.number ?? "");
   const [description, setDescription] = useState(invoice?.description ?? "");
   const [items, setItems] = useState<DraftInvoiceItem[]>(() =>
@@ -4008,29 +4008,20 @@ function InvoiceForm({
             </p>
           </div>
         )}
-        <Field label="Subtotal">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={subtotalAmount}
-            onChange={(e) => setAmount(e.target.value)}
-            readOnly={items.length > 0}
-            className={inputCls}
-            placeholder="1250.00"
-          />
-        </Field>
-        <Field label="Currency">
-          <input
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
-            maxLength={3}
-            className={inputCls}
-          />
-          {!currencyValid && (
-            <p className="mt-1 text-xs text-destructive">Use a three-letter currency code.</p>
-          )}
-        </Field>
+        <div className="rounded-lg border border-border bg-background px-3 py-2">
+          <p className="text-xs font-medium text-muted-foreground">Subtotal</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {currency.toUpperCase()} {subtotalAmount || "0.00"}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Edit description and amount on the Invoice step.
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-background px-3 py-2">
+          <p className="text-xs font-medium text-muted-foreground">Currency</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">{currency.toUpperCase()}</p>
+          {!currencyValid && <p className="mt-1 text-xs text-destructive">Use a three-letter currency code.</p>}
+        </div>
       </div>
       </MobileWorkflowSection>
       <MobileWorkflowSection active={mobileStep === 1}>
@@ -4083,14 +4074,62 @@ function InvoiceForm({
       </div>
       </MobileWorkflowSection>
       <MobileWorkflowSection active={mobileStep === 0}>
-      <CatalogItemPicker
-        currency={currency}
-        onAdd={(item) => setItems((current) => [...current, item])}
-      />
-      <InvoiceItemPicker
-        currency={currency}
-        onAdd={(item) => setItems((current) => [...current, item])}
-      />
+      <div className="space-y-4 rounded-xl border border-primary/35 bg-primary/5 p-4">
+        <div>
+          <p className="text-sm font-semibold text-foreground">What is the client paying for?</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            For a custom or one-time invoice, description + amount is all you need. Saved services and invoice items are optional below.
+          </p>
+        </div>
+        <Field label="Description">
+          <textarea
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            rows={3}
+            placeholder="Example: 3-hour corporate seminar video coverage + 60–90 second highlight reel"
+            className={inputCls}
+          />
+        </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={items.length ? "Amount (calculated from items)" : "Amount"}>
+            <input
+              aria-label="Invoice amount"
+              type="number"
+              min="0"
+              step="0.01"
+              value={subtotalAmount}
+              readOnly={items.length > 0}
+              onChange={(event) => setAmount(event.target.value)}
+              className={inputCls}
+              placeholder="1250.00"
+            />
+          </Field>
+          <Field label="Currency">
+            <input
+              value={currency}
+              onChange={(event) => setCurrency(event.target.value)}
+              maxLength={3}
+              className={inputCls}
+            />
+          </Field>
+        </div>
+      </div>
+
+      <details className="rounded-xl border border-border bg-background/40">
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-foreground">
+          Add saved services or invoice items <span className="font-normal text-muted-foreground">(optional)</span>
+        </summary>
+        <div className="space-y-3 border-t border-border p-3">
+          <CatalogItemPicker
+            currency={currency}
+            onAdd={(item) => setItems((current) => [...current, item])}
+          />
+          <InvoiceItemPicker
+            currency={currency}
+            onAdd={(item) => setItems((current) => [...current, item])}
+          />
+        </div>
+      </details>
       {items.length > 0 && (
         <div className="space-y-2 rounded-lg border border-border p-3">
           <p className="text-sm font-medium">Invoice items</p>
@@ -4172,8 +4211,6 @@ function InvoiceForm({
           </p>
         </div>
       )}
-      <div className="space-y-3 sm:hidden"><Field label="Service description"><textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={2} className={inputCls} /></Field>
-      <Field label="Manual amount"><input aria-label="Manual amount" type="number" min="0" step="0.01" value={subtotalAmount} readOnly={items.length > 0} onChange={(event) => setAmount(event.target.value)} className={inputCls} /></Field></div>
       </MobileWorkflowSection>
       <MobileWorkflowSection active={mobileStep === 2}>
       <div className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-3">
@@ -4317,14 +4354,6 @@ function InvoiceForm({
           </Field>
         )}
       </div>
-      <div className="hidden sm:block"><Field label="Description">
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={2}
-          className={inputCls}
-        />
-      </Field></div>
       <div className="space-y-3 rounded-lg border border-primary/25 bg-primary/5 p-3">
         <div className="flex min-h-12 items-center justify-between gap-4">
           <div>
