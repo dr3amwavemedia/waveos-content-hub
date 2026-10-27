@@ -97,7 +97,18 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
       },
     };
 
-    const response = await fetch("https://connector-gateway.lovable.dev/parallel/v1/responses", {
+    const domain = new URL(website).hostname.replace(/^www\./, "");
+    const businessName = brand?.business_name?.trim() || domain;
+    const queries = [
+      `"${businessName}" ${brand?.service_area ?? ""}`.trim(),
+      `site:${domain} services`,
+      `site:${domain} about`,
+      `site:${domain} contact`,
+      `"${businessName}" reviews`,
+      `"${businessName}" ${brand?.industry ?? ""}`.trim(),
+    ].map((query) => query.slice(0, 200));
+
+    const searchResponse = await fetch("https://connector-gateway.lovable.dev/parallel/v1/search", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${appKey}`,
@@ -105,41 +116,124 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "parallel",
-        reasoning: { effort: "low" },
-        input: `Audit the public SEO presence for the business starting from ${website}. Use the supplied site as an identity clue, then review accessible public pages and search results tied to that same business. Brand context is only for identifying relevant services, audience and market: ${JSON.stringify(brand)}. Give practical steps a small business owner can actually complete. Prioritize Google Business Profile/local discoverability, title/meta clarity, crawl/index signals that are publicly observable, service/location pages, internal linking, useful content, structured information, reputation/authority opportunities, and obvious mobile/site issues when publicly supported. Do not promise rankings, guaranteed traffic or guaranteed placement. Do not invent Search Console, PageSpeed, backlink counts, keyword positions, traffic, conversion or private Google data. Every factual observation must cite an actually consulted public URL. Keep each action concise because WaveOS will hide its detailed steps inside a dropdown. Return the most important actions first.`,
-        text: { format: { type: "json_schema", name: "seo_growth_audit", schema } },
+        mode: "advanced",
+        objective: `Find accessible public pages and listings for the same business as ${website}. Prioritize the official website, service/about/contact/location pages, Google or reputable local listings, reviews/reputation sources, and public pages useful for an evidence-based SEO audit. Brand identity context: ${JSON.stringify(brand)}. Do not infer private analytics, rankings, traffic, backlinks, or Search Console data.`,
+        search_queries: queries,
+        advanced_settings: { max_results: 24 },
       }),
     });
-    if (!response.ok) throw new Error("SEO research could not be completed from public sources.");
 
-    const payload = (await response.json()) as {
-      output?: Array<{
-        content?: Array<{ type?: string; text?: string; annotations?: Array<{ type?: string; url?: string }> }>;
-        action?: { url?: string; sources?: Array<{ url?: string }> };
-      }>;
-    };
-    const raw = payload.output?.flatMap((item) => item.content ?? []).find((item) => item.type === "output_text")?.text;
-    if (!raw) throw new Error("SEO research returned no usable report.");
+    if (!searchResponse.ok) {
+      console.warn("SEO public search failed", { status: searchResponse.status });
+      if (searchResponse.status === 402) throw new Error("SEO research credits are currently unavailable.");
+      if (searchResponse.status === 429) throw new Error("SEO research is busy right now. Try again in a moment.");
+      throw new Error("SEO public research is temporarily unavailable.");
+    }
 
-    const consulted = new Set(
-      (payload.output ?? [])
-        .flatMap((item) => [
-          ...(item.action?.url ? [item.action.url] : []),
-          ...(item.action?.sources ?? []).flatMap((source) => (source.url ? [source.url] : [])),
-          ...(item.content ?? []).flatMap((content) =>
-            (content.annotations ?? []).flatMap((annotation) =>
-              annotation.type === "url_citation" && annotation.url ? [annotation.url] : [],
-            ),
-          ),
-        ])
-        .flatMap((source) => {
-          const normalized = normalizeResearchSource(source);
-          return normalized ? [normalized] : [];
-        }),
-    );
+    const searchPayload = (await searchResponse.json()) as { results?: unknown[]; warnings?: unknown[] };
+    if (searchPayload.warnings?.length) console.warn("SEO public search returned warnings", { count: searchPayload.warnings.length });
 
-    const parsed = seoReportSchema.parse(JSON.parse(raw));
+    const sourceRows = (searchPayload.results ?? []).flatMap((item) => {
+      if (!item || typeof item !== "object") return [];
+      const row = item as Record<string, unknown>;
+      if (typeof row.url !== "string" || typeof row.title !== "string") return [];
+      const url = normalizeResearchSource(row.url);
+      if (!url) return [];
+      const excerpts = Array.isArray(row.excerpts)
+        ? row.excerpts.filter((value): value is string => typeof value === "string").join(" ")
+        : typeof row.excerpt === "string"
+          ? row.excerpt
+          : "";
+      return [{ url, title: row.title.trim(), excerpt: excerpts.trim().slice(0, 1800) }];
+    });
+
+    const uniqueSources = Array.from(new Map(sourceRows.map((row) => [row.url, row])).values()).slice(0, 20);
+    if (!uniqueSources.length) throw new Error("SEO research returned no usable public sources.");
+
+    const consulted = new Set(uniqueSources.map((row) => row.url));
+    const sourceBundle = uniqueSources
+      .map((row, index) => `[${index + 1}] ${row.title}\nURL: ${row.url}\nEvidence: ${row.excerpt || "Public page located; no excerpt was returned."}`)
+      .join("\n\n");
+
+    let parsed: z.infer<typeof seoReportSchema> | null = null;
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${appKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-3.1-flash-lite",
+        max_tokens: 3000,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: `You are WaveOS SEO Growth. Build a concise, useful SEO action plan only from the supplied public-source evidence. Never invent rankings, traffic, Search Console data, backlink counts, conversions, PageSpeed scores, review counts, or technical findings that are not explicitly supported. Every factual action must cite one or more exact URLs from the supplied source list. Suggestions may recommend checks or improvements, but must be phrased as recommendations rather than claims when evidence is incomplete. Prioritize practical local SEO, website clarity, service/location pages, internal linking, structured business information, content, Google Business/reputation opportunities, and publicly observable technical issues. Return JSON only with this exact shape: {"business":string|null,"website":string|null,"summary":string,"quickWins":string[],"actions":[{"title":string,"why":string,"priority":"high"|"medium"|"low","category":"Google Business"|"Website"|"Technical SEO"|"Local SEO"|"Content"|"Authority","steps":string[],"sources":string[]}],"limitations":string[]}.`,
+          },
+          {
+            role: "user",
+            content: `Website: ${website}\nBrand context: ${JSON.stringify(brand)}\n\nAllowed public sources:\n${sourceBundle}`,
+          },
+        ],
+      }),
+    });
+
+    if (aiResponse.ok) {
+      const json = (await aiResponse.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const raw = json.choices?.[0]?.message?.content?.trim();
+      if (raw) {
+        try {
+          parsed = seoReportSchema.parse(JSON.parse(raw.replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "")));
+        } catch (error) {
+          console.warn("SEO synthesis response rejected", error instanceof z.ZodError ? { issues: error.issues.length } : { kind: "invalid_json" });
+        }
+      }
+    } else {
+      console.warn("SEO synthesis failed", { status: aiResponse.status });
+    }
+
+    if (!parsed) {
+      const official = uniqueSources.find((row) => new URL(row.url).hostname.replace(/^www\./, "") === domain) ?? uniqueSources[0];
+      parsed = {
+        business: businessName,
+        website,
+        summary: `WaveOS found public pages for ${businessName}, but the deeper AI synthesis was unavailable. These safe next steps are based on the public site and should be verified before making changes.`,
+        quickWins: [
+          "Make the primary services and service area unmistakable on key pages.",
+          "Give each major service a focused page with clear internal links.",
+          "Keep business name, contact details, and location/service-area information consistent across public listings.",
+        ],
+        actions: [
+          {
+            title: "Clarify services and location signals",
+            why: "Clear service and location language helps people and search engines understand what the business offers and where it operates.",
+            priority: "high",
+            category: "Local SEO",
+            steps: ["Review the homepage and major service pages for specific service names and service-area language.", "Link important service and location pages from the main navigation or relevant page copy."],
+            sources: [official.url],
+          },
+          {
+            title: "Strengthen service-page structure",
+            why: "Focused service pages create clearer destinations for specific customer searches and make internal linking more useful.",
+            priority: "medium",
+            category: "Website",
+            steps: ["Confirm each core service has a useful standalone page.", "Add descriptive page titles, headings, and links between related services where appropriate."],
+            sources: [official.url],
+          },
+          {
+            title: "Verify public business information",
+            why: "Consistent public business details support local discoverability and reduce customer confusion.",
+            priority: "medium",
+            category: "Google Business",
+            steps: ["Compare the website's business name, phone, service area, and website URL with the current Google Business Profile and other important listings.", "Correct any inconsistent public details you find."],
+            sources: [official.url],
+          },
+        ],
+        limitations: ["The AI synthesis step was unavailable, so this fallback avoids claiming page-specific issues that were not independently verified."],
+      };
+    }
+
     const actions = parsed.actions
       .map((action) => ({
         ...action,
@@ -157,6 +251,6 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
       actions,
       observedAt: new Date().toISOString(),
       methodology:
-        "Public-source SEO guidance. WaveOS does not have access to private Google Search Console, Analytics, ranking or backlink-provider data unless those sources are separately connected.",
+        "Public-source SEO guidance. WaveOS researches accessible public pages first, then builds recommendations only from those sources. It does not have private Google Search Console, Analytics, ranking or backlink-provider data unless those sources are separately connected.",
     };
   });
