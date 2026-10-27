@@ -3957,132 +3957,6 @@ function InvoiceForm({
         </button>
       </div>
       <MobileWorkflowSteps steps={mobileSteps} step={mobileStep} onChange={setMobileStep} />
-      <MobileWorkflowSection active={mobileStep === 1}>
-      <div className="flex flex-col gap-3 rounded-xl border border-primary/50 bg-primary/10 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-semibold text-foreground">Service fee</p>
-            <span
-              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
-                serviceFeeEnabled
-                  ? "bg-emerald-500/15 text-emerald-400"
-                  : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {serviceFeeEnabled ? "On" : "Off"}
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Add 2.9% at Stripe Checkout. The invoice keeps the agreed base amount.
-          </p>
-          {serviceFeeEnabled && (
-            <p className="mt-1 text-xs font-medium text-primary">
-              Checkout fee: {currency.toUpperCase()} {(previewServiceFeeCents / 100).toFixed(2)} ·
-              card total {currency.toUpperCase()}{" "}
-              {((previewDiscount.totalCents + previewServiceFeeCents) / 100).toFixed(2)}
-            </p>
-          )}
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={serviceFeeEnabled}
-          aria-label="Add 2.9% service fee"
-          onClick={() => setServiceFeeEnabled((enabled) => !enabled)}
-          className={`inline-flex min-h-11 min-w-36 items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
-            serviceFeeEnabled
-              ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
-              : "border-border bg-background text-foreground hover:border-primary/50 hover:text-primary"
-          }`}
-        >
-          {serviceFeeEnabled ? "Fee on — remove" : "Fee off — add 2.9%"}
-        </button>
-      </div>
-      </MobileWorkflowSection>
-      <MobileWorkflowSection active={mobileStep === 1}>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {invoice ? (
-          <Field label="Number">
-            <input
-              value={number}
-              onChange={(e) => setNumber(e.target.value)}
-              className={inputCls}
-            />
-          </Field>
-        ) : (
-          <div className="rounded-lg border border-border bg-background px-3 py-2">
-            <p className="text-xs font-medium text-muted-foreground">Invoice number</p>
-            <p className="mt-1 text-sm font-semibold text-foreground">Assigned automatically</p>
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              WaveOS assigns the next agency invoice number when you save.
-            </p>
-          </div>
-        )}
-        <div className="rounded-lg border border-border bg-background px-3 py-2">
-          <p className="text-xs font-medium text-muted-foreground">Subtotal</p>
-          <p className="mt-1 text-sm font-semibold text-foreground">
-            {currency.toUpperCase()} {subtotalAmount || "0.00"}
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            Edit description and amount on the Invoice step.
-          </p>
-        </div>
-        <div className="rounded-lg border border-border bg-background px-3 py-2">
-          <p className="text-xs font-medium text-muted-foreground">Currency</p>
-          <p className="mt-1 text-sm font-semibold text-foreground">{currency.toUpperCase()}</p>
-          {!currencyValid && <p className="mt-1 text-xs text-destructive">Use a three-letter currency code.</p>}
-        </div>
-      </div>
-      </MobileWorkflowSection>
-      <MobileWorkflowSection active={mobileStep === 1}>
-      <div className="grid gap-3 rounded-lg border border-border/70 bg-background/40 p-3 sm:grid-cols-2">
-        <Field label="Discount">
-          <select
-            value={discountType}
-            onChange={(event) => setDiscountType(event.target.value as InvoiceDiscountType)}
-            className={inputCls}
-          >
-            <option value="none">No discount</option>
-            <option value="fixed">Fixed amount</option>
-            <option value="percentage">Percentage</option>
-          </select>
-        </Field>
-        {discountType !== "none" && (
-          <Field label={discountType === "fixed" ? "Discount amount" : "Discount percent"}>
-            <input
-              type="number"
-              min="0"
-              max={discountType === "percentage" ? "100" : subtotalAmount || undefined}
-              step="0.01"
-              value={discountValue}
-              onChange={(event) => setDiscountValue(event.target.value)}
-              className={inputCls}
-              placeholder={discountType === "fixed" ? "100.00" : "10"}
-            />
-            {!discountValid && (
-              <p className="mt-1 text-xs text-destructive">Enter a discount below the subtotal.</p>
-            )}
-          </Field>
-        )}
-        <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
-          <p className="text-xs font-medium text-muted-foreground">Invoice total</p>
-          <p className="mt-1 text-lg font-semibold text-foreground">
-            {currency.toUpperCase()} {effectiveAmount}
-          </p>
-          {serviceFeeEnabled && (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {previewProcessingFeeAtCheckout
-                ? `Stripe adds ${currency.toUpperCase()} ${(previewServiceFeeCents / 100).toFixed(2)} when the client clicks Pay.`
-                : `Includes ${currency.toUpperCase()} ${(previewServiceFeeCents / 100).toFixed(2)} service fee for this existing or automatic-payment invoice.`}
-            </p>
-          )}
-        </div>
-        <p className="text-xs text-muted-foreground sm:col-span-2">
-          Manual Stripe payments show the processing fee as a separate checkout line. Existing
-          issued invoices and automatic charges keep their original recorded totals.
-        </p>
-      </div>
-      </MobileWorkflowSection>
       <MobileWorkflowSection active={mobileStep === 0}>
       <div className="space-y-4 rounded-xl border border-primary/35 bg-primary/5 p-4">
         <div>
@@ -4221,6 +4095,132 @@ function InvoiceForm({
           </p>
         </div>
       )}
+      </MobileWorkflowSection>
+      <MobileWorkflowSection active={mobileStep === 1}>
+      <div className="flex flex-col gap-3 rounded-xl border border-primary/50 bg-primary/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-foreground">Service fee</p>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${
+                serviceFeeEnabled
+                  ? "bg-emerald-500/15 text-emerald-400"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {serviceFeeEnabled ? "On" : "Off"}
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Add 2.9% at Stripe Checkout. The invoice keeps the agreed base amount.
+          </p>
+          {serviceFeeEnabled && (
+            <p className="mt-1 text-xs font-medium text-primary">
+              Checkout fee: {currency.toUpperCase()} {(previewServiceFeeCents / 100).toFixed(2)} ·
+              card total {currency.toUpperCase()}{" "}
+              {((previewDiscount.totalCents + previewServiceFeeCents) / 100).toFixed(2)}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={serviceFeeEnabled}
+          aria-label="Add 2.9% service fee"
+          onClick={() => setServiceFeeEnabled((enabled) => !enabled)}
+          className={`inline-flex min-h-11 min-w-36 items-center justify-center rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
+            serviceFeeEnabled
+              ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+              : "border-border bg-background text-foreground hover:border-primary/50 hover:text-primary"
+          }`}
+        >
+          {serviceFeeEnabled ? "Fee on — remove" : "Fee off — add 2.9%"}
+        </button>
+      </div>
+      </MobileWorkflowSection>
+      <MobileWorkflowSection active={mobileStep === 1}>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {invoice ? (
+          <Field label="Number">
+            <input
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              className={inputCls}
+            />
+          </Field>
+        ) : (
+          <div className="rounded-lg border border-border bg-background px-3 py-2">
+            <p className="text-xs font-medium text-muted-foreground">Invoice number</p>
+            <p className="mt-1 text-sm font-semibold text-foreground">Assigned automatically</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              WaveOS assigns the next agency invoice number when you save.
+            </p>
+          </div>
+        )}
+        <div className="rounded-lg border border-border bg-background px-3 py-2">
+          <p className="text-xs font-medium text-muted-foreground">Subtotal</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">
+            {currency.toUpperCase()} {subtotalAmount || "0.00"}
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Edit description and amount on the Invoice step.
+          </p>
+        </div>
+        <div className="rounded-lg border border-border bg-background px-3 py-2">
+          <p className="text-xs font-medium text-muted-foreground">Currency</p>
+          <p className="mt-1 text-sm font-semibold text-foreground">{currency.toUpperCase()}</p>
+          {!currencyValid && <p className="mt-1 text-xs text-destructive">Use a three-letter currency code.</p>}
+        </div>
+      </div>
+      </MobileWorkflowSection>
+      <MobileWorkflowSection active={mobileStep === 1}>
+      <div className="grid gap-3 rounded-lg border border-border/70 bg-background/40 p-3 sm:grid-cols-2">
+        <Field label="Discount">
+          <select
+            value={discountType}
+            onChange={(event) => setDiscountType(event.target.value as InvoiceDiscountType)}
+            className={inputCls}
+          >
+            <option value="none">No discount</option>
+            <option value="fixed">Fixed amount</option>
+            <option value="percentage">Percentage</option>
+          </select>
+        </Field>
+        {discountType !== "none" && (
+          <Field label={discountType === "fixed" ? "Discount amount" : "Discount percent"}>
+            <input
+              type="number"
+              min="0"
+              max={discountType === "percentage" ? "100" : subtotalAmount || undefined}
+              step="0.01"
+              value={discountValue}
+              onChange={(event) => setDiscountValue(event.target.value)}
+              className={inputCls}
+              placeholder={discountType === "fixed" ? "100.00" : "10"}
+            />
+            {!discountValid && (
+              <p className="mt-1 text-xs text-destructive">Enter a discount below the subtotal.</p>
+            )}
+          </Field>
+        )}
+        <div className="rounded-lg border border-border bg-surface/70 px-3 py-2">
+          <p className="text-xs font-medium text-muted-foreground">Invoice total</p>
+          <p className="mt-1 text-lg font-semibold text-foreground">
+            {currency.toUpperCase()} {effectiveAmount}
+          </p>
+          {serviceFeeEnabled && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {previewProcessingFeeAtCheckout
+                ? `Stripe adds ${currency.toUpperCase()} ${(previewServiceFeeCents / 100).toFixed(2)} when the client clicks Pay.`
+                : `Includes ${currency.toUpperCase()} ${(previewServiceFeeCents / 100).toFixed(2)} service fee for this existing or automatic-payment invoice.`}
+            </p>
+          )}
+        </div>
+        <p className="text-xs text-muted-foreground sm:col-span-2">
+          Manual Stripe payments show the processing fee as a separate checkout line. Existing
+          issued invoices and automatic charges keep their original recorded totals.
+        </p>
+      </div>
       </MobileWorkflowSection>
       <MobileWorkflowSection active={mobileStep === 2}>
       <div className="space-y-3 rounded-xl border border-border/70 bg-background/40 p-3">
