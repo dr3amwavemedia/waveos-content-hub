@@ -124,15 +124,15 @@ export function MobileCommandCenter({
 
   return (
     <div className="space-y-5 sm:hidden">
-      <div className="-mx-3 flex gap-2 overflow-x-auto px-3 pb-0.5 [scrollbar-width:none]">
+      <div className="grid grid-cols-4 gap-1.5">
         {status.map((s) => (
           <Link
             key={s.label}
             to={s.to}
-            className={`flex min-h-11 shrink-0 items-baseline gap-1.5 rounded-full border px-3.5 py-2 ${s.tone}`}
+            className={`flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-full border px-2 py-2 ${s.tone}`}
           >
-            <span className={`text-base font-semibold tabular-nums ${s.valueTone}`}>{s.value}</span>
-            <span className="text-xs text-muted-foreground">{s.label}</span>
+            <span className={`text-sm font-semibold tabular-nums ${s.valueTone}`}>{s.value}</span>
+            <span className="truncate text-[10px] text-muted-foreground">{s.label}</span>
           </Link>
         ))}
       </div>
