@@ -1,4 +1,4 @@
-import { STUDIO_FORMATS, logoContainSize, type DesignDocument, type ImageElement } from "./studio-template-model";
+import { logoContainSize, studioDocumentSize, type DesignDocument, type ImageElement } from "./studio-template-model";
 import { applyPhotoFilterPixels, isIdentityPhotoFilter, photoFilterCss, type PhotoFilterParams } from "./studio-photo-filter";
 const imageCache = new Map<string,Promise<HTMLImageElement>>();
 
@@ -46,7 +46,7 @@ export function loadStudioImage(url:string) {
 }
 export function studioImageUrl(element:ImageElement,urls:Record<string,string>,logo?:string|null){return element.sourceType === "workspace-logo" ? logo : element.templateUrl ?? urls[element.assetId ?? ""];}
 export async function renderStudioArtwork(canvas:HTMLCanvasElement,document:DesignDocument,urls:Record<string,string>,logo?:string|null,targetWidth?:number){
-  const format=STUDIO_FORMATS[document.format];canvas.width=targetWidth??format.width;canvas.height=Math.round(canvas.width*format.height/format.width);
+  const format=studioDocumentSize(document);canvas.width=targetWidth??format.width;canvas.height=Math.round(canvas.width*format.height/format.width);
   const ctx=canvas.getContext("2d");if(!ctx)return false;
   await Promise.all(document.elements.filter(e=>e.type === "text").map(async e=>{if(e.type === "text")try{await window.document.fonts.load(`${e.fontWeight} ${e.fontSize}px "${e.fontFamily??"Inter"}"`);}catch{/* System font fallback remains editable. */}}));
   ctx.scale(canvas.width/format.width,canvas.height/format.height);ctx.fillStyle=document.background;ctx.fillRect(0,0,format.width,format.height);let ready=true;
