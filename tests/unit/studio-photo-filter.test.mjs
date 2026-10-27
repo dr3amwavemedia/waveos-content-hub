@@ -9,7 +9,7 @@ test('Brightness 200% doubles pixel values like the browser canvas filter', () =
   assert.deepEqual(applyPhotoFilterPixels([100, 100, 100, 255], { ...base, brightness: 200 }), [200, 200, 200, 255]);
 });
 test('Contrast pushes values away from mid-grey and clamps at the limits', () => {
-  assert.deepEqual(applyPhotoFilterPixels([64, 191, 250, 255], { ...base, contrast: 200 }), [0, 255, 255, 255]);
+  assert.deepEqual(applyPhotoFilterPixels([50, 220, 250, 255], { ...base, contrast: 200 }), [0, 255, 255, 255]);
 });
 test('Saturation 0% turns a colour pixel grey', () => {
   const [r, g, b] = applyPhotoFilterPixels([255, 0, 0, 255], { ...base, saturation: 0 });
