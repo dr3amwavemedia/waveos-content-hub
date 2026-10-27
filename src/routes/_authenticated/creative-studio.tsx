@@ -120,6 +120,9 @@ function normalizeDocument(document: DesignDocument): DesignDocument {
   };
 }
 
+/** Media picker page size: preview URLs are signed only for tiles on screen. */
+const MEDIA_PICKER_PAGE = 24;
+
 function CreativeStudioPage() {
   const postSearch=Route.useSearch();
   const incoming=useRef<string|null>(null);
@@ -957,7 +960,7 @@ function CreativeStudioPage() {
             <dl className="mt-3 space-y-2 text-xs"><div><dt className="text-muted-foreground">Preferred CTA</dt><dd className="break-words">{profile?.default_ctas?.[0] ?? "Not saved"}</dd></div><div><dt className="text-muted-foreground">Website</dt><dd className="break-words">{profile?.website ?? "Not saved"}</dd></div><div><dt className="text-muted-foreground">Brand voice</dt><dd>{profile?.tone_traits?.join(" · ") || "Not saved"}</dd></div><div><dt className="text-muted-foreground">Saved fonts</dt><dd>Not available — template fonts preserved</dd></div></dl>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {branding.data?.logoUrl && <Button variant="outline" className="h-20" onClick={()=>{const slot=mediaSlots.find(item=>item.role==="logo");if(slot){changeDocument(current=>replaceStudioMedia(current,slot.layer.id,{assetId:null,sourceType:"workspace-logo"}));}else addWorkspaceLogo();}}><img src={branding.data.logoUrl} alt="Primary logo" className="max-h-14 max-w-full object-contain" /></Button>}
-              {(mediaAssets.data??[]).filter(asset=>asset.tags?.some(tag=>["brand","product","team","background"].includes(tag))).map(asset=><Button key={asset.id} variant="outline" className="h-20 overflow-hidden p-0" aria-label={`Use brand photo ${asset.name}`} onClick={()=>{const slot=selectedId?mediaSlots.find(item=>item.layer.id===selectedId):mediaSlots.find(item=>item.role==="background");if(slot){changeDocument(current=>replaceStudioMedia(current,slot.layer.id,{assetId:asset.id}));}else addImage(asset.id);}}>{assetUrls[asset.id]?<img src={assetUrls[asset.id]} alt={asset.name} className="h-full w-full object-cover"/>:<ImageIcon/>}</Button>)}
+              {brandPhotoAssets.map(asset=><Button key={asset.id} variant="outline" className="h-20 overflow-hidden p-0" aria-label={`Use brand photo ${asset.name}`} onClick={()=>{const slot=selectedId?mediaSlots.find(item=>item.layer.id===selectedId):mediaSlots.find(item=>item.role==="background");if(slot){changeDocument(current=>replaceStudioMedia(current,slot.layer.id,{assetId:asset.id}));}else addImage(asset.id);}}>{assetUrls[asset.id]?<img src={assetUrls[asset.id]} alt={asset.name} className="h-full w-full object-cover"/>:<ImageIcon/>}</Button>)}
             </div>
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}>
@@ -983,7 +986,7 @@ function CreativeStudioPage() {
             <Button variant="outline" className="mt-3 min-h-11 w-full sm:hidden" onClick={() => uploadInputRef.current?.click()}><Upload /> Upload image</Button>
             {replaceId && <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Sample photography · generated, not business-owned</summary><div className="mt-2 grid grid-cols-3 gap-2">{Array.from(new Set(TEMPLATE_LIBRARY.map(item=>item.photo))).map((url,index)=><Button key={url} variant="outline" className="aspect-square h-auto overflow-hidden p-0" aria-label={`Replace with sample photo ${index+1}`} onClick={()=>{if(replaceId){changeDocument(current=>replaceStudioMedia(current,replaceId,{assetId:null,templateUrl:url}));setSelectedId(replaceId);setReplaceId(null);setMobileTool(null);}}}><img src={url} alt={`Sample photo ${index+1}`} className="h-full w-full object-cover"/></Button>)}</div></details>}
             <div className="mt-3 grid max-h-[55dvh] grid-cols-3 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-2">
-              {(mediaAssets.data ?? []).filter(asset => mediaTab === "All" || mediaTab === "Uploads" || (mediaTab === "Recent" && document.elements.some(item => item.type === "image" && item.assetId === asset.id)) || (mediaTab === "Brand" && asset.tags?.includes("brand"))).map((asset) => (
+              {visiblePickerAssets.map((asset) => (
                 <button
                   key={asset.id}
                   type="button"
@@ -1004,6 +1007,11 @@ function CreativeStudioPage() {
                 <p className="text-xs text-muted-foreground">Upload a JPG or PNG to get started.</p>
               )}
             </div>
+            {pickerAssets.length > visiblePickerAssets.length && (
+              <Button variant="outline" size="sm" className="mt-2 min-h-11 w-full" onClick={() => setMediaPickerLimit((limit) => limit + MEDIA_PICKER_PAGE)}>
+                Show more ({pickerAssets.length - visiblePickerAssets.length} more)
+              </Button>
+            )}
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Layers" && "hidden sm:block")}>
             <div className="flex items-center gap-2 text-sm font-semibold">
