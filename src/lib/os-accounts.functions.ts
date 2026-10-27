@@ -485,3 +485,112 @@ export const deleteOsAccount = createServerFn({ method: "POST" })
     if (result.error) throw result.error;
     return { deleted: true };
   });
+
+
+export const inviteComplimentaryOsAccount = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: {
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    workspaceName?: string;
+    plan: "standard" | "full" | "expanded";
+  }) => data)
+  .handler(async ({ data, context }) => {
+    const admin = await requireOwner(context.userId);
+    const email = data.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+    const planLimits = { standard: 3, full: 4, expanded: 8 } as const;
+    if (!Object.hasOwn(planLimits, data.plan)) throw new Error("Choose a valid WaveOS tier.");
+
+    // Invite only new public-app accounts. Existing users may have real paid
+    // subscriptions or Dream Wave access and must never be silently converted.
+    const existing = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    if (existing.error) throw existing.error;
+    if (existing.data.users.some((user) => user.email?.toLowerCase() === email)) {
+      throw new Error("That email already has a WaveOS account. Use the existing account controls instead of creating a complimentary duplicate.");
+    }
+
+    const origin = process.env.WAVEOS_APP_URL ?? "https://waveos.dreamwavemedia.co";
+    const invite = await admin.auth.admin.inviteUserByEmail(email, {
+      redirectTo: new URL("/reset-password", origin).toString(),
+      data: {
+        first_name: data.firstName?.trim() || "",
+        last_name: data.lastName?.trim() || "",
+        account_source: "os_data",
+        signup_source: "public_trial",
+        workspace_name: data.workspaceName?.trim() || "",
+        complimentary_access: true,
+        complimentary_plan: data.plan,
+      },
+    });
+    if (invite.error || !invite.data.user) throw invite.error ?? new Error("WaveOS invitation could not be created.");
+
+    const userId = invite.data.user.id;
+    const membership = await admin
+      .from("workspace_members")
+      .select("workspace_id,workspaces!inner(data_source)")
+      .eq("user_id", userId)
+      .eq("workspaces.data_source", "os_data")
+      .limit(1)
+      .maybeSingle();
+    if (membership.error) throw membership.error;
+    const workspaceId = (membership.data as { workspace_id?: string } | null)?.workspace_id;
+    if (!workspaceId) {
+      // Auth invitation already exists, so leave a clear audit trail rather
+      // than guessing at billing state.
+      await admin.from("activity_logs").insert({
+        actor_user_id: context.userId,
+        action: "complimentary_os_invite_needs_provisioning",
+        entity_type: "profile",
+        entity_id: userId,
+        safe_metadata: { email, plan: data.plan },
+      });
+      throw new Error("The invitation was created, but its WaveOS workspace was not provisioned. Do not resend it; check OS Data before retrying.");
+    }
+
+    const current = await admin
+      .from("workspace_social_subscriptions" as never)
+      .select("stripe_subscription_id,stripe_customer_id")
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+    if (current.error) throw current.error;
+    const paid = current.data as { stripe_subscription_id?: string | null; stripe_customer_id?: string | null } | null;
+    if (paid?.stripe_subscription_id || paid?.stripe_customer_id) {
+      throw new Error("This workspace already has Stripe billing and cannot be converted to complimentary access from this control.");
+    }
+
+    const subscription = await admin
+      .from("workspace_social_subscriptions" as never)
+      .upsert(
+        {
+          workspace_id: workspaceId,
+          plan: data.plan,
+          status: "active",
+          internal_test_access: true,
+          billing_interval: null,
+          account_limit: planLimits[data.plan],
+          trial_started_at: null,
+          trial_ends_at: null,
+          current_period_end: null,
+          cancel_at_period_end: false,
+          payment_failure_count: 0,
+          last_payment_failed_at: null,
+          service_locked_at: null,
+        } as never,
+        { onConflict: "workspace_id" },
+      );
+    if (subscription.error) throw subscription.error;
+
+    await admin.from("profiles" as never).update({ payments_enabled: false } as never).eq("id", userId);
+    await admin.from("activity_logs").insert({
+      workspace_id: workspaceId,
+      actor_user_id: context.userId,
+      action: "complimentary_os_invite_created",
+      entity_type: "workspace",
+      entity_id: workspaceId,
+      safe_metadata: { email, plan: data.plan, account_limit: planLimits[data.plan] },
+    });
+
+    return { invited: true, email, workspaceId, plan: data.plan };
+  });
