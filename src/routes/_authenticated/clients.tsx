@@ -3941,10 +3941,20 @@ function InvoiceForm({
       }}
       className="space-y-3 rounded-lg border border-dashed border-border bg-surface/40 p-3"
     >
-      <div>
-        <p className="text-sm font-semibold text-foreground">
-          {invoice ? `Edit ${invoice.number || "invoice"}` : "New invoice"}
-        </p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">
+            {invoice ? `Edit ${invoice.number || "invoice"}` : "New invoice"}
+          </p>
+          <p className="text-xs text-muted-foreground sm:hidden">You can leave this editor without saving.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onDone}
+          className="min-h-10 rounded-lg border border-border px-3 text-xs font-semibold sm:hidden"
+        >
+          Cancel
+        </button>
       </div>
       <MobileWorkflowSteps steps={mobileSteps} step={mobileStep} onChange={setMobileStep} />
       <MobileWorkflowSection active={mobileStep === 1}>
