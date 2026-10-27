@@ -4904,16 +4904,6 @@ export type Database = {
         Args: { _user_id: string; _workspace_id: string }
         Returns: boolean
       }
-      claim_webhook_event: {
-        Args: {
-          _event_type: string
-          _external_id: string
-          _payload: Json
-          _processed_at: string
-          _source: string
-        }
-        Returns: boolean
-      }
       claim_signwell_completion_jobs: {
         Args: { _limit?: number }
         Returns: {
@@ -4929,6 +4919,22 @@ export type Database = {
           state: string
           updated_at: string
         }[]
+        SetofOptions: {
+          from: "*"
+          to: "signwell_completion_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      claim_webhook_event: {
+        Args: {
+          _event_type: string
+          _external_id: string
+          _payload: Json
+          _processed_at: string
+          _source: string
+        }
+        Returns: boolean
       }
       client_can_view_financials: {
         Args: { _user_id: string; _workspace_id: string }
