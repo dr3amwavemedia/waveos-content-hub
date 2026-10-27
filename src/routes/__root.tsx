@@ -253,6 +253,7 @@ function RootComponent() {
       <Toaster
         theme="dark"
         position="top-right"
+        offset="calc(env(safe-area-inset-top) + 12px)"
         toastOptions={{
           style: {
             background: "var(--color-surface-2)",
