@@ -14,18 +14,21 @@ export async function renderStudioArtwork(canvas:HTMLCanvasElement,document:Desi
   for(const element of document.elements){ctx.save();ctx.translate(element.x*format.width,element.y*format.height);ctx.rotate((element.rotation??0)*Math.PI/180);ctx.globalAlpha=element.opacity??1;
     if(element.type === "shape"){ctx.fillStyle=element.color;if(element.shape === "circle"){ctx.beginPath();ctx.ellipse(0,0,element.width/2,element.height/2,0,0,Math.PI*2);ctx.fill();}else ctx.fillRect(-element.width/2,-element.height/2,element.width,element.height);if((element.borderWidth??0)>0){ctx.strokeStyle=element.borderColor??element.color;ctx.lineWidth=element.borderWidth??0;if(element.shape === "circle")ctx.stroke();else ctx.strokeRect(-element.width/2,-element.height/2,element.width,element.height);}}
     else if(element.type === "text"){ctx.fillStyle=element.color;ctx.font=`${element.fontWeight} ${element.fontSize}px "${element.fontFamily??"Inter"}"`;ctx.textAlign=element.align;ctx.textBaseline="middle";ctx.letterSpacing=`${element.letterSpacing??0}px`;const lines=element.text.split("\n").slice(0,8),lineHeight=element.fontSize*1.18;lines.forEach((line,i)=>ctx.fillText(line,0,(i-(lines.length-1)/2)*lineHeight,format.width*.88));}
-    else{const url=studioImageUrl(element,urls,logo);if(url)try{const image=await loadStudioImage(url);const warmth=element.warmth??0,highlights=element.highlights??0,shadows=element.shadows??0;
-      const effectiveBrightness=clampPercent((element.brightness??100)+highlights*.18+shadows*.12);
-      const effectiveContrast=clampPercent((element.contrast??100)+highlights*.08-shadows*.08);
-      const warmSepia=Math.max(0,warmth)/180;
-      const coolHue=warmth<0?Math.min(18,Math.abs(warmth)*.18):0;
-      ctx.filter=`brightness(${effectiveBrightness}%) contrast(${effectiveContrast}%) saturate(${element.saturation??100}%) sepia(${warmSepia}) hue-rotate(${coolHue}deg)`;const isLogo=element.brandRole==="logo"||element.mediaRole==="logo"||element.sourceType==="workspace-logo";const crop=isLogo?{x:0,y:0,width:1,height:1}:element.crop??{x:0,y:0,width:1,height:1};const size=isLogo?logoContainSize(element.width,element.height,image.naturalWidth,image.naturalHeight):element;ctx.drawImage(image,image.naturalWidth*crop.x,image.naturalHeight*crop.y,image.naturalWidth*crop.width,image.naturalHeight*crop.height,-size.width/2,-size.height/2,size.width,size.height);}catch{ready=false;}else ready=false;}
+    else{const url=studioImageUrl(element,urls,logo);if(url)try{const image=await loadStudioImage(url);const exposure=element.exposure??0,warmth=element.warmth??0,highlights=element.highlights??0,shadows=element.shadows??0;
+      const exposureMultiplier=Math.pow(2,(exposure/100)*1.5);
+      const effectiveBrightness=clampFilter((element.brightness??100)*exposureMultiplier+highlights*.30+shadows*.22);
+      const effectiveContrast=clampFilter((element.contrast??100)+highlights*.12-shadows*.16);
+      const effectiveSaturation=clampFilter(element.saturation??100);
+      const warmSepia=Math.max(0,warmth)/160;
+      const warmHue=warmth>0?Math.min(10,warmth*.10):0;
+      const coolHue=warmth<0?Math.min(22,Math.abs(warmth)*.22):0;
+      ctx.filter=`brightness(${effectiveBrightness}%) contrast(${effectiveContrast}%) saturate(${effectiveSaturation}%) sepia(${warmSepia}) hue-rotate(${warmHue-coolHue}deg)`;const isLogo=element.brandRole==="logo"||element.mediaRole==="logo"||element.sourceType==="workspace-logo";const crop=isLogo?{x:0,y:0,width:1,height:1}:element.crop??{x:0,y:0,width:1,height:1};const size=isLogo?logoContainSize(element.width,element.height,image.naturalWidth,image.naturalHeight):element;ctx.drawImage(image,image.naturalWidth*crop.x,image.naturalHeight*crop.y,image.naturalWidth*crop.width,image.naturalHeight*crop.height,-size.width/2,-size.height/2,size.width,size.height);}catch{ready=false;}else ready=false;}
     ctx.restore();
   }
   return ready;
 }
 
 
-function clampPercent(value:number){
-  return Math.max(0,Math.min(200,value));
+function clampFilter(value:number){
+  return Math.max(0,Math.min(300,value));
 }
