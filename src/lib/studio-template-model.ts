@@ -10,7 +10,13 @@ export type TextElement = Layer & { type: "text"; text: string; contentRole?: "b
 export type ShapeElement = Layer & { type: "shape"; shape: "rectangle" | "circle"; borderColor?: string; borderWidth?: number; width: number; height: number; color: string };
 export type ImageElement = Layer & { type: "image"; mediaRole?: "background" | "secondary" | "logo"; sourceType: "media" | "workspace-logo"; assetId: string | null; templateUrl?: string; exposure?: number; brightness?: number; contrast?: number; saturation?: number; warmth?: number; highlights?: number; shadows?: number; sharpness?: number; crop?: {x:number;y:number;width:number;height:number}; width:number;height:number };
 export type DesignElement = TextElement | ShapeElement | ImageElement;
-export type DesignDocument = { version: 1; format: DesignFormat; background: string; elements: DesignElement[] };
+export type DesignDocument = { version: 1; format: DesignFormat; customWidth?: number; customHeight?: number; background: string; elements: DesignElement[] };
+export function studioDocumentSize(document: DesignDocument) {
+  const preset = STUDIO_FORMATS[document.format];
+  const width = document.customWidth && document.customWidth > 0 ? document.customWidth : preset.width;
+  const height = document.customHeight && document.customHeight > 0 ? document.customHeight : preset.height;
+  return { label: document.customWidth && document.customHeight ? "Original" : preset.label, width, height };
+}
 export const STUDIO_FONTS = ["DM Sans", "Cormorant Garamond", "Caveat", "Barlow Condensed", "Manrope", "Inter", "Arial", "Georgia", "Courier New"];
 export type StudioBrand = { primary:string; secondary?:string; logoUrl?:string|null; headingFont?:string; bodyFont?:string; accentFont?:string; businessName?:string; cta?:string; website?:string; services?:string; serviceArea?:string };
 export type BrandApplyMode = "colors" | "fonts" | "light" | "full" | "logo";
