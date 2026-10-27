@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { analyzeSeoGrowth } from "@/lib/seo-growth.functions";
 
-type SeoResult = Awaited<ReturnType<ReturnType<typeof useServerFn<typeof analyzeSeoGrowth>>>>;
 
 export function SeoGrowthPanel({
   workspaceId,
