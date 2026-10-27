@@ -589,7 +589,17 @@ function Shell({ children }: { children: ReactNode }) {
           <div className="absolute inset-0 bg-background/70 backdrop-blur" onClick={() => setCreateSheetOpen(false)} />
           <div className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-border-strong bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border-strong" />
-            <p className="mb-2 px-1 text-sm font-semibold text-foreground">Create</p>
+            <div className="mb-2 flex items-center justify-between gap-3 px-1">
+              <p className="text-sm font-semibold text-foreground">Create</p>
+              <button
+                type="button"
+                onClick={() => setCreateSheetOpen(false)}
+                className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-elevated text-muted-foreground"
+                aria-label="Close create menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
             <div className="grid grid-cols-2 gap-2" onClick={() => setCreateSheetOpen(false)}>
               {[
                 { to: "/create", label: "Create Post", icon: Plus, show: true },
