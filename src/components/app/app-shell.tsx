@@ -485,7 +485,7 @@ function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <header data-global-mobile-header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/80 px-4 py-3 backdrop-blur lg:hidden">
+      <header data-global-mobile-header className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-surface/90 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur lg:hidden">
         <WaveLogo compact />
         <div className="flex items-center gap-2">
           <NotificationsBell />
@@ -506,7 +506,7 @@ function Shell({ children }: { children: ReactNode }) {
             className="absolute inset-0 bg-background/70 backdrop-blur"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-border bg-sidebar p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-border bg-sidebar px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
             <div className="flex items-center justify-between">
               <WaveLogo />
               <button
@@ -539,7 +539,7 @@ function Shell({ children }: { children: ReactNode }) {
         <AccountStatusBanner />
         <div
           className={cn(
-            "mx-auto px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:pt-8 lg:pb-10",
+            "mx-auto px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:pt-8 lg:pb-10",
             useWideCanvas ? "max-w-none lg:px-8 xl:px-10" : "max-w-7xl lg:px-10",
           )}
         >
