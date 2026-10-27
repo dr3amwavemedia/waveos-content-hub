@@ -67,3 +67,52 @@ export function validatedResearchReport(raw: unknown, consultedUrls: string[]) {
   if (sourcesFiltered) report.limitations = [...report.limitations, RESEARCH_SOURCE_WARNING];
   return { report, sourcesFiltered };
 }
+
+export const independentComparisonSchema = z.object({
+  businessA: researchReportSchema,
+  businessB: researchReportSchema,
+  comparison: z.array(z.object({
+    title: z.string(),
+    businessA: researchClaim,
+    businessB: researchClaim,
+    takeaway: researchClaim,
+  })),
+  opportunities: z.array(researchClaim),
+  limitations: z.array(z.string()),
+});
+export type IndependentComparison = z.infer<typeof independentComparisonSchema>;
+
+export function validatedIndependentComparison(raw: unknown, consultedUrls: string[]) {
+  const parsed = independentComparisonSchema.parse(raw);
+  const businessA = groundedReport(parsed.businessA, consultedUrls);
+  const businessB = groundedReport(parsed.businessB, consultedUrls);
+  const consulted = new Set(consultedUrls.flatMap(source => {
+    const url = normalizeResearchSource(source);
+    return url ? [url] : [];
+  }));
+  const cleanClaim = (claim: z.infer<typeof researchClaim>) => {
+    const sources = [...new Set(claim.sources.flatMap(source => {
+      const url = normalizeResearchSource(source);
+      return url && consulted.has(url) ? [url] : [];
+    }))];
+    return { text: claim.text.trim(), sources };
+  };
+  const comparison = parsed.comparison.map(row => ({
+    title: row.title,
+    businessA: cleanClaim(row.businessA),
+    businessB: cleanClaim(row.businessB),
+    takeaway: cleanClaim(row.takeaway),
+  })).filter(row => row.businessA.sources.length || row.businessB.sources.length || row.takeaway.sources.length);
+  const opportunities = parsed.opportunities.map(cleanClaim).filter(claim => claim.text && claim.sources.length);
+  if (!businessA.sections.some(section => section.findings.length) || !businessB.sections.some(section => section.findings.length)) {
+    throw new Error(RESEARCH_FAILURE_MESSAGE);
+  }
+  return {
+    comparison: { ...parsed, businessA, businessB, comparison, opportunities },
+    sourcesFiltered:
+      JSON.stringify(parsed.businessA) !== JSON.stringify(businessA) ||
+      JSON.stringify(parsed.businessB) !== JSON.stringify(businessB) ||
+      comparison.length !== parsed.comparison.length ||
+      opportunities.length !== parsed.opportunities.length,
+  };
+}
