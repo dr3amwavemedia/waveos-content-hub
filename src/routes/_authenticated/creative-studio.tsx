@@ -143,6 +143,8 @@ function CreativeStudioPage() {
   const [cropId, setCropId] = useState<string | null>(null);
   const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const [mediaTab, setMediaTab] = useState("All");
+  const [mediaPickerLimit, setMediaPickerLimit] = useState(MEDIA_PICKER_PAGE);
+  useEffect(() => { setMediaPickerLimit(MEDIA_PICKER_PAGE); }, [mediaTab]);
   const [replaceId, setReplaceId] = useState<string | null>(null);
   const [adjustment, setAdjustment] = useState("brightness");
   const [renderReady, setRenderReady] = useState(false);
@@ -281,11 +283,33 @@ function CreativeStudioPage() {
     };
   }, [assetUrls, document.elements, mediaAssets.data]);
 
+  const pickerAssets = useMemo(
+    () =>
+      (mediaAssets.data ?? []).filter(
+        (asset) =>
+          mediaTab === "All" ||
+          mediaTab === "Uploads" ||
+          (mediaTab === "Recent" && document.elements.some((item) => item.type === "image" && item.assetId === asset.id)) ||
+          (mediaTab === "Brand" && asset.tags?.includes("brand")),
+      ),
+    [mediaAssets.data, mediaTab, document.elements],
+  );
+  const brandPhotoAssets = useMemo(
+    () => (mediaAssets.data ?? []).filter((asset) => asset.tags?.some((tag) => ["brand", "product", "team", "background"].includes(tag))).slice(0, MEDIA_PICKER_PAGE),
+    [mediaAssets.data],
+  );
+  const visiblePickerAssets = pickerAssets.slice(0, mediaPickerLimit);
+  const warmIds = [...visiblePickerAssets, ...brandPhotoAssets].map((asset) => asset.id).filter((id) => !assetUrls[id]);
+  const warmKey = Array.from(new Set(warmIds)).join(",");
+
   useEffect(() => {
     let cancelled = false;
-    // Keep the editor responsive on large libraries. The selected/design media
-    // loads on demand above; only warm a small first page for the visual picker.
-    const assets = (mediaAssets.data ?? []).slice(0, 12).filter((asset) => !assetUrls[asset.id]);
+    // Keep the editor responsive on large libraries: only sign preview URLs for
+    // the picker page currently shown (plus a few brand photos). Design media
+    // loads on demand above, and "Show more" warms the next page.
+    if (!warmKey) return;
+    const ids = new Set(warmKey.split(","));
+    const assets = (mediaAssets.data ?? []).filter((asset) => ids.has(asset.id));
     if (!assets.length) return;
     void Promise.all(
       assets.map(async (asset) => {
@@ -303,7 +327,7 @@ function CreativeStudioPage() {
       }));
     });
     return () => { cancelled = true; };
-  }, [mediaAssets.data]);
+  }, [warmKey, mediaAssets.data]);
 
   useEffect(() => {
     let cancelled = false;
