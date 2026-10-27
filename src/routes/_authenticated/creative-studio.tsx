@@ -120,6 +120,9 @@ function normalizeDocument(document: DesignDocument): DesignDocument {
   };
 }
 
+/** Media picker page size: preview URLs are signed only for tiles on screen. */
+const MEDIA_PICKER_PAGE = 24;
+
 function CreativeStudioPage() {
   const postSearch=Route.useSearch();
   const incoming=useRef<string|null>(null);
@@ -143,6 +146,8 @@ function CreativeStudioPage() {
   const [cropId, setCropId] = useState<string | null>(null);
   const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
   const [mediaTab, setMediaTab] = useState("All");
+  const [mediaPickerLimit, setMediaPickerLimit] = useState(MEDIA_PICKER_PAGE);
+  useEffect(() => { setMediaPickerLimit(MEDIA_PICKER_PAGE); }, [mediaTab]);
   const [replaceId, setReplaceId] = useState<string | null>(null);
   const [adjustment, setAdjustment] = useState("brightness");
   const [renderReady, setRenderReady] = useState(false);
@@ -281,11 +286,33 @@ function CreativeStudioPage() {
     };
   }, [assetUrls, document.elements, mediaAssets.data]);
 
+  const pickerAssets = useMemo(
+    () =>
+      (mediaAssets.data ?? []).filter(
+        (asset) =>
+          mediaTab === "All" ||
+          mediaTab === "Uploads" ||
+          (mediaTab === "Recent" && document.elements.some((item) => item.type === "image" && item.assetId === asset.id)) ||
+          (mediaTab === "Brand" && asset.tags?.includes("brand")),
+      ),
+    [mediaAssets.data, mediaTab, document.elements],
+  );
+  const brandPhotoAssets = useMemo(
+    () => (mediaAssets.data ?? []).filter((asset) => asset.tags?.some((tag) => ["brand", "product", "team", "background"].includes(tag))).slice(0, MEDIA_PICKER_PAGE),
+    [mediaAssets.data],
+  );
+  const visiblePickerAssets = pickerAssets.slice(0, mediaPickerLimit);
+  const warmIds = [...visiblePickerAssets, ...brandPhotoAssets].map((asset) => asset.id).filter((id) => !assetUrls[id]);
+  const warmKey = Array.from(new Set(warmIds)).join(",");
+
   useEffect(() => {
     let cancelled = false;
-    // Keep the editor responsive on large libraries. The selected/design media
-    // loads on demand above; only warm a small first page for the visual picker.
-    const assets = (mediaAssets.data ?? []).slice(0, 12).filter((asset) => !assetUrls[asset.id]);
+    // Keep the editor responsive on large libraries: only sign preview URLs for
+    // the picker page currently shown (plus a few brand photos). Design media
+    // loads on demand above, and "Show more" warms the next page.
+    if (!warmKey) return;
+    const ids = new Set(warmKey.split(","));
+    const assets = (mediaAssets.data ?? []).filter((asset) => ids.has(asset.id));
     if (!assets.length) return;
     void Promise.all(
       assets.map(async (asset) => {
@@ -303,7 +330,7 @@ function CreativeStudioPage() {
       }));
     });
     return () => { cancelled = true; };
-  }, [mediaAssets.data]);
+  }, [warmKey, mediaAssets.data]);
 
   useEffect(() => {
     let cancelled = false;
@@ -933,7 +960,7 @@ function CreativeStudioPage() {
             <dl className="mt-3 space-y-2 text-xs"><div><dt className="text-muted-foreground">Preferred CTA</dt><dd className="break-words">{profile?.default_ctas?.[0] ?? "Not saved"}</dd></div><div><dt className="text-muted-foreground">Website</dt><dd className="break-words">{profile?.website ?? "Not saved"}</dd></div><div><dt className="text-muted-foreground">Brand voice</dt><dd>{profile?.tone_traits?.join(" · ") || "Not saved"}</dd></div><div><dt className="text-muted-foreground">Saved fonts</dt><dd>Not available — template fonts preserved</dd></div></dl>
             <div className="mt-3 grid grid-cols-2 gap-2">
               {branding.data?.logoUrl && <Button variant="outline" className="h-20" onClick={()=>{const slot=mediaSlots.find(item=>item.role==="logo");if(slot){changeDocument(current=>replaceStudioMedia(current,slot.layer.id,{assetId:null,sourceType:"workspace-logo"}));}else addWorkspaceLogo();}}><img src={branding.data.logoUrl} alt="Primary logo" className="max-h-14 max-w-full object-contain" /></Button>}
-              {(mediaAssets.data??[]).filter(asset=>asset.tags?.some(tag=>["brand","product","team","background"].includes(tag))).map(asset=><Button key={asset.id} variant="outline" className="h-20 overflow-hidden p-0" aria-label={`Use brand photo ${asset.name}`} onClick={()=>{const slot=selectedId?mediaSlots.find(item=>item.layer.id===selectedId):mediaSlots.find(item=>item.role==="background");if(slot){changeDocument(current=>replaceStudioMedia(current,slot.layer.id,{assetId:asset.id}));}else addImage(asset.id);}}>{assetUrls[asset.id]?<img src={assetUrls[asset.id]} alt={asset.name} className="h-full w-full object-cover"/>:<ImageIcon/>}</Button>)}
+              {brandPhotoAssets.map(asset=><Button key={asset.id} variant="outline" className="h-20 overflow-hidden p-0" aria-label={`Use brand photo ${asset.name}`} onClick={()=>{const slot=selectedId?mediaSlots.find(item=>item.layer.id===selectedId):mediaSlots.find(item=>item.role==="background");if(slot){changeDocument(current=>replaceStudioMedia(current,slot.layer.id,{assetId:asset.id}));}else addImage(asset.id);}}>{assetUrls[asset.id]?<img src={assetUrls[asset.id]} alt={asset.name} className="h-full w-full object-cover"/>:<ImageIcon/>}</Button>)}
             </div>
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}>
@@ -954,12 +981,12 @@ function CreativeStudioPage() {
           <section className={cn("surface-card p-4", mobileTool !== "Media" && "hidden sm:block")}>
             <h2 className="text-sm font-semibold">{replaceId ? "Replace image" : "Media Library"}</h2>
             {mediaSlots.length>0 && <div className="mt-3 space-y-2" aria-label="Replaceable media slots">{mediaSlots.map(({layer,role})=><div key={layer.id} className="flex min-w-0 items-center gap-2"><Button variant={replaceId===layer.id?"secondary":"outline"} className="min-h-11 min-w-0 flex-1 justify-start whitespace-normal text-left text-xs" aria-label={role==="background"?"Replace Background":`Replace ${layer.name}`} onClick={()=>{setReplaceId(layer.id);setSelectedId(layer.id);setMediaTab("All");}}><ImageIcon className="shrink-0"/>{role==="background"?"Replace Background":role==="logo"?"Replace Logo":`Replace ${layer.name}`}</Button><Button size="icon" variant="ghost" aria-label={`Edit ${layer.name}`} onClick={()=>{setSelectedId(layer.id);setCropId(role==="logo"?null:layer.id);setMobileTool(role==="logo"?"Edit":"Crop");}}><Crop/></Button></div>)}{replaceId && <Button variant="ghost" size="sm" onClick={()=>setReplaceId(null)}>Cancel replacement</Button>}</div>}
-            <div className="mt-2 flex gap-1">{["All","Uploads","Brand","Recent"].map(tab=><Button key={tab} size="sm" variant={mediaTab === tab ? "secondary" : "ghost"} onClick={()=>setMediaTab(tab)}>{tab}</Button>)}</div>
+            <div className="mt-2 flex flex-wrap gap-1">{["All","Uploads","Brand","Recent"].map(tab=><Button key={tab} size="sm" variant={mediaTab === tab ? "secondary" : "ghost"} onClick={()=>setMediaTab(tab)}>{tab}</Button>)}</div>
             {mediaTab === "Brand" && branding.data?.logoUrl && <Button variant="outline" className="mt-3 h-20 w-full" onClick={addWorkspaceLogo}><img src={branding.data.logoUrl} alt="Workspace logo" className="max-h-14 max-w-full object-contain" /></Button>}
             <Button variant="outline" className="mt-3 min-h-11 w-full sm:hidden" onClick={() => uploadInputRef.current?.click()}><Upload /> Upload image</Button>
             {replaceId && <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Sample photography · generated, not business-owned</summary><div className="mt-2 grid grid-cols-3 gap-2">{Array.from(new Set(TEMPLATE_LIBRARY.map(item=>item.photo))).map((url,index)=><Button key={url} variant="outline" className="aspect-square h-auto overflow-hidden p-0" aria-label={`Replace with sample photo ${index+1}`} onClick={()=>{if(replaceId){changeDocument(current=>replaceStudioMedia(current,replaceId,{assetId:null,templateUrl:url}));setSelectedId(replaceId);setReplaceId(null);setMobileTool(null);}}}><img src={url} alt={`Sample photo ${index+1}`} className="h-full w-full object-cover"/></Button>)}</div></details>}
             <div className="mt-3 grid max-h-[55dvh] grid-cols-3 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-2">
-              {(mediaAssets.data ?? []).filter(asset => mediaTab === "All" || mediaTab === "Uploads" || (mediaTab === "Recent" && document.elements.some(item => item.type === "image" && item.assetId === asset.id)) || (mediaTab === "Brand" && asset.tags?.includes("brand"))).map((asset) => (
+              {visiblePickerAssets.map((asset) => (
                 <button
                   key={asset.id}
                   type="button"
@@ -980,6 +1007,11 @@ function CreativeStudioPage() {
                 <p className="text-xs text-muted-foreground">Upload a JPG or PNG to get started.</p>
               )}
             </div>
+            {pickerAssets.length > visiblePickerAssets.length && (
+              <Button variant="outline" size="sm" className="mt-2 min-h-11 w-full" onClick={() => setMediaPickerLimit((limit) => limit + MEDIA_PICKER_PAGE)}>
+                Show more ({pickerAssets.length - visiblePickerAssets.length} more)
+              </Button>
+            )}
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Layers" && "hidden sm:block")}>
             <div className="flex items-center gap-2 text-sm font-semibold">
@@ -1027,7 +1059,7 @@ function CreativeStudioPage() {
           </section>
         </MobileToolPanel>
 
-        <section className="relative flex min-h-64 items-center justify-center overflow-hidden sm:surface-card sm:min-h-[30rem] sm:p-6">
+        <section className="relative flex min-h-64 items-center justify-center overflow-hidden sm:surface-card sm:sticky sm:top-4 sm:min-h-[30rem] sm:self-start sm:p-6">
           <div className="w-full max-w-3xl">
             {document.elements.length === 0 && <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center"><div className="rounded-full border border-border/80 bg-background/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">Tap Add, Media, or Templates to start creating</div></div>}
             <div className="relative mx-auto w-fit max-w-full" style={{ transform: `scale(${viewportZoom})` }}><canvas
