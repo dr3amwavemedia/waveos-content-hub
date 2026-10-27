@@ -283,7 +283,9 @@ function CreativeStudioPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const assets = (mediaAssets.data ?? []).filter((asset) => !assetUrls[asset.id]);
+    // Keep the editor responsive on large libraries. The selected/design media
+    // loads on demand above; only warm a small first page for the visual picker.
+    const assets = (mediaAssets.data ?? []).slice(0, 12).filter((asset) => !assetUrls[asset.id]);
     if (!assets.length) return;
     void Promise.all(
       assets.map(async (asset) => {
