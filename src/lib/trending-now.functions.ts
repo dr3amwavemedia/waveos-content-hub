@@ -40,7 +40,7 @@ export const discoverTrends=createServerFn({method:"POST"}).middleware([requireS
    if(source.platform==='YouTube'){
     try{
      const response=await fetch(`https://www.youtube.com/oembed?url=${encodeURIComponent(trend.url)}&format=json`,{signal:AbortSignal.timeout(5000)});
-     if(!response.ok)return null;
+     if(!response.ok)return trend;
      const data=await response.json() as {title?:unknown;author_name?:unknown;thumbnail_url?:unknown};
      return {...trend,title:typeof data.title==='string'&&data.title.trim()?data.title:trend.title,creator:typeof data.author_name==='string'?data.author_name:trend.creator,thumbnail:typeof data.thumbnail_url==='string'?data.thumbnail_url:trend.thumbnail};
     }catch{return trend;}
