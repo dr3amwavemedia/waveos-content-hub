@@ -2,13 +2,27 @@ export type Trend = {id:string;title:string;url:string;source:string;excerpt:str
 export type TrendFilters={platform:string;style:string;language:string;market:string;niche:string;businessType:string;audience:string;days:number;kind:string};
 export const DEFAULT_TREND_FILTERS:TrendFilters={platform:"All videos",style:"Any style",language:"Any language",market:"",niche:"",businessType:"",audience:"",days:7,kind:"Any type"};
 export function trendVideoSource(raw:string):{platform:Trend["platform"];embedUrl?:string}|null{
- try{const url=new URL(raw),host=url.hostname.replace(/^www\./,'');
- if(host==='tiktok.com'&&/^\/@[^/]+\/video\/\d+\/?$/.test(url.pathname))return {platform:'TikTok'};
- if(host==='instagram.com'&&/^\/reels?\/[A-Za-z0-9_-]+\/?$/.test(url.pathname))return {platform:'Instagram'};
- if((host==='facebook.com'||host==='m.facebook.com')&&(/^\/reel\/\d+\/?$/.test(url.pathname)||/\/videos\/\d+\/?$/.test(url.pathname)||url.pathname==='/watch/'))return {platform:'Facebook'};
- const id=host==='youtube.com'&&/^\/shorts\/[A-Za-z0-9_-]{11}\/?$/.test(url.pathname)?url.pathname.split('/')[2]:undefined;
- if(id)return {platform:'YouTube',embedUrl:`https://www.youtube-nocookie.com/embed/${id}`};
- }catch{/* Invalid source. */}return null;
+ try{
+  const url=new URL(raw),host=url.hostname.replace(/^www\./,'');
+  const path=url.pathname.replace(/\/+$/,'');
+  if((host==='tiktok.com'||host==='m.tiktok.com')&&/^\/@[^/]+\/video\/\d+$/.test(path))return {platform:'TikTok'};
+  if(host==='vm.tiktok.com'&&/^\/[A-Za-z0-9_-]+$/.test(path))return {platform:'TikTok'};
+  if((host==='instagram.com'||host==='m.instagram.com')&&/^\/reels?\/[A-Za-z0-9_-]+$/.test(path))return {platform:'Instagram'};
+  if(host==='facebook.com'||host==='m.facebook.com'){
+   if(/^\/reel\/[^/]+$/.test(path)||/\/videos\/[^/]+$/.test(path)||/^\/share\/r\/[^/]+$/.test(path)||path==='/watch'){
+    return {platform:'Facebook'};
+   }
+  }
+  let id:string|undefined;
+  if(host==='youtube.com'){
+   if(/^\/shorts\/[A-Za-z0-9_-]{11}$/.test(path))id=path.split('/')[2];
+   else if(path==='/watch'&&/^[A-Za-z0-9_-]{11}$/.test(url.searchParams.get('v')??''))id=url.searchParams.get('v')??undefined;
+  }else if(host==='youtu.be'&&/^\/[A-Za-z0-9_-]{11}$/.test(path)){
+   id=path.slice(1);
+  }
+  if(id)return {platform:'YouTube',embedUrl:`https://www.youtube-nocookie.com/embed/${id}`};
+ }catch{/* Invalid source. */}
+ return null;
 }
 export function videoTrendResults(trends:Trend[],platform='All videos'){
  return trends.flatMap(trend=>{const source=trendVideoSource(trend.url);return source&&(platform==='All videos'||source.platform===platform)?[{...trend,...source}]:[];});
