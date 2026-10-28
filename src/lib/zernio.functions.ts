@@ -342,7 +342,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
           const snapshotRows = modes.flatMap(({ mode, selected }) => {
             const sourceReference = selected.map((source) => source.sourceReference).join(" + ");
             const recordCount = selected.reduce((sum, source) => sum + source.recordCount, 0);
-            const metricRows = ANALYTICS_METRIC_KEYS.map((metricKey) => {
+            const metricRows: Array<Record<string, unknown> & { metric_key: string }> = ANALYTICS_METRIC_KEYS.map((metricKey) => {
               const metric = combineAnalyticsMetric(selected, metricKey);
               return {
                 workspace_id: data.workspaceId,
