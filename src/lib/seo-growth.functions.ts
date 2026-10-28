@@ -182,33 +182,6 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
     const parallelKey = process.env.PARALLEL_API_KEY;
     const appKey = process.env.LOVABLE_API_KEY;
 
-    const claimSchema = {
-      type: "object",
-      additionalProperties: false,
-      required: ["title", "why", "priority", "category", "steps", "sources"],
-      properties: {
-        title: { type: "string" },
-        why: { type: "string" },
-        priority: { type: "string", enum: ["high", "medium", "low"] },
-        category: { type: "string", enum: ["Google Business", "Website", "Technical SEO", "Local SEO", "Content", "Authority"] },
-        steps: { type: "array", items: { type: "string" } },
-        sources: { type: "array", items: { type: "string" } },
-      },
-    };
-    const schema = {
-      type: "object",
-      additionalProperties: false,
-      required: ["business", "website", "summary", "quickWins", "actions", "limitations"],
-      properties: {
-        business: { type: ["string", "null"] },
-        website: { type: ["string", "null"] },
-        summary: { type: "string" },
-        quickWins: { type: "array", items: { type: "string" } },
-        actions: { type: "array", items: claimSchema },
-        limitations: { type: "array", items: { type: "string" } },
-      },
-    };
-
     const domain = new URL(website).hostname.replace(/^www\./, "");
     const businessName = brand?.business_name?.trim() || domain;
     const queries = [
