@@ -142,11 +142,14 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
       const today = now.slice(0, 10);
       const profileLookup = await supabaseAdmin
         .from("social_intelligence_profiles" as never)
-        .select("id")
+        .select("id,metadata")
         .eq("workspace_id", data.workspaceId)
         .maybeSingle();
 
-      let intelligenceProfile = profileLookup.data as { id: string } | null;
+      let intelligenceProfile = profileLookup.data as { id: string; metadata?: Record<string, unknown> | null } | null;
+      let historicalRangeStart: string | null = null;
+      let historicalRangeEnd: string | null = null;
+      let historicalRecordCount = 0;
       if (!intelligenceProfile) {
         const created = await supabaseAdmin
           .from("social_intelligence_profiles" as never)
@@ -163,10 +166,157 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
           } as never)
           .select("id")
           .single();
-        if (!created.error) intelligenceProfile = created.data as { id: string };
+        if (!created.error) intelligenceProfile = { ...(created.data as { id: string }), metadata: {} };
       }
 
       if (intelligenceProfile) {
+        const existingMetadata = intelligenceProfile.metadata ?? {};
+        const previousBackfill = existingMetadata.historicalBackfill as
+          | { completedAt?: string; availableRangeStart?: string; availableRangeEnd?: string; dailyRecords?: number }
+          | undefined;
+        historicalRangeStart = previousBackfill?.availableRangeStart ?? null;
+        historicalRangeEnd = previousBackfill?.availableRangeEnd ?? null;
+        historicalRecordCount = Number(previousBackfill?.dailyRecords ?? 0);
+
+        // Initial onboarding backfill: request two provider-supported windows so
+        // a newly connected workspace can analyze up to ~2 years immediately.
+        if (!previousBackfill?.completedAt) {
+          type DashboardDaily = {
+            date?: string;
+            impressions?: number;
+            reach?: number;
+            engagement?: number;
+            views?: number;
+            followersGained?: number;
+          };
+          type DashboardPost = {
+            postId?: string;
+            platform?: string;
+            publishedAt?: string;
+            metrics?: Record<string, unknown>;
+          };
+          type DashboardPayload = {
+            daily?: DashboardDaily[];
+            topPosts?: DashboardPost[];
+            recentPosts?: DashboardPost[];
+            dataAsOf?: string;
+          };
+
+          const end = new Date();
+          const newestEnd = end.toISOString().slice(0, 10);
+          const newestStartDate = new Date(end);
+          newestStartDate.setUTCDate(newestStartDate.getUTCDate() - 365);
+          const newestStart = newestStartDate.toISOString().slice(0, 10);
+          const olderEndDate = new Date(newestStartDate);
+          olderEndDate.setUTCDate(olderEndDate.getUTCDate() - 1);
+          const olderEnd = olderEndDate.toISOString().slice(0, 10);
+          const olderStartDate = new Date(olderEndDate);
+          olderStartDate.setUTCDate(olderStartDate.getUTCDate() - 365);
+          const olderStart = olderStartDate.toISOString().slice(0, 10);
+          const windows = [
+            { fromDate: olderStart, toDate: olderEnd },
+            { fromDate: newestStart, toDate: newestEnd },
+          ];
+
+          const dashboardResults: DashboardPayload[] = [];
+          for (const window of windows) {
+            try {
+              const params = new URLSearchParams({
+                profileId: profile.profile_id,
+                fromDate: window.fromDate,
+                toDate: window.toDate,
+                topPosts: "25",
+                recentPosts: "25",
+              });
+              dashboardResults.push(
+                await zernioRequest<DashboardPayload>(`/analytics/dashboard?${params}`),
+              );
+            } catch (reason) {
+              const failure = classifyAnalyticsError(reason);
+              if (!["unsupported", "permission_missing"].includes(failure.availability)) throw reason;
+            }
+          }
+
+          const allDaily = dashboardResults
+            .flatMap((result) => result.daily ?? [])
+            .filter((row) => typeof row.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(row.date))
+            .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+          if (allDaily.length) {
+            const capturedAt = now;
+            const backfillRows = allDaily.flatMap((row) => {
+              const values: Array<[string, number | undefined]> = [
+                ["impressions", row.impressions],
+                ["reach", row.reach],
+                ["views", row.views],
+                ["engagements", row.engagement],
+                ["followers_gained", row.followersGained],
+              ];
+              return values.flatMap(([metricKey, rawValue]) => {
+                const value = Number(rawValue);
+                if (!Number.isFinite(value) || value < 0) return [];
+                return [{
+                  workspace_id: data.workspaceId,
+                  profile_id: intelligenceProfile!.id,
+                  metric_key: metricKey,
+                  provider: "zernio",
+                  availability: value === 0 ? "true_zero" : "available",
+                  value,
+                  unit: "count",
+                  range_start: row.date,
+                  range_end: row.date,
+                  record_count: 1,
+                  captured_at: capturedAt,
+                  source_reference: "zernio analytics dashboard daily",
+                  calculation_version: "waveos-zernio-dashboard-daily-v1",
+                  evidence: {
+                    coverage: "complete",
+                    mode: "combined",
+                    historicalBackfill: true,
+                  },
+                }];
+              });
+            });
+
+            // Keep inserts comfortably below request-size limits.
+            for (let index = 0; index < backfillRows.length; index += 500) {
+              const saved = await supabaseAdmin
+                .from("social_intelligence_snapshots" as never)
+                .insert(backfillRows.slice(index, index + 500) as never);
+              if (saved.error) throw saved.error;
+            }
+
+            historicalRangeStart = allDaily[0]?.date ?? null;
+            historicalRangeEnd = allDaily.at(-1)?.date ?? null;
+            historicalRecordCount = allDaily.length;
+            const topPosts = dashboardResults
+              .flatMap((result) => result.topPosts ?? [])
+              .filter((post) => post.postId && post.publishedAt)
+              .sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)))
+              .slice(0, 40);
+
+            const metadata = {
+              ...existingMetadata,
+              historicalBackfill: {
+                completedAt: now,
+                requestedRangeStart: olderStart,
+                requestedRangeEnd: newestEnd,
+                availableRangeStart: historicalRangeStart,
+                availableRangeEnd: historicalRangeEnd,
+                dailyRecords: historicalRecordCount,
+                topPosts,
+                dataAsOf: dashboardResults.map((result) => result.dataAsOf).filter(Boolean).at(-1) ?? null,
+              },
+            };
+            const metadataUpdate = await supabaseAdmin
+              .from("social_intelligence_profiles" as never)
+              .update({ metadata } as never)
+              .eq("workspace_id", data.workspaceId);
+            if (metadataUpdate.error) throw metadataUpdate.error;
+            intelligenceProfile.metadata = metadata;
+          }
+        }
+
         const latestCombined = await supabaseAdmin
           .from("social_intelligence_snapshots" as never)
           .select("captured_at,range_start,range_end,evidence")
@@ -274,9 +424,9 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
             analyzed_sources: availableSources.map((source) => source.key),
             requested_range_start: requestedRangeStart,
             requested_range_end: requestedRangeEnd,
-            available_range_start: availableStarts[0] ?? null,
-            available_range_end: availableEnds.at(-1) ?? null,
-            record_count: sources.reduce((sum, source) => sum + source.recordCount, 0),
+            available_range_start: historicalRangeStart ?? availableStarts[0] ?? null,
+            available_range_end: historicalRangeEnd ?? availableEnds.at(-1) ?? null,
+            record_count: historicalRecordCount || sources.reduce((sum, source) => sum + source.recordCount, 0),
             last_attempt_at: now,
             last_success_at: availableSources.length ? (sync.lastSuccessAt ?? now) : null,
             safe_error_code: availableSources.length ? null : String(sync.state),
