@@ -1319,7 +1319,7 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
   );
 }
 
-function MediaPicker({
+export function MediaPicker({
   workspaceId,
   picked,
   onClose,
@@ -1334,7 +1334,7 @@ function MediaPicker({
   const [search, setSearch] = useState("");
   const assets = useMediaAssets(workspaceId, { search: search || undefined });
   const [urls, setUrls] = useState<Record<string, string>>({});
-  const [source, setSource] = useState<"waveos" | ExternalMediaProvider>("waveos");
+  const [source, setSource] = useState<"waveos" | ExternalMediaProvider | "frameio">("waveos");
   const deviceInputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadAsset(workspaceId);
   const storageUsage = useMediaStorageUsage(workspaceId);
@@ -1406,6 +1406,7 @@ function MediaPicker({
                 ["waveos", "WaveOS"],
                 ["google_drive", "Google Drive"],
                 ["dropbox", "Dropbox"],
+                ["frameio", "Frame.io"],
               ] as const
             ).map(([value, label]) => (
               <button
@@ -1457,7 +1458,17 @@ function MediaPicker({
           />
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-4">
-          {source !== "waveos" ? (
+          {source === "frameio" ? (
+            <FrameioProviderPicker
+              workspaceId={workspaceId}
+              query={search}
+              selected={selected}
+              onImported={(ids) => {
+                setSelected((current) => Array.from(new Set([...current, ...ids])));
+                void assets.refetch();
+              }}
+            />
+          ) : source !== "waveos" ? (
             <ExternalProviderPicker
               provider={source}
               workspaceId={workspaceId}
