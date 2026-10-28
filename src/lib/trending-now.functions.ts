@@ -31,7 +31,7 @@ export const discoverTrends=createServerFn({method:"POST"}).middleware([requireS
    if(source.platform==='TikTok'){
     try{
      const response=await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(trend.url)}`,{signal:AbortSignal.timeout(5000)});
-     if(!response.ok)return null;
+     if(!response.ok)return trend;
      const data=await response.json() as {title?:unknown;author_name?:unknown;thumbnail_url?:unknown};
      const thumbnail=typeof data.thumbnail_url==='string'&&/^https:\/\//.test(data.thumbnail_url)?data.thumbnail_url:undefined;
      return {...trend,title:typeof data.title==='string'&&data.title.trim()?data.title:trend.title,creator:typeof data.author_name==='string'?data.author_name:trend.creator,thumbnail};
