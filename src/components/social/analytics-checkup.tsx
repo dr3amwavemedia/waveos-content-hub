@@ -103,6 +103,7 @@ export function AnalyticsCheckup({
     queryKey: ["social-intelligence", workspaceId],
     queryFn: () => intelligenceFn({ data: { workspaceId } }),
     retry: false,
+    enabled: analytics.isSuccess,
   });
 
   const selectedSources = useMemo(() => {
@@ -130,7 +131,7 @@ export function AnalyticsCheckup({
     <div className="space-y-6">
       <section className="space-y-5">
         <header className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase text-analytics">Performance & growth</p><h2 className="mt-1 text-xl font-semibold">Your business at a glance</h2></div><label className="text-xs text-muted-foreground"><span className="sr-only">Performance period</span><select aria-label="Performance period" className="min-h-11 rounded-lg border border-border bg-surface px-3 text-foreground" value={days} onChange={event=>setDays(Number(event.target.value) as 7|30|90)}>{[7,30,90].map(value=><option key={value} value={value}>Last {value} days</option>)}</select></label></header>
-        <div className="flex flex-wrap items-center gap-3"><Button variant="outline" disabled={refreshing||analytics.isFetching} onClick={async()=>{setRefreshing(true);try{const result=await analyticsFn({data:{workspaceId,days,refresh:true}});queryClient.setQueryData(["analytics-checkup",workspaceId,days],result);}catch{await analytics.refetch();}finally{setRefreshing(false);}}}>{refreshing?<Loader2 className="animate-spin"/>:<RefreshCw/>}{refreshing?"Refreshing…":"Refresh analytics"}</Button><span className="text-xs text-muted-foreground">Last provider sync: {formatDateTime(analytics.data?.sync.lastSuccessAt)}</span></div>
+        <div className="flex flex-wrap items-center gap-3"><Button variant="outline" disabled={refreshing||analytics.isFetching} onClick={async()=>{setRefreshing(true);try{const result=await analyticsFn({data:{workspaceId,days,refresh:true}});queryClient.setQueryData(["analytics-checkup",workspaceId,days],result);await queryClient.invalidateQueries({queryKey:["social-intelligence",workspaceId]});}catch{await analytics.refetch();await queryClient.invalidateQueries({queryKey:["social-intelligence",workspaceId]});}finally{setRefreshing(false);}}}>{refreshing?<Loader2 className="animate-spin"/>:<RefreshCw/>}{refreshing?"Refreshing…":"Refresh analytics"}</Button><span className="text-xs text-muted-foreground">Last provider sync: {formatDateTime(analytics.data?.sync.lastSuccessAt)}</span></div>
         {analytics.data?.sync.state!=="available" && analytics.data?.sync && <p role="status" className="border-l-2 border-warning pl-3 text-sm">{analytics.data.sync.message}</p>}
         <div className="flex gap-1 rounded-lg border border-border bg-surface p-1">{(["combined","organic","paid"] as AnalyticsMode[]).map(value=><Button key={value} variant={mode===value?"secondary":"ghost"} className="min-w-0 flex-1 capitalize" onClick={()=>setMode(value)}>{value}</Button>)}</div>
         <section className="border-y border-border py-5">
