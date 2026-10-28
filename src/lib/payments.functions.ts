@@ -299,3 +299,67 @@ export const getInvoicePaymentState = createServerFn({ method: "POST" })
       outcome,
     };
   });
+
+
+export const recordManualInvoicePayment = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((d: {
+    invoiceId: string;
+    method: "cash" | "check" | "zelle" | "ach" | "venmo_cashapp" | "card_other" | "other";
+    reference?: string;
+    paidAt?: string;
+  }) => d)
+  .handler(async ({ data, context }) => {
+    const { data: roles, error: roleError } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "dream_wave_owner")
+      .maybeSingle();
+    if (roleError) throw roleError;
+    if (!roles) throw new Error("Only Dream Wave owners can record manual payments.");
+
+    const { data: invoice, error } = await context.supabase
+      .from("client_invoices")
+      .select("id,workspace_id,number,amount_paid_cents,currency,status,paid_at")
+      .eq("id", data.invoiceId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!invoice) throw new Error("Invoice not found.");
+    if (invoice.status !== "paid" || invoice.amount_paid_cents <= 0) {
+      throw new Error("Save the invoice as paid before recording the manual payment.");
+    }
+
+    const labels: Record<string,string> = {
+      cash: "Cash",
+      check: "Check",
+      zelle: "Zelle",
+      ach: "ACH / bank transfer",
+      venmo_cashapp: "Venmo / Cash App",
+      card_other: "Card outside Stripe",
+      other: "Other",
+    };
+    const occurredAt = data.paidAt && !Number.isNaN(new Date(data.paidAt).getTime())
+      ? new Date(data.paidAt).toISOString()
+      : invoice.paid_at ?? new Date().toISOString();
+    const description = `Manual payment · ${labels[data.method] ?? data.method}${data.reference?.trim() ? ` · Ref: ${data.reference.trim()}` : ""}${invoice.number ? ` · ${invoice.number}` : ""}`;
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error: ledgerError } = await supabaseAdmin
+      .from("payment_ledger")
+      .upsert({
+        source: "invoice_backfill",
+        external_id: `manual:${invoice.id}`,
+        invoice_id: invoice.id,
+        workspace_id: invoice.workspace_id,
+        kind: "payment",
+        amount_cents: invoice.amount_paid_cents,
+        currency: (invoice.currency ?? "USD").toUpperCase(),
+        occurred_at: occurredAt,
+        description,
+        status: "posted",
+        created_by: context.userId,
+      }, { onConflict: "source,external_id" });
+    if (ledgerError) throw ledgerError;
+    return { recorded: true };
+  });
