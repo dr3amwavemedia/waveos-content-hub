@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, ChevronDown, ExternalLink, Loader2, Search, Sparkles, Target } from "lucide-react";
+import { ChevronDown, ExternalLink, Loader2, Search, Sparkles, Target } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -47,9 +47,9 @@ export function SeoGrowthPanel({
           <Sparkles className="h-4 w-4" />
           <p className="text-xs font-semibold uppercase tracking-[0.18em]">SEO Growth</p>
         </div>
-        <h2 className="mt-2 text-xl font-semibold">Find the next SEO moves</h2>
+        <h2 className="mt-2 text-xl font-semibold">What should I improve next?</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Add a public website and WaveOS will turn what it can verify into a short action plan.
+          Add your website. WaveOS explains what to improve in plain English and gives you steps you can follow or send to your web person.
         </p>
         <div className="mt-4 flex flex-col gap-2 sm:flex-row">
           <label className="relative min-w-0 flex-1">
@@ -82,8 +82,8 @@ export function SeoGrowthPanel({
           <section className="rounded-2xl border border-border bg-card p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">SEO snapshot</p>
-                <h3 className="mt-1 text-base font-semibold">What WaveOS found</h3>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">Simple summary</p>
+                <h3 className="mt-1 text-base font-semibold">What WaveOS noticed</h3>
               </div>
               <div className="rounded-xl bg-primary/10 p-2 text-primary">
                 <Target className="h-5 w-5" />
@@ -118,8 +118,8 @@ export function SeoGrowthPanel({
 
           <section className="space-y-2">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold">Priority actions</h3>
-              <span className="text-[11px] text-muted-foreground">Tap for steps</span>
+              <h3 className="text-sm font-semibold">What to work on next</h3>
+              <span className="text-[11px] text-muted-foreground">Tap to see what to do</span>
             </div>
 
             {result.actions.map((action: any, index: number) => (
@@ -148,14 +148,11 @@ export function SeoGrowthPanel({
                 </summary>
 
                 <div className="border-t border-border px-4 py-4">
-                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-primary">
-                    <span>{action.category}</span>
-                    <ArrowRight className="h-3 w-3" />
-                    <span>Next steps</span>
-                  </div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">Why this matters</p>
                   <p className="mt-2 text-sm leading-5 text-muted-foreground">{action.why}</p>
 
-                  <ol className="mt-4 space-y-3">
+                  <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-primary">What to do</p>
+                  <ol className="mt-2 space-y-3">
                     {action.steps.map((step: string, stepIndex: number) => (
                       <li key={stepIndex} className="flex gap-3 text-sm">
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
@@ -165,6 +162,13 @@ export function SeoGrowthPanel({
                       </li>
                     ))}
                   </ol>
+
+                  <div className="mt-4 rounded-lg border border-primary/15 bg-primary/5 p-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">What to tell your web / marketing person</p>
+                    <p className="mt-1 text-sm leading-5 text-foreground">
+                      “Please handle the steps above for <strong>{action.title}</strong> and let me know when they’re complete.”
+                    </p>
+                  </div>
 
                   {action.sources?.length > 0 && (
                     <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-3">
@@ -187,7 +191,7 @@ export function SeoGrowthPanel({
           </section>
 
           <details className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-xs text-muted-foreground">
-            <summary className="cursor-pointer font-semibold text-foreground">How this was checked</summary>
+            <summary className="cursor-pointer font-semibold text-foreground">How WaveOS checked this</summary>
             <p className="mt-2 leading-5">{result.methodology}</p>
             {result.limitations?.map((item: string, index: number) => (
               <p className="mt-1 leading-5" key={index}>{item}</p>
