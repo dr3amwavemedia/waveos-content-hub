@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
@@ -11,6 +11,10 @@ import {
   Save,
   ShieldCheck,
   Sparkles,
+  Upload,
+  Images,
+  Video,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequireFeature } from "@/components/app/require-feature";
@@ -30,6 +34,13 @@ import {
 import { cn } from "@/lib/utils";
 import { generateCampaignDirection } from "@/lib/campaign-ideas.functions";
 import { MobileWorkflowSteps, MobileWorkflowSection, MobileWorkflowFooter } from "@/components/app/mobile-workflow";
+import {
+  getMediaPreviewUrl,
+  useMediaAssets,
+  useMediaFolders,
+  useUploadAsset,
+  type MediaAsset,
+} from "@/hooks/use-media";
 
 export const Route = createFileRoute("/_authenticated/campaigns")({
   component: () => (
@@ -111,7 +122,21 @@ function CampaignManagerPage() {
     pillars:Array<{name:string;purpose:string;examples:string[]}>;
     hooks:string[];
     notes:string[];
+    mediaRecommendations:Array<{
+      mediaId:string;
+      reason:string;
+      platforms:string[];
+      suggestedDay:string;
+      caption:string;
+      hashtags:string[];
+    }>;
   } | null>(null);
+  const [selectedMediaIds,setSelectedMediaIds]=useState<string[]>([]);
+  const [mediaFolder,setMediaFolder]=useState<string>("all");
+  const mediaInputRef=useRef<HTMLInputElement|null>(null);
+  const mediaFolders=useMediaFolders(workspaceId);
+  const mediaAssets=useMediaAssets(workspaceId,{folderId:mediaFolder==="all"?undefined:mediaFolder==="root"?null:mediaFolder});
+  const uploadMedia=useUploadAsset(workspaceId);
   const [directionBusy, setDirectionBusy] = useState(false);
   const mobileSteps = ["Campaign name", "Your goal", "Platforms", "Posting frequency", "Planning schedule", "Review campaign"];
   const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
@@ -222,6 +247,7 @@ function CampaignManagerPage() {
           name: input.name,
           goal: input.goal,
           platforms: input.platforms,
+          mediaIds: selectedMediaIds,
         },
       });
       setCampaignDirection(direction);
@@ -262,15 +288,15 @@ function CampaignManagerPage() {
   return (
     <div className="space-y-6">
       <UnsavedChangesGuard dirty={dirty} subject="this campaign plan" />
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <header className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-purple-500/5 p-4 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-            <Megaphone className="h-4 w-4" /> Internal planning
+            <Megaphone className="h-4 w-4" /> Campaign intelligence
           </div>
-          <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Campaign Manager</h1>
-          <p className="mt-2 hidden max-w-3xl text-sm text-muted-foreground sm:block">
-            Build a reviewable campaign outline from your own constraints. Nothing here schedules,
-            publishes, spends money, or contacts an external platform.
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Build a campaign from your content</h1>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+            Choose the content you already have, then let WaveOS use your brand and performance history to recommend what to post, where, when, and how to caption it.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -289,7 +315,31 @@ function CampaignManagerPage() {
             <Sparkles /> Build plan
           </Button>
         </div>
+        </div>
       </header>
+
+      <section className="rounded-2xl border border-border bg-surface/70 p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 font-semibold"><Images className="h-4 w-4 text-primary" /> Choose campaign media</div>
+            <p className="mt-1 text-xs text-muted-foreground">Select multiple photos/videos from a folder or upload new pieces. AI Direction will evaluate the selected content.</p>
+          </div>
+          <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">
+            {uploadMedia.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload media
+            <input ref={mediaInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={async(e)=>{const files=Array.from(e.target.files??[]); const folderId=mediaFolder==="all"||mediaFolder==="root"?null:mediaFolder; for(const file of files){try{const asset=await uploadMedia.mutateAsync({file,folderId,tags:["campaign"]}); setSelectedMediaIds(ids=>Array.from(new Set([...ids,asset.id])));}catch(error){toast.error(error instanceof Error?error.message:"Upload failed.");}} e.currentTarget.value="";}} />
+          </label>
+        </div>
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+          <Button type="button" variant={mediaFolder==="all"?"default":"outline"} size="sm" onClick={()=>setMediaFolder("all")}>All media</Button>
+          <Button type="button" variant={mediaFolder==="root"?"default":"outline"} size="sm" onClick={()=>setMediaFolder("root")}>Uncategorized</Button>
+          {(mediaFolders.data??[]).map(folder=><Button key={folder.id} type="button" variant={mediaFolder===folder.id?"default":"outline"} size="sm" onClick={()=>setMediaFolder(folder.id)}>{folder.name}</Button>)}
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
+          {(mediaAssets.data??[]).slice(0,36).map(asset=><CampaignMediaTile key={asset.id} asset={asset} selected={selectedMediaIds.includes(asset.id)} onToggle={()=>setSelectedMediaIds(ids=>ids.includes(asset.id)?ids.filter(id=>id!==asset.id):[...ids,asset.id])} />)}
+        </div>
+        {!mediaAssets.isLoading && !(mediaAssets.data??[]).length && <p className="mt-4 text-sm text-muted-foreground">No media in this folder yet. Upload files or choose another folder.</p>}
+        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>{selectedMediaIds.length} selected</span>{selectedMediaIds.length>0&&<button type="button" className="text-primary" onClick={()=>setSelectedMediaIds([])}>Clear selection</button>}</div>
+      </section>
 
       {campaignDirection && (
         <details className="rounded-xl border border-primary/25 bg-primary/5 p-4" open>
@@ -312,6 +362,17 @@ function CampaignManagerPage() {
               ))}
             </div>
             <div><p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Hooks to explore</p><div className="mt-2 flex flex-wrap gap-2">{campaignDirection.hooks.map((hook,index)=><span key={index} className="rounded-full border border-border bg-background px-3 py-1.5 text-xs">{hook}</span>)}</div></div>
+            {campaignDirection.mediaRecommendations.length > 0 && <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Recommended content plan</p>
+              <div className="mt-2 space-y-3">
+                {campaignDirection.mediaRecommendations.map((rec,index)=><div key={rec.mediaId+index} className="rounded-xl border border-border bg-background/60 p-3">
+                  <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">{(mediaAssets.data??[]).find(a=>a.id===rec.mediaId)?.name ?? `Selected media ${index+1}`}</p><p className="mt-1 text-xs text-muted-foreground">{rec.reason}</p></div><span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">{rec.suggestedDay}</span></div>
+                  <p className="mt-3 text-sm">{rec.caption}</p>
+                  <div className="mt-2 flex flex-wrap gap-1">{rec.hashtags.map(tag=><span key={tag} className="text-xs text-primary">{tag.startsWith("#")?tag:`#${tag}`}</span>)}</div>
+                  <div className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground">{rec.platforms.join(" · ")}</div>
+                </div>)}
+              </div>
+            </div>}
           </div>
         </details>
       )}
@@ -626,3 +687,15 @@ function ChoiceGroup({
 
 const inputClass =
   "min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20";
+
+
+function CampaignMediaTile({asset,selected,onToggle}:{asset:MediaAsset;selected:boolean;onToggle:()=>void}) {
+  const [url,setUrl]=useState<string|null>(null);
+  useState(()=>{void getMediaPreviewUrl(asset,3600,"thumbnail").then(setUrl).catch(()=>setUrl(null)); return null;});
+  const isVideo=asset.mime_type.startsWith("video/");
+  return <button type="button" onClick={onToggle} className={cn("relative aspect-square overflow-hidden rounded-xl border bg-elevated",selected?"border-primary ring-2 ring-primary/30":"border-border")}>
+    {url ? (isVideo ? <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata" /> : <img src={url} alt={asset.name} className="h-full w-full object-cover" />) : <div className="flex h-full items-center justify-center text-muted-foreground">{isVideo?<Video className="h-5 w-5"/>:<Images className="h-5 w-5"/>}</div>}
+    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2 pb-2 pt-6 text-left text-[10px] text-white"><span className="line-clamp-1">{asset.name}</span></div>
+    {selected&&<span className="absolute right-1.5 top-1.5 rounded-full bg-primary p-1 text-primary-foreground"><CheckCircle2 className="h-4 w-4"/></span>}
+  </button>;
+}
