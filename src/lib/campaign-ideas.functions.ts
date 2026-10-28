@@ -47,11 +47,71 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
     if (!member && !staff) throw new Error("forbidden");
     if (!staff && !entitled) throw new Error("AI Campaign Direction is available on Current and Tidal.");
 
-    const { data: profile } = await context.supabase
-      .from("brand_profiles")
-      .select("business_name,industry,service_area,primary_services,target_audience,brand_summary,tone_traits,preferred_phrases,words_to_avoid,default_ctas")
-      .eq("workspace_id", data.workspaceId)
-      .maybeSingle();
+    const [{ data: profile }, { data: intelligenceProfile }, { data: historyRows }] = await Promise.all([
+      context.supabase
+        .from("brand_profiles")
+        .select("business_name,industry,service_area,primary_services,target_audience,brand_summary,tone_traits,preferred_phrases,words_to_avoid,default_ctas")
+        .eq("workspace_id", data.workspaceId)
+        .maybeSingle(),
+      context.supabase
+        .from("social_intelligence_profiles" as never)
+        .select("available_range_start,available_range_end,record_count,metadata")
+        .eq("workspace_id", data.workspaceId)
+        .maybeSingle(),
+      context.supabase
+        .from("social_intelligence_snapshots" as never)
+        .select("metric_key,value,range_start,range_end,evidence")
+        .eq("workspace_id", data.workspaceId)
+        .eq("availability", "available")
+        .order("range_end", { ascending: false })
+        .limit(1200),
+    ]);
+
+    type HistoryRow = {
+      metric_key: string;
+      value: number | string | null;
+      range_start: string | null;
+      range_end: string | null;
+      evidence: { mode?: string; historicalBackfill?: boolean } | null;
+    };
+    const rows = ((historyRows ?? []) as HistoryRow[])
+      .filter((row) => row.evidence?.mode === "combined" && row.range_end && row.value !== null)
+      .map((row) => ({ ...row, numericValue: Number(row.value) }))
+      .filter((row) => Number.isFinite(row.numericValue));
+
+    const rankedDays = (metric: string) =>
+      rows
+        .filter((row) => row.metric_key === metric)
+        .sort((a, b) => b.numericValue - a.numericValue)
+        .slice(0, 8)
+        .map((row) => ({ date: row.range_end, value: row.numericValue }));
+
+    const intelligence = intelligenceProfile as {
+      available_range_start?: string | null;
+      available_range_end?: string | null;
+      record_count?: number | null;
+      metadata?: {
+        historicalBackfill?: {
+          topPosts?: Array<{
+            postId?: string;
+            platform?: string;
+            publishedAt?: string;
+            metrics?: Record<string, unknown>;
+          }>;
+          dailyRecords?: number;
+        };
+      } | null;
+    } | null;
+
+    const performanceContext = {
+      availableRangeStart: intelligence?.available_range_start ?? null,
+      availableRangeEnd: intelligence?.available_range_end ?? null,
+      dailyRecords: intelligence?.metadata?.historicalBackfill?.dailyRecords ?? intelligence?.record_count ?? 0,
+      strongestEngagementDays: rankedDays("engagements"),
+      strongestReachDays: rankedDays("reach"),
+      strongestViewDays: rankedDays("views"),
+      topPosts: (intelligence?.metadata?.historicalBackfill?.topPosts ?? []).slice(0, 20),
+    };
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -67,7 +127,7 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "You are WaveOS Campaign Director. Build an organic social campaign direction that feels like a smart creative strategist, not a template generator. Use the saved brand profile as personality/audience context, but do not force every idea to repeat industry keywords. Favor specific human angles, recognizable situations, behind-the-scenes, storytelling, useful education, proof/process, personality, culture, transformation, and audience-relevant moments. Avoid generic marketing filler, fake urgency, invented offers, invented results, made-up statistics, and repetitive sales CTAs. Do not create a posting schedule or claim optimal posting times. Return JSON only with keys: angle, audienceInsight, pillars (name,purpose,examples), hooks, notes.",
+              "You are WaveOS Campaign Director. Build an organic social campaign direction that feels like a smart creative strategist, not a template generator. Use the saved brand profile as personality/audience context and use supplied historical performance evidence to learn from what has actually attracted attention. When historical evidence exists, favor patterns supported by the strongest observed days/posts while still introducing fresh creative angles; never imply causation from correlation and never invent missing metrics. If evidence is sparse, say so internally through conservative recommendations rather than fabricating performance conclusions. Favor specific human angles, recognizable situations, behind-the-scenes, storytelling, useful education, proof/process, personality, culture, transformation, and audience-relevant moments. Avoid generic marketing filler, fake urgency, invented offers, invented results, made-up statistics, and repetitive sales CTAs. Do not create a posting schedule or claim optimal posting times. Return JSON only with keys: angle, audienceInsight, pillars (name,purpose,examples), hooks, notes.",
           },
           {
             role: "user",
@@ -75,7 +135,8 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
 Campaign name/idea: ${data.name || "Untitled campaign"}
 Goal: ${data.goal}
 Platforms: ${data.platforms.join(", ")}
-Optional brief: ${data.brief ?? "None supplied"}`,
+Optional brief: ${data.brief ?? "None supplied"}
+Historical performance evidence: ${JSON.stringify(performanceContext)}`,
           },
         ],
       }),
