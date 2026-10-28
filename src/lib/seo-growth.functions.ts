@@ -39,6 +39,119 @@ function publicHttps(raw: string) {
   return url.href;
 }
 
+type SeoSource = { url: string; title: string; excerpt: string };
+
+function decodeHtml(value: string) {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+}
+
+function textFromHtml(html: string) {
+  return decodeHtml(
+    html
+      .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+      .replace(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim(),
+  );
+}
+
+function htmlField(html: string, pattern: RegExp) {
+  const match = html.match(pattern);
+  return match?.[1] ? textFromHtml(match[1]).trim() : "";
+}
+
+function pageEvidence(html: string) {
+  const title = htmlField(html, /<title[^>]*>([\s\S]*?)<\/title>/i);
+  const description =
+    html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["'][^>]*>/i)?.[1] ??
+    html.match(/<meta[^>]+content=["']([^"']*)["'][^>]+name=["']description["'][^>]*>/i)?.[1] ??
+    "";
+  const h1 = [...html.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/gi)].slice(0, 3).map((match) => textFromHtml(match[1]));
+  const h2 = [...html.matchAll(/<h2\b[^>]*>([\s\S]*?)<\/h2>/gi)].slice(0, 5).map((match) => textFromHtml(match[1]));
+  const canonical =
+    html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["'][^>]*>/i)?.[1] ??
+    html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["']canonical["'][^>]*>/i)?.[1] ??
+    "";
+  const robots =
+    html.match(/<meta[^>]+name=["']robots["'][^>]+content=["']([^"']*)["'][^>]*>/i)?.[1] ?? "";
+  const hasJsonLd = /<script[^>]+type=["']application\/ld\+json["']/i.test(html);
+  const body = textFromHtml(html).slice(0, 3600);
+  return [
+    title && `Title: ${title}`,
+    description && `Meta description: ${decodeHtml(description)}`,
+    h1.length && `H1: ${h1.join(" | ")}`,
+    h2.length && `H2: ${h2.join(" | ")}`,
+    canonical && `Canonical: ${canonical}`,
+    robots && `Robots: ${robots}`,
+    `Structured data present: ${hasJsonLd ? "yes" : "not observed in fetched HTML"}`,
+    body && `Page text: ${body}`,
+  ].filter(Boolean).join("\n").slice(0, 5200);
+}
+
+function sameSiteHost(a: string, b: string) {
+  return a.replace(/^www\./, "").toLowerCase() === b.replace(/^www\./, "").toLowerCase();
+}
+
+async function crawlOfficialSite(startUrl: string): Promise<SeoSource[]> {
+  const start = new URL(startUrl);
+  const queued = [start.href];
+  const seen = new Set<string>();
+  const results: SeoSource[] = [];
+
+  while (queued.length && results.length < 8) {
+    const current = queued.shift()!;
+    if (seen.has(current)) continue;
+    seen.add(current);
+    try {
+      const response = await fetch(current, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(8000),
+        headers: { "User-Agent": "WaveOS-SEO-Audit/1.0" },
+      });
+      if (!response.ok) continue;
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("text/html")) continue;
+      const finalUrl = new URL(response.url || current);
+      if (finalUrl.protocol !== "https:" || !sameSiteHost(finalUrl.hostname, start.hostname)) continue;
+      const html = (await response.text()).slice(0, 800_000);
+      const normalized = normalizeResearchSource(finalUrl.href);
+      if (!normalized) continue;
+      const title = htmlField(html, /<title[^>]*>([\s\S]*?)<\/title>/i) || finalUrl.pathname || start.hostname;
+      results.push({ url: normalized, title, excerpt: pageEvidence(html) });
+
+      const links = [...html.matchAll(/<a\b[^>]+href=["']([^"'#]+)["']/gi)]
+        .map((match) => match[1])
+        .flatMap((href) => {
+          try {
+            const url = new URL(href, finalUrl);
+            if (url.protocol !== "https:" || !sameSiteHost(url.hostname, start.hostname)) return [];
+            url.hash = "";
+            url.search = "";
+            const path = url.pathname.toLowerCase();
+            if (/\.(?:jpg|jpeg|png|gif|webp|svg|pdf|zip|mp4|mov|mp3|xml)$/i.test(path)) return [];
+            return [url.href];
+          } catch {
+            return [];
+          }
+        })
+        .filter((url) => /\/(?:services?|about|contact|locations?|areas?|portfolio|work|blog|news|pricing|faq|team)(?:\/|$)/i.test(new URL(url).pathname));
+      for (const link of links.slice(0, 12)) if (!seen.has(link) && !queued.includes(link)) queued.push(link);
+    } catch (error) {
+      console.warn("SEO direct page fetch failed", { url: current, kind: error instanceof Error ? error.name : "unknown" });
+    }
+  }
+
+  return results;
+}
+
 export const analyzeSeoGrowth = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) =>
@@ -68,7 +181,6 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
 
     const parallelKey = process.env.PARALLEL_API_KEY;
     const appKey = process.env.LOVABLE_API_KEY;
-    if (!parallelKey || !appKey) throw new Error("SEO research connection is unavailable.");
 
     const claimSchema = {
       type: "object",
@@ -108,47 +220,63 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
       `"${businessName}" ${brand?.industry ?? ""}`.trim(),
     ].map((query) => query.slice(0, 200));
 
-    const searchResponse = await fetch("https://connector-gateway.lovable.dev/parallel/v1/search", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${appKey}`,
-        "X-Connection-Api-Key": parallelKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        mode: "advanced",
-        objective: `Find accessible public pages and listings for the same business as ${website}. Prioritize the official website, service/about/contact/location pages, Google or reputable local listings, reviews/reputation sources, and public pages useful for an evidence-based SEO audit. Brand identity context: ${JSON.stringify(brand)}. Do not infer private analytics, rankings, traffic, backlinks, or Search Console data.`,
-        search_queries: queries,
-        advanced_settings: { max_results: 24 },
-      }),
-    });
+    const directSources = await crawlOfficialSite(website);
+    let searchRows: SeoSource[] = [];
+    let researchNotice: string | null = null;
 
-    if (!searchResponse.ok) {
-      console.warn("SEO public search failed", { status: searchResponse.status });
-      if (searchResponse.status === 402) throw new Error("SEO research credits are currently unavailable.");
-      if (searchResponse.status === 429) throw new Error("SEO research is busy right now. Try again in a moment.");
-      throw new Error("SEO public research is temporarily unavailable.");
+    if (parallelKey && appKey) {
+      try {
+        const searchResponse = await fetch("https://connector-gateway.lovable.dev/parallel/v1/search", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${appKey}`,
+            "X-Connection-Api-Key": parallelKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            mode: "advanced",
+            objective: `Find accessible public pages and listings for the same business as ${website}. Prioritize the official website, service/about/contact/location pages, Google or reputable local listings, reviews/reputation sources, and public pages useful for an evidence-based SEO audit. Brand identity context: ${JSON.stringify(brand)}. Do not infer private analytics, rankings, traffic, backlinks, or Search Console data.`,
+            search_queries: queries,
+            advanced_settings: { max_results: 24 },
+          }),
+        });
+
+        if (searchResponse.ok) {
+          const searchPayload = (await searchResponse.json()) as { results?: unknown[]; warnings?: unknown[] };
+          if (searchPayload.warnings?.length) console.warn("SEO public search returned warnings", { count: searchPayload.warnings.length });
+          searchRows = (searchPayload.results ?? []).flatMap((item) => {
+            if (!item || typeof item !== "object") return [];
+            const row = item as Record<string, unknown>;
+            if (typeof row.url !== "string" || typeof row.title !== "string") return [];
+            const url = normalizeResearchSource(row.url);
+            if (!url) return [];
+            const excerpts = Array.isArray(row.excerpts)
+              ? row.excerpts.filter((value): value is string => typeof value === "string").join(" ")
+              : typeof row.excerpt === "string"
+                ? row.excerpt
+                : "";
+            return [{ url, title: row.title.trim(), excerpt: excerpts.trim().slice(0, 1800) }];
+          });
+        } else {
+          console.warn("SEO public search unavailable; using direct-site audit", { status: searchResponse.status });
+          researchNotice =
+            searchResponse.status === 402
+              ? "Broader web research credits were unavailable, so this audit used the business website directly."
+              : searchResponse.status === 429
+                ? "Broader web research was temporarily rate-limited, so this audit used the business website directly."
+                : "Broader web research was unavailable, so this audit used the business website directly.";
+        }
+      } catch (error) {
+        console.warn("SEO public search request failed; using direct-site audit", { kind: error instanceof Error ? error.name : "unknown" });
+        researchNotice = "Broader web research was unavailable, so this audit used the business website directly.";
+      }
+    } else {
+      researchNotice = "Broader web research is not connected, so this audit used the business website directly.";
     }
 
-    const searchPayload = (await searchResponse.json()) as { results?: unknown[]; warnings?: unknown[] };
-    if (searchPayload.warnings?.length) console.warn("SEO public search returned warnings", { count: searchPayload.warnings.length });
-
-    const sourceRows = (searchPayload.results ?? []).flatMap((item) => {
-      if (!item || typeof item !== "object") return [];
-      const row = item as Record<string, unknown>;
-      if (typeof row.url !== "string" || typeof row.title !== "string") return [];
-      const url = normalizeResearchSource(row.url);
-      if (!url) return [];
-      const excerpts = Array.isArray(row.excerpts)
-        ? row.excerpts.filter((value): value is string => typeof value === "string").join(" ")
-        : typeof row.excerpt === "string"
-          ? row.excerpt
-          : "";
-      return [{ url, title: row.title.trim(), excerpt: excerpts.trim().slice(0, 1800) }];
-    });
-
+    const sourceRows: SeoSource[] = [...directSources, ...searchRows];
     const uniqueSources = Array.from(new Map(sourceRows.map((row) => [row.url, row])).values()).slice(0, 20);
-    if (!uniqueSources.length) throw new Error("SEO research returned no usable public sources.");
+    if (!uniqueSources.length) throw new Error("WaveOS could not read this website. Confirm the site is public HTTPS and try again.");
 
     const consulted = new Set(uniqueSources.map((row) => row.url));
     const sourceBundle = uniqueSources
@@ -156,7 +284,7 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
       .join("\n\n");
 
     let parsed: z.infer<typeof seoReportSchema> | null = null;
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = appKey ? await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${appKey}`,
@@ -177,9 +305,9 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
           },
         ],
       }),
-    });
+    }) : null;
 
-    if (aiResponse.ok) {
+    if (aiResponse?.ok) {
       const json = (await aiResponse.json()) as { choices?: Array<{ message?: { content?: string } }> };
       const raw = json.choices?.[0]?.message?.content?.trim();
       if (raw) {
@@ -189,7 +317,7 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
           console.warn("SEO synthesis response rejected", error instanceof z.ZodError ? { issues: error.issues.length } : { kind: "invalid_json" });
         }
       }
-    } else {
+    } else if (aiResponse) {
       console.warn("SEO synthesis failed", { status: aiResponse.status });
     }
 
@@ -230,9 +358,14 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
             sources: [official.url],
           },
         ],
-        limitations: ["The AI synthesis step was unavailable, so this fallback avoids claiming page-specific issues that were not independently verified."],
+        limitations: [
+          "The AI synthesis step was unavailable, so this fallback avoids claiming page-specific issues that were not independently verified.",
+          ...(researchNotice ? [researchNotice] : []),
+        ],
       };
     }
+
+    if (researchNotice && !parsed.limitations.includes(researchNotice)) parsed.limitations = [...parsed.limitations, researchNotice];
 
     const actions = parsed.actions
       .map((action) => ({
@@ -251,6 +384,6 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
       actions,
       observedAt: new Date().toISOString(),
       methodology:
-        "Public-source SEO guidance. WaveOS researches accessible public pages first, then builds recommendations only from those sources. It does not have private Google Search Console, Analytics, ranking or backlink-provider data unless those sources are separately connected.",
+        "Public-source SEO guidance. WaveOS audits the entered website directly and supplements it with broader public research when that connection is available. It does not have private Google Search Console, Analytics, ranking or backlink-provider data unless those sources are separately connected.",
     };
   });
