@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { MediaPicker } from "@/routes/_authenticated/create";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -140,6 +141,7 @@ function CampaignManagerPage() {
     }>;
   } | null>(null);
   const [selectedMediaIds,setSelectedMediaIds]=useState<string[]>([]);
+  const [showSharedMediaPicker,setShowSharedMediaPicker]=useState(false);
   const [mediaFolder,setMediaFolder]=useState<string>("all");
   const mediaInputRef=useRef<HTMLInputElement|null>(null);
   const mediaFolders=useMediaFolders(workspaceId);
@@ -435,10 +437,15 @@ function CampaignManagerPage() {
             <div className="flex items-center gap-2 font-semibold"><Images className="h-4 w-4 text-primary" /> Choose campaign media</div>
             <p className="mt-1 text-xs text-muted-foreground">Select multiple photos/videos from a folder or upload new pieces. AI Direction will evaluate the selected content.</p>
           </div>
-          <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">
-            {uploadMedia.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload media
-            <input ref={mediaInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={async(e)=>{const files=Array.from(e.target.files??[]); const folderId=mediaFolder==="all"||mediaFolder==="root"?null:mediaFolder; for(const file of files){try{const asset=await uploadMedia.mutateAsync({file,folderId,tags:["campaign"]}); setSelectedMediaIds(ids=>Array.from(new Set([...ids,asset.id])));}catch(error){toast.error(error instanceof Error?error.message:"Upload failed.");}} e.currentTarget.value="";}} />
-          </label>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" className="min-h-11" onClick={()=>setShowSharedMediaPicker(true)}>
+              <Images className="h-4 w-4" /> Drive / Dropbox / Frame.io
+            </Button>
+            <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">
+              {uploadMedia.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload media
+              <input ref={mediaInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={async(e)=>{const files=Array.from(e.target.files??[]); const folderId=mediaFolder==="all"||mediaFolder==="root"?null:mediaFolder; for(const file of files){try{const asset=await uploadMedia.mutateAsync({file,folderId,tags:["campaign"]}); setSelectedMediaIds(ids=>Array.from(new Set([...ids,asset.id])));}catch(error){toast.error(error instanceof Error?error.message:"Upload failed.");}} e.currentTarget.value="";}} />
+            </label>
+          </div>
         </div>
         <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
           <Button type="button" variant={mediaFolder==="all"?"default":"outline"} size="sm" onClick={()=>setMediaFolder("all")}>All media</Button>
@@ -451,6 +458,19 @@ function CampaignManagerPage() {
         {!mediaAssets.isLoading && !(mediaAssets.data??[]).length && <p className="mt-4 text-sm text-muted-foreground">No media in this folder yet. Upload files or choose another folder.</p>}
         <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>{selectedMediaIds.length} selected{selectedMediaIds.length===0 ? " · choose at least one piece of content" : ""}</span>{selectedMediaIds.length>0&&<button type="button" className="text-primary" onClick={()=>setSelectedMediaIds([])}>Clear selection</button>}</div>
       </section>
+
+      {showSharedMediaPicker && workspaceId && (
+        <MediaPicker
+          workspaceId={workspaceId}
+          picked={selectedMediaIds}
+          onClose={()=>setShowSharedMediaPicker(false)}
+          onConfirm={(ids)=>{
+            setSelectedMediaIds(ids.slice(0,24));
+            setShowSharedMediaPicker(false);
+            void mediaAssets.refetch();
+          }}
+        />
+      )}
 
       {campaignDirection && (
         <details className="rounded-xl border border-primary/25 bg-primary/5 p-4" open>
