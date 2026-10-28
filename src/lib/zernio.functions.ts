@@ -7,6 +7,9 @@ import {
   classifyAnalyticsError,
   parseAnalyticsPayload,
   unavailableAnalyticsSource,
+  combineAnalyticsMetric,
+  deriveEngagements,
+  ANALYTICS_METRIC_KEYS,
   type AnalyticsSource,
   type AnalyticsSourceKey,
 } from "@/lib/analytics-transparency";
@@ -131,6 +134,162 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
       loadSource("external", `/analytics?${base}&source=external`),
       loadSource("paid", `/ads?${base}`),
     ]);
+
+    // Persist one sourced observation per day/range so the analytics UI can
+    // build real history instead of showing live totals with no timeline.
+    try {
+      const now = new Date().toISOString();
+      const today = now.slice(0, 10);
+      const profileLookup = await supabaseAdmin
+        .from("social_intelligence_profiles" as never)
+        .select("id")
+        .eq("workspace_id", data.workspaceId)
+        .maybeSingle();
+
+      let intelligenceProfile = profileLookup.data as { id: string } | null;
+      if (!intelligenceProfile) {
+        const created = await supabaseAdmin
+          .from("social_intelligence_profiles" as never)
+          .insert({
+            workspace_id: data.workspaceId,
+            provider: "zernio",
+            sync_state: "not_synced",
+            analyzed_sources: [],
+            requested_range_start: requestedRangeStart,
+            requested_range_end: requestedRangeEnd,
+            record_count: 0,
+            last_attempt_at: now,
+            metadata: {},
+          } as never)
+          .select("id")
+          .single();
+        if (!created.error) intelligenceProfile = created.data as { id: string };
+      }
+
+      if (intelligenceProfile) {
+        const latestCombined = await supabaseAdmin
+          .from("social_intelligence_snapshots" as never)
+          .select("captured_at,range_start,range_end,evidence")
+          .eq("workspace_id", data.workspaceId)
+          .eq("profile_id", intelligenceProfile.id)
+          .eq("range_start", requestedRangeStart)
+          .eq("range_end", requestedRangeEnd)
+          .contains("evidence" as never, { mode: "combined" } as never)
+          .order("captured_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const previous = latestCombined.data as { captured_at?: string } | null;
+        const alreadyCapturedToday = previous?.captured_at?.slice(0, 10) === today;
+
+        if (!alreadyCapturedToday) {
+          const modes = [
+            { mode: "combined", selected: sources },
+            { mode: "organic", selected: sources.filter((source) => source.key !== "paid") },
+            { mode: "paid", selected: sources.filter((source) => source.key === "paid") },
+          ] as const;
+
+          const snapshotRows = modes.flatMap(({ mode, selected }) => {
+            const sourceReference = selected.map((source) => source.sourceReference).join(" + ");
+            const recordCount = selected.reduce((sum, source) => sum + source.recordCount, 0);
+            const metricRows = ANALYTICS_METRIC_KEYS.map((metricKey) => {
+              const metric = combineAnalyticsMetric(selected, metricKey);
+              return {
+                workspace_id: data.workspaceId,
+                profile_id: intelligenceProfile!.id,
+                metric_key: metricKey,
+                provider: "zernio",
+                availability: metric.availability,
+                value: metric.value,
+                unit: "count",
+                range_start: requestedRangeStart,
+                range_end: requestedRangeEnd,
+                record_count: recordCount,
+                captured_at: now,
+                source_reference: sourceReference || "publishing-provider",
+                calculation_version: "waveos-combined-provider-sources-v1",
+                evidence: {
+                  coverage: metric.coverage,
+                  mode,
+                  contributingSources: metric.contributingSources,
+                  expectedSources: metric.expectedSources,
+                },
+              };
+            });
+            const engagements = deriveEngagements(selected);
+            metricRows.push({
+              workspace_id: data.workspaceId,
+              profile_id: intelligenceProfile!.id,
+              metric_key: "engagements",
+              provider: "zernio",
+              availability: engagements.availability,
+              value: engagements.value,
+              unit: "count",
+              range_start: requestedRangeStart,
+              range_end: requestedRangeEnd,
+              record_count: recordCount,
+              captured_at: now,
+              source_reference: sourceReference || "publishing-provider",
+              calculation_version: engagements.calculationVersion,
+              evidence: {
+                coverage: engagements.coverage,
+                mode,
+                contributingSources: engagements.contributingSources,
+                expectedSources: engagements.expectedSources,
+              },
+            });
+            return metricRows;
+          });
+
+          const saved = await supabaseAdmin
+            .from("social_intelligence_snapshots" as never)
+            .insert(snapshotRows as never);
+          if (saved.error) throw saved.error;
+        }
+
+        const availableSources = sources.filter((source) =>
+          ["available", "true_zero"].includes(source.availability),
+        );
+        const availableStarts = sources
+          .map((source) => source.availableRangeStart)
+          .filter((value): value is string => Boolean(value))
+          .sort();
+        const availableEnds = sources
+          .map((source) => source.availableRangeEnd)
+          .filter((value): value is string => Boolean(value))
+          .sort();
+
+        const profileState =
+          availableSources.length === sources.length
+            ? "available"
+            : availableSources.length
+              ? "partial"
+              : sync.state === "available"
+                ? "not_synced"
+                : sync.state;
+        const profileUpdate = await supabaseAdmin
+          .from("social_intelligence_profiles" as never)
+          .update({
+            sync_state: profileState,
+            analyzed_sources: availableSources.map((source) => source.key),
+            requested_range_start: requestedRangeStart,
+            requested_range_end: requestedRangeEnd,
+            available_range_start: availableStarts[0] ?? null,
+            available_range_end: availableEnds.at(-1) ?? null,
+            record_count: sources.reduce((sum, source) => sum + source.recordCount, 0),
+            last_attempt_at: now,
+            last_success_at: availableSources.length ? (sync.lastSuccessAt ?? now) : null,
+            safe_error_code: availableSources.length ? null : String(sync.state),
+            safe_error_message: availableSources.length ? null : sync.message,
+            updated_at: now,
+          } as never)
+          .eq("workspace_id", data.workspaceId);
+        if (profileUpdate.error) throw profileUpdate.error;
+      }
+    } catch (historyError) {
+      console.warn("Historical analytics snapshot persistence failed", historyError);
+    }
+
     return { sources, requestedRangeStart, requestedRangeEnd, sync };
   });
 
