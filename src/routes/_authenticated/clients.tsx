@@ -53,6 +53,7 @@ import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
 import { WEDDING_STAGES } from "@/components/app/wedding-theme";
+import { recordManualInvoicePayment } from "@/lib/payments.functions";
 
 function toLocalInput(iso: string) {
   const d = new Date(iso);
@@ -155,6 +156,8 @@ type InvoiceListItem = Pick<
   | "service_fee_cents"
   | "processing_fee_at_checkout"
   | "delivery_lock_enabled"
+  | "payment_provider"
+  | "provider_payment_id"
 >;
 type CrmAccountRow = Database["public"]["Tables"]["crm_accounts"]["Row"];
 type CrmContactRow = Pick<
@@ -3315,7 +3318,7 @@ function InvoicesTab({
     queryKey: ["client-invoices", workspaceId],
     queryFn: async () => {
       const invoiceColumns =
-        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,service_fee_percent,service_fee_cents,processing_fee_at_checkout,checkout_payment_type,checkout_payment_cents,delivery_lock_enabled";
+        "id,number,description,amount_cents,currency,status,hosted_url,issued_at,due_at,paid_at,amount_paid_cents,payment_plan,billing_month,published_at,subtotal_cents,discount_type,discount_value,service_fee_percent,service_fee_cents,processing_fee_at_checkout,checkout_payment_type,checkout_payment_cents,delivery_lock_enabled,payment_provider,provider_payment_id";
       const { data, error } = await supabase
         .from("client_invoices")
         .select(`${invoiceColumns},line_items`)
@@ -3496,6 +3499,9 @@ function InvoicesTab({
                     </span>
                   )}
                   <span>Issued {new Date(i.issued_at).toLocaleDateString()}</span>
+                  {i.status === "paid" && i.payment_provider?.startsWith("manual_") && (
+                    <span className="capitalize">Paid via {i.payment_provider.replace("manual_", "").replaceAll("_", " / ")}</span>
+                  )}
                   {i.due_at && <span>Due {new Date(i.due_at).toLocaleDateString()}</span>}
                   {i.hosted_url && (
                     <a
@@ -3595,6 +3601,7 @@ function InvoiceForm({
   onDone: () => void;
 }) {
   const qc = useQueryClient();
+  const recordManualPayment = useServerFn(recordManualInvoicePayment);
   const [mobileStep, setMobileStep] = useState(0);
   const mobileSteps = ["Invoice", "Pricing", "Payment", "Preview", "Save"];
   const [number, setNumber] = useState(invoice?.number ?? "");
@@ -3633,6 +3640,17 @@ function InvoiceForm({
   );
   const [currency, setCurrency] = useState(invoice?.currency ?? "USD");
   const [status, setStatus] = useState<InvoiceStatus>(invoice?.status ?? "unpaid");
+  const [manualPaymentMethod, setManualPaymentMethod] = useState(
+    invoice?.payment_provider?.startsWith("manual_")
+      ? invoice.payment_provider.replace("manual_", "")
+      : "",
+  );
+  const [manualPaymentReference, setManualPaymentReference] = useState(
+    invoice?.payment_provider?.startsWith("manual_") ? (invoice.provider_payment_id ?? "") : "",
+  );
+  const [manualPaidDate, setManualPaidDate] = useState(
+    invoice?.paid_at?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+  );
   const [hostedUrl, setHostedUrl] = useState(invoice?.hosted_url ?? "");
   const [issuedAt, setIssuedAt] = useState(
     invoice?.issued_at.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
@@ -3719,6 +3737,14 @@ function InvoiceForm({
         status !== "void" && status !== "draft" && cents != null && cents > 0 && received === cents
           ? "paid"
           : status;
+      const isStripePaid = invoice?.payment_provider === "stripe" && Boolean(invoice?.provider_payment_id);
+      const manualPaid = effectiveStatus === "paid" && !isStripePaid;
+      if (manualPaid && !manualPaymentMethod) {
+        throw new Error("Choose how this manual payment was received.");
+      }
+      const manualPaidAt = manualPaid && manualPaidDate
+        ? `${manualPaidDate}T12:00:00.000Z`
+        : null;
       let invoiceNumber = number.trim();
       if (!invoice && !invoiceNumber) {
         const generated = await supabase.rpc("next_invoice_number", { _workspace_id: workspaceId });
@@ -3749,7 +3775,15 @@ function InvoiceForm({
         hosted_url: trimmedUrl || null,
         issued_at: dateInputToIso(issuedAt)!,
         due_at: dateInputToIso(dueAt),
-        paid_at: effectiveStatus === "paid" ? (invoice?.paid_at ?? new Date().toISOString()) : null,
+        paid_at: effectiveStatus === "paid"
+          ? (manualPaidAt ?? invoice?.paid_at ?? new Date().toISOString())
+          : null,
+        payment_provider: manualPaid
+          ? `manual_${manualPaymentMethod}`
+          : (invoice?.payment_provider ?? "manual"),
+        provider_payment_id: manualPaid
+          ? (manualPaymentReference.trim() || null)
+          : (invoice?.provider_payment_id ?? null),
       };
 
       let result: { data: { id: string } | null; error: { message: string; code?: string } | null };
@@ -3791,6 +3825,16 @@ function InvoiceForm({
         throw error;
       }
       if (!data?.id) throw new Error("The invoice changes were not saved. Please try again.");
+      if (manualPaid) {
+        await recordManualPayment({
+          data: {
+            invoiceId: data.id,
+            method: manualPaymentMethod as "cash" | "check" | "zelle" | "ach" | "venmo_cashapp" | "card_other" | "other",
+            reference: manualPaymentReference.trim() || undefined,
+            paidAt: manualPaidAt ?? undefined,
+          },
+        });
+      }
       if (autopayEnabled) {
         // Recurring retainers bill the full amount each month; a one-time
         // automatic charge must only collect what this invoice still owes
@@ -4441,6 +4485,28 @@ function InvoiceForm({
             ))}
           </select>
         </Field>
+        {status === "paid" && !(invoice?.payment_provider === "stripe" && invoice?.provider_payment_id) && (
+          <>
+            <Field label="How was this paid?">
+              <select value={manualPaymentMethod} onChange={(e)=>setManualPaymentMethod(e.target.value)} className={inputCls} required>
+                <option value="">Choose payment method</option>
+                <option value="cash">Cash</option>
+                <option value="check">Check</option>
+                <option value="zelle">Zelle</option>
+                <option value="ach">ACH / bank transfer</option>
+                <option value="venmo_cashapp">Venmo / Cash App</option>
+                <option value="card_other">Card outside Stripe</option>
+                <option value="other">Other</option>
+              </select>
+            </Field>
+            <Field label="Payment date">
+              <input type="date" value={manualPaidDate} onChange={(e)=>setManualPaidDate(e.target.value)} className={inputCls} required />
+            </Field>
+            <Field label="Reference / note (optional)">
+              <input value={manualPaymentReference} onChange={(e)=>setManualPaymentReference(e.target.value)} className={inputCls} placeholder="Check #, Zelle name, confirmation…" />
+            </Field>
+          </>
+        )}
         <Field label="Issued">
           <input
             type="date"
@@ -5563,20 +5629,21 @@ function ModalShell({
       <div className="absolute inset-0 bg-background/70 backdrop-blur" onClick={onClose} />
       <div
         className={cn(
-          "surface-card relative h-[100dvh] w-full overflow-y-auto rounded-none p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:p-6",
+          "surface-card relative h-[100dvh] w-full overflow-y-auto rounded-none p-0 pb-[max(1rem,env(safe-area-inset-bottom))] sm:h-auto sm:max-h-[90vh] sm:rounded-xl",
           wide ? "max-w-2xl" : "max-w-lg",
         )}
       >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-foreground">{title}</h2>
+        <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border/70 bg-background/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur sm:px-6 sm:pt-4">
+          <h2 className="min-w-0 truncate pr-3 text-base font-semibold text-foreground">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-elevated hover:text-foreground"
+            aria-label="Close"
+            className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center rounded-xl border border-border bg-surface text-foreground shadow-sm hover:bg-elevated"
           >
-            <X className="h-4 w-4" />
+            <X className="h-5 w-5" />
           </button>
         </div>
-        {children}
+        <div className="p-4 sm:p-6">{children}</div>
       </div>
     </div>
   );
