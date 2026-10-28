@@ -32,7 +32,7 @@ import {
   type CampaignPlanningItem,
 } from "@/lib/phase-one-planning";
 import { cn } from "@/lib/utils";
-import { generateCampaignDirection } from "@/lib/campaign-ideas.functions";
+import { createCampaignPostDrafts, generateCampaignDirection } from "@/lib/campaign-ideas.functions";
 import { MobileWorkflowSteps, MobileWorkflowSection, MobileWorkflowFooter } from "@/components/app/mobile-workflow";
 import {
   getMediaPreviewUrl,
@@ -116,6 +116,7 @@ function CampaignManagerPage() {
   const [dirty, setDirty] = useState(false);
   const [mobileStep, setMobileStep] = useState(0);
   const campaignDirectionFn = useServerFn(generateCampaignDirection);
+  const createDraftsFn = useServerFn(createCampaignPostDrafts);
   const [campaignDirection, setCampaignDirection] = useState<{
     angle:string;
     audienceInsight:string;
@@ -129,6 +130,13 @@ function CampaignManagerPage() {
       suggestedDay:string;
       caption:string;
       hashtags:string[];
+      contentType:string;
+      visualSummary:string;
+      likelyPurpose:string;
+      hookPotential:"low"|"medium"|"high";
+      suggestedPlatforms:string[];
+      confidence:"low"|"medium"|"high";
+      inspectionMode:"photo"|"video_frames"|"metadata_only";
     }>;
   } | null>(null);
   const [selectedMediaIds,setSelectedMediaIds]=useState<string[]>([]);
@@ -138,6 +146,8 @@ function CampaignManagerPage() {
   const mediaAssets=useMediaAssets(workspaceId,{folderId:mediaFolder==="all"?undefined:mediaFolder==="root"?null:mediaFolder});
   const uploadMedia=useUploadAsset(workspaceId);
   const [directionBusy, setDirectionBusy] = useState(false);
+  const [draftsBusy,setDraftsBusy]=useState(false);
+  const [draftsCreated,setDraftsCreated]=useState(false);
   const mobileSteps = ["Campaign name", "Your goal", "Platforms", "Posting frequency", "Planning schedule", "Review campaign"];
   const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
     workspaceId,
@@ -237,10 +247,83 @@ function CampaignManagerPage() {
     );
   }
 
+  async function extractVideoFrames(asset: MediaAsset) {
+    if (!asset.mime_type.startsWith("video/")) return [] as string[];
+    let url: string;
+    try {
+      url = await getMediaPreviewUrl(asset, 60 * 30, "content");
+    } catch {
+      return [];
+    }
+    return await new Promise<string[]>((resolve) => {
+      const video = document.createElement("video");
+      video.crossOrigin = "anonymous";
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      const frames: string[] = [];
+      let points: number[] = [];
+      let index = 0;
+      const finish = () => {
+        video.removeAttribute("src");
+        video.load();
+        resolve(frames);
+      };
+      const timeout = window.setTimeout(finish, 12000);
+      video.onerror = () => {
+        window.clearTimeout(timeout);
+        finish();
+      };
+      video.onloadedmetadata = () => {
+        if (!Number.isFinite(video.duration) || video.duration <= 0) {
+          window.clearTimeout(timeout);
+          finish();
+          return;
+        }
+        points = [0.15,0.5,0.85].map((ratio)=>Math.max(0.05,Math.min(video.duration-0.05,video.duration*ratio)));
+        video.currentTime = points[index]!;
+      };
+      video.onseeked = () => {
+        try {
+          const maxEdge = 480;
+          const scale = Math.min(1, maxEdge / Math.max(video.videoWidth || 1, video.videoHeight || 1));
+          const canvas = document.createElement("canvas");
+          canvas.width = Math.max(1, Math.round((video.videoWidth || 1) * scale));
+          canvas.height = Math.max(1, Math.round((video.videoHeight || 1) * scale));
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(video,0,0,canvas.width,canvas.height);
+            const frame = canvas.toDataURL("image/jpeg",0.6);
+            if (frame.length <= 350000) frames.push(frame);
+          }
+        } catch {
+          // Cross-origin or decode failure: metadata-only fallback is intentional.
+        }
+        index += 1;
+        if (index < points.length) video.currentTime = points[index]!;
+        else {
+          window.clearTimeout(timeout);
+          finish();
+        }
+      };
+      video.src = url;
+    });
+  }
+
   async function generateDirection() {
     if (!workspaceId || !input.platforms.length || directionBusy) return;
     setDirectionBusy(true);
+    setDraftsCreated(false);
     try {
+      const selectedAssets=(mediaAssets.data??[]).filter((asset)=>selectedMediaIds.includes(asset.id));
+      const videoFrames = (
+        await Promise.all(
+          selectedAssets
+            .filter((asset)=>asset.mime_type.startsWith("video/"))
+            .slice(0,6)
+            .map(async(asset)=>({mediaId:asset.id,frames:await extractVideoFrames(asset)})),
+        )
+      ).filter((entry)=>entry.frames.length>0);
       const direction = await campaignDirectionFn({
         data: {
           workspaceId,
@@ -248,6 +331,7 @@ function CampaignManagerPage() {
           goal: input.goal,
           platforms: input.platforms,
           mediaIds: selectedMediaIds,
+          videoFrames,
         },
       });
       setCampaignDirection(direction);
@@ -256,6 +340,33 @@ function CampaignManagerPage() {
       toast.error(error instanceof Error ? error.message : "Campaign direction could not be generated.");
     } finally {
       setDirectionBusy(false);
+    }
+  }
+
+  async function createPostDrafts() {
+    if (!workspaceId || !campaignDirection?.mediaRecommendations.length || draftsBusy || draftsCreated) return;
+    setDraftsBusy(true);
+    try {
+      const result=await createDraftsFn({
+        data:{
+          workspaceId,
+          campaignName:input.name,
+          recommendations:campaignDirection.mediaRecommendations.map((rec)=>({
+            mediaId:rec.mediaId,
+            caption:rec.caption,
+            hashtags:rec.hashtags,
+            platforms:rec.platforms,
+            suggestedDay:rec.suggestedDay,
+            contentType:rec.contentType,
+          })),
+        },
+      });
+      setDraftsCreated(true);
+      toast.success(`Created ${result.count} post draft${result.count===1?"":"s"}.`);
+    } catch(error) {
+      toast.error(error instanceof Error?error.message:"Post drafts could not be created.");
+    } finally {
+      setDraftsBusy(false);
     }
   }
 
@@ -308,8 +419,8 @@ function CampaignManagerPage() {
             {workflowDraft.save.isPending ? <Loader2 className="animate-spin" /> : <Save />}
             Save draft
           </Button>
-          <Button variant="outline" onClick={() => void generateDirection()} disabled={!input.platforms.length || directionBusy}>
-            {directionBusy ? <Loader2 className="animate-spin" /> : <Sparkles />} AI direction
+          <Button onClick={() => void generateDirection()} disabled={!input.platforms.length || directionBusy || selectedMediaIds.length===0}>
+            {directionBusy ? <Loader2 className="animate-spin" /> : <Sparkles />} Analyze & Build Campaign
           </Button>
           <Button className="hidden sm:inline-flex" onClick={generatePlan} disabled={errors.length > 0}>
             <Sparkles /> Build plan
@@ -338,7 +449,7 @@ function CampaignManagerPage() {
           {(mediaAssets.data??[]).slice(0,36).map(asset=><CampaignMediaTile key={asset.id} asset={asset} selected={selectedMediaIds.includes(asset.id)} onToggle={()=>setSelectedMediaIds(ids=>ids.includes(asset.id)?ids.filter(id=>id!==asset.id):[...ids,asset.id])} />)}
         </div>
         {!mediaAssets.isLoading && !(mediaAssets.data??[]).length && <p className="mt-4 text-sm text-muted-foreground">No media in this folder yet. Upload files or choose another folder.</p>}
-        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>{selectedMediaIds.length} selected</span>{selectedMediaIds.length>0&&<button type="button" className="text-primary" onClick={()=>setSelectedMediaIds([])}>Clear selection</button>}</div>
+        <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>{selectedMediaIds.length} selected{selectedMediaIds.length===0 ? " · choose at least one piece of content" : ""}</span>{selectedMediaIds.length>0&&<button type="button" className="text-primary" onClick={()=>setSelectedMediaIds([])}>Clear selection</button>}</div>
       </section>
 
       {campaignDirection && (
@@ -367,10 +478,25 @@ function CampaignManagerPage() {
               <div className="mt-2 space-y-3">
                 {campaignDirection.mediaRecommendations.map((rec,index)=><div key={rec.mediaId+index} className="rounded-xl border border-border bg-background/60 p-3">
                   <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">{(mediaAssets.data??[]).find(a=>a.id===rec.mediaId)?.name ?? `Selected media ${index+1}`}</p><p className="mt-1 text-xs text-muted-foreground">{rec.reason}</p></div><span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">{rec.suggestedDay}</span></div>
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg bg-surface/70 p-2"><span className="text-muted-foreground">Content</span><div className="mt-1 font-medium">{rec.contentType}</div></div>
+                    <div className="rounded-lg bg-surface/70 p-2"><span className="text-muted-foreground">Hook potential</span><div className="mt-1 font-medium capitalize">{rec.hookPotential}</div></div>
+                  </div>
+                  <p className="mt-3 text-xs text-muted-foreground">{rec.visualSummary}</p>
+                  <p className="mt-2 text-xs"><span className="font-medium">Purpose:</span> {rec.likelyPurpose}</p>
                   <p className="mt-3 text-sm">{rec.caption}</p>
                   <div className="mt-2 flex flex-wrap gap-1">{rec.hashtags.map(tag=><span key={tag} className="text-xs text-primary">{tag.startsWith("#")?tag:`#${tag}`}</span>)}</div>
-                  <div className="mt-2 text-[11px] uppercase tracking-wide text-muted-foreground">{rec.platforms.join(" · ")}</div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground"><span>{rec.platforms.join(" · ")}</span><span>•</span><span className="capitalize">{rec.confidence} confidence</span><span>•</span><span>{rec.inspectionMode==="video_frames"?"Video visually inspected":rec.inspectionMode==="photo"?"Photo visually inspected":"Metadata only"}</span></div>
                 </div>)}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button onClick={()=>void createPostDrafts()} disabled={draftsBusy||draftsCreated}>
+                  {draftsBusy?<Loader2 className="h-4 w-4 animate-spin"/>:<CheckCircle2 className="h-4 w-4"/>}
+                  {draftsCreated?"Post drafts created":"Create post drafts"}
+                </Button>
+                <Button asChild variant="outline">
+                  <a href="/create">Open Create Post</a>
+                </Button>
               </div>
             </div>}
           </div>
