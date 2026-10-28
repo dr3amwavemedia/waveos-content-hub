@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarDays,
@@ -691,7 +691,7 @@ const inputClass =
 
 function CampaignMediaTile({asset,selected,onToggle}:{asset:MediaAsset;selected:boolean;onToggle:()=>void}) {
   const [url,setUrl]=useState<string|null>(null);
-  useState(()=>{void getMediaPreviewUrl(asset,3600,"thumbnail").then(setUrl).catch(()=>setUrl(null)); return null;});
+  useEffect(()=>{let cancelled=false; void getMediaPreviewUrl(asset,3600,"thumbnail").then(value=>{if(!cancelled)setUrl(value);}).catch(()=>{if(!cancelled)setUrl(null);}); return ()=>{cancelled=true;};},[asset]);
   const isVideo=asset.mime_type.startsWith("video/");
   return <button type="button" onClick={onToggle} className={cn("relative aspect-square overflow-hidden rounded-xl border bg-elevated",selected?"border-primary ring-2 ring-primary/30":"border-border")}>
     {url ? (isVideo ? <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata" /> : <img src={url} alt={asset.name} className="h-full w-full object-cover" />) : <div className="flex h-full items-center justify-center text-muted-foreground">{isVideo?<Video className="h-5 w-5"/>:<Images className="h-5 w-5"/>}</div>}
