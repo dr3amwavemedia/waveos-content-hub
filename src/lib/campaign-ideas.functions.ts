@@ -11,7 +11,18 @@ const campaignIdeaSchema = z.object({
     examples: z.array(z.string().trim().min(1).max(300)).min(1).max(4),
   })).min(2).max(5),
   hooks: z.array(z.string().trim().min(1).max(250)).min(3).max(8),
-  notes: z.array(z.string().trim().min(1).max(350)).max(5),
+  notes: z.preprocess(
+    (value) => typeof value === "string" ? [value] : value,
+    z.array(z.string().trim().min(1).max(350)).max(5),
+  ),
+  mediaRecommendations: z.array(z.object({
+    mediaId: z.string().uuid(),
+    reason: z.string().trim().min(1).max(500),
+    platforms: z.array(z.string().trim().min(1).max(40)).min(1).max(6),
+    suggestedDay: z.string().trim().min(1).max(80),
+    caption: z.string().trim().min(1).max(1200),
+    hashtags: z.array(z.string().trim().min(1).max(80)).max(15),
+  })).max(24).default([]),
 });
 
 export const generateCampaignDirection = createServerFn({ method: "POST" })
@@ -22,6 +33,7 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
     goal: z.enum(["awareness", "engagement", "leads", "launch", "retention"]),
     platforms: z.array(z.string().trim().min(1).max(40)).min(1).max(12),
     brief: z.string().trim().max(2000).optional(),
+    mediaIds: z.array(z.string().uuid()).max(24).default([]),
   }).parse(input))
   .handler(async ({ data, context }) => {
     const key = process.env.LOVABLE_API_KEY;
@@ -103,6 +115,37 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
       } | null;
     } | null;
 
+    const selectedMedia = data.mediaIds.length
+      ? await context.supabase
+          .from("media_assets")
+          .select("id,name,mime_type,tags,storage_path,thumbnail_url,source_web_url,source_provider,duration_seconds,width,height")
+          .eq("workspace_id", data.workspaceId)
+          .in("id", data.mediaIds)
+      : { data: [], error: null };
+    if (selectedMedia.error) throw selectedMedia.error;
+
+    const mediaContext = await Promise.all(
+      (selectedMedia.data ?? []).map(async (asset) => {
+        let previewUrl = asset.thumbnail_url ?? asset.source_web_url ?? null;
+        if (!previewUrl && asset.storage_path && asset.mime_type?.startsWith("image/")) {
+          const { data: signed } = await context.supabase.storage
+            .from("media")
+            .createSignedUrl(asset.storage_path, 60 * 20);
+          previewUrl = signed?.signedUrl ?? null;
+        }
+        return {
+          id: asset.id,
+          name: asset.name,
+          mimeType: asset.mime_type,
+          tags: asset.tags ?? [],
+          durationSeconds: asset.duration_seconds,
+          width: asset.width,
+          height: asset.height,
+          previewUrl,
+        };
+      }),
+    );
+
     const performanceContext = {
       availableRangeStart: intelligence?.available_range_start ?? null,
       availableRangeEnd: intelligence?.available_range_end ?? null,
@@ -127,16 +170,30 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "You are WaveOS Campaign Director. Build an organic social campaign direction that feels like a smart creative strategist, not a template generator. Use the saved brand profile as personality/audience context and use supplied historical performance evidence to learn from what has actually attracted attention. When historical evidence exists, favor patterns supported by the strongest observed days/posts while still introducing fresh creative angles; never imply causation from correlation and never invent missing metrics. If evidence is sparse, say so internally through conservative recommendations rather than fabricating performance conclusions. Favor specific human angles, recognizable situations, behind-the-scenes, storytelling, useful education, proof/process, personality, culture, transformation, and audience-relevant moments. Avoid generic marketing filler, fake urgency, invented offers, invented results, made-up statistics, and repetitive sales CTAs. Do not create a posting schedule or claim optimal posting times. Return JSON only with keys: angle, audienceInsight, pillars (name,purpose,examples), hooks, notes.",
+              "You are WaveOS Campaign Director. Build an organic social campaign direction that feels like a smart creative strategist, not a template generator. When selected media is provided, act as a content planner: rank the supplied pieces, identify which are strongest for the requested platforms, recommend a sensible day or sequence for each, and write a usable caption and hashtag set for each selected recommendation. Never invent visual details you cannot actually infer from supplied metadata or previews.  Use the saved brand profile as personality/audience context and use supplied historical performance evidence to learn from what has actually attracted attention. When historical evidence exists, favor patterns supported by the strongest observed days/posts while still introducing fresh creative angles; never imply causation from correlation and never invent missing metrics. If evidence is sparse, say so internally through conservative recommendations rather than fabricating performance conclusions. Favor specific human angles, recognizable situations, behind-the-scenes, storytelling, useful education, proof/process, personality, culture, transformation, and audience-relevant moments. Avoid generic marketing filler, fake urgency, invented offers, invented results, made-up statistics, and repetitive sales CTAs. Do not create a posting schedule or claim optimal posting times. Return JSON only with keys: angle, audienceInsight, pillars (name,purpose,examples), hooks, notes, mediaRecommendations (mediaId,reason,platforms,suggestedDay,caption,hashtags).",
           },
           {
             role: "user",
-            content: `Brand profile: ${JSON.stringify(profile ?? {})}
+            content: [
+              {
+                type: "text",
+                text: `Brand profile: ${JSON.stringify(profile ?? {})}
 Campaign name/idea: ${data.name || "Untitled campaign"}
 Goal: ${data.goal}
 Platforms: ${data.platforms.join(", ")}
 Optional brief: ${data.brief ?? "None supplied"}
-Historical performance evidence: ${JSON.stringify(performanceContext)}`,
+Historical performance evidence: ${JSON.stringify(performanceContext)}
+Selected media: ${JSON.stringify(mediaContext.map(({previewUrl,...rest})=>rest))}
+Available media previews are supplied below when possible.`,
+              },
+              ...mediaContext
+                .filter((item) => item.previewUrl && item.mimeType?.startsWith("image/"))
+                .slice(0, 12)
+                .map((item) => ({
+                  type: "image_url" as const,
+                  image_url: { url: item.previewUrl! },
+                })),
+            ],
           },
         ],
       }),
