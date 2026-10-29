@@ -13,3 +13,10 @@ test('undated non-video pages are still excluded',()=>{const rows=[{url:'https:/
 test('TikTok video ids provide a source-derived upload timestamp when possible',()=>{const date=tiktokPublishedAt('https://www.tiktok.com/@hutch.on.film/video/7696386731351870742');assert.ok(date);assert.ok(!Number.isNaN(Date.parse(date)));});
 
 test('common social share URLs are recognized as video candidates',()=>{assert.equal(trendVideoSource('https://m.tiktok.com/@creator/video/123456789')?.platform,'TikTok');assert.equal(trendVideoSource('https://vm.tiktok.com/ZM123abc/')?.platform,'TikTok');assert.equal(trendVideoSource('https://m.instagram.com/reel/Abc_123/')?.platform,'Instagram');assert.equal(trendVideoSource('https://facebook.com/share/r/AbC123/')?.platform,'Facebook');});
+
+test('extracts direct social video URLs found inside Parallel excerpts',()=>{
+ const rows=[{url:'https://example.com/article',title:'Film ideas',excerpts:['Watch this example https://www.youtube.com/shorts/abcdefghijk and this https://www.instagram.com/reel/Abc_123/']}];
+ const trends=normalizeTrendResults(rows,'2026-10-29T00:00:00Z','topic','2026-10-22');
+ assert.equal(trends.length,2);
+ assert.deepEqual(new Set(trends.map(item=>item.platform)),new Set(['YouTube','Instagram']));
+});
