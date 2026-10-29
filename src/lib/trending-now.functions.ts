@@ -82,8 +82,20 @@ export const discoverTrends=createServerFn({method:"POST"}).middleware([requireS
     `${terms} YouTube Short creator`,
     `${terms} Facebook Reel creator`,
    ].map(value=>value.slice(0,200));
-   const fallbackResults=await runSearch(fallbackQueries,`Find original public short-form videos relevant to this creative search: ${data.query||direction||terms}. Prefer direct TikTok video, Instagram Reel, YouTube Shorts, and Facebook Reel/video URLs. High public traction is preferred when visible, but do not exclude a useful original video solely because the search result does not expose view/like counts or a publish date. Do not invent engagement, dates, rankings or audio rights.`,36,false);
+   const fallbackResults=await runSearch(fallbackQueries,`Find original public short-form videos relevant to this creative search: ${data.query||direction||terms}. Return pages that contain or point directly to TikTok videos, Instagram Reels, YouTube Shorts, or Facebook Reels. High public traction is preferred when visible, but do not exclude a useful original video solely because the search result does not expose view/like counts or a publish date. Do not invent engagement, dates, rankings or audio rights.`,36,false);
    combined=[...combined,...fallbackResults];
+   seen=new Set<string>();
+   observations=normalizeTrendResults(combined,observedAt,data.type,cutoff).filter(item=>{if(seen.has(item.url))return false;seen.add(item.url);return true;});
+   candidates=videoTrendResults(observations,data.filters?.platform).map(trend=>({...trend,searchContext:direction}));
+  }
+  if(candidates.length===0 && (!data.filters?.platform || data.filters.platform==='All videos' || data.filters.platform==='YouTube')){
+   const youtubeOnly=await runSearch(
+    [`site:youtube.com/shorts ${terms}`,`${terms} YouTube Shorts`,`${broadTerms} YouTube Shorts creator`].map(value=>value.slice(0,200)),
+    `Find public YouTube Shorts that can inspire this content direction: ${data.query||direction||terms}. Prefer direct youtube.com/shorts URLs. Return useful original creator videos even when public view counts are not shown in search results. Do not invent metrics, dates, rankings or rights.`,
+    24,
+    false,
+   );
+   combined=[...combined,...youtubeOnly];
    seen=new Set<string>();
    observations=normalizeTrendResults(combined,observedAt,data.type,cutoff).filter(item=>{if(seen.has(item.url))return false;seen.add(item.url);return true;});
    candidates=videoTrendResults(observations,data.filters?.platform).map(trend=>({...trend,searchContext:direction}));
