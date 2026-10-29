@@ -35,23 +35,29 @@ export function tiktokPublishedAt(raw:string):string|null{
 function excerptPublishedAt(excerpt:string):string|null{
  const match=excerpt.match(/\bon\s+([A-Z][a-z]+\s+\d{1,2},\s+\d{4})\b/);if(!match)return null;const parsed=Date.parse(match[1]);return Number.isNaN(parsed)?null:new Date(parsed).toISOString();
 }
+function safeHttpsUrl(raw:string):string|null{
+ try{
+  const parsed=new URL(raw);
+  if(parsed.protocol!=="https:"||parsed.username||parsed.password||parsed.port||!parsed.hostname.includes(".")||/^\d+\.\d+\.\d+\.\d+$/.test(parsed.hostname)||/(^|\.)(localhost|local|internal|test|invalid)$/.test(parsed.hostname))return null;
+  return parsed.href;
+ }catch{return null;}
+}
+function embeddedVideoUrls(text:string){
+ const matches=text.match(/https:\/\/(?:www\.|m\.)?(?:tiktok\.com\/@[^\s"'<>]+\/video\/\d+|instagram\.com\/reels?\/[A-Za-z0-9_-]+\/?|youtube\.com\/shorts\/[A-Za-z0-9_-]{11}|youtu\.be\/[A-Za-z0-9_-]{11}|facebook\.com\/(?:reel\/[^\s"'<>/?#]+|share\/r\/[^\s"'<>/?#]+|[^\s"'<>]+\/videos\/[^\s"'<>/?#]+))/gi)??[];
+ return [...new Set(matches.map(value=>value.replace(/[),.;!?]+$/,"")).map(value=>safeHttpsUrl(value)).filter((value):value is string=>Boolean(value)).filter(value=>Boolean(trendVideoSource(value))))];
+}
 export function normalizeTrendResults(results:unknown[],observedAt:string,type:Trend["type"],cutoff:string):Trend[]{
  return results.flatMap(item=>{
   if(!item || typeof item!=="object")return [];const row=item as Record<string,unknown>;
-  if(typeof row.url!=="string"||typeof row.title!=="string")return [];
-  let url:string;try{const parsed=new URL(row.url);if(parsed.protocol!=="https:"||parsed.username||parsed.password||parsed.port||!parsed.hostname.includes(".")||/^\d+\.\d+\.\d+\.\d+$/.test(parsed.hostname)||/(^|\.)(localhost|local|internal|test|invalid)$/.test(parsed.hostname))return [];url=parsed.href;}catch{return [];}
+  const title=typeof row.title==="string"&&row.title.trim()?row.title.trim():"Public short-form video";
   const excerpts=Array.isArray(row.excerpts)?row.excerpts.filter((text):text is string=>typeof text==="string").join("\n"):"";
-  const videoSource=trendVideoSource(url);
+  const topLevel=typeof row.url==="string"?safeHttpsUrl(row.url):null;
+  const candidateUrls=[...(topLevel&&trendVideoSource(topLevel)?[topLevel]:[]),...embeddedVideoUrls([typeof row.url==="string"?row.url:"",title,excerpts].join("\n"))];
+  const uniqueCandidates=[...new Set(candidateUrls)];
+  if(!uniqueCandidates.length)return [];
   const reportedDate=typeof row.publish_date==="string"&&!Number.isNaN(Date.parse(row.publish_date))?row.publish_date:null;
-  const publishedAt=reportedDate??tiktokPublishedAt(url)??excerptPublishedAt(excerpts);
-  // Dated observations still have to fall inside the requested window.
-  if(publishedAt&&(Date.parse(publishedAt)<Date.parse(cutoff)||Date.parse(publishedAt)>Date.parse(observedAt)))return [];
-  // Undated original social videos are useful inspiration but are never
-  // represented as verified current trends. Undated non-video pages stay out.
-  if(!publishedAt&&!videoSource)return [];
-  if(!videoSource&&!/social media|instagram|tiktok|reels|youtube shorts|trending audio|viral format/i.test(`${row.title} ${excerpts}`))return [];
   const thumbnailCandidate=[row.thumbnail_url,row.thumbnail,row.image_url,row.image].find(value=>typeof value==="string"&&/^https:\/\//i.test(value as string));
-  const metricText=`${row.title} ${excerpts}`;
+  const metricText=`${title} ${excerpts}`;
   const metricMatches=[...metricText.matchAll(/(\d+(?:\.\d+)?)\s*([KMB])?\s*(views?|likes?|plays?)/gi)];
   const units:Record<string,number>={K:1_000,M:1_000_000,B:1_000_000_000};
   let viralStrength=0;const evidence:string[]=[];
@@ -61,7 +67,12 @@ export function normalizeTrendResults(results:unknown[],observedAt:string,type:T
     if(kind.startsWith("view")||kind.startsWith("play")) viralStrength=Math.max(viralStrength,value>=1_000_000?4:value>=250_000?3:value>=50_000?2:value>=10_000?1:0);
     if(kind.startsWith("like")) viralStrength=Math.max(viralStrength,value>=50_000?4:value>=10_000?3:value>=2_000?2:value>=500?1:0);
   }
-  return [{id:url,title:row.title,url,source:new URL(url).hostname,excerpt:excerpts,publishedAt,observedAt,type,status:"unknown" as const,licensing:type==="audio"?"unknown" as const:"not_applicable" as const,thumbnail:typeof thumbnailCandidate==="string"?thumbnailCandidate:undefined,engagementEvidence:evidence.slice(0,3).join(" · ")||undefined,viralStrength}];
+  return uniqueCandidates.flatMap(url=>{
+    const publishedAt=reportedDate??tiktokPublishedAt(url)??excerptPublishedAt(excerpts);
+    if(publishedAt&&(Date.parse(publishedAt)<Date.parse(cutoff)||Date.parse(publishedAt)>Date.parse(observedAt)))return [];
+    const videoSource=trendVideoSource(url);if(!videoSource)return [];
+    return [{id:url,title,url,source:new URL(url).hostname,excerpt:excerpts,publishedAt,observedAt,type,status:"unknown" as const,licensing:type==="audio"?"unknown" as const:"not_applicable" as const,thumbnail:typeof thumbnailCandidate==="string"?thumbnailCandidate:undefined,engagementEvidence:evidence.slice(0,3).join(" · ")||undefined,viralStrength}];
+  });
  });
 }
 export function trendIsStale(trend:Trend,now=Date.now()){return !trend.publishedAt || now-Date.parse(trend.publishedAt)>7*86400000;}
