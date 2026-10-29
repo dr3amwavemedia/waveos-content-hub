@@ -495,24 +495,32 @@ export const getSocialIntelligenceProfile = createServerFn({ method: "POST" })
         safeMessage: "No historical social intelligence sync has been recorded for this workspace.",
       };
     }
-    const snapshotResult = await supabaseAdmin
-      .from("social_intelligence_snapshots" as never)
-      .select(
-        "id,metric_key,provider,availability,value,unit,range_start,range_end,record_count,captured_at,source_reference,calculation_version,evidence",
-      )
-      .eq("workspace_id", data.workspaceId)
-      .eq("profile_id", profile.id)
-      .order("captured_at", { ascending: false })
-      .limit(100);
-    if (schemaIsUnavailable(snapshotResult.error)) {
-      return {
-        schemaAvailable: false,
-        profile: null,
-        snapshots: [],
-        safeMessage: "Historical social intelligence is not available in this environment yet.",
-      };
+    const snapshotRows: unknown[] = [];
+    const pageSize = 1000;
+    for (let start = 0; ; start += pageSize) {
+      const snapshotResult = await supabaseAdmin
+        .from("social_intelligence_snapshots" as never)
+        .select(
+          "id,metric_key,provider,availability,value,unit,range_start,range_end,record_count,captured_at,source_reference,calculation_version,evidence",
+        )
+        .eq("workspace_id", data.workspaceId)
+        .eq("profile_id", profile.id)
+        .order("range_end", { ascending: false })
+        .order("captured_at", { ascending: false })
+        .range(start, start + pageSize - 1);
+      if (schemaIsUnavailable(snapshotResult.error)) {
+        return {
+          schemaAvailable: false,
+          profile: null,
+          snapshots: [],
+          safeMessage: "Historical social intelligence is not available in this environment yet.",
+        };
+      }
+      if (snapshotResult.error) throw snapshotResult.error;
+      const page = (snapshotResult.data ?? []) as unknown[];
+      snapshotRows.push(...page);
+      if (page.length < pageSize) break;
     }
-    if (snapshotResult.error) throw snapshotResult.error;
     type Snapshot = {
       id: string;
       metric_key: string;
@@ -531,7 +539,7 @@ export const getSocialIntelligenceProfile = createServerFn({ method: "POST" })
     return {
       schemaAvailable: true,
       profile,
-      snapshots: ((snapshotResult.data ?? []) as Snapshot[]).map((row) => ({
+      snapshots: (snapshotRows as Snapshot[]).map((row) => ({
         ...row,
         value: row.value === null || !Number.isFinite(Number(row.value)) ? null : Number(row.value),
       })),
