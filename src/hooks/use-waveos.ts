@@ -185,9 +185,16 @@ async function loadWorkspaces(
             !Array.isArray(workspace.feature_overrides)
               ? (workspace.feature_overrides as Record<string, unknown>)
               : {};
+
+          // Social Media staff get their own explicitly assigned workspace plus
+          // DWM-managed client workspaces that have social-management access.
+          // Public WaveOS/os_data accounts and test-plan workspaces must never
+          // leak into the staff client switcher merely because they subscribe
+          // to a WaveOS plan.
+          if (membershipMap.has(workspace.id)) return true;
+          if (workspace.data_source !== "client_data") return false;
+
           return (
-            workspace.id === STAFF_WORKSPACE_ID ||
-            membershipMap.has(workspace.id) ||
             workspace.access_tier === "social_management" ||
             subscribedWorkspaceIds.has(workspace.id) ||
             overrides.social_management_access === true
@@ -195,9 +202,10 @@ async function loadWorkspaces(
         })
       : (workspaces ?? []);
 
-  // Every staff identity starts in the shared Dream Wave workspace. A client
-  // membership must never silently become a staff member's default workspace.
+  // Social Media staff start in their own assigned workspace/account. Other
+  // staff retain the shared Dream Wave staff workspace as their default.
   const rank = (id: string) => {
+    if (ctx.staffType === "media_manager") return membershipMap.has(id) ? 0 : 1;
     if (ctx.isStaff) return id === STAFF_WORKSPACE_ID ? 0 : 1;
     return membershipMap.get(id) === "owner" ? 0 : 1;
   };
