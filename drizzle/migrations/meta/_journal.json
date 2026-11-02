@@ -190,6 +190,13 @@
       "when": 1792712352867,
       "tag": "0026_signwell_completion_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1793652043034,
+      "tag": "0027_publish_attempts_unpublish_tracking",
+      "breakpoints": true
     }
   ]
 }

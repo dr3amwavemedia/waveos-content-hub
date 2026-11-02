@@ -11,6 +11,7 @@ import {
   Camera,
   Check,
   ChevronRight,
+  ExternalLink,
   Cloud,
   FileImage,
   FileText,
@@ -42,6 +43,7 @@ import {
 } from "@/hooks/use-media";
 import type { MediaAsset } from "@/hooks/use-media";
 import { mediaThumbRenderKind } from "@/lib/frameio-media-preview";
+import type { DuplicateGuardMatch } from "@/lib/publish-fingerprint";
 import {
   getExternalMediaStatus,
   getGooglePickerToken,
@@ -73,7 +75,7 @@ import {
   type SocialPlatform,
 } from "@/hooks/use-content";
 import { PenSquare } from "lucide-react";
-import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
+import { formatInTimeZone, isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 import { usePermissions } from "@/hooks/use-permissions";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -292,6 +294,10 @@ function CreatePost() {
   const assist = useServerFn(waveAssist);
 
   const [publishing, setPublishing] = useState<null | "now" | "schedule">(null);
+  const [duplicateGuard, setDuplicateGuard] = useState<{
+    contentId: string;
+    matches: DuplicateGuardMatch[];
+  } | null>(null);
   const [assisting, setAssisting] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -514,35 +520,60 @@ function CreatePost() {
         navigate({ to: "/approvals" });
         return;
       }
-      const res = await publishFn({ data: { contentId: id } });
-      qc.invalidateQueries({ queryKey: ["content-items"] });
-      qc.invalidateQueries({ queryKey: ["content-item", id] });
-      if (res.failed === 0 && res.pending === 0)
-        toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
-      else if (res.failed === 0)
-        toast.success(
-          `Published to ${res.success}; ${res.pending} channel${res.pending === 1 ? " is" : "s are"} still processing`,
-        );
-      else
-        toast.warning(
-          `Published to ${res.success}, ${res.failed} failed — open Posts & insights to retry`,
-        );
-      navigate({ to: "/social", search: { view: "posts" } });
+      await runPublish(id, false);
     } catch (e) {
-      const message = (e as Error).message;
-      if (message === "frameio_share_not_ready") {
-        toast.error(
-          "Frame.io media is not ready. Re-sync the assigned Frame.io Share and try again.",
-        );
-      } else if (message === "frameio_file_removed_from_share") {
-        toast.error(
-          "This file is no longer in the assigned Frame.io Share. Pick it again or choose another file.",
-        );
-      } else {
-        toast.error(message);
-      }
+      showPublishError(e);
     } finally {
       setPublishing(null);
+    }
+  }
+
+  async function runPublish(id: string, allowDuplicate: boolean) {
+    const res = await publishFn({ data: { contentId: id, allowDuplicate } });
+    qc.invalidateQueries({ queryKey: ["content-items"] });
+    qc.invalidateQueries({ queryKey: ["content-item", id] });
+    if (res.duplicateGuard?.length) {
+      // Nothing was sent. The user must explicitly confirm a second copy.
+      setDuplicateGuard({ contentId: id, matches: res.duplicateGuard });
+      return;
+    }
+    if (res.failed === 0 && res.pending === 0)
+      toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
+    else if (res.failed === 0)
+      toast.success(
+        `Published to ${res.success}; ${res.pending} channel${res.pending === 1 ? " is" : "s are"} still processing`,
+      );
+    else
+      toast.warning(
+        `Published to ${res.success}, ${res.failed} failed — open Posts & insights to retry`,
+      );
+    navigate({ to: "/social", search: { view: "posts" } });
+  }
+
+  async function handlePublishAnotherCopy() {
+    if (!duplicateGuard || publishing !== null) return;
+    const { contentId } = duplicateGuard;
+    setDuplicateGuard(null);
+    setPublishing("now");
+    try {
+      await runPublish(contentId, true);
+    } catch (e) {
+      showPublishError(e);
+    } finally {
+      setPublishing(null);
+    }
+  }
+
+  function showPublishError(e: unknown) {
+    const message = (e as Error).message;
+    if (message === "frameio_share_not_ready") {
+      toast.error("Frame.io media is not ready. Re-sync the assigned Frame.io Share and try again.");
+    } else if (message === "frameio_file_removed_from_share") {
+      toast.error(
+        "This file is no longer in the assigned Frame.io Share. Pick it again or choose another file.",
+      );
+    } else {
+      toast.error(message);
     }
   }
 
@@ -899,6 +930,16 @@ function CreatePost() {
         <Button disabled={locked||publishing!==null||!caption.trim()||!platforms.length} onClick={handlePublishNow}><Send className="size-4"/>Publish</Button>
       </div>
 
+      {duplicateGuard && (
+        <DuplicatePublishDialog
+          matches={duplicateGuard.matches}
+          timeZone={activeWorkspace.timezone ?? "UTC"}
+          busy={publishing !== null}
+          onCancel={() => setDuplicateGuard(null)}
+          onConfirm={() => void handlePublishAnotherCopy()}
+        />
+      )}
+
       {showLibrary && (
         <MediaPicker
           workspaceId={workspaceId!}
@@ -910,6 +951,83 @@ function CreatePost() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function DuplicatePublishDialog({
+  matches,
+  timeZone,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  matches: DuplicateGuardMatch[];
+  timeZone: string;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="duplicate-publish-title"
+    >
+      <div className="surface-card max-h-[90vh] w-full max-w-lg overflow-y-auto p-5 sm:p-6">
+        <p className="text-xs font-semibold uppercase tracking-wider text-warning">
+          Possible duplicate
+        </p>
+        <h2 id="duplicate-publish-title" className="mt-1 text-xl font-semibold text-foreground">
+          This was already published
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          Nothing has been sent yet. The same caption and media went out from another post in the
+          last 24 hours:
+        </p>
+        <ul className="mt-3 space-y-2">
+          {matches.map((match) => {
+            const label = PLATFORM_LABEL[match.platform as SocialPlatform] ?? match.platform;
+            return (
+              <li
+                key={match.existingAttemptId}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border bg-elevated/60 p-3"
+              >
+                <span className="text-sm text-foreground">
+                  <span className="font-semibold">{label}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    Published{" "}
+                    {formatInTimeZone(match.attemptedAt, timeZone, {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}{" "}
+                    {timeZone}
+                  </span>
+                </span>
+                {match.postUrl && (
+                  <a
+                    href={match.postUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium hover:bg-elevated"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" /> Open existing post
+                  </a>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <Button variant="outline" disabled={busy} onClick={onCancel}>
+            Don&apos;t publish
+          </Button>
+          <Button variant="destructive" disabled={busy} onClick={onConfirm}>
+            Publish another copy
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
