@@ -36,6 +36,7 @@ const post = (overrides = {}) => ({
   publishedAt: "2026-11-02T20:27:17.288Z",
   source: "zernio",
   removedAt: null,
+  verifiedLive: true,
   aliases: postAliases(
     overrides.platform ?? "facebook",
     overrides.platformPostId ?? "111",
@@ -123,8 +124,8 @@ test("analytics rows split cross-posted copies and keep only the requested accou
 test("two Facebook duplicates with distinct Zernio ids stay two separate cards", () => {
   const payload = {
     posts: [
-      { latePostId: "late-A", content: "Dup", platformAnalytics: [{ platform: "facebook", accountId: { _id: "acc-fb" }, platformPostId: "A" }] },
-      { latePostId: "late-B", content: "Dup", platformAnalytics: [{ platform: "facebook", accountId: { _id: "acc-fb" }, platformPostId: "B" }] },
+      { latePostId: "late-A", content: "Dup", platformAnalytics: [{ platform: "facebook", status: "published", accountId: { _id: "acc-fb" }, platformPostId: "A" }] },
+      { latePostId: "late-B", content: "Dup", platformAnalytics: [{ platform: "facebook", status: "published", accountId: { _id: "acc-fb" }, platformPostId: "B" }] },
     ],
   };
   const cards = mergeLivePosts(normalizeAnalyticsPosts(payload, fb));
