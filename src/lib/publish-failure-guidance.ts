@@ -16,7 +16,7 @@ const NO_CAUSE = /without returning a detailed platform message|does not identif
 const ACCOUNT = /connect|account|profile|authorization|authori[sz]ed|token|permission/;
 const MEDIA =
   /\b(media|image|images|photo|video|videos|aspect ratio|duration|file size|size|format|resolution|dimensions?)\b/;
-const CAPTION = /\b(caption|text|characters?|hashtags?|mentions?)\b/;
+const CAPTION = /caption|text|character|hashtag|mention/;
 
 export function failureGuidance(
   message: string | null,
