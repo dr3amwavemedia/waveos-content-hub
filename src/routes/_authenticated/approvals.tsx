@@ -228,6 +228,12 @@ function ApprovalDetail({ item }: { item: ContentItem }) {
       setNote("");
       if (decision === "approved" && requestedAction === "publish_now") {
         const result = await publishFn({ data: { contentId: item.id } });
+        if (result.duplicateGuard?.length) {
+          toast.warning(
+            "Approved, but not published: the same caption and media already went out from another post in the last 24 hours. Open the post to review it and confirm before publishing another copy.",
+          );
+          return;
+        }
         toast.success(
           result.failed
             ? `Approved and published to ${result.success}; ${result.failed} channel${result.failed === 1 ? "" : "s"} failed.`
