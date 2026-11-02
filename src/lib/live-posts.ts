@@ -73,7 +73,8 @@ export type LivePost = {
   platform: string;
   accountId: string;
   accountName: string;
-  platformPostId: string;
+  /** Platform post id; null when the provider only reported a stable URL. */
+  platformPostId: string | null;
   /** Zernio post id; the only id unpublish accepts. Null for external-only posts. */
   latePostId: string | null;
   url: string | null;
@@ -83,12 +84,100 @@ export type LivePost = {
   publishedAt: string | null;
   source: "zernio" | "external";
   removedAt: string | null;
+  /**
+   * True only when a current provider source reported this exact target as
+   * live and no provider source contradicts it. WaveOS history never sets it.
+   */
+  verifiedLive: boolean;
   /** Every id/URL form this platform post is known by, for safe matching. */
   aliases: string[];
 };
 
 export function livePostKey(platform: string, accountId: string, platformPostId: string) {
   return `${toProviderPlatform(platform)}:${accountId}:${platformPostId}`;
+}
+
+// ---------------------------------------------------------------------------
+// Published eligibility. Provider-confirmed live state is authoritative; a
+// WaveOS attempt's own status (failed, timeout, success) never decides it.
+
+const LIVE_STATUSES = new Set(["published", "success", "succeeded", "live", "posted"]);
+const REMOVED_STATUSES = new Set([
+  "cancelled",
+  "canceled",
+  "deleted",
+  "removed",
+  "unpublished",
+]);
+
+export type ProviderTargetState = "live" | "removed" | "not_live";
+
+/**
+ * State of one exact provider target. `missingStatus` is "live" only for
+ * platform-synced posts, which the platform returns only once they exist;
+ * everything else must state published explicitly. A removed/cancelled parent
+ * removes every target; any other parent status (partial, failed) defers to
+ * the target's own status so only its published targets count.
+ */
+export function providerTargetState(input: {
+  status: unknown;
+  parentStatus?: unknown;
+  records?: unknown[];
+  missingStatus?: "live" | "not_live";
+}): ProviderTargetState {
+  const normalize = (value: unknown) =>
+    typeof value === "string" && value.trim() ? value.trim().toLowerCase() : null;
+  const deleted = (input.records ?? []).some((value) => {
+    const row = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+    if (!row) return false;
+    return (
+      row.isDeleted === true ||
+      row.deleted === true ||
+      row.isRemoved === true ||
+      [row.deletedAt, row.removedAt, row.unpublishedAt].some(
+        (date) => typeof date === "string" && !Number.isNaN(Date.parse(date)),
+      )
+    );
+  });
+  const parent = normalize(input.parentStatus);
+  if (deleted || (parent && REMOVED_STATUSES.has(parent))) return "removed";
+  const status = normalize(input.status);
+  if (!status) return input.missingStatus === "live" ? "live" : "not_live";
+  if (REMOVED_STATUSES.has(status)) return "removed";
+  return LIVE_STATUSES.has(status) ? "live" : "not_live";
+}
+
+export type PublishedCardState = "live" | "removed";
+
+/**
+ * The only two states the Published library shows. Removed is WaveOS-recorded
+ * removal history; anything not verified live and not removed is excluded.
+ */
+export function publishedCardState(post: Pick<LivePost, "removedAt" | "verifiedLive">) {
+  if (post.removedAt) return "removed" as const;
+  return post.verifiedLive ? ("live" as const) : null;
+}
+
+export const PUBLISHED_STATE_LABEL: Record<PublishedCardState, string> = {
+  live: "Live",
+  removed: "Removed",
+};
+
+/** Final Published list: verified live cards and intentional removal history. */
+export function finalizePublishedLibrary(posts: LivePost[]) {
+  return posts.filter((post) => publishedCardState(post) !== null);
+}
+
+/** Counts over the eligible cards only. */
+export function publishedCounts(posts: LivePost[]) {
+  let live = 0;
+  let removed = 0;
+  for (const post of posts) {
+    const state = publishedCardState(post);
+    if (state === "live") live += 1;
+    else if (state === "removed") removed += 1;
+  }
+  return { live, removed };
 }
 
 /**
