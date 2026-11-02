@@ -86,7 +86,7 @@ test("publishing keeps audit attribution on the authenticated real actor", () =>
   assert.match(publishFunctions, /middleware\(\[requireSupabaseAuth\]\)/);
   assert.match(
     publishFunctions,
-    /publishContentItemWithZernio\(data\.contentId, context\.userId[,)]/,
+    /publishContentItemWithZernio\(data\.contentId, context\.userId\)/,
   );
   assert.match(publisher, /actor_user_id: actorUserId \?\? null/);
   assert.match(releaseMigration, /actor_user_id[\s\S]*_uid/);
