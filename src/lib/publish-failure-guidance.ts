@@ -27,6 +27,12 @@ export function failureGuidance(
   if (TIMEOUT.test(error)) {
     return `This was a provider timeout, not a rejection of the vertical format or media. Zernio did not answer in time and may still be processing the post. Wait a few minutes, then use Open and retry post without changing or re-exporting the media. Networks that already succeeded will not be posted twice.`;
   }
+  if (options.errorCode === "unexpected_target") {
+    return `Zernio reported an extra destination that WaveOS did not request. Nothing was removed automatically and WaveOS will not re-send this post. Open Social Media › Published, press Refresh, and remove any copy you didn't intend.`;
+  }
+  if (options.errorCode === "target_guard") {
+    return `WaveOS stopped this post before sending because its destination didn't match the account selected for ${platform}. Nothing was sent. Review the post's platforms and accounts, then publish again.`;
+  }
   if (options.errorCode === "duplicate_guard") {
     return `WaveOS stopped this post before it reached ${platform} because the same caption and media were already published there from another post in the last 24 hours. Check the existing post first. To post a second copy on purpose, use Open and retry post and confirm Publish another copy.`;
   }
