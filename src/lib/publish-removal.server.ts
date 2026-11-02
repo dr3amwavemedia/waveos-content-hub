@@ -1,6 +1,5 @@
 import type { Json } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
-import type { SocialPlatform } from "@/hooks/use-content";
 import { toZernioPlatform, zernioRequest } from "@/lib/zernio.server";
 import { unpublishBlockReason, withUnpublishedMarker } from "@/lib/published-post-management";
 
@@ -44,7 +43,7 @@ export async function unpublishZernioPublishAttempt(attemptId: string, actorUser
       `/posts/${encodeURIComponent(attempt.provider_post_id!)}/unpublish`,
       {
         method: "POST",
-        body: JSON.stringify({ platform: toZernioPlatform(attempt.platform as SocialPlatform) }),
+        body: JSON.stringify({ platform: toZernioPlatform(attempt.platform) }),
       },
     );
   } catch (reason) {

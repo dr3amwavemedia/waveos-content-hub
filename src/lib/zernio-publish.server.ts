@@ -5,6 +5,7 @@ import { normalizeZernioAccounts, toZernioPlatform, zernioRequest } from "@/lib/
 import { cleanupConfirmedTemporaryMedia } from "@/lib/temporary-media-cleanup.server";
 import { assertPublishingEnabled } from "@/lib/publishing-controls.server";
 import { normalizeZernioRequestError, ZERNIO_CREATE_POST_TIMEOUT_MS } from "@/lib/zernio-timeout";
+import { readUnpublishedMarker } from "@/lib/published-post-management";
 
 type ZernioTarget = {
   platform?: string;
@@ -393,11 +394,15 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
 export async function refreshZernioPublishAttempt(attemptId: string) {
   const { data: attempt, error } = await supabaseAdmin
     .from("publish_attempts")
-    .select("id,content_item_id,platform,provider,provider_post_id")
+    .select("id,content_item_id,platform,provider,provider_post_id,response_snapshot")
     .eq("id", attemptId)
     .maybeSingle();
   if (error) throw error;
   if (!attempt) throw new Error("Publishing attempt not found.");
+  // A refresh would overwrite the stored removal record and restore the link.
+  if (readUnpublishedMarker(attempt.response_snapshot)) {
+    throw new Error("This post was removed from the platform, so there is nothing to refresh.");
+  }
   if (attempt.provider !== "zernio" || !attempt.provider_post_id) {
     throw new Error("This attempt does not have a Zernio post reference.");
   }
