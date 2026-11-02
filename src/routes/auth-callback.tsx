@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { WaveLogo } from "@/components/branding/wave-logo";
 import { createSocialSubscriptionCheckout } from "@/lib/social-subscriptions.functions";
+import { withRequestTimeout } from "@/lib/request-timeout";
 
 const POST_AUTH_NEXT_KEY = "waveos.postAuthNext";
 const PUBLIC_SIGNUP_KEY = "waveos.publicSignup";
@@ -108,8 +109,12 @@ function AuthCallbackPage() {
       }
       if (cancelled) return;
       const target = resolveTarget();
-      if (target === "/home") navigate({ to: "/home", replace: true });
-      else window.location.replace(target);
+      // Use a clean document navigation after authentication. On mobile browsers,
+      // an in-app router transition can remain pending while the protected route
+      // performs its auth/role bootstrap, leaving this callback spinner visible.
+      // A full navigation starts /home with the persisted Supabase session and
+      // avoids carrying the callback route transition across the auth boundary.
+      window.location.replace(target);
     };
     const completeSignIn = () => {
       completion ??= goToTarget();
@@ -129,7 +134,10 @@ function AuthCallbackPage() {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
       if (code) {
-        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        const { error } = await withRequestTimeout(
+          supabase.auth.exchangeCodeForSession(code),
+          15_000,
+        );
         if (!error) {
           await completeSignIn();
           return;
@@ -146,11 +154,15 @@ function AuthCallbackPage() {
         hashParams.get("error");
 
       for (let attempt = 0; attempt < 40; attempt += 1) {
-        const { data } = await supabase.auth.getSession();
-        if (cancelled) return;
-        if (data.session) {
-          await completeSignIn();
-          return;
+        try {
+          const { data } = await withRequestTimeout(supabase.auth.getSession(), 5_000);
+          if (cancelled) return;
+          if (data.session) {
+            await completeSignIn();
+            return;
+          }
+        } catch (sessionError) {
+          console.warn("[auth-callback] session check timed out", sessionError);
         }
         await new Promise((resolve) => setTimeout(resolve, 300));
       }
