@@ -615,18 +615,25 @@ export type LivePostRemoval =
   | { kind: "removed"; message: string }
   | { kind: "remove" }
   | { kind: "manual"; message: string }
-  | { kind: "not_allowed"; message: string };
+  | { kind: "not_allowed"; message: string }
+  | { kind: "unverified"; message: string };
 
 /** What the post dialog offers for one exact card. */
 export function livePostRemoval(post: LivePost, canManage: boolean): LivePostRemoval {
   const label = livePlatformLabel(post.platform);
   if (post.removedAt) return { kind: "removed", message: `Removed from ${label}` };
+  // Manage controls exist only for a card every provider source confirms live.
+  if (!post.verifiedLive)
+    return {
+      kind: "unverified",
+      message: `WaveOS can't confirm this post is live on ${label} right now. Try Refresh.`,
+    };
   if (!providerPlatformSupportsUnpublish(post.platform))
     return {
       kind: "manual",
       message: `${label} doesn't allow removing posts from WaveOS. Open the post on ${label} and delete it there.`,
     };
-  if (!post.latePostId)
+  if (!post.latePostId || !post.platformPostId)
     return {
       kind: "manual",
       message: `This post was published outside WaveOS, so there is no safe way to remove it from here. Open it on ${label} and delete it there.`,
@@ -656,7 +663,14 @@ export function zernioPostContainsCopy(
     if (!entry) return false;
     if (toProviderPlatform(str(entry.platform) ?? "") !== providerPlatform) return false;
     if (zernioAccountId(entry.accountId) !== target.accountId) return false;
-    if (str(entry.status) !== "published") return false;
+    if (
+      providerTargetState({
+        status: entry.status,
+        parentStatus: record(zernioPost)?.status,
+        records: [entry],
+      }) !== "live"
+    )
+      return false;
     const entryAliases = postAliases(
       providerPlatform,
       str(entry.platformPostId),
