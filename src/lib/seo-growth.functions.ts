@@ -2,6 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeResearchSource } from "@/lib/competitive-research";
+import { recordAiUsage } from "@/lib/ai-usage.server";
+
+const SEO_MODEL = "google/gemini-3.1-flash-lite";
 
 const seoClaim = z.object({
   title: z.string().trim().min(1).max(180),
@@ -257,6 +260,8 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
       .join("\n\n");
 
     let parsed: z.infer<typeof seoReportSchema> | null = null;
+    let aiUsage: {prompt_tokens?:number;completion_tokens?:number}|null = null;
+    const aiStartedAt = Date.now();
     const aiResponse = appKey ? await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -264,7 +269,7 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3.1-flash-lite",
+        model: SEO_MODEL,
         max_tokens: 3000,
         response_format: { type: "json_object" },
         messages: [
@@ -281,17 +286,30 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
     }) : null;
 
     if (aiResponse?.ok) {
-      const json = (await aiResponse.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const json = (await aiResponse.json()) as { choices?: Array<{ message?: { content?: string } }>; usage?: {prompt_tokens?:number;completion_tokens?:number} };
+      aiUsage = json.usage ?? null;
       const raw = json.choices?.[0]?.message?.content?.trim();
       if (raw) {
         try {
-          parsed = seoReportSchema.parse(JSON.parse(raw.replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "")));
+          parsed = seoReportSchema.parse(JSON.parse(raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")));
         } catch (error) {
           console.warn("SEO synthesis response rejected", error instanceof z.ZodError ? { issues: error.issues.length } : { kind: "invalid_json" });
         }
       }
     } else if (aiResponse) {
       console.warn("SEO synthesis failed", { status: aiResponse.status });
+    }
+    if (aiResponse) {
+      await recordAiUsage({
+        workspaceId:data.workspaceId,
+        userId:context.userId,
+        feature:"seo_growth",
+        model:SEO_MODEL,
+        durationMs:Date.now()-aiStartedAt,
+        status:aiResponse.ok?(parsed?"succeeded":"invalid_response"):"provider_error",
+        usage:aiUsage,
+        safeErrorCode:aiResponse.ok?(parsed?null:"invalid_response"):`http_${aiResponse.status}`,
+      });
     }
 
     if (!parsed) {

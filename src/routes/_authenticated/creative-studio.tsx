@@ -35,6 +35,7 @@ import {
   ArrowLeft,
   MoreHorizontal,
   Palette,
+  Video,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequireFeature } from "@/components/app/require-feature";
@@ -184,6 +185,8 @@ function CreativeStudioPage() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [autoSaveState, setAutoSaveState] = useState<"idle"|"saving"|"saved"|"error">("idle");
+  const currentDraftSignatureRef = useRef("");
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [mobileStarted, setMobileStarted] = useState(false);
   const [mobileTool, setMobileTool] = useState<string | null>(null);
@@ -204,6 +207,22 @@ function CreativeStudioPage() {
     workflowKey: "creative-studio",
     entityId: designId,
   });
+  const autoSaveDraft = workflowDraft.save.mutateAsync;
+  currentDraftSignatureRef.current = JSON.stringify({name,designId,document});
+
+  useEffect(() => {
+    if (!dirty || !workspaceId || !name.trim()) return;
+    const payload = {name,designId,document};
+    const signature = JSON.stringify(payload);
+    setAutoSaveState("saving");
+    const timer = window.setTimeout(() => {
+      void autoSaveDraft(payload).then(() => {
+        if (currentDraftSignatureRef.current === signature) setDirty(false);
+        setAutoSaveState("saved");
+      }).catch(() => setAutoSaveState("error"));
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [autoSaveDraft, designId, dirty, document, name, workspaceId]);
 
   const designs = useQuery({
     queryKey: ["creative-designs", workspaceId],
@@ -871,6 +890,7 @@ function CreativeStudioPage() {
           </p>
         </div>
         <div className="hidden flex-wrap gap-2 sm:flex">
+          <span className="self-center text-xs text-muted-foreground" role="status">{autoSaveState==="saving"?"Saving draft…":autoSaveState==="saved"?"Draft saved":autoSaveState==="error"?"Auto-save paused":""}</span>
           <Button
             variant="outline"
             onClick={() => void saveServerDraft()}
@@ -905,13 +925,12 @@ function CreativeStudioPage() {
         </div>
       </header>
 
-      {!mobileStarted && <section className="grid grid-cols-2 gap-3 sm:hidden" aria-label="Start a design">
+      {!mobileStarted && <section className="grid gap-3 sm:hidden" aria-label="Creative Studio tools">
         {[
-          { label: "Create Graphic", icon: WandSparkles, tool: "Templates", photo: false },
-          { label: "Edit Photo", icon: ImageIcon, tool: "Media", photo: true },
-          { label: "Resize Content", icon: Maximize2, tool: "Canvas", photo: false },
-          { label: "Brand Template", icon: Layers3, tool: "Templates", photo: false },
-        ].map(({ label, icon: Icon, tool, photo }) => <Button key={label} variant="outline" className="min-h-32 flex-col gap-3 whitespace-normal rounded-2xl border-border-strong bg-gradient-to-br from-secondary to-surface text-center" onClick={() => { setPhotoMode(photo); setMobileStarted(true); setMobileTool(tool); }}><Icon className="size-8 text-primary" /><span>{label}</span></Button>)}
+          { label: "Graphic Design", icon: WandSparkles, tool: "Templates", photo: false, video: false },
+          { label: "Photo Editor", icon: ImageIcon, tool: "Media", photo: true, video: false },
+          { label: "Video Editor", icon: Video, tool: "Media", photo: false, video: true },
+        ].map(({ label, icon: Icon, tool, photo, video }) => <Button key={label} variant="outline" className="min-h-28 flex-row justify-start gap-4 whitespace-normal rounded-2xl border-border-strong bg-gradient-to-br from-secondary to-surface px-6 text-left" onClick={() => { if(video){void navigate({to:"/create"});return;} setPhotoMode(photo); setMobileStarted(true); setMobileTool(tool); }}><Icon className="size-8 shrink-0 text-primary" /><span><span className="block text-base font-semibold">{label}</span>{video&&<span className="mt-1 block text-xs font-normal text-muted-foreground">Open the mobile video creation workflow</span>}</span></Button>)}
       </section>}
 
       {workflowDraft.data?.payload && (

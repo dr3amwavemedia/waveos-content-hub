@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { recordAiUsage } from "@/lib/ai-usage.server";
 
 // Caption generation is a high-volume, lightweight text task. Keep this on a
 // current low-cost Gateway model rather than the deprecated Gemini 2.5 line.
@@ -100,6 +101,7 @@ export const waveAssist = createServerFn({ method: "POST" })
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 20_000);
+    const startedAt = Date.now();
     let res: Response;
     try {
       res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -136,15 +138,37 @@ export const waveAssist = createServerFn({ method: "POST" })
       clearTimeout(timeout);
     }
 
-    if (res.status === 429) throw new Error("Rate limit reached. Try again in a moment.");
-    if (res.status === 402) throw new Error("AI credits exhausted. Please top up in Settings.");
-    if (!res.ok) throw new Error(`AI request failed: ${res.status}`);
+    if (!res.ok) {
+      await recordAiUsage({
+        workspaceId: data.workspaceId,
+        userId: context.userId,
+        feature: `wave_assist.${data.mode}`,
+        model: MODEL,
+        durationMs: Date.now() - startedAt,
+        status: "provider_error",
+        safeErrorCode: `http_${res.status}`,
+      });
+      if (res.status === 429) throw new Error("Rate limit reached. Try again in a moment.");
+      if (res.status === 402) throw new Error("AI credits exhausted. Please top up in Settings.");
+      throw new Error(`AI request failed: ${res.status}`);
+    }
 
     const json = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     const out = (json.choices?.[0]?.message?.content ?? "").trim();
     if (!out || out.length > 20_000) {
+      await recordAiUsage({
+        workspaceId: data.workspaceId,
+        userId: context.userId,
+        feature: `wave_assist.${data.mode}`,
+        model: MODEL,
+        durationMs: Date.now() - startedAt,
+        status: "invalid_response",
+        usage: json.usage,
+        safeErrorCode: "empty_or_oversize",
+      });
       throw new Error("The caption assistant returned an invalid draft. Please try again.");
     }
     if (data.mode === "caption_suite") {
@@ -165,11 +189,29 @@ export const waveAssist = createServerFn({ method: "POST" })
       ) {
         throw new Error("The caption assistant returned an incomplete draft. Please try again.");
       }
+      await recordAiUsage({
+        workspaceId: data.workspaceId,
+        userId: context.userId,
+        feature: `wave_assist.${data.mode}`,
+        model: MODEL,
+        durationMs: Date.now() - startedAt,
+        status: "succeeded",
+        usage: json.usage,
+      });
       return {
         suggestion: parsed.primaryCaption.trim(),
         primaryCaption: parsed.primaryCaption.trim(),
         variants,
       };
     }
+    await recordAiUsage({
+      workspaceId: data.workspaceId,
+      userId: context.userId,
+      feature: `wave_assist.${data.mode}`,
+      model: MODEL,
+      durationMs: Date.now() - startedAt,
+      status: "succeeded",
+      usage: json.usage,
+    });
     return { suggestion: out, primaryCaption: null, variants: [] };
   });

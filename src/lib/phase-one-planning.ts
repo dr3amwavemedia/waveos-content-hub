@@ -1,6 +1,7 @@
 export const CAMPAIGN_GOALS = ["awareness", "engagement", "leads", "launch", "retention"] as const;
 
 export type CampaignGoal = (typeof CAMPAIGN_GOALS)[number];
+export type CampaignOptimizationMode = "automatic" | "approval_required";
 
 export interface CampaignPlanningInput {
   name: string;
@@ -12,6 +13,7 @@ export interface CampaignPlanningInput {
   postingHours: string[];
   excludedDays: string[];
   approvalRequired: boolean;
+  optimizationMode: CampaignOptimizationMode;
 }
 
 export interface CampaignPlanningItem {
