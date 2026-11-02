@@ -222,7 +222,9 @@ export function destinationHeadline(lines: Array<{ text: string }>) {
 
 export const META_SHARING_WARNING =
   "WaveOS will send only to Instagram. If Meta automatic sharing is enabled in Accounts Center, Meta may still copy it to Facebook.";
-export const META_SHARING_HELP_URL = "https://accountscenter.instagram.com/sharing_preferences/";
+export const META_SHARING_HELP_URL = "https://accountscenter.instagram.com/";
+export const META_SHARING_HELP_STEPS =
+  "In Meta Accounts Center, open Connected experiences › Sharing across profiles and turn off automatic sharing from Instagram to Facebook.";
 
 /** Instagram selected, Facebook not selected, and a Facebook connection exists. */
 export function showMetaSharingWarning(platforms: string[], connections: EditorConnection[]) {
