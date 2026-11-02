@@ -70,7 +70,7 @@ export function withUnpublishedMarker(
   snapshot: unknown,
   marker: { unpublishedAt: string; unpublishedBy: string; unpublishResponse: unknown },
 ) {
-  const base = isRecord(snapshot)
+  const base: Record<string, unknown> = isRecord(snapshot)
     ? { ...snapshot }
     : snapshot === null || snapshot === undefined
       ? {}
