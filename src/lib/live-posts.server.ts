@@ -15,6 +15,7 @@ import {
   mergeLivePosts,
   normalizeAnalyticsPosts,
   normalizeSyncedPosts,
+  normalizeZernioPosts,
   providerPlatformSupportsUnpublish,
   requestAccountIds,
   toProviderPlatform,
@@ -78,6 +79,18 @@ function analyticsPath(accountId: string, page: number, now = new Date()) {
   return `/analytics?${params}`;
 }
 
+const ZERNIO_POSTS_PAGE_SIZE = 50;
+
+function zernioPostsPath(accountId: string, page: number) {
+  const params = new URLSearchParams({
+    accountId,
+    limit: String(ZERNIO_POSTS_PAGE_SIZE),
+    page: String(page),
+    fields: "platforms,content,mediaItems,status,createdAt",
+  });
+  return `/posts?${params}`;
+}
+
 function hasMorePages(payload: unknown, page: number) {
   const pagination = (payload as { pagination?: { pages?: unknown; totalPages?: unknown } } | null)
     ?.pagination;
@@ -115,16 +128,27 @@ export async function loadLivePostsPage(input: {
           error = classifyAccountError(reason, account);
         }
       }
-      try {
-        const analytics = await zernioRequest<unknown>(analyticsPath(account.accountId, input.page), {
+      // Zernio's own post records carry the post id unpublish needs; synced
+      // and analytics history cover posts made directly on the platform.
+      const [zernioPosts, analytics] = await Promise.allSettled([
+        zernioRequest<unknown>(zernioPostsPath(account.accountId, input.page), {
           signal: AbortSignal.timeout(LIVE_POSTS_TIMEOUT_MS),
-        });
-        lists.push(normalizeAnalyticsPosts(analytics, account));
-        hasMore = hasMorePages(analytics, input.page);
-      } catch (reason) {
-        // Keep the first failure; a reconnect message is more useful than a retry hint.
-        if (!error || (!error.reconnect && classifyAccountError(reason, account).reconnect)) {
-          error = classifyAccountError(reason, account);
+        }),
+        zernioRequest<unknown>(analyticsPath(account.accountId, input.page), {
+          signal: AbortSignal.timeout(LIVE_POSTS_TIMEOUT_MS),
+        }),
+      ]);
+      for (const [result, normalize] of [
+        [zernioPosts, normalizeZernioPosts],
+        [analytics, normalizeAnalyticsPosts],
+      ] as const) {
+        if (result.status === "fulfilled") {
+          lists.push(normalize(result.value, account));
+          hasMore = hasMore || hasMorePages(result.value, input.page);
+        } else {
+          const failure = classifyAccountError(result.reason, account);
+          // Keep the first failure; a reconnect message beats a retry hint.
+          if (!error || (!error.reconnect && failure.reconnect)) error = failure;
         }
       }
       return { posts: mergeLivePosts(...lists), hasMore, error };
@@ -182,6 +206,8 @@ async function withStoredHistory(workspaceId: string, posts: LivePost[]) {
         return [
           {
             key: livePostKey(meta.platform, meta.account_id, meta.platform_post_id),
+            accountId: meta.account_id,
+            latePostId: typeof meta.late_post_id === "string" ? meta.late_post_id : null,
             removedAt: row.created_at,
           },
         ];
@@ -227,6 +253,9 @@ export async function removeExactLivePost(input: {
     platformPostId: input.platformPostId,
     url: input.url,
   };
+  if ((zernioPost as { status?: unknown } | undefined)?.status === "cancelled") {
+    throw new Error(`This post was already removed from ${label}.`);
+  }
   if (!zernioPostContainsCopy(zernioPost, target)) {
     throw new Error(
       `WaveOS couldn't match this card to a single ${label} post, so nothing was removed. Delete it on ${label}.`,
