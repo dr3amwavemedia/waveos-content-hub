@@ -416,6 +416,7 @@ export function mergeLivePosts(...lists: LivePost[][]): LivePost[] {
     }
     merged[index] = {
       ...existing,
+      platformPostId: existing.platformPostId ?? post.platformPostId,
       latePostId: existing.latePostId ?? post.latePostId,
       url: existing.url ?? post.url,
       caption: existing.caption || post.caption,
@@ -424,6 +425,8 @@ export function mergeLivePosts(...lists: LivePost[][]): LivePost[] {
       publishedAt: existing.publishedAt ?? post.publishedAt,
       source: existing.source === "zernio" || post.source === "zernio" ? "zernio" : "external",
       removedAt: existing.removedAt ?? post.removedAt,
+      // Conservative: one unverified/contradicted copy makes the card unverified.
+      verifiedLive: existing.verifiedLive && post.verifiedLive,
       aliases: [...new Set([...existing.aliases, ...post.aliases])],
     };
   }
