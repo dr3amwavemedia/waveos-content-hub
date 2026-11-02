@@ -12,6 +12,8 @@ import {
   mergeLivePosts,
   normalizeAnalyticsPosts,
   normalizeSyncedPosts,
+  normalizeZernioPosts,
+  postAliases,
   providerPlatformSupportsUnpublish,
   toProviderPlatform,
   zernioPostContainsCopy,
@@ -34,6 +36,11 @@ const post = (overrides = {}) => ({
   publishedAt: "2026-11-02T20:27:17.288Z",
   source: "zernio",
   removedAt: null,
+  aliases: postAliases(
+    overrides.platform ?? "facebook",
+    overrides.platformPostId ?? "111",
+    "url" in overrides ? overrides.url : "https://www.facebook.com/watch/?v=111",
+  ),
   ...overrides,
 });
 
@@ -164,10 +171,92 @@ test("WaveOS history links a Zernio id only for the same URL and single matching
 test("logged removals mark only the exact card", () => {
   const cards = applyRemovalLog(
     [post(), post({ key: livePostKey("facebook", "acc-fb", "222"), platformPostId: "222" })],
-    [{ key: "facebook:acc-fb:111", removedAt: "2026-11-02T21:00:00Z" }],
+    [{ key: "facebook:acc-fb:111", accountId: "acc-fb", latePostId: null, removedAt: "2026-11-02T21:00:00Z" }],
   );
   assert.equal(cards[0].removedAt, "2026-11-02T21:00:00Z");
   assert.equal(cards[1].removedAt, null);
+  // A logged Zernio post id marks that account's card even if its key differs.
+  const byLate = applyRemovalLog(
+    [post({ key: "facebook:acc-fb:other", latePostId: "late-9" }), post({ key: "facebook:acc-fb-2:x", accountId: "acc-fb-2", latePostId: "late-9" })],
+    [{ key: "nope", accountId: "acc-fb", latePostId: "late-9", removedAt: "2026-11-02T21:00:00Z" }],
+  );
+  assert.equal(byLate[0].removedAt, "2026-11-02T21:00:00Z");
+  assert.equal(byLate[1].removedAt, null);
+});
+
+test("analytics list rows read per-account copies from `platforms`", () => {
+  const cards = normalizeAnalyticsPosts(
+    {
+      posts: [
+        {
+          _id: "ext-1",
+          isExternal: true,
+          latePostId: null,
+          platform: "facebook",
+          content: "Story",
+          publishedAt: "2026-10-28T13:01:22.000Z",
+          platformPostUrl: "https://facebook.com/stories/1/abc/?view_single=1",
+          platforms: [{ platform: "facebook", status: "published", platformPostId: "1845060533187303", accountId: "acc-fb", platformPostUrl: "https://facebook.com/stories/1/abc/?view_single=1" }],
+        },
+      ],
+    },
+    fb,
+  );
+  assert.equal(cards.length, 1);
+  assert.equal(cards[0].platformPostId, "1845060533187303");
+  assert.equal(cards[0].latePostId, null);
+});
+
+// Shapes observed for the Nov 2 Facebook duplicate on one Page.
+const fbSync = {
+  posts: [
+    { platform: "facebook", platformPostId: "398965860178419_1739355274868386", platformPostUrl: "https://www.facebook.com/reel/1462074119406696/", publishedAt: "2026-11-02T20:28:03.000Z", content: "Ever wonder", mediaType: "video" },
+    { platform: "facebook", platformPostId: "398965860178419_1739354224868491", platformPostUrl: "https://www.facebook.com/reel/1631234285363380/", publishedAt: "2026-11-02T20:26:05.000Z", content: "Ever wonder", mediaType: "video" },
+  ],
+};
+const fbZernio = {
+  posts: [
+    { _id: "6ae8f21ab5b67967df0ebc8a", status: "published", content: "Ever wonder", platforms: [{ platform: "facebook", status: "published", accountId: { _id: "acc-fb" }, platformPostId: "1462074119406696", platformPostUrl: "https://www.facebook.com/watch/?v=1462074119406696", publishedAt: "2026-11-02T20:27:17.288Z" }] },
+    { _id: "6ae8f1b1072fcbf9f7dd8cd2", status: "published", content: "Ever wonder", platforms: [{ platform: "facebook", status: "published", accountId: "acc-fb", platformPostId: "1631234285363380", platformPostUrl: "https://www.facebook.com/watch/?v=1631234285363380" }] },
+  ],
+};
+
+test("both Facebook duplicate copies show as two cards, each with its own Zernio id", () => {
+  const cards = mergeLivePosts(normalizeSyncedPosts(fbSync, fb), normalizeZernioPosts(fbZernio, fb));
+  assert.equal(cards.length, 2);
+  const byReel = Object.fromEntries(cards.map((card) => [card.url, card.latePostId]));
+  assert.deepEqual(byReel, {
+    "https://www.facebook.com/reel/1462074119406696/": "6ae8f21ab5b67967df0ebc8a",
+    "https://www.facebook.com/reel/1631234285363380/": "6ae8f1b1072fcbf9f7dd8cd2",
+  });
+  for (const card of cards) assert.deepEqual(livePostRemoval(card, true), { kind: "remove" });
+});
+
+test("each duplicate card verifies only against its own Zernio post", () => {
+  const cards = mergeLivePosts(normalizeSyncedPosts(fbSync, fb), normalizeZernioPosts(fbZernio, fb));
+  const [late, early] = [...cards].sort((a, b) => a.platformPostId.localeCompare(b.platformPostId)).reverse();
+  const [z1, z2] = fbZernio.posts;
+  const target = (card) => ({ platform: card.platform, accountId: card.accountId, platformPostId: card.platformPostId, url: card.url });
+  assert.equal(zernioPostContainsCopy(z1, target(late)), true);
+  assert.equal(zernioPostContainsCopy(z2, target(late)), false);
+  assert.equal(zernioPostContainsCopy(z2, target(early)), true);
+  assert.equal(zernioPostContainsCopy(z1, target(early)), false);
+});
+
+test("Zernio post records only produce cards for this account's published copies", () => {
+  const cards = normalizeZernioPosts(
+    { posts: [
+      { _id: "z1", platforms: [
+        { platform: "facebook", status: "published", accountId: "acc-fb", platformPostId: "1" },
+        { platform: "facebook", status: "published", accountId: "acc-fb-2", platformPostId: "2" },
+        { platform: "facebook", status: "failed", accountId: "acc-fb", platformPostId: "3" },
+        { platform: "instagram", status: "published", accountId: "acc-fb", platformPostId: "4" },
+      ] },
+      { platforms: [{ platform: "facebook", status: "published", accountId: "acc-fb", platformPostId: "5" }] },
+    ] },
+    fb,
+  );
+  assert.deepEqual(cards.map((card) => [card.platformPostId, card.latePostId]), [["1", "z1"]]);
 });
 
 test("dialog offers Remove only for managers on supported posts with a Zernio id", () => {
