@@ -3432,6 +3432,10 @@ export type Database = {
           request_snapshot: Json
           response_snapshot: Json
           status: Database["public"]["Enums"]["publish_status"]
+          unpublish_error: string | null
+          unpublish_response: Json | null
+          unpublished_at: string | null
+          unpublished_by: string | null
           updated_at: string
           workspace_id: string
         }
@@ -3452,6 +3456,10 @@ export type Database = {
           request_snapshot?: Json
           response_snapshot?: Json
           status?: Database["public"]["Enums"]["publish_status"]
+          unpublish_error?: string | null
+          unpublish_response?: Json | null
+          unpublished_at?: string | null
+          unpublished_by?: string | null
           updated_at?: string
           workspace_id: string
         }
@@ -3472,6 +3480,10 @@ export type Database = {
           request_snapshot?: Json
           response_snapshot?: Json
           status?: Database["public"]["Enums"]["publish_status"]
+          unpublish_error?: string | null
+          unpublish_response?: Json | null
+          unpublished_at?: string | null
+          unpublished_by?: string | null
           updated_at?: string
           workspace_id?: string
         }
