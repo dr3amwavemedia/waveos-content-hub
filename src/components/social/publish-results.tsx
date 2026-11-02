@@ -10,6 +10,7 @@ import { PLATFORM_LABEL, type SocialPlatform } from "@/hooks/use-content";
 import { cn } from "@/lib/utils";
 import { formatInTimeZone } from "@/lib/date-time";
 import { refreshPublishAttemptDetails } from "@/lib/publish.functions";
+import { failureGuidance, hasProviderReference } from "@/lib/publish-failure-guidance";
 import type { Database } from "@/integrations/supabase/types";
 
 export type PublishAttempt = Database["public"]["Tables"]["publish_attempts"]["Row"];
@@ -118,7 +119,11 @@ function FailureDetails({
   isRefreshing: boolean;
 }) {
   const platform = PLATFORM_LABEL[attempt.platform as SocialPlatform] ?? attempt.platform;
-  const guidance = failureGuidance(attempt.error_message, platform);
+  const hasReference = hasProviderReference(attempt);
+  const guidance = failureGuidance(attempt.error_message, platform, {
+    errorCode: attempt.error_code,
+    hasReference,
+  });
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur"
@@ -178,19 +183,21 @@ function FailureDetails({
           </p>
         )}
         <div className="mt-5 flex flex-wrap justify-end gap-2">
-          <button
-            type="button"
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isRefreshing ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            Refresh provider details
-          </button>
+          {hasReference && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-elevated disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isRefreshing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              Refresh provider details
+            </button>
+          )}
           <Link
             to="/social"
             search={{ view: "accounts" }}
@@ -209,21 +216,4 @@ function FailureDetails({
       </div>
     </div>
   );
-}
-
-function failureGuidance(message: string | null, platform: string) {
-  const error = (message ?? "").toLowerCase();
-  if (/without returning a detailed platform message|does not identify the content/.test(error)) {
-    return `The provider did not identify a cause. Refresh the provider details above. If no additional reason appears, use the provider reference when contacting support rather than changing content that already works on ${platform}.`;
-  }
-  if (/connect|account|profile|authorization|authori[sz]ed|token|permission/.test(error)) {
-    return `Reconnect ${platform} under Social accounts, confirm the correct profile is selected, then reopen this post and publish it again.`;
-  }
-  if (/media|image|video|aspect|ratio|duration|size|format|resolution/.test(error)) {
-    return `Review ${platform}'s media requirements. Adjust the file format, dimensions, duration, or size, then reopen this post and retry.`;
-  }
-  if (/caption|text|character|hashtag|mention/.test(error)) {
-    return `Review the ${platform} caption for unsupported mentions, hashtags, links, or length, then retry the post.`;
-  }
-  return `Confirm ${platform} is connected and permitted to publish, review the provider response above, then reopen this post and retry. Networks that already succeeded will not be posted twice.`;
 }
