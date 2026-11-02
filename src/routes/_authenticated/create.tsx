@@ -35,12 +35,13 @@ import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/app/empty-state";
 import { useWorkspace } from "@/components/app/workspace-context";
 import {
-  getMediaPreviewUrl,
+  getMediaPreview,
   useMediaAssets,
   useMediaStorageUsage,
   useUploadAsset,
 } from "@/hooks/use-media";
 import type { MediaAsset } from "@/hooks/use-media";
+import { mediaThumbRenderKind } from "@/lib/frameio-media-preview";
 import {
   getExternalMediaStatus,
   getGooglePickerToken,
@@ -1290,21 +1291,54 @@ function MediaPreviewRow({
   );
 }
 
+type MediaPreview = { url: string | null; kind: "image" | "video" | null };
+
 function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => void }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [preview, setPreview] = useState<MediaPreview | null>(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!asset) return;
-    void getMediaPreviewUrl(asset, 600, "thumbnail").then(setUrl);
+    let active = true;
+    setPreview(null);
+    setFailed(false);
+    getMediaPreview(asset, 600, "thumbnail")
+      .then((value) => {
+        if (active) setPreview(value);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
+    return () => {
+      active = false;
+    };
   }, [asset?.id]);
   if (!asset) return <div className="aspect-square rounded-lg border border-border bg-elevated" />;
+  const kind = mediaThumbRenderKind({
+    url: preview?.url,
+    failed,
+    sourceProvider: asset.source_provider,
+    mimeType: asset.mime_type,
+    previewKind: preview?.kind,
+  });
   return (
     <div className="group relative aspect-[4/3] max-h-96 overflow-hidden rounded-lg border border-border bg-elevated">
-      {url && (asset.source_provider === "google_drive" || asset.mime_type.startsWith("image/")) ? (
-        <img src={url} alt={asset.name} className="h-full w-full object-contain" loading="lazy" />
-      ) : url && asset.mime_type.startsWith("video/") ? (
-        <video src={url} className="h-full w-full object-cover" muted />
+      {kind === "image" ? (
+        <img
+          src={preview!.url!}
+          alt={asset.name}
+          className="h-full w-full object-contain"
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      ) : kind === "video" ? (
+        <video
+          src={preview!.url!}
+          className="h-full w-full object-cover"
+          muted
+          onError={() => setFailed(true)}
+        />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+        <div className="flex h-full w-full items-center justify-center p-2 text-center text-xs text-muted-foreground">
           {asset.name}
         </div>
       )}
@@ -1333,7 +1367,8 @@ export function MediaPicker({
   const [selected, setSelected] = useState<string[]>(picked);
   const [search, setSearch] = useState("");
   const assets = useMediaAssets(workspaceId, { search: search || undefined });
-  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [urls, setUrls] = useState<Record<string, MediaPreview>>({});
+  const [brokenPreviews, setBrokenPreviews] = useState<string[]>([]);
   const [source, setSource] = useState<"waveos" | ExternalMediaProvider | "frameio">("waveos");
   const deviceInputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadAsset(workspaceId);
@@ -1377,7 +1412,11 @@ export function MediaPicker({
       const items = assets.data ?? [];
       const entries = await Promise.all(
         items.map(
-          async (a) => [a.id, (await getMediaPreviewUrl(a, 600, "thumbnail")) ?? ""] as const,
+          async (a) =>
+            [
+              a.id,
+              await getMediaPreview(a, 600, "thumbnail").catch(() => ({ url: null, kind: null })),
+            ] as const,
         ),
       );
       setUrls(Object.fromEntries(entries));
@@ -1504,21 +1543,38 @@ export function MediaPicker({
                         : "border-border hover:border-primary/40",
                     )}
                   >
-                    {urls[a.id] &&
-                    (a.source_provider === "google_drive" || a.mime_type.startsWith("image/")) ? (
-                      <img
-                        src={urls[a.id]}
-                        alt={a.name}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : urls[a.id] && a.mime_type.startsWith("video/") ? (
-                      <video src={urls[a.id]} className="h-full w-full object-cover" muted />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] text-muted-foreground">
-                        {a.name}
-                      </div>
-                    )}
+                    {(() => {
+                      const preview = urls[a.id];
+                      const kind = mediaThumbRenderKind({
+                        url: preview?.url,
+                        failed: brokenPreviews.includes(a.id),
+                        sourceProvider: a.source_provider,
+                        mimeType: a.mime_type,
+                        previewKind: preview?.kind,
+                      });
+                      const markBroken = () =>
+                        setBrokenPreviews((current) => [...current, a.id]);
+                      return kind === "image" ? (
+                        <img
+                          src={preview!.url!}
+                          alt={a.name}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          onError={markBroken}
+                        />
+                      ) : kind === "video" ? (
+                        <video
+                          src={preview!.url!}
+                          className="h-full w-full object-cover"
+                          muted
+                          onError={markBroken}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] text-muted-foreground">
+                          {a.name}
+                        </div>
+                      );
+                    })()}
                     {isSel && (
                       <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
                         <Check className="h-3 w-3" />
@@ -1564,6 +1620,7 @@ function FrameioProviderPicker({
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [brokenThumbs, setBrokenThumbs] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -1656,12 +1713,13 @@ function FrameioProviderPicker({
                     : "border-border hover:border-primary/40",
                 )}
               >
-                {file.thumbnailUrl ? (
+                {file.thumbnailUrl && !brokenThumbs.includes(file.id) ? (
                   <img
                     src={file.thumbnailUrl}
                     alt={file.name}
                     className="h-16 w-16 shrink-0 rounded-lg object-cover"
                     loading="lazy"
+                    onError={() => setBrokenThumbs((current) => [...current, file.id])}
                   />
                 ) : (
                   <span

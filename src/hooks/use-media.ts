@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { getExternalMediaPreviewUrl } from "@/hooks/use-external-media";
+import { getFrameioMediaPreviewUrl } from "@/hooks/use-frameio";
+import type { MediaPreviewKind } from "@/lib/frameio-media-preview";
 
 export interface MediaFolder {
   id: string;
@@ -295,14 +297,18 @@ export async function getSignedMediaUrl(path: string, expiresIn = 3600) {
   return data.signedUrl;
 }
 
-export async function getMediaPreviewUrl(
+/**
+ * Preview URL plus, for Frame.io, how it must be rendered. A Frame.io poster
+ * for a video is an image, so callers should honour `kind` when it is set.
+ */
+export async function getMediaPreview(
   asset: MediaAsset,
   expiresIn = 3600,
   mode: "thumbnail" | "content" = "content",
-) {
+): Promise<{ url: string | null; kind: MediaPreviewKind | null }> {
   if (asset.source_provider === "waveos") {
     if (!asset.storage_path) throw new Error("Media file is missing its storage path.");
-    return getSignedMediaUrl(asset.storage_path, expiresIn);
+    return { url: await getSignedMediaUrl(asset.storage_path, expiresIn), kind: null };
   }
   if (asset.source_provider === "google_drive" || asset.source_provider === "dropbox") {
     const result = await getExternalMediaPreviewUrl(
@@ -311,10 +317,19 @@ export async function getMediaPreviewUrl(
       asset.id,
       mode,
     );
-    return result.url;
+    return { url: result.url, kind: null };
   }
-  if (asset.source_provider === "frameio") return asset.thumbnail_url ?? asset.source_web_url;
-  return asset.thumbnail_url ?? asset.source_web_url;
+  if (asset.source_provider === "frameio")
+    return getFrameioMediaPreviewUrl(asset.workspace_id, asset.id);
+  return { url: asset.thumbnail_url ?? asset.source_web_url, kind: null };
+}
+
+export async function getMediaPreviewUrl(
+  asset: MediaAsset,
+  expiresIn = 3600,
+  mode: "thumbnail" | "content" = "content",
+) {
+  return (await getMediaPreview(asset, expiresIn, mode)).url;
 }
 
 async function probeMedia(file: File): Promise<{

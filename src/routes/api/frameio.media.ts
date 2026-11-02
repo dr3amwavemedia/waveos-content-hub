@@ -79,6 +79,32 @@ export const Route = createFileRoute("/api/frameio/media")({
           source.sync_status !== "ready"
         )
           return json({ error: "frameio_share_not_ready" }, 409);
+
+        let previewAsset: { external_file_id: string; mime_type: string } | null = null;
+        if (body.action === "preview_url") {
+          const assetId = typeof body.assetId === "string" ? body.assetId : "";
+          if (!assetId) return json({ error: "asset_required" }, 400);
+          const { data: assetData } = await supabaseAdmin
+            .from("media_assets")
+            .select("id,workspace_id,source_provider,external_file_id,mime_type")
+            .eq("id", assetId)
+            .maybeSingle();
+          const asset = assetData as unknown as {
+            workspace_id: string;
+            source_provider: string | null;
+            external_file_id: string | null;
+            mime_type: string;
+          } | null;
+          if (
+            !asset ||
+            asset.workspace_id !== workspaceId ||
+            asset.source_provider !== "frameio" ||
+            !asset.external_file_id
+          )
+            return json({ error: "Media not found." }, 404);
+          previewAsset = { external_file_id: asset.external_file_id, mime_type: asset.mime_type };
+        }
+
         const { listFrameioShareFiles } = await import("@/lib/frameio.server");
         let allFiles;
         try {
@@ -103,6 +129,31 @@ export const Route = createFileRoute("/api/frameio/media")({
           }
           return json({ error: "Frame.io could not be reached. Try again in a moment." }, 502);
         }
+
+        if (previewAsset) {
+          const fileId = previewAsset.external_file_id;
+          const listed = allFiles.find((file) => file.id === fileId);
+          if (!listed)
+            return json({ error: "This file is no longer in the assigned Frame.io gallery." }, 404);
+          const { frameioFileThumbnailUrl, frameioFileOriginalUrl } =
+            await import("@/lib/frameio.server");
+          const { frameioOriginalPreviewKind } = await import("@/lib/frameio-media-preview");
+          try {
+            const thumbnail =
+              (await frameioFileThumbnailUrl(source.frameio_account_id, fileId)) ??
+              listed.thumbnailUrl;
+            if (thumbnail) return json({ url: thumbnail, kind: "image" });
+            const kind = frameioOriginalPreviewKind(previewAsset.mime_type);
+            const original = kind
+              ? await frameioFileOriginalUrl(source.frameio_account_id, fileId).catch(() => null)
+              : null;
+            if (kind && original) return json({ url: original, kind });
+            return json({ error: "Frame.io is still preparing a preview for this file." }, 409);
+          } catch {
+            return json({ error: "Frame.io preview could not be loaded. Try again in a moment." }, 502);
+          }
+        }
+
         const query = typeof body.query === "string" ? body.query.trim().toLowerCase() : "";
         const files = query
           ? allFiles.filter((file) => file.name.toLowerCase().includes(query))
