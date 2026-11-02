@@ -5,9 +5,11 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { zernioRequest } from "@/lib/zernio.server";
 import { isZernioTimeoutError } from "@/lib/zernio-timeout";
 import {
+  applyProviderVetoes,
   applyRemovalLog,
   applyWaveosHistory,
   classifyAccountError,
+  finalizePublishedLibrary,
   livePlatformLabel,
   livePostKey,
   LIVE_POSTS_PAGE_SIZE,
@@ -17,12 +19,14 @@ import {
   normalizeSyncedPosts,
   normalizeZernioPosts,
   providerPlatformSupportsUnpublish,
+  providerVetoes,
   requestAccountIds,
   toProviderPlatform,
   zernioPostContainsCopy,
   type AccountFetchError,
   type LivePost,
   type LivePostAccount,
+  type ProviderVeto,
 } from "@/lib/live-posts";
 
 const LIVE_POSTS_TIMEOUT_MS = 20_000;
@@ -108,11 +112,13 @@ export async function loadLivePostsPage(input: {
       if (account.needsReconnect) {
         return {
           posts: [] as LivePost[],
+          vetoes: [] as ProviderVeto[],
           hasMore: false,
           error: classifyAccountError({ code: "ads_connection_required", status: 409 }, account),
         };
       }
       const lists: LivePost[][] = [];
+      const vetoes: ProviderVeto[] = [];
       let error: AccountFetchError | null = null;
       let hasMore = false;
       // Refresh the account's recent platform posts only for the first page.
@@ -124,6 +130,7 @@ export async function loadLivePostsPage(input: {
             signal: AbortSignal.timeout(LIVE_POSTS_TIMEOUT_MS),
           });
           lists.push(normalizeSyncedPosts(synced, account));
+          vetoes.push(...providerVetoes(synced, account, "synced"));
         } catch (reason) {
           error = classifyAccountError(reason, account);
         }
@@ -138,12 +145,13 @@ export async function loadLivePostsPage(input: {
           signal: AbortSignal.timeout(LIVE_POSTS_TIMEOUT_MS),
         }),
       ]);
-      for (const [result, normalize] of [
-        [zernioPosts, normalizeZernioPosts],
-        [analytics, normalizeAnalyticsPosts],
+      for (const [result, normalize, source] of [
+        [zernioPosts, normalizeZernioPosts, "zernio"],
+        [analytics, normalizeAnalyticsPosts, "analytics"],
       ] as const) {
         if (result.status === "fulfilled") {
           lists.push(normalize(result.value, account));
+          vetoes.push(...providerVetoes(result.value, account, source));
           hasMore = hasMore || hasMorePages(result.value, input.page);
         } else {
           const failure = classifyAccountError(result.reason, account);
@@ -151,12 +159,24 @@ export async function loadLivePostsPage(input: {
           if (!error || (!error.reconnect && failure.reconnect)) error = failure;
         }
       }
-      return { posts: mergeLivePosts(...lists), hasMore, error };
+      // Without Zernio's own records nothing on this account can be checked
+      // against cancellations, so show the account error instead of cards.
+      if (zernioPosts.status === "rejected") {
+        return { posts: [] as LivePost[], vetoes, hasMore: false, error };
+      }
+      return { posts: mergeLivePosts(...lists), vetoes, hasMore, error };
     }),
   );
 
   let posts = mergeLivePosts(...outcomes.map((outcome) => outcome.posts));
   posts = await withStoredHistory(input.workspaceId, posts);
+  // Vetoes last, so a Zernio id linked from history is checked too.
+  posts = finalizePublishedLibrary(
+    applyProviderVetoes(
+      posts,
+      outcomes.flatMap((outcome) => outcome.vetoes),
+    ),
+  );
   return {
     posts,
     accounts: input.accounts.map((account, index) => ({
