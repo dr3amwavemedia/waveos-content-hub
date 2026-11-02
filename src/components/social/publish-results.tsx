@@ -23,6 +23,7 @@ import { failureGuidance, hasProviderReference } from "@/lib/publish-failure-gui
 import {
   isUnpublishConfirmation,
   publishedAttemptActions,
+  readUnpublishedMarker,
   UNPUBLISH_CONFIRMATION,
   unsupportedUnpublishMessage,
 } from "@/lib/published-post-management";
@@ -42,7 +43,7 @@ export function PublishAttemptChip({
   onOpen: (attempt: PublishAttempt) => void;
 }) {
   const label = platformLabel(attempt);
-  const removed = attempt.status === "success" && Boolean(attempt.unpublished_at);
+  const removed = attempt.status === "success" && Boolean(readUnpublishedMarker(attempt.response_snapshot));
   const content = (
     <>
       {removed ? (
@@ -134,8 +135,14 @@ export function PublishAttemptDialog({
   const [confirming, setConfirming] = useState(false);
   const [confirmation, setConfirmation] = useState("");
   const [removing, setRemoving] = useState(false);
-  const [removedAt, setRemovedAt] = useState<string | null>(attempt.unpublished_at);
-  const actions = publishedAttemptActions({ ...attempt, unpublished_at: removedAt });
+  // Set right after a successful removal so the dialog updates before the refetch lands.
+  const [justRemovedAt, setJustRemovedAt] = useState<string | null>(null);
+  const actions = publishedAttemptActions(
+    justRemovedAt
+      ? { ...attempt, post_url: null, response_snapshot: { _waveos: { unpublishedAt: justRemovedAt } } }
+      : attempt,
+  );
+  const removedAt = actions.removedAt;
   const hasReference = hasProviderReference(attempt);
   const isFailure = attempt.status === "failed";
   const formatTime = (value: string) =>
@@ -172,7 +179,7 @@ export function PublishAttemptDialog({
       const result = await unpublish({
         data: { attemptId: attempt.id, confirmation: UNPUBLISH_CONFIRMATION },
       });
-      setRemovedAt(result.unpublishedAt);
+      setJustRemovedAt(result.unpublishedAt);
       setConfirming(false);
       setConfirmation("");
       await queryClient.invalidateQueries({ queryKey: ["publish-attempts"] });
@@ -266,12 +273,6 @@ export function PublishAttemptDialog({
         {!isFailure && actions.removeUnsupported && (
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
             {unsupportedUnpublishMessage(platform)}
-          </p>
-        )}
-
-        {!isFailure && !actions.removed && attempt.unpublish_error && (
-          <p className="mt-4 rounded-xl border border-destructive/25 bg-destructive/10 p-3 text-sm text-foreground">
-            Last removal attempt: {attempt.unpublish_error}
           </p>
         )}
 
