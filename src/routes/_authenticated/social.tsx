@@ -354,7 +354,7 @@ function SocialWorkspace() {
 
       <nav
         aria-label="Social Media workspace"
-        className="grid grid-cols-5 gap-1 rounded-2xl border border-border bg-surface/70 p-1 sm:p-1.5"
+        className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-surface/70 p-1 [scrollbar-width:none] sm:grid sm:grid-cols-5 sm:overflow-visible sm:p-1.5"
       >
         <WorkspaceTab
           active={activeView === "overview"}
@@ -558,7 +558,7 @@ function WorkspaceTab({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-xl px-0.5 py-2 text-left transition sm:justify-start sm:px-4",
+        "flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-left transition sm:min-h-14 sm:min-w-0 sm:shrink sm:justify-start sm:px-4",
         active
           ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/30"
           : "text-muted-foreground hover:bg-elevated hover:text-foreground",
@@ -566,7 +566,7 @@ function WorkspaceTab({
     >
       <Icon className={cn("hidden h-4 w-4 shrink-0 sm:block", active && "text-primary")} />
       <span className="min-w-0">
-        <span className="block truncate text-[11px] font-semibold tracking-tight sm:text-sm sm:tracking-normal">{label}</span>
+        <span className="block whitespace-nowrap text-xs font-semibold sm:truncate sm:text-sm">{label}</span>
         <span className="hidden truncate text-[11px] text-muted-foreground md:block">
           {description}
         </span>
