@@ -14,6 +14,7 @@ import {
 } from "@/lib/invoice-payment-schedule";
 import { applyStripeCheckoutPayment } from "@/lib/stripe-invoice-payment.server";
 import { invoiceCheckoutAmounts } from "@/lib/invoice-service-fee";
+import { manualPaymentLedgerTarget } from "@/lib/manual-payment-ledger";
 
 /**
  * Create a Stripe Checkout session for one invoice.
@@ -345,21 +346,33 @@ export const recordManualInvoicePayment = createServerFn({ method: "POST" })
     const description = `Manual payment · ${labels[data.method] ?? data.method}${data.reference?.trim() ? ` · Ref: ${data.reference.trim()}` : ""}${invoice.number ? ` · ${invoice.number}` : ""}`;
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error: ledgerError } = await supabaseAdmin
+    const { data: existingRows, error: existingError } = await supabaseAdmin
       .from("payment_ledger")
-      .upsert({
-        source: "invoice_backfill",
-        external_id: `manual:${invoice.id}`,
-        invoice_id: invoice.id,
-        workspace_id: invoice.workspace_id,
-        kind: "payment",
-        amount_cents: invoice.amount_paid_cents,
-        currency: (invoice.currency ?? "USD").toUpperCase(),
-        occurred_at: occurredAt,
-        description,
-        status: "posted",
-        created_by: context.userId,
-      }, { onConflict: "source,external_id" });
+      .select("id,source,external_id")
+      .eq("invoice_id", invoice.id)
+      .eq("source", "invoice_backfill");
+    if (existingError) throw existingError;
+    const target = manualPaymentLedgerTarget(invoice.id, existingRows ?? []);
+    const entry = {
+      invoice_id: invoice.id,
+      workspace_id: invoice.workspace_id,
+      kind: "payment",
+      amount_cents: invoice.amount_paid_cents,
+      currency: (invoice.currency ?? "USD").toUpperCase(),
+      occurred_at: occurredAt,
+      description,
+      status: "posted",
+    };
+    const { error: ledgerError } = target.action === "update"
+      ? await supabaseAdmin.from("payment_ledger").update(entry).eq("id", target.id)
+      : await supabaseAdmin
+          .from("payment_ledger")
+          .upsert({
+            ...entry,
+            source: "invoice_backfill",
+            external_id: target.externalId,
+            created_by: context.userId,
+          }, { onConflict: "source,external_id" });
     if (ledgerError) throw ledgerError;
     return { recorded: true };
   });

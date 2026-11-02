@@ -12,6 +12,14 @@ export const ANALYTICS_METRIC_KEYS = [
 ] as const;
 
 export type AnalyticsMetricKey = (typeof ANALYTICS_METRIC_KEYS)[number];
+
+/**
+ * Stored history keys are lowercase snake_case (database check constraint),
+ * so camelCase metric keys such as "storyViews" are saved as "story_views".
+ */
+export function snapshotMetricKey(metricKey: string): string {
+  return metricKey.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
 export type AnalyticsAvailability =
   | "available"
   | "true_zero"
