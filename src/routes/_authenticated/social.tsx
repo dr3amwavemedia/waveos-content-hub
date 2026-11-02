@@ -558,7 +558,7 @@ function WorkspaceTab({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "flex min-h-14 items-center justify-center gap-2 rounded-xl px-2 py-2 text-left transition sm:justify-start sm:px-4",
+        "flex min-h-14 min-w-0 items-center justify-center gap-2 rounded-xl px-0.5 py-2 text-left transition sm:justify-start sm:px-4",
         active
           ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/30"
           : "text-muted-foreground hover:bg-elevated hover:text-foreground",
@@ -566,7 +566,7 @@ function WorkspaceTab({
     >
       <Icon className={cn("hidden h-4 w-4 shrink-0 sm:block", active && "text-primary")} />
       <span className="min-w-0">
-        <span className="block truncate text-xs font-semibold sm:text-sm">{label}</span>
+        <span className="block truncate text-[11px] font-semibold tracking-tight sm:text-sm sm:tracking-normal">{label}</span>
         <span className="hidden truncate text-[11px] text-muted-foreground md:block">
           {description}
         </span>
