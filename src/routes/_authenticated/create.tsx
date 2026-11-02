@@ -45,6 +45,15 @@ import type { MediaAsset } from "@/hooks/use-media";
 import { mediaThumbRenderKind } from "@/lib/frameio-media-preview";
 import type { DuplicateGuardMatch } from "@/lib/publish-fingerprint";
 import {
+  destinationHeadline,
+  destinationLines,
+  META_SHARING_HELP_STEPS,
+  META_SHARING_HELP_URL,
+  META_SHARING_WARNING,
+  sameDestinations,
+  showMetaSharingWarning,
+} from "@/lib/publish-targets";
+import {
   getExternalMediaStatus,
   getGooglePickerToken,
   importExternalMedia,
@@ -297,6 +306,7 @@ function CreatePost() {
   const [duplicateGuard, setDuplicateGuard] = useState<{
     contentId: string;
     matches: DuplicateGuardMatch[];
+    expectedPlatforms: SocialPlatform[];
   } | null>(null);
   const [assisting, setAssisting] = useState(false);
 
@@ -307,6 +317,15 @@ function CreatePost() {
       setSaveStatus("idle");
     }
   }, [title, caption, platforms, pickedMedia, scheduledAt]);
+  const accountSelections = Object.fromEntries(
+    (existing.data?.variants ?? []).map((variant) => [
+      variant.platform,
+      ((variant.platform_options ?? {}) as { accountIds?: string[] }).accountIds ?? [],
+    ]),
+  );
+  const destinations = destinationLines(platforms, socialConnections.data ?? [], accountSelections);
+  const destinationTitle = destinationHeadline(destinations);
+  const metaSharingWarning = showMetaSharingWarning(platforms, socialConnections.data ?? []);
   const status = existing.data?.item?.status ?? "draft";
   const locked = status === "published" || status === "publishing" || status === "in_review";
 
@@ -349,6 +368,9 @@ function CreatePost() {
       scheduled_at: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
     });
     setSavedId(item.id);
+    // The saved post now owns this content; a leftover local draft must not
+    // pre-fill the next new post with these platforms or captions.
+    if (draftStorageKey) window.localStorage.removeItem(draftStorageKey);
     return item.id;
   }
 
@@ -507,9 +529,29 @@ function CreatePost() {
     }
     setPublishing("now");
     try {
+      const shownPlatforms = [...platforms];
       const id = await ensureSaved();
       if (!id) return;
-      if (!confirm("Publish this post to the selected channels right now?")) return;
+      // Publish exactly what is saved, and only if it matches what is shown.
+      const { data: savedVariants, error: savedVariantsError } = await supabase
+        .from("post_variants")
+        .select("platform")
+        .eq("content_item_id", id)
+        .eq("enabled", true);
+      if (savedVariantsError) throw savedVariantsError;
+      if (!sameDestinations((savedVariants ?? []).map((row) => row.platform), shownPlatforms)) {
+        await qc.invalidateQueries({ queryKey: ["content-item", id] });
+        return toast.error(
+          "The saved platforms don't match what's selected here. Nothing was sent. Review the destinations and press Publish again.",
+        );
+      }
+      const lines = destinationLines(shownPlatforms, socialConnections.data ?? [], accountSelections);
+      if (
+        !confirm(
+          `${destinationHeadline(lines)}\n\n${lines.map((line) => `• ${line.text}`).join("\n")}\n\nPublish right now?`,
+        )
+      )
+        return;
       const nextStatus = await submitForApproval.mutateAsync({
         contentId: id,
         requestedAction: "publish_now",
@@ -520,7 +562,7 @@ function CreatePost() {
         navigate({ to: "/approvals" });
         return;
       }
-      await runPublish(id, false);
+      await runPublish(id, false, shownPlatforms);
     } catch (e) {
       showPublishError(e);
     } finally {
@@ -528,15 +570,17 @@ function CreatePost() {
     }
   }
 
-  async function runPublish(id: string, allowDuplicate: boolean) {
-    const res = await publishFn({ data: { contentId: id, allowDuplicate } });
+  async function runPublish(id: string, allowDuplicate: boolean, expectedPlatforms: SocialPlatform[]) {
+    const res = await publishFn({ data: { contentId: id, allowDuplicate, expectedPlatforms } });
     qc.invalidateQueries({ queryKey: ["content-items"] });
     qc.invalidateQueries({ queryKey: ["content-item", id] });
     if (res.duplicateGuard?.length) {
       // Nothing was sent. The user must explicitly confirm a second copy.
-      setDuplicateGuard({ contentId: id, matches: res.duplicateGuard });
+      setDuplicateGuard({ contentId: id, matches: res.duplicateGuard, expectedPlatforms });
       return;
     }
+    const checkForMetaCopy =
+      res.success > 0 && showMetaSharingWarning(expectedPlatforms, socialConnections.data ?? []);
     if (res.failed === 0 && res.pending === 0)
       toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
     else if (res.failed === 0)
@@ -547,16 +591,29 @@ function CreatePost() {
       toast.warning(
         `Published to ${res.success}, ${res.failed} failed — open Posts & insights to retry`,
       );
+    if (checkForMetaCopy) {
+      // WaveOS cannot prevent Meta's own cross-sharing; offer a quick check.
+      toast.info("Sent only to Instagram. Want to check Facebook for an automatic Meta copy?", {
+        duration: 15000,
+        action: {
+          label: "Check Published",
+          onClick: () => {
+            void qc.invalidateQueries({ queryKey: ["live-posts", workspaceId] });
+            void navigate({ to: "/social", search: { view: "live" } });
+          },
+        },
+      });
+    }
     navigate({ to: "/social", search: { view: "posts" } });
   }
 
   async function handlePublishAnotherCopy() {
     if (!duplicateGuard || publishing !== null) return;
-    const { contentId } = duplicateGuard;
+    const { contentId, expectedPlatforms } = duplicateGuard;
     setDuplicateGuard(null);
     setPublishing("now");
     try {
-      await runPublish(contentId, true);
+      await runPublish(contentId, true, expectedPlatforms);
     } catch (e) {
       showPublishError(e);
     } finally {
@@ -884,6 +941,12 @@ function CreatePost() {
               </p>
             </div>
 
+            <PublishDestinations
+              title={destinationTitle}
+              lines={destinations}
+              metaWarning={metaSharingWarning}
+            />
+
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
               <button
                 disabled={
@@ -924,10 +987,18 @@ function CreatePost() {
           </div>
         </aside>
       </div>
-      <div className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 grid grid-cols-3 gap-2 border-y border-border bg-background px-3 py-3 lg:hidden" aria-label="Post actions">
+      <div className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 border-y border-border bg-background px-3 pb-3 pt-2 lg:hidden" aria-label="Post actions">
+        <PublishDestinations
+          compact
+          title={destinationTitle}
+          lines={destinations}
+          metaWarning={metaSharingWarning}
+        />
+        <div className="mt-2 grid grid-cols-3 gap-2">
         <Button variant="outline" disabled={locked||create.isPending||update.isPending||publishing!==null} onClick={handleSaveDraft}><FileText className="size-4"/>Save Draft</Button>
         <Button variant="secondary" disabled={locked||publishing!==null||!canSchedule} onClick={()=>{if(scheduledAt)void handleScheduleLater();else window.document.getElementById('post-schedule')?.scrollIntoView({behavior:'smooth',block:'center'});}}><CalendarClock className="size-4"/>Schedule</Button>
         <Button disabled={locked||publishing!==null||!caption.trim()||!platforms.length} onClick={handlePublishNow}><Send className="size-4"/>Publish</Button>
+        </div>
       </div>
 
       {duplicateGuard && (
@@ -950,6 +1021,69 @@ function CreatePost() {
             setShowLibrary(false);
           }}
         />
+      )}
+    </div>
+  );
+}
+
+/** The exact destinations Publish will use, shown directly above the button. */
+function PublishDestinations({
+  title,
+  lines,
+  metaWarning,
+  compact = false,
+}: {
+  title: string;
+  lines: Array<{ platform: string; text: string; connected: boolean }>;
+  metaWarning: boolean;
+  compact?: boolean;
+}) {
+  const [showHelp, setShowHelp] = useState(false);
+  return (
+    <div
+      className={cn(
+        "rounded-lg border border-primary/30 bg-primary/5",
+        compact ? "px-3 py-2" : "p-3",
+      )}
+      data-testid="publish-destinations"
+      aria-live="polite"
+    >
+      <p className="text-sm font-semibold text-foreground">{title}</p>
+      {lines.length > 1 && (
+        <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+          {lines.map((line) => (
+            <li key={line.platform}>• {line.text}</li>
+          ))}
+        </ul>
+      )}
+      {lines.some((line) => !line.connected) && (
+        <p className="mt-1 text-xs text-destructive">Connect every selected platform before publishing.</p>
+      )}
+      {metaWarning && (
+        <div className="mt-2 border-t border-border pt-2 text-xs leading-5 text-muted-foreground">
+          <p role="note">{META_SHARING_WARNING}</p>
+          <button
+            type="button"
+            onClick={() => setShowHelp((value) => !value)}
+            className="mt-1 font-semibold text-primary hover:underline"
+            aria-expanded={showHelp}
+          >
+            How to turn off Sharing across profiles
+          </button>
+          {showHelp && (
+            <p className="mt-1">
+              {META_SHARING_HELP_STEPS}{" "}
+              <a
+                href={META_SHARING_HELP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-primary hover:underline"
+              >
+                Open Accounts Center
+              </a>
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
