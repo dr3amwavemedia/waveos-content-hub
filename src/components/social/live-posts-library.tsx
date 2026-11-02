@@ -17,11 +17,15 @@ import { cn } from "@/lib/utils";
 import { formatInTimeZone } from "@/lib/date-time";
 import { listLivePosts, removeLivePost } from "@/lib/live-posts.functions";
 import {
+  finalizePublishedLibrary,
   isLivePostRemoveConfirmation,
   LIVE_POST_REMOVE_CONFIRMATION,
   livePlatformLabel,
   livePostRemoval,
   mergeLivePosts,
+  publishedCardState,
+  publishedCounts,
+  PUBLISHED_STATE_LABEL,
   type LivePost,
 } from "@/lib/live-posts";
 
@@ -62,13 +66,18 @@ export function LivePostsLibrary({
     page.accounts.flatMap((account) => (account.error ? [account.error] : [])),
   );
   const uniqueErrors = [...new Map(errors.map((error) => [error.accountId, error])).values()];
+  // Only verified-live cards and intentional removal history; filters,
+  // counts and empty states all read this list.
   const posts = useMemo(
     () =>
-      mergeLivePosts(...pages.map((page) => page.posts)).map((post) =>
-        removed[post.key] ? { ...post, removedAt: post.removedAt ?? removed[post.key]! } : post,
+      finalizePublishedLibrary(
+        mergeLivePosts(...pages.map((page) => page.posts)).map((post) =>
+          removed[post.key] ? { ...post, removedAt: post.removedAt ?? removed[post.key]! } : post,
+        ),
       ),
     [pages, removed],
   );
+  const counts = publishedCounts(posts);
   const platforms = [...new Set(accounts.map((account) => account.platform))];
   const visible = posts.filter(
     (post) =>
@@ -85,7 +94,7 @@ export function LivePostsLibrary({
             Published posts
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Everything live on your connected accounts, including posts made directly on each
+            Posts your connected accounts confirm are live, including ones made directly on each
             platform.
           </p>
         </div>
@@ -191,7 +200,7 @@ export function LivePostsLibrary({
         </div>
       ) : visible.length === 0 ? (
         <div className="rounded-2xl border border-border bg-surface/60 p-8 text-center">
-          <p className="text-sm font-semibold text-foreground">No published posts found.</p>
+          <p className="text-sm font-semibold text-foreground">No live posts found.</p>
           <p className="mt-1 text-sm text-muted-foreground">
             {posts.length
               ? "Nothing matches these filters."
@@ -199,6 +208,12 @@ export function LivePostsLibrary({
           </p>
         </div>
       ) : (
+        <>
+        <p className="text-xs text-muted-foreground" aria-live="polite">
+          {visible.length === posts.length
+            ? `${counts.live} live${counts.removed ? ` · ${counts.removed} removed` : ""}`
+            : `Showing ${visible.length} of ${posts.length}`}
+        </p>
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {visible.map((post) => (
             <li key={post.key}>
@@ -206,6 +221,7 @@ export function LivePostsLibrary({
             </li>
           ))}
         </ul>
+        </>
       )}
 
       {query.hasNextPage && (
@@ -272,6 +288,7 @@ function LivePostCard({
   onOpen: () => void;
 }) {
   const label = livePlatformLabel(post.platform);
+  const state = publishedCardState(post) ?? "removed";
   return (
     <button
       type="button"
@@ -279,7 +296,7 @@ function LivePostCard({
       aria-label={`Open ${label} post from ${formatDate(post.publishedAt, timeZone)}`}
       className={cn(
         "group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-surface text-left transition hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-        post.removedAt && "opacity-60",
+        state === "removed" && "opacity-60",
       )}
     >
       <div className="relative">
@@ -287,11 +304,14 @@ function LivePostCard({
         <span className="absolute left-2 top-2 rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold text-foreground backdrop-blur">
           {label}
         </span>
-        {post.removedAt && (
-          <span className="absolute right-2 top-2 rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground backdrop-blur">
-            Removed
-          </span>
-        )}
+        <span
+          className={cn(
+            "absolute right-2 top-2 rounded-full bg-background/85 px-2 py-0.5 text-[11px] font-semibold backdrop-blur",
+            state === "live" ? "text-success" : "text-muted-foreground",
+          )}
+        >
+          {PUBLISHED_STATE_LABEL[state]}
+        </span>
       </div>
       <div className="flex flex-1 flex-col gap-1 p-3">
         <p className="line-clamp-2 text-sm text-foreground">{post.caption || "No caption"}</p>
@@ -323,9 +343,11 @@ function LivePostDialog({
   const [confirmation, setConfirmation] = useState("");
   const [removing, setRemoving] = useState(false);
   const removal = livePostRemoval(post, canManage);
+  const state = publishedCardState(post) ?? "removed";
 
   async function handleRemove() {
-    if (!isLivePostRemoveConfirmation(confirmation) || !post.latePostId) return;
+    if (removal.kind !== "remove" || !isLivePostRemoveConfirmation(confirmation)) return;
+    if (!post.latePostId || !post.platformPostId) return;
     setRemoving(true);
     try {
       const result = await removeFn({
@@ -364,7 +386,7 @@ function LivePostDialog({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {post.removedAt ? "Removed" : "Published"} · {formatDate(post.publishedAt, timeZone)}
+              {PUBLISHED_STATE_LABEL[state]} · {formatDate(post.publishedAt, timeZone)}
             </p>
             <h2 id="live-post-title" className="mt-1 truncate text-xl font-semibold text-foreground">
               {label} · {post.accountName}
@@ -399,7 +421,9 @@ function LivePostDialog({
             )}
           </div>
         )}
-        {(removal.kind === "manual" || removal.kind === "not_allowed") && (
+        {(removal.kind === "manual" ||
+          removal.kind === "not_allowed" ||
+          removal.kind === "unverified") && (
           <p className="mt-4 rounded-xl border border-border bg-elevated/60 p-3 text-sm leading-6 text-muted-foreground">
             {removal.message}
           </p>
@@ -454,7 +478,7 @@ function LivePostDialog({
                 <Trash2 className="h-4 w-4" /> Remove from {label}
               </button>
             )}
-            {post.url && !post.removedAt && (
+            {post.url && state === "live" && (
               <a
                 href={post.url}
                 target="_blank"
