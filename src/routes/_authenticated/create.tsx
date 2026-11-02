@@ -694,7 +694,13 @@ function CreatePost() {
   }
 
   return (
-    <div className="space-y-4 pb-24 lg:space-y-6 lg:pb-0">
+    <div
+      className={cn(
+        "space-y-4 lg:space-y-6 lg:pb-0",
+        // Room for the phone action bar, which also shows the destinations.
+        metaSharingWarning ? "pb-72" : "pb-44",
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
@@ -1048,7 +1054,7 @@ function PublishDestinations({
       data-testid="publish-destinations"
       aria-live="polite"
     >
-      <p className="text-sm font-semibold text-foreground">{title}</p>
+      <p className={cn("font-semibold text-foreground", compact ? "text-xs" : "text-sm")}>{title}</p>
       {lines.length > 1 && (
         <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
           {lines.map((line) => (
@@ -1060,7 +1066,12 @@ function PublishDestinations({
         <p className="mt-1 text-xs text-destructive">Connect every selected platform before publishing.</p>
       )}
       {metaWarning && (
-        <div className="mt-2 border-t border-border pt-2 text-xs leading-5 text-muted-foreground">
+        <div
+          className={cn(
+            "border-t border-border text-muted-foreground",
+            compact ? "mt-1.5 pt-1.5 text-[11px] leading-4" : "mt-2 pt-2 text-xs leading-5",
+          )}
+        >
           <p role="note">{META_SHARING_WARNING}</p>
           <button
             type="button"
