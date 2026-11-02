@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import type { MediaPreviewKind } from "@/lib/frameio-media-preview";
 
 async function frameioRequest<T>(body: Record<string, unknown>, path = "/api/frameio") {
   const { data } = await supabase.auth.getSession();
@@ -70,3 +71,27 @@ export const importFrameioWorkspaceMedia = (workspaceId: string, fileIds: string
     },
     "/api/frameio/media",
   );
+
+export type FrameioMediaPreview = { url: string; kind: MediaPreviewKind };
+
+// Frame.io links are short-lived; reuse a fresh one briefly so the same tile
+// shown in the picker and the post card does not request it twice.
+const PREVIEW_CACHE_MS = 5 * 60 * 1000;
+const previewCache = new Map<string, { at: number; value: Promise<FrameioMediaPreview> }>();
+
+export function getFrameioMediaPreviewUrl(workspaceId: string, assetId: string) {
+  const key = `${workspaceId}:${assetId}`;
+  const cached = previewCache.get(key);
+  if (cached && Date.now() - cached.at < PREVIEW_CACHE_MS) return cached.value;
+  const value = frameioRequest<Partial<FrameioMediaPreview>>(
+    { action: "preview_url", workspaceId, assetId },
+    "/api/frameio/media",
+  ).then((result) => {
+    if (typeof result.url !== "string" || (result.kind !== "image" && result.kind !== "video"))
+      throw new Error("Frame.io preview is not available yet.");
+    return { url: result.url, kind: result.kind };
+  });
+  previewCache.set(key, { at: Date.now(), value });
+  value.catch(() => previewCache.delete(key));
+  return value;
+}
