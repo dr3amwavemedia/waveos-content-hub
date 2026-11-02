@@ -4,7 +4,19 @@ import { resolveMediaAssetUrl } from "@/lib/external-media.server";
 import { normalizeZernioAccounts, toZernioPlatform, zernioRequest } from "@/lib/zernio.server";
 import { cleanupConfirmedTemporaryMedia } from "@/lib/temporary-media-cleanup.server";
 import { assertPublishingEnabled } from "@/lib/publishing-controls.server";
-import { normalizeZernioRequestError, ZERNIO_CREATE_POST_TIMEOUT_MS } from "@/lib/zernio-timeout";
+import {
+  isZernioTimeoutError,
+  normalizeZernioRequestError,
+  ZERNIO_CREATE_POST_TIMEOUT_MS,
+} from "@/lib/zernio-timeout";
+import {
+  DUPLICATE_GUARD_ERROR_CODE,
+  DUPLICATE_GUARD_WINDOW_MS,
+  findDuplicatePublishes,
+  publishFingerprint,
+  type DuplicateGuardMatch,
+} from "@/lib/publish-fingerprint";
+import { snapshotAccountIds, unpublishBlockReason } from "@/lib/published-post-management";
 
 type ZernioTarget = {
   platform?: string;
@@ -22,7 +34,18 @@ type ZernioPost = {
   platforms?: ZernioTarget[];
 };
 
-export async function publishContentItemWithZernio(contentId: string, actorUserId?: string | null) {
+export type PublishContentResult = {
+  success: number;
+  failed: number;
+  pending: number;
+  duplicateGuard?: DuplicateGuardMatch[];
+};
+
+export async function publishContentItemWithZernio(
+  contentId: string,
+  actorUserId?: string | null,
+  options: { allowDuplicate?: boolean } = {},
+): Promise<PublishContentResult> {
   const { data: item, error } = await supabaseAdmin
     .from("content_items")
     .select("*")
