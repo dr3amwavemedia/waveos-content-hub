@@ -283,7 +283,10 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
   let pending = 0;
 
   try {
-    for (const { idempotencyKey, providerPlatform, requestBody, variant } of preparedVariants) {
+    for (const [
+      index,
+      { idempotencyKey, providerPlatform, requestBody, variant },
+    ] of preparedVariants.entries()) {
       const { data: existing, error: existingError } = await supabaseAdmin
         .from("publish_attempts")
         .select("id,status")
@@ -308,7 +311,10 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
             provider: "zernio",
             status: "sending",
             idempotency_key: idempotencyKey,
-            request_snapshot: requestBody as unknown as Json,
+            request_snapshot: {
+              ...requestBody,
+              waveosFingerprint: fingerprints[index],
+            } as unknown as Json,
             attempted_at: new Date().toISOString(),
             error_code: null,
             error_message: null,
