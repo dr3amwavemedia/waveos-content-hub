@@ -4,6 +4,7 @@ import { resolveMediaAssetUrl } from "@/lib/external-media.server";
 import { normalizeZernioAccounts, toZernioPlatform, zernioRequest } from "@/lib/zernio.server";
 import { cleanupConfirmedTemporaryMedia } from "@/lib/temporary-media-cleanup.server";
 import { assertPublishingEnabled } from "@/lib/publishing-controls.server";
+import { normalizeZernioRequestError, ZERNIO_CREATE_POST_TIMEOUT_MS } from "@/lib/zernio-timeout";
 
 type ZernioTarget = {
   platform?: string;
@@ -295,6 +296,7 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
           method: "POST",
           headers: { "Idempotency-Key": idempotencyKey },
           body: JSON.stringify(requestBody),
+          signal: AbortSignal.timeout(ZERNIO_CREATE_POST_TIMEOUT_MS),
         });
         const result = zernioPostResult(response.post, providerPlatform);
         const { error: attemptUpdateError } = await supabaseAdmin
@@ -317,14 +319,14 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
         else if (result.status === "sending") pending += 1;
         else failed += 1;
       } catch (reason) {
-        const providerError = reason as Error & { code?: string; details?: unknown };
+        const providerError = normalizeZernioRequestError(reason);
         const { error: failureWriteError } = await supabaseAdmin
           .from("publish_attempts")
           .update({
             status: "failed",
-            error_code: providerError.code ?? "zernio_request_failed",
+            error_code: providerError.code,
             error_message: providerError.message,
-            response_snapshot: (providerError.details ?? {}) as Json,
+            response_snapshot: providerError.details as Json,
             completed_at: new Date().toISOString(),
           })
           .eq("id", attempt.id)
