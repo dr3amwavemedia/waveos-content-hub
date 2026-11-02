@@ -10,6 +10,7 @@ import {
   combineAnalyticsMetric,
   deriveEngagements,
   ANALYTICS_METRIC_KEYS,
+  snapshotMetricKey,
   type AnalyticsSource,
   type AnalyticsSourceKey,
 } from "@/lib/analytics-transparency";
@@ -347,7 +348,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
               return {
                 workspace_id: data.workspaceId,
                 profile_id: intelligenceProfile!.id,
-                metric_key: metricKey,
+                metric_key: snapshotMetricKey(metricKey),
                 provider: "zernio",
                 availability: metric.availability,
                 value: metric.value,
