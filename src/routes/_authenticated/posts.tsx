@@ -1,36 +1,19 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
-import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import {
-  AlertCircle,
-  CalendarClock,
-  CheckCircle2,
-  FileText,
-  Loader2,
-  PenSquare,
-  RefreshCw,
-  X,
-} from "lucide-react";
-import { toast } from "sonner";
+import { CalendarClock, FileText, PenSquare } from "lucide-react";
 
 import { EmptyState } from "@/components/app/empty-state";
 import { useWorkspace } from "@/components/app/workspace-context";
 import {
-  PLATFORM_LABEL,
-  useContentItems,
-  usePublishAttempts,
-  type ContentStatus,
-  type SocialPlatform,
-} from "@/hooks/use-content";
+  PublishAttemptChip,
+  PublishAttemptDialog,
+  type PublishAttempt,
+} from "@/components/social/publish-results";
+import { useContentItems, usePublishAttempts, type ContentStatus } from "@/hooks/use-content";
 import { cn } from "@/lib/utils";
 import { formatInTimeZone } from "@/lib/date-time";
-import { refreshPublishAttemptDetails } from "@/lib/publish.functions";
-import { failureGuidance, hasProviderReference } from "@/lib/publish-failure-guidance";
-import type { Database } from "@/integrations/supabase/types";
 
 type PostsFilter = "all" | "draft" | "scheduled" | "published" | "failed";
-type PublishAttempt = Database["public"]["Tables"]["publish_attempts"]["Row"];
 
 export const Route = createFileRoute("/_authenticated/posts")({
   beforeLoad: () => {
