@@ -11,6 +11,7 @@ import {
   Camera,
   Check,
   ChevronRight,
+  ExternalLink,
   Cloud,
   FileImage,
   FileText,
@@ -74,7 +75,7 @@ import {
   type SocialPlatform,
 } from "@/hooks/use-content";
 import { PenSquare } from "lucide-react";
-import { isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
+import { formatInTimeZone, isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 import { usePermissions } from "@/hooks/use-permissions";
 import { supabase } from "@/integrations/supabase/client";
 
