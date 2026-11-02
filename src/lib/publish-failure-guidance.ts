@@ -27,6 +27,9 @@ export function failureGuidance(
   if (TIMEOUT.test(error)) {
     return `This was a provider timeout, not a rejection of the vertical format or media. Zernio did not answer in time and may still be processing the post. Wait a few minutes, then use Open and retry post without changing or re-exporting the media. Networks that already succeeded will not be posted twice.`;
   }
+  if (options.errorCode === "duplicate_guard") {
+    return `WaveOS stopped this post before it reached ${platform} because the same caption and media were already published there from another post in the last 24 hours. Check the existing post first. To post a second copy on purpose, use Open and retry post and confirm Publish another copy.`;
+  }
   if (NO_CAUSE.test(error)) {
     return options.hasReference === false
       ? `The provider did not identify a cause. Reopen this post and retry rather than changing content that already works on ${platform}.`
