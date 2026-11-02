@@ -71,7 +71,7 @@ export function normalizeTrendResults(results:unknown[],observedAt:string,type:T
     const publishedAt=reportedDate??tiktokPublishedAt(url)??excerptPublishedAt(excerpts);
     if(publishedAt&&(Date.parse(publishedAt)<Date.parse(cutoff)||Date.parse(publishedAt)>Date.parse(observedAt)))return [];
     const videoSource=trendVideoSource(url);if(!videoSource)return [];
-    return [{id:url,title,url,source:new URL(url).hostname,excerpt:excerpts,publishedAt,observedAt,type,status:"unknown" as const,licensing:type==="audio"?"unknown" as const:"not_applicable" as const,thumbnail:typeof thumbnailCandidate==="string"?thumbnailCandidate:undefined,engagementEvidence:evidence.slice(0,3).join(" · ")||undefined,viralStrength}];
+    return [{id:url,title,url,source:new URL(url).hostname,excerpt:excerpts,publishedAt,observedAt,type,status:"unknown" as const,licensing:type==="audio"?"unknown" as const:"not_applicable" as const,thumbnail:typeof thumbnailCandidate==="string"?thumbnailCandidate:undefined,engagementEvidence:evidence.slice(0,3).join(" · ")||undefined,viralStrength,...videoSource}];
   });
  });
 }

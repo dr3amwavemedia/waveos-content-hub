@@ -94,6 +94,7 @@ const DEFAULT_INPUT: CampaignPlanningInput = {
   postingHours: ["09:00", "15:00"],
   excludedDays: ["saturday", "sunday"],
   approvalRequired: true,
+  optimizationMode: "approval_required",
 };
 
 interface CampaignPlanRow {
@@ -115,6 +116,8 @@ function CampaignManagerPage() {
   const [input, setInput] = useState<CampaignPlanningInput>(DEFAULT_INPUT);
   const [preview, setPreview] = useState<CampaignPlanningItem[]>([]);
   const [dirty, setDirty] = useState(false);
+  const [autoSaveState, setAutoSaveState] = useState<"idle"|"saving"|"saved"|"error">("idle");
+  const editRevisionRef = useRef(0);
   const [mobileStep, setMobileStep] = useState(0);
   const campaignDirectionFn = useServerFn(generateCampaignDirection);
   const createDraftsFn = useServerFn(createCampaignPostDrafts);
@@ -141,6 +144,7 @@ function CampaignManagerPage() {
     }>;
   } | null>(null);
   const [selectedMediaIds,setSelectedMediaIds]=useState<string[]>([]);
+  const [confirmedMediaIds,setConfirmedMediaIds]=useState<string[]>([]);
   const [showSharedMediaPicker,setShowSharedMediaPicker]=useState(false);
   const [mediaFolder,setMediaFolder]=useState<string>("all");
   const mediaInputRef=useRef<HTMLInputElement|null>(null);
@@ -155,6 +159,20 @@ function CampaignManagerPage() {
     workspaceId,
     workflowKey: "campaign-manager",
   });
+  const autoSaveDraft = workflowDraft.save.mutateAsync;
+
+  useEffect(() => {
+    if (!dirty || !workspaceId) return;
+    const revision = editRevisionRef.current;
+    setAutoSaveState("saving");
+    const timer = window.setTimeout(() => {
+      void autoSaveDraft(input).then(() => {
+        if (editRevisionRef.current === revision) setDirty(false);
+        setAutoSaveState("saved");
+      }).catch(() => setAutoSaveState("error"));
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [autoSaveDraft, dirty, input, workspaceId]);
 
   const campaigns = useQuery({
     queryKey: ["campaign-plans", workspaceId],
@@ -197,6 +215,7 @@ function CampaignManagerPage() {
           posting_hours: input.postingHours,
           excluded_days: input.excludedDays,
           approval_required: input.approvalRequired,
+          optimization_mode: input.optimizationMode,
           status: "draft",
         })
         .select("id")
@@ -236,6 +255,7 @@ function CampaignManagerPage() {
   });
 
   function update<K extends keyof CampaignPlanningInput>(key: K, value: CampaignPlanningInput[K]) {
+    editRevisionRef.current += 1;
     setInput((current) => ({ ...current, [key]: value }));
     setPreview([]);
     setDirty(true);
@@ -339,6 +359,7 @@ function CampaignManagerPage() {
         },
       });
       setCampaignDirection(direction);
+      setConfirmedMediaIds([]);
       toast.success("Organic campaign direction is ready.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Campaign direction could not be generated.");
@@ -349,6 +370,10 @@ function CampaignManagerPage() {
 
   async function createPostDrafts() {
     if (!workspaceId || !campaignDirection?.mediaRecommendations.length || draftsBusy || draftsCreated) return;
+    if (confirmedMediaIds.length !== campaignDirection.mediaRecommendations.length) {
+      toast.error("Confirm or correct what WaveOS understood about every asset first.");
+      return;
+    }
     setDraftsBusy(true);
     try {
       const result=await createDraftsFn({
@@ -362,6 +387,8 @@ function CampaignManagerPage() {
             platforms:rec.platforms,
             suggestedDay:rec.suggestedDay,
             contentType:rec.contentType,
+            visualSummary:rec.visualSummary,
+            likelyPurpose:rec.likelyPurpose,
           })),
         },
       });
@@ -372,6 +399,21 @@ function CampaignManagerPage() {
     } finally {
       setDraftsBusy(false);
     }
+  }
+
+  function updateMediaRecommendation(
+    index: number,
+    patch: Partial<NonNullable<typeof campaignDirection>["mediaRecommendations"][number]>,
+  ) {
+    setCampaignDirection((current) => current ? {
+      ...current,
+      mediaRecommendations: current.mediaRecommendations.map((recommendation, itemIndex) =>
+        itemIndex === index ? { ...recommendation, ...patch } : recommendation,
+      ),
+    } : current);
+    const mediaId = campaignDirection?.mediaRecommendations[index]?.mediaId;
+    if (mediaId) setConfirmedMediaIds((current) => current.filter((id) => id !== mediaId));
+    setDraftsCreated(false);
   }
 
   async function saveServerDraft() {
@@ -415,6 +457,7 @@ function CampaignManagerPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <span className="self-center text-xs text-muted-foreground" role="status">{autoSaveState==="saving"?"Saving draft…":autoSaveState==="saved"?"Draft saved":autoSaveState==="error"?"Auto-save paused":""}</span>
           <Button
             variant="outline"
             onClick={() => void saveServerDraft()}
@@ -500,19 +543,23 @@ function CampaignManagerPage() {
               <div className="mt-2 space-y-3">
                 {campaignDirection.mediaRecommendations.map((rec,index)=><div key={rec.mediaId+index} className="rounded-xl border border-border bg-background/60 p-3">
                   <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">{(mediaAssets.data??[]).find(a=>a.id===rec.mediaId)?.name ?? `Selected media ${index+1}`}</p><p className="mt-1 text-xs text-muted-foreground">{rec.reason}</p></div><span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">{rec.suggestedDay}</span></div>
-                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-surface/70 p-2"><span className="text-muted-foreground">Content</span><div className="mt-1 font-medium">{rec.contentType}</div></div>
+                  <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                    <label className="rounded-lg bg-surface/70 p-2"><span className="text-muted-foreground">What WaveOS thinks this is</span><input className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 font-medium" value={rec.contentType} onChange={(event)=>updateMediaRecommendation(index,{contentType:event.target.value})}/></label>
                     <div className="rounded-lg bg-surface/70 p-2"><span className="text-muted-foreground">Hook potential</span><div className="mt-1 font-medium capitalize">{rec.hookPotential}</div></div>
                   </div>
-                  <p className="mt-3 text-xs text-muted-foreground">{rec.visualSummary}</p>
-                  <p className="mt-2 text-xs"><span className="font-medium">Purpose:</span> {rec.likelyPurpose}</p>
-                  <p className="mt-3 text-sm">{rec.caption}</p>
+                  <label className="mt-3 block text-xs"><span className="font-medium">What it shows</span><textarea className="mt-1 min-h-16 w-full rounded-md border border-border bg-background px-2 py-1.5 text-muted-foreground" value={rec.visualSummary} onChange={(event)=>updateMediaRecommendation(index,{visualSummary:event.target.value})}/></label>
+                  <label className="mt-2 block text-xs"><span className="font-medium">Main message or purpose</span><input className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5" value={rec.likelyPurpose} onChange={(event)=>updateMediaRecommendation(index,{likelyPurpose:event.target.value})}/></label>
+                  <label className="mt-3 block text-xs"><span className="font-medium">Proposed caption / angle</span><textarea className="mt-1 min-h-24 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm" value={rec.caption} onChange={(event)=>updateMediaRecommendation(index,{caption:event.target.value})}/></label>
                   <div className="mt-2 flex flex-wrap gap-1">{rec.hashtags.map(tag=><span key={tag} className="text-xs text-primary">{tag.startsWith("#")?tag:`#${tag}`}</span>)}</div>
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-muted-foreground"><span>{rec.platforms.join(" · ")}</span><span>•</span><span className="capitalize">{rec.confidence} confidence</span><span>•</span><span>{rec.inspectionMode==="video_frames"?"Video visually inspected":rec.inspectionMode==="photo"?"Photo visually inspected":"Metadata only"}</span></div>
+                  <Button type="button" size="sm" className="mt-3" variant={confirmedMediaIds.includes(rec.mediaId)?"secondary":"outline"} onClick={()=>setConfirmedMediaIds((current)=>current.includes(rec.mediaId)?current.filter((id)=>id!==rec.mediaId):[...current,rec.mediaId])}>
+                    <Check className="h-4 w-4" /> {confirmedMediaIds.includes(rec.mediaId)?"Confirmed · edit again":"Confirm understanding"}
+                  </Button>
                 </div>)}
               </div>
+              <p className="mt-3 text-xs text-muted-foreground">{confirmedMediaIds.length} of {campaignDirection.mediaRecommendations.length} assets confirmed. Corrections stay private to this workspace and guide future campaign analysis.</p>
               <div className="mt-4 flex flex-wrap gap-2">
-                <Button onClick={()=>void createPostDrafts()} disabled={draftsBusy||draftsCreated}>
+                <Button onClick={()=>void createPostDrafts()} disabled={draftsBusy||draftsCreated||confirmedMediaIds.length!==campaignDirection.mediaRecommendations.length}>
                   {draftsBusy?<Loader2 className="h-4 w-4 animate-spin"/>:<CheckCircle2 className="h-4 w-4"/>}
                   {draftsCreated?"Post drafts created":"Create post drafts"}
                 </Button>
@@ -680,6 +727,15 @@ function CampaignManagerPage() {
               onChange={(event) => update("approvalRequired", event.target.checked)}
             />
           </label>
+          <fieldset className="mt-3 rounded-xl border border-border bg-background/40 p-4">
+            <legend className="px-1 text-sm font-semibold">Campaign optimization</legend>
+            <p className="mt-1 text-xs text-muted-foreground">Only upcoming, unpublished items can ever be changed. Published posts are never altered.</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <Button type="button" variant={input.optimizationMode==="approval_required"?"secondary":"outline"} className="h-auto min-h-14 whitespace-normal" onClick={()=>update("optimizationMode","approval_required")}>Approval Required</Button>
+              <Button type="button" variant={input.optimizationMode==="automatic"?"secondary":"outline"} className="h-auto min-h-14 whitespace-normal" onClick={()=>update("optimizationMode","automatic")}>Automatic Optimization</Button>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">{input.optimizationMode==="automatic"?"WaveOS may optimize future unpublished items and will notify you.":"WaveOS recommends changes and waits for your approval."}</p>
+          </fieldset>
           </MobileWorkflowSection>
 
           {errors.length > 0 && (
@@ -698,7 +754,7 @@ function CampaignManagerPage() {
               <ShieldCheck className="h-4 w-4 text-primary" /> Guardrails
             </div>
             <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-              <li>• Internal plan only; no automatic publishing.</li>
+              <li>• Nothing here schedules or publishes automatically.</li>
               <li>• Times are user-selected planning windows, not performance claims.</li>
               <li>• Approval status is preserved on every generated item.</li>
               <li>• AI suggestions are creative direction only; they never schedule or publish.</li>

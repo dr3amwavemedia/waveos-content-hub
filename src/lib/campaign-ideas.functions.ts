@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { recordAiUsage } from "@/lib/ai-usage.server";
+
+const CAMPAIGN_MODEL = "google/gemini-3.1-flash-lite";
 
 const campaignIdeaSchema = z.object({
   angle: z.string().trim().min(1).max(500),
@@ -158,6 +161,10 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
             asset.source_metadata && typeof asset.source_metadata === "object"
               ? (asset.source_metadata as Record<string, unknown>).waveos_campaign_intelligence ?? null
               : null,
+          userCorrection:
+            asset.source_metadata && typeof asset.source_metadata === "object"
+              ? (asset.source_metadata as Record<string, unknown>).waveos_campaign_correction ?? null
+              : null,
           inspectionMode: asset.mime_type?.startsWith("video/")
             ? (frameMap.has(asset.id) ? "video_frames" : "metadata_only")
             : (previewUrl ? "photo" : "metadata_only"),
@@ -176,6 +183,7 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
       topPosts: (intelligence?.metadata?.historicalBackfill?.topPosts ?? []).slice(0, 20),
     };
 
+    const startedAt = Date.now();
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -183,7 +191,7 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3.1-flash-lite",
+        model: CAMPAIGN_MODEL,
         max_tokens: 1800,
         response_format: { type: "json_object" },
         messages: [
@@ -225,15 +233,50 @@ Available photo previews and extracted video frames are supplied below when poss
         ],
       }),
     });
-    if (response.status === 429) throw new Error("Rate limit reached. Try again in a moment.");
-    if (response.status === 402) throw new Error("AI credits exhausted. Please top up in Settings.");
-    if (!response.ok) throw new Error("Campaign AI could not be completed.");
+    if (!response.ok) {
+      await recordAiUsage({
+        workspaceId: data.workspaceId,
+        userId: context.userId,
+        feature: "campaign_direction",
+        model: CAMPAIGN_MODEL,
+        durationMs: Date.now() - startedAt,
+        status: "provider_error",
+        safeErrorCode: `http_${response.status}`,
+      });
+      if (response.status === 429) throw new Error("Rate limit reached. Try again in a moment.");
+      if (response.status === 402) throw new Error("AI credits exhausted. Please top up in Settings.");
+      throw new Error("Campaign AI could not be completed.");
+    }
 
-    const json = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const json = await response.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
     const raw = json.choices?.[0]?.message?.content?.trim();
-    if (!raw) throw new Error("Campaign AI returned no usable direction.");
-    const clean = raw.replace(/^\`\`\`(?:json)?\s*/i, "").replace(/\s*\`\`\`$/, "");
+    if (!raw) {
+      await recordAiUsage({
+        workspaceId: data.workspaceId,
+        userId: context.userId,
+        feature: "campaign_direction",
+        model: CAMPAIGN_MODEL,
+        durationMs: Date.now() - startedAt,
+        status: "invalid_response",
+        usage: json.usage,
+        safeErrorCode: "empty_response",
+      });
+      throw new Error("Campaign AI returned no usable direction.");
+    }
+    const clean = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
     const parsed = campaignIdeaSchema.parse(JSON.parse(clean));
+    await recordAiUsage({
+      workspaceId: data.workspaceId,
+      userId: context.userId,
+      feature: "campaign_direction",
+      model: CAMPAIGN_MODEL,
+      durationMs: Date.now() - startedAt,
+      status: "succeeded",
+      usage: json.usage,
+    });
 
     // Persist reusable media intelligence without replacing provider metadata.
     for (const recommendation of parsed.mediaRecommendations) {
@@ -280,6 +323,8 @@ const campaignDraftInput = z.object({
     platforms: z.array(z.string().trim().min(1).max(40)).max(6),
     suggestedDay: z.string().trim().max(80),
     contentType: z.string().trim().max(120).optional(),
+    visualSummary: z.string().trim().min(1).max(500),
+    likelyPurpose: z.string().trim().min(1).max(240),
   })).min(1).max(24),
 });
 
@@ -305,6 +350,40 @@ export const createCampaignPostDrafts = createServerFn({ method: "POST" })
     if (!canManage) throw new Error("You do not have permission to create campaign drafts.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const mediaIds = data.recommendations.map((recommendation) => recommendation.mediaId);
+    const { data: assets, error: assetsError } = await supabaseAdmin
+      .from("media_assets")
+      .select("id,source_metadata")
+      .eq("workspace_id", data.workspaceId)
+      .in("id", mediaIds);
+    if (assetsError) throw assetsError;
+    if ((assets ?? []).length !== new Set(mediaIds).size) {
+      throw new Error("One or more campaign assets are no longer available in this workspace.");
+    }
+    for (const recommendation of data.recommendations) {
+      const asset = (assets ?? []).find((row) => row.id === recommendation.mediaId);
+      const existing =
+        asset?.source_metadata && typeof asset.source_metadata === "object"
+          ? (asset.source_metadata as Record<string, unknown>)
+          : {};
+      const { error: correctionError } = await supabaseAdmin
+        .from("media_assets")
+        .update({
+          source_metadata: {
+            ...existing,
+            waveos_campaign_correction: {
+              correctedAt: new Date().toISOString(),
+              correctedBy: context.userId,
+              contentType: recommendation.contentType ?? "unknown",
+              visualSummary: recommendation.visualSummary,
+              likelyPurpose: recommendation.likelyPurpose,
+            },
+          },
+        })
+        .eq("id", recommendation.mediaId)
+        .eq("workspace_id", data.workspaceId);
+      if (correctionError) throw correctionError;
+    }
     const rows = data.recommendations.map((rec, index) => ({
       workspace_id: data.workspaceId,
       created_by: context.userId,
