@@ -73,7 +73,8 @@ export type LivePost = {
   platform: string;
   accountId: string;
   accountName: string;
-  platformPostId: string;
+  /** Platform post id; null when the provider only reported a stable URL. */
+  platformPostId: string | null;
   /** Zernio post id; the only id unpublish accepts. Null for external-only posts. */
   latePostId: string | null;
   url: string | null;
@@ -83,12 +84,100 @@ export type LivePost = {
   publishedAt: string | null;
   source: "zernio" | "external";
   removedAt: string | null;
+  /**
+   * True only when a current provider source reported this exact target as
+   * live and no provider source contradicts it. WaveOS history never sets it.
+   */
+  verifiedLive: boolean;
   /** Every id/URL form this platform post is known by, for safe matching. */
   aliases: string[];
 };
 
 export function livePostKey(platform: string, accountId: string, platformPostId: string) {
   return `${toProviderPlatform(platform)}:${accountId}:${platformPostId}`;
+}
+
+// ---------------------------------------------------------------------------
+// Published eligibility. Provider-confirmed live state is authoritative; a
+// WaveOS attempt's own status (failed, timeout, success) never decides it.
+
+const LIVE_STATUSES = new Set(["published", "success", "succeeded", "live", "posted"]);
+const REMOVED_STATUSES = new Set([
+  "cancelled",
+  "canceled",
+  "deleted",
+  "removed",
+  "unpublished",
+]);
+
+export type ProviderTargetState = "live" | "removed" | "not_live";
+
+/**
+ * State of one exact provider target. `missingStatus` is "live" only for
+ * platform-synced posts, which the platform returns only once they exist;
+ * everything else must state published explicitly. A removed/cancelled parent
+ * removes every target; any other parent status (partial, failed) defers to
+ * the target's own status so only its published targets count.
+ */
+export function providerTargetState(input: {
+  status: unknown;
+  parentStatus?: unknown;
+  records?: unknown[];
+  missingStatus?: "live" | "not_live";
+}): ProviderTargetState {
+  const normalize = (value: unknown) =>
+    typeof value === "string" && value.trim() ? value.trim().toLowerCase() : null;
+  const deleted = (input.records ?? []).some((value) => {
+    const row = value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+    if (!row) return false;
+    return (
+      row.isDeleted === true ||
+      row.deleted === true ||
+      row.isRemoved === true ||
+      [row.deletedAt, row.removedAt, row.unpublishedAt].some(
+        (date) => typeof date === "string" && !Number.isNaN(Date.parse(date)),
+      )
+    );
+  });
+  const parent = normalize(input.parentStatus);
+  if (deleted || (parent && REMOVED_STATUSES.has(parent))) return "removed";
+  const status = normalize(input.status);
+  if (!status) return input.missingStatus === "live" ? "live" : "not_live";
+  if (REMOVED_STATUSES.has(status)) return "removed";
+  return LIVE_STATUSES.has(status) ? "live" : "not_live";
+}
+
+export type PublishedCardState = "live" | "removed";
+
+/**
+ * The only two states the Published library shows. Removed is WaveOS-recorded
+ * removal history; anything not verified live and not removed is excluded.
+ */
+export function publishedCardState(post: Pick<LivePost, "removedAt" | "verifiedLive">) {
+  if (post.removedAt) return "removed" as const;
+  return post.verifiedLive ? ("live" as const) : null;
+}
+
+export const PUBLISHED_STATE_LABEL: Record<PublishedCardState, string> = {
+  live: "Live",
+  removed: "Removed",
+};
+
+/** Final Published list: verified live cards and intentional removal history. */
+export function finalizePublishedLibrary(posts: LivePost[]) {
+  return posts.filter((post) => publishedCardState(post) !== null);
+}
+
+/** Counts over the eligible cards only. */
+export function publishedCounts(posts: LivePost[]) {
+  let live = 0;
+  let removed = 0;
+  for (const post of posts) {
+    const state = publishedCardState(post);
+    if (state === "live") live += 1;
+    else if (state === "removed") removed += 1;
+  }
+  return { live, removed };
 }
 
 /**
@@ -169,43 +258,88 @@ function thumbnailOf(row: Record<string, unknown>) {
   return null;
 }
 
-/** Posts returned by POST /posts/sync-external (no locator) for one account. */
+/** One eligible card; requires a stable platform post id or https URL. */
+function buildCard(
+  account: LivePostAccount,
+  input: {
+    platformPostId: string | null;
+    url: string | null;
+    latePostId: string | null;
+    row: Record<string, unknown>;
+    publishedAt: string | null;
+    source: LivePost["source"];
+  },
+): LivePost[] {
+  const platform = toProviderPlatform(account.platform);
+  const aliases = postAliases(platform, input.platformPostId, input.url);
+  const locator = input.platformPostId ?? aliases.find((alias) => alias.startsWith("url:"));
+  if (!locator) return [];
+  return [
+    {
+      key: livePostKey(platform, account.accountId, locator),
+      platform,
+      accountId: account.accountId,
+      accountName: account.name,
+      platformPostId: input.platformPostId,
+      latePostId: input.latePostId,
+      url: input.url,
+      caption: str(input.row.content) ?? "",
+      thumbnailUrl: thumbnailOf(input.row),
+      mediaType: str(input.row.mediaType),
+      publishedAt: input.publishedAt,
+      source: input.source,
+      removedAt: null,
+      verifiedLive: true,
+      aliases,
+    },
+  ];
+}
+
+const entriesOf = (row: Record<string, unknown>) =>
+  (Array.isArray(row.platforms)
+    ? row.platforms
+    : Array.isArray(row.platformAnalytics)
+      ? row.platformAnalytics
+      : []
+  )
+    .map(record)
+    .filter((entry): entry is Record<string, unknown> => Boolean(entry));
+
+const isAccountTarget = (entry: Record<string, unknown>, account: LivePostAccount) =>
+  zernioAccountId(entry.accountId) === account.accountId &&
+  toProviderPlatform(str(entry.platform) ?? "") === toProviderPlatform(account.platform);
+
+/**
+ * Posts returned by POST /posts/sync-external (no locator) for one account.
+ * The platform returns these only once they exist, so a missing status is
+ * live; an explicit non-live or deleted status is not.
+ */
 export function normalizeSyncedPosts(payload: unknown, account: LivePostAccount): LivePost[] {
   const rows = record(payload)?.posts;
   if (!Array.isArray(rows)) return [];
+  const accountPlatform = toProviderPlatform(account.platform);
   return rows.flatMap((value) => {
     const row = record(value);
     if (!row) return [];
-    const platformPostId = str(row.platformPostId);
-    if (!platformPostId) return [];
-    const platform = toProviderPlatform(str(row.platform) ?? account.platform);
-    if (platform !== toProviderPlatform(account.platform)) return [];
-    const url = httpsUrl(row.platformPostUrl);
-    return [
-      {
-        key: livePostKey(platform, account.accountId, platformPostId),
-        platform,
-        accountId: account.accountId,
-        accountName: account.name,
-        platformPostId,
-        latePostId: null,
-        url,
-        caption: str(row.content) ?? "",
-        thumbnailUrl: thumbnailOf(row),
-        mediaType: str(row.mediaType),
-        publishedAt: isoDate(row.publishedAt),
-        source: "external" as const,
-        removedAt: null,
-        aliases: postAliases(platform, platformPostId, url),
-      },
-    ];
+    if (toProviderPlatform(str(row.platform) ?? account.platform) !== accountPlatform) return [];
+    if (providerTargetState({ status: row.status, records: [row], missingStatus: "live" }) !== "live")
+      return [];
+    return buildCard(account, {
+      platformPostId: str(row.platformPostId),
+      url: httpsUrl(row.platformPostUrl),
+      latePostId: null,
+      row,
+      publishedAt: isoDate(row.publishedAt),
+      source: "external",
+    });
   });
 }
 
 /**
  * Posts from GET /analytics scoped to one account. A cross-posted Zernio post
  * carries one platformAnalytics entry per account; only the entry for this
- * exact account and platform becomes a card, so copies are never conflated.
+ * exact account and platform becomes a card, and only when that exact entry
+ * (or the row, for single-target rows) says published.
  */
 export function normalizeAnalyticsPosts(payload: unknown, account: LivePostAccount): LivePost[] {
   const rows = record(payload)?.posts;
@@ -215,95 +349,158 @@ export function normalizeAnalyticsPosts(payload: unknown, account: LivePostAccou
     const row = record(value);
     if (!row) return [];
     const latePostId = str(row.latePostId);
-    const perAccount = Array.isArray(row.platforms)
-      ? row.platforms
-      : Array.isArray(row.platformAnalytics)
-        ? row.platformAnalytics
-        : [];
-    const entries = perAccount
-      .map(record)
-      .filter((entry): entry is Record<string, unknown> => Boolean(entry));
-    const matches = entries.filter(
+    const entries = entriesOf(row);
+    const live = entries.filter(
       (entry) =>
-        zernioAccountId(entry.accountId) === account.accountId &&
-        toProviderPlatform(str(entry.platform) ?? "") === accountPlatform &&
-        (str(entry.status) ?? "published") === "published",
+        isAccountTarget(entry, account) &&
+        providerTargetState({
+          status: entry.status ?? (entries.length === 1 ? row.status : null),
+          parentStatus: row.status,
+          records: [entry, row],
+        }) === "live",
     );
-    const candidates = matches.length
-      ? matches.map((entry) => ({
+    const candidates = live.length
+      ? live.map((entry) => ({
           platformPostId: str(entry.platformPostId),
-          url: httpsUrl(entry.platformPostUrl) ?? (matches.length === 1 ? httpsUrl(row.platformPostUrl) : null),
+          url: httpsUrl(entry.platformPostUrl) ?? (live.length === 1 ? httpsUrl(row.platformPostUrl) : null),
+          publishedAt: isoDate(entry.publishedAt) ?? isoDate(row.publishedAt),
         }))
-      : entries.length === 0 && toProviderPlatform(str(row.platform) ?? "") === accountPlatform
+      : entries.length === 0 &&
+          toProviderPlatform(str(row.platform) ?? "") === accountPlatform &&
+          providerTargetState({ status: row.status, records: [row] }) === "live"
         ? // Single-platform rows without per-account entries; the request was
           // already scoped to this account.
-          [{ platformPostId: str(row.platformPostId), url: httpsUrl(row.platformPostUrl) }]
+          [
+            {
+              platformPostId: str(row.platformPostId),
+              url: httpsUrl(row.platformPostUrl),
+              publishedAt: isoDate(row.publishedAt),
+            },
+          ]
         : [];
-    return candidates.flatMap((candidate) => {
-      if (!candidate.platformPostId) return [];
-      return [
-        {
-          key: livePostKey(accountPlatform, account.accountId, candidate.platformPostId),
-          platform: accountPlatform,
-          accountId: account.accountId,
-          accountName: account.name,
-          platformPostId: candidate.platformPostId,
-          latePostId,
-          url: candidate.url,
-          caption: str(row.content) ?? "",
-          thumbnailUrl: thumbnailOf(row),
-          mediaType: str(row.mediaType),
-          publishedAt: isoDate(row.publishedAt),
-          source: latePostId || row.isExternal === false ? ("zernio" as const) : ("external" as const),
-          removedAt: null,
-          aliases: postAliases(accountPlatform, candidate.platformPostId, candidate.url),
-        },
-      ];
-    });
+    return candidates.flatMap((candidate) =>
+      buildCard(account, {
+        ...candidate,
+        latePostId,
+        row,
+        source: latePostId || row.isExternal === false ? "zernio" : "external",
+      }),
+    );
   });
 }
 
 /**
  * Zernio's own post records (GET /posts?accountId=…). These carry the Zernio
- * post id that unpublish needs, one card per published copy on this account.
+ * post id that unpublish needs. Only this account's targets whose own status
+ * is published become cards, so a partial post contributes only its published
+ * targets and a cancelled post contributes none.
  */
 export function normalizeZernioPosts(payload: unknown, account: LivePostAccount): LivePost[] {
   const rows = record(payload)?.posts;
   if (!Array.isArray(rows)) return [];
-  const accountPlatform = toProviderPlatform(account.platform);
   return rows.flatMap((value) => {
     const row = record(value);
     const latePostId = str(row?._id);
     if (!row || !latePostId) return [];
-    const entries = (Array.isArray(row.platforms) ? row.platforms : [])
-      .map(record)
-      .filter((entry): entry is Record<string, unknown> => Boolean(entry));
-    return entries.flatMap((entry) => {
-      if (zernioAccountId(entry.accountId) !== account.accountId) return [];
-      if (toProviderPlatform(str(entry.platform) ?? "") !== accountPlatform) return [];
-      if (str(entry.status) !== "published") return [];
-      const platformPostId = str(entry.platformPostId);
-      if (!platformPostId) return [];
-      const url = httpsUrl(entry.platformPostUrl);
-      return [
-        {
-          key: livePostKey(accountPlatform, account.accountId, platformPostId),
-          platform: accountPlatform,
-          accountId: account.accountId,
-          accountName: account.name,
-          platformPostId,
-          latePostId,
-          url,
-          caption: str(row.content) ?? "",
-          thumbnailUrl: thumbnailOf(row),
-          mediaType: str(row.mediaType),
-          publishedAt: isoDate(entry.publishedAt) ?? isoDate(row.publishedAt),
-          source: "zernio" as const,
-          removedAt: null,
-          aliases: postAliases(accountPlatform, platformPostId, url),
-        },
-      ];
+    return entriesOf(row).flatMap((entry) => {
+      if (!isAccountTarget(entry, account)) return [];
+      if (
+        providerTargetState({ status: entry.status, parentStatus: row.status, records: [entry, row] }) !==
+        "live"
+      )
+        return [];
+      return buildCard(account, {
+        platformPostId: str(entry.platformPostId),
+        url: httpsUrl(entry.platformPostUrl),
+        latePostId,
+        row,
+        publishedAt: isoDate(entry.publishedAt) ?? isoDate(row.publishedAt),
+        source: "zernio",
+      });
     });
+  });
+}
+
+/** A provider statement that one exact target is not live right now. */
+export type ProviderVeto = {
+  platform: string;
+  accountId: string;
+  latePostId: string | null;
+  aliases: string[];
+  state: Exclude<ProviderTargetState, "live">;
+};
+
+/**
+ * Contradicting provider evidence for this account. Zernio's own post record
+ * is authoritative for its post id, so any non-live target status there
+ * vetoes other sources (analytics can keep reporting a cancelled post as
+ * published). Analytics and synced rows veto only when explicitly removed.
+ */
+export function providerVetoes(
+  payload: unknown,
+  account: LivePostAccount,
+  source: "zernio" | "analytics" | "synced",
+): ProviderVeto[] {
+  const rows = record(payload)?.posts;
+  if (!Array.isArray(rows)) return [];
+  const platform = toProviderPlatform(account.platform);
+  const veto = (
+    state: ProviderTargetState,
+    latePostId: string | null,
+    platformPostId: string | null,
+    url: string | null,
+  ): ProviderVeto[] => {
+    if (state === "live") return [];
+    if (source !== "zernio" && state !== "removed") return [];
+    const aliases = postAliases(platform, platformPostId, url);
+    if (!latePostId && !aliases.length) return [];
+    return [{ platform, accountId: account.accountId, latePostId, aliases, state }];
+  };
+  return rows.flatMap((value) => {
+    const row = record(value);
+    if (!row) return [];
+    const latePostId = source === "zernio" ? str(row._id) : source === "analytics" ? str(row.latePostId) : null;
+    if (source === "zernio" && !latePostId) return [];
+    const entries = entriesOf(row);
+    if (!entries.length) {
+      if (source === "zernio") return [];
+      if (toProviderPlatform(str(row.platform) ?? account.platform) !== platform) return [];
+      return veto(
+        providerTargetState({ status: row.status, records: [row], missingStatus: "live" }),
+        latePostId,
+        str(row.platformPostId),
+        httpsUrl(row.platformPostUrl),
+      );
+    }
+    return entries.flatMap((entry) => {
+      if (!isAccountTarget(entry, account)) return [];
+      return veto(
+        providerTargetState({
+          status: entry.status,
+          parentStatus: row.status,
+          records: [entry, row],
+          missingStatus: source === "zernio" ? "not_live" : "live",
+        }),
+        latePostId,
+        str(entry.platformPostId),
+        httpsUrl(entry.platformPostUrl),
+      );
+    });
+  });
+}
+
+/** Marks cards that any provider source contradicts as not verified live. */
+export function applyProviderVetoes(posts: LivePost[], vetoes: ProviderVeto[]) {
+  if (!vetoes.length) return posts;
+  return posts.map((post) => {
+    const contradicted = vetoes.some(
+      (veto) =>
+        veto.platform === post.platform &&
+        veto.accountId === post.accountId &&
+        ((veto.latePostId !== null && veto.latePostId === post.latePostId) ||
+          veto.aliases.some((alias) => post.aliases.includes(alias))),
+    );
+    return contradicted ? { ...post, verifiedLive: false } : post;
   });
 }
 
@@ -327,6 +524,7 @@ export function mergeLivePosts(...lists: LivePost[][]): LivePost[] {
     }
     merged[index] = {
       ...existing,
+      platformPostId: existing.platformPostId ?? post.platformPostId,
       latePostId: existing.latePostId ?? post.latePostId,
       url: existing.url ?? post.url,
       caption: existing.caption || post.caption,
@@ -335,6 +533,8 @@ export function mergeLivePosts(...lists: LivePost[][]): LivePost[] {
       publishedAt: existing.publishedAt ?? post.publishedAt,
       source: existing.source === "zernio" || post.source === "zernio" ? "zernio" : "external",
       removedAt: existing.removedAt ?? post.removedAt,
+      // Conservative: one unverified/contradicted copy makes the card unverified.
+      verifiedLive: existing.verifiedLive && post.verifiedLive,
       aliases: [...new Set([...existing.aliases, ...post.aliases])],
     };
   }
@@ -415,18 +615,25 @@ export type LivePostRemoval =
   | { kind: "removed"; message: string }
   | { kind: "remove" }
   | { kind: "manual"; message: string }
-  | { kind: "not_allowed"; message: string };
+  | { kind: "not_allowed"; message: string }
+  | { kind: "unverified"; message: string };
 
 /** What the post dialog offers for one exact card. */
 export function livePostRemoval(post: LivePost, canManage: boolean): LivePostRemoval {
   const label = livePlatformLabel(post.platform);
   if (post.removedAt) return { kind: "removed", message: `Removed from ${label}` };
+  // Manage controls exist only for a card every provider source confirms live.
+  if (!post.verifiedLive)
+    return {
+      kind: "unverified",
+      message: `WaveOS can't confirm this post is live on ${label} right now. Try Refresh.`,
+    };
   if (!providerPlatformSupportsUnpublish(post.platform))
     return {
       kind: "manual",
       message: `${label} doesn't allow removing posts from WaveOS. Open the post on ${label} and delete it there.`,
     };
-  if (!post.latePostId)
+  if (!post.latePostId || !post.platformPostId)
     return {
       kind: "manual",
       message: `This post was published outside WaveOS, so there is no safe way to remove it from here. Open it on ${label} and delete it there.`,
@@ -456,7 +663,14 @@ export function zernioPostContainsCopy(
     if (!entry) return false;
     if (toProviderPlatform(str(entry.platform) ?? "") !== providerPlatform) return false;
     if (zernioAccountId(entry.accountId) !== target.accountId) return false;
-    if (str(entry.status) !== "published") return false;
+    if (
+      providerTargetState({
+        status: entry.status,
+        parentStatus: record(zernioPost)?.status,
+        records: [entry],
+      }) !== "live"
+    )
+      return false;
     const entryAliases = postAliases(
       providerPlatform,
       str(entry.platformPostId),
