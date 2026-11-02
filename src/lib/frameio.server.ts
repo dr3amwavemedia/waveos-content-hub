@@ -6,6 +6,7 @@ import {
   encryptExternalToken,
   externalMediaEnv,
 } from "@/lib/external-media.server";
+import { frameioThumbnailLink } from "@/lib/frameio-media-preview";
 
 export const frameioEnv = (name: "FRAMEIO_CLIENT_ID" | "FRAMEIO_CLIENT_SECRET") =>
   externalMediaEnv(name);
@@ -183,7 +184,7 @@ export async function listFrameioShareFiles(accountId: string, shareId: string) 
         name: String(entry.name ?? "Untitled"),
         mediaType,
         sizeBytes: Number(entry.file_size ?? 0),
-        thumbnailUrl: typeof links.thumbnail?.url === "string" ? links.thumbnail.url : null,
+        thumbnailUrl: frameioThumbnailLink(links),
         viewUrl: typeof entry.view_url === "string" ? entry.view_url : null,
         width: positiveFrameioNumber(entry.width ?? metadata.width),
         height: positiveFrameioNumber(entry.height ?? metadata.height),
@@ -214,4 +215,16 @@ export async function frameioFileOriginalUrl(accountId: string, fileId: string) 
   const url = links.original?.inline_url ?? links.original?.download_url;
   if (typeof url !== "string") throw new Error("frameio_file_not_ready");
   return url;
+}
+
+/**
+ * Fresh, short-lived thumbnail link for one Frame.io file (V4 show-file).
+ * Returns null when Frame.io has not produced a thumbnail yet.
+ */
+export async function frameioFileThumbnailUrl(accountId: string, fileId: string) {
+  const result = await frameioGet<{ data?: Record<string, unknown> }>(
+    `/v4/accounts/${encodeURIComponent(accountId)}/files/${encodeURIComponent(fileId)}?include=media_links.thumbnail`,
+    true,
+  );
+  return frameioThumbnailLink((result.data ?? {}).media_links);
 }
