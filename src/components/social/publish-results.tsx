@@ -27,8 +27,24 @@ import {
   unsupportedUnpublishMessage,
 } from "@/lib/published-post-management";
 import type { Database } from "@/integrations/supabase/types";
+import { readTargetSummary, TARGET_LABELS } from "@/lib/publish-targets";
 
 export type PublishAttempt = Database["public"]["Tables"]["publish_attempts"]["Row"];
+
+/** "Instagram (account …e20f01d)" for each destination the request contained. */
+function sentTargets(snapshot: unknown) {
+  const summary = readTargetSummary(snapshot);
+  const platforms =
+    summary?.platforms ??
+    (Array.isArray((snapshot as { platforms?: unknown } | null)?.platforms)
+      ? ((snapshot as { platforms: Array<{ platform?: unknown; accountId?: unknown }> }).platforms
+          .filter((entry) => typeof entry?.platform === "string" && typeof entry?.accountId === "string")
+          .map((entry) => ({ platform: entry.platform as string, accountId: entry.accountId as string })))
+      : []);
+  return platforms.map(
+    (target) => `${TARGET_LABELS[target.platform] ?? target.platform} (account …${target.accountId.slice(-7)})`,
+  );
+}
 
 const platformLabel = (attempt: PublishAttempt) =>
   PLATFORM_LABEL[attempt.platform as SocialPlatform] ?? attempt.platform;
@@ -137,6 +153,7 @@ export function PublishAttemptDialog({
   const [removedAt, setRemovedAt] = useState<string | null>(attempt.unpublished_at);
   const actions = publishedAttemptActions({ ...attempt, unpublished_at: removedAt });
   const hasReference = hasProviderReference(attempt);
+  const sentTo = sentTargets(attempt.request_snapshot);
   const isFailure = attempt.status === "failed";
   const formatTime = (value: string) =>
     `${formatInTimeZone(value, timeZone, { dateStyle: "medium", timeStyle: "short" })} ${timeZone}`;
@@ -278,6 +295,11 @@ export function PublishAttemptDialog({
         <p className="mt-4 text-xs text-muted-foreground">
           Attempted {formatTime(attempt.attempted_at)}
         </p>
+        {sentTo.length > 0 && (
+          <p className="mt-1 break-all text-xs text-muted-foreground">
+            Sent only to: {sentTo.join(", ")}
+          </p>
+        )}
         {hasReference && (
           <p className="mt-1 break-all text-xs text-muted-foreground">
             Provider reference: {attempt.provider_post_id ?? attempt.ayrshare_post_id}

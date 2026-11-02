@@ -22,10 +22,15 @@ export const refreshPublishAttemptDetails = createServerFn({ method: "POST" })
 
 export const publishContentItem = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: { contentId: string; allowDuplicate?: boolean }) => ({
-    contentId: data.contentId,
-    allowDuplicate: data.allowDuplicate === true,
-  }))
+  .validator(
+    (data: { contentId: string; allowDuplicate?: boolean; expectedPlatforms?: string[] }) => ({
+      contentId: data.contentId,
+      allowDuplicate: data.allowDuplicate === true,
+      expectedPlatforms: Array.isArray(data.expectedPlatforms)
+        ? data.expectedPlatforms.filter((value): value is string => typeof value === "string").slice(0, 20)
+        : undefined,
+    }),
+  )
   .handler(async ({ data, context }) => {
     const { data: item, error } = await context.supabase
       .from("content_items")
@@ -39,6 +44,7 @@ export const publishContentItem = createServerFn({ method: "POST" })
     const { publishContentItemWithZernio } = await import("./zernio-publish.server");
     return publishContentItemWithZernio(data.contentId, context.userId, {
       allowDuplicate: data.allowDuplicate,
+      expectedPlatforms: data.expectedPlatforms,
     });
   });
 

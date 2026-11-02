@@ -10,6 +10,13 @@ import {
   ZERNIO_CREATE_POST_TIMEOUT_MS,
 } from "@/lib/zernio-timeout";
 import {
+  assertSingleTargetRequest,
+  readTargetSummary,
+  sameDestinations,
+  unexpectedResponseTargets,
+  unexpectedTargetMessage,
+} from "@/lib/publish-targets";
+import {
   DUPLICATE_GUARD_ERROR_CODE,
   DUPLICATE_GUARD_WINDOW_MS,
   findDuplicatePublishes,
@@ -44,7 +51,7 @@ export type PublishContentResult = {
 export async function publishContentItemWithZernio(
   contentId: string,
   actorUserId?: string | null,
-  options: { allowDuplicate?: boolean } = {},
+  options: { allowDuplicate?: boolean; expectedPlatforms?: string[] } = {},
 ): Promise<PublishContentResult> {
   const { data: item, error } = await supabaseAdmin
     .from("content_items")
@@ -102,6 +109,19 @@ export async function publishContentItemWithZernio(
     .eq("enabled", true);
   if (variantsError) throw variantsError;
   if (!variants?.length) throw new Error("No platforms selected.");
+  // Interactive publishes pass the destinations the person saw on screen. The
+  // saved selection must match exactly, so stale editor state cannot add one.
+  if (
+    options.expectedPlatforms &&
+    !sameDestinations(
+      variants.map((variant) => variant.platform),
+      options.expectedPlatforms,
+    )
+  ) {
+    throw new Error(
+      "The saved platforms don't match what was shown when you pressed Publish. Nothing was sent. Review the destinations and publish again.",
+    );
+  }
 
   // Resolve the provider profile from the content item's workspace every time.
   // Neither the acting staff member nor browser state can choose a different
@@ -239,6 +259,11 @@ export async function publishContentItemWithZernio(
         `Connect ${variant.platform} to this client's Zernio profile before publishing.`,
       );
     }
+    if (selectedConnections.length !== 1) {
+      throw new Error(
+        `Choose exactly one ${variant.platform} account for this post. WaveOS sends each platform to one account.`,
+      );
+    }
     if (contentType && !["instagram", "facebook"].includes(variant.platform)) {
       throw new Error(`${variant.platform} does not support Story publishing through Zernio.`);
     }
@@ -266,7 +291,21 @@ export async function publishContentItemWithZernio(
       mediaAssetIds: item.media_asset_ids ?? [],
       contentType,
     };
-    return { idempotencyKey, providerPlatform, requestBody, variant, fingerprintInput };
+    const connection = selectedConnections[0]!;
+    const targetSummary = assertSingleTargetRequest({
+      variantPlatform: variant.platform,
+      requestBody,
+      connection,
+    });
+    return {
+      idempotencyKey,
+      providerPlatform,
+      requestBody,
+      variant,
+      fingerprintInput,
+      connection,
+      targetSummary,
+    };
   });
   const fingerprints = await Promise.all(
     preparedVariants.map((prepared) => publishFingerprint(prepared.fingerprintInput)),
@@ -308,11 +347,17 @@ export async function publishContentItemWithZernio(
   try {
     for (const [
       index,
-      { idempotencyKey, providerPlatform, requestBody, variant },
+      { idempotencyKey, providerPlatform, requestBody, variant, connection },
     ] of preparedVariants.entries()) {
+      // Re-check immediately before the create call; nothing is sent on mismatch.
+      const targetSummary = assertSingleTargetRequest({
+        variantPlatform: variant.platform,
+        requestBody,
+        connection,
+      });
       const { data: existing, error: existingError } = await supabaseAdmin
         .from("publish_attempts")
-        .select("id,status")
+        .select("id,status,error_code,provider_post_id")
         .eq("idempotency_key", idempotencyKey)
         .eq("platform", variant.platform)
         .eq("content_item_id", contentId)
@@ -321,6 +366,12 @@ export async function publishContentItemWithZernio(
       if (existingError) throw existingError;
       if (existing?.status === "success") {
         success += 1;
+        continue;
+      }
+      // Already created once with an unexpected extra destination. Never
+      // re-send; the person reviews it in Published posts instead.
+      if (existing?.error_code === "unexpected_target" && existing.provider_post_id) {
+        failed += 1;
         continue;
       }
 
@@ -337,6 +388,7 @@ export async function publishContentItemWithZernio(
             request_snapshot: {
               ...requestBody,
               waveosFingerprint: fingerprints[index],
+              waveosTarget: targetSummary,
             } as unknown as Json,
             attempted_at: new Date().toISOString(),
             error_code: null,
@@ -357,6 +409,17 @@ export async function publishContentItemWithZernio(
           signal: AbortSignal.timeout(ZERNIO_CREATE_POST_TIMEOUT_MS),
         });
         const result = zernioPostResult(response.post, providerPlatform);
+        const extraTargets = unexpectedResponseTargets(response.post, targetSummary);
+        if (extraTargets.length) {
+          console.error("Zernio reported unrequested publish targets", {
+            attemptId: attempt.id,
+            requested: targetSummary.platforms,
+            unexpected: extraTargets,
+          });
+          result.status = "failed";
+          result.errorCode = "unexpected_target";
+          result.errorMessage = unexpectedTargetMessage(extraTargets, variant.platform);
+        }
         const { error: attemptUpdateError } = await supabaseAdmin
           .from("publish_attempts")
           .update({
@@ -451,7 +514,7 @@ export async function publishContentItemWithZernio(
 export async function refreshZernioPublishAttempt(attemptId: string) {
   const { data: attempt, error } = await supabaseAdmin
     .from("publish_attempts")
-    .select("id,content_item_id,platform,provider,provider_post_id")
+    .select("id,content_item_id,platform,provider,provider_post_id,request_snapshot")
     .eq("id", attemptId)
     .maybeSingle();
   if (error) throw error;
@@ -463,6 +526,13 @@ export async function refreshZernioPublishAttempt(attemptId: string) {
     `/posts/${encodeURIComponent(attempt.provider_post_id)}`,
   );
   const result = zernioPostResult(response.post, toZernioPlatform(attempt.platform));
+  const storedTarget = readTargetSummary(attempt.request_snapshot);
+  const extraTargets = storedTarget ? unexpectedResponseTargets(response.post, storedTarget) : [];
+  if (extraTargets.length) {
+    result.status = "failed";
+    result.errorCode = "unexpected_target";
+    result.errorMessage = unexpectedTargetMessage(extraTargets, attempt.platform);
+  }
   await supabaseAdmin
     .from("publish_attempts")
     .update({
