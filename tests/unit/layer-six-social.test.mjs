@@ -171,7 +171,7 @@ test("analytics has its own discoverable workspace and exposes engagement signal
   const social = readFileSync("src/routes/_authenticated/social.tsx", "utf8");
   const analyticsRoute = readFileSync("src/routes/_authenticated/analytics.tsx", "utf8");
   const analyticsCheckup = readFileSync("src/components/social/analytics-checkup.tsx", "utf8");
-  assert.match(social, /"overview" \| "posts" \| "analytics" \| "accounts"/);
+  assert.match(social, /"overview" \| "posts" \| (?:"live" \| )?"analytics" \| "accounts"/);
   assert.match(analyticsCheckup, /key: "likes", label: "Likes"/);
   assert.match(analyticsCheckup, /key: "reach", label: "Reach"/);
   assert.match(analyticsCheckup, /key: "impressions", label: "Impressions"/);
