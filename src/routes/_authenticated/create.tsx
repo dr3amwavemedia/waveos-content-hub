@@ -698,7 +698,7 @@ function CreatePost() {
       className={cn(
         "space-y-4 lg:space-y-6 lg:pb-0",
         // Room for the phone action bar, which also shows the destinations.
-        metaSharingWarning ? "pb-72" : "pb-44",
+        metaSharingWarning ? "pb-40" : "pb-24",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
