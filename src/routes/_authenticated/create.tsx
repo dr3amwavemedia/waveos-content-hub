@@ -292,6 +292,10 @@ function CreatePost() {
   const assist = useServerFn(waveAssist);
 
   const [publishing, setPublishing] = useState<null | "now" | "schedule">(null);
+  const [duplicateGuard, setDuplicateGuard] = useState<{
+    contentId: string;
+    matches: DuplicateGuardMatch[];
+  } | null>(null);
   const [assisting, setAssisting] = useState(false);
 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -514,35 +518,60 @@ function CreatePost() {
         navigate({ to: "/approvals" });
         return;
       }
-      const res = await publishFn({ data: { contentId: id } });
-      qc.invalidateQueries({ queryKey: ["content-items"] });
-      qc.invalidateQueries({ queryKey: ["content-item", id] });
-      if (res.failed === 0 && res.pending === 0)
-        toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
-      else if (res.failed === 0)
-        toast.success(
-          `Published to ${res.success}; ${res.pending} channel${res.pending === 1 ? " is" : "s are"} still processing`,
-        );
-      else
-        toast.warning(
-          `Published to ${res.success}, ${res.failed} failed — open Posts & insights to retry`,
-        );
-      navigate({ to: "/social", search: { view: "posts" } });
+      await runPublish(id, false);
     } catch (e) {
-      const message = (e as Error).message;
-      if (message === "frameio_share_not_ready") {
-        toast.error(
-          "Frame.io media is not ready. Re-sync the assigned Frame.io Share and try again.",
-        );
-      } else if (message === "frameio_file_removed_from_share") {
-        toast.error(
-          "This file is no longer in the assigned Frame.io Share. Pick it again or choose another file.",
-        );
-      } else {
-        toast.error(message);
-      }
+      showPublishError(e);
     } finally {
       setPublishing(null);
+    }
+  }
+
+  async function runPublish(id: string, allowDuplicate: boolean) {
+    const res = await publishFn({ data: { contentId: id, allowDuplicate } });
+    qc.invalidateQueries({ queryKey: ["content-items"] });
+    qc.invalidateQueries({ queryKey: ["content-item", id] });
+    if (res.duplicateGuard?.length) {
+      // Nothing was sent. The user must explicitly confirm a second copy.
+      setDuplicateGuard({ contentId: id, matches: res.duplicateGuard });
+      return;
+    }
+    if (res.failed === 0 && res.pending === 0)
+      toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
+    else if (res.failed === 0)
+      toast.success(
+        `Published to ${res.success}; ${res.pending} channel${res.pending === 1 ? " is" : "s are"} still processing`,
+      );
+    else
+      toast.warning(
+        `Published to ${res.success}, ${res.failed} failed — open Posts & insights to retry`,
+      );
+    navigate({ to: "/social", search: { view: "posts" } });
+  }
+
+  async function handlePublishAnotherCopy() {
+    if (!duplicateGuard || publishing !== null) return;
+    const { contentId } = duplicateGuard;
+    setDuplicateGuard(null);
+    setPublishing("now");
+    try {
+      await runPublish(contentId, true);
+    } catch (e) {
+      showPublishError(e);
+    } finally {
+      setPublishing(null);
+    }
+  }
+
+  function showPublishError(e: unknown) {
+    const message = (e as Error).message;
+    if (message === "frameio_share_not_ready") {
+      toast.error("Frame.io media is not ready. Re-sync the assigned Frame.io Share and try again.");
+    } else if (message === "frameio_file_removed_from_share") {
+      toast.error(
+        "This file is no longer in the assigned Frame.io Share. Pick it again or choose another file.",
+      );
+    } else {
+      toast.error(message);
     }
   }
 
