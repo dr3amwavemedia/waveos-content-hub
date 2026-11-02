@@ -253,7 +253,9 @@ function CampaignManagerPage() {
     if (!asset.mime_type.startsWith("video/")) return [] as string[];
     let url: string;
     try {
-      url = await getMediaPreviewUrl(asset, 60 * 30, "content");
+      const previewUrl = await getMediaPreviewUrl(asset, 60 * 30, "content");
+      if (!previewUrl) return [];
+      url = previewUrl;
     } catch {
       return [];
     }
