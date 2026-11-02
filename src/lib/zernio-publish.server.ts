@@ -4,8 +4,19 @@ import { resolveMediaAssetUrl } from "@/lib/external-media.server";
 import { normalizeZernioAccounts, toZernioPlatform, zernioRequest } from "@/lib/zernio.server";
 import { cleanupConfirmedTemporaryMedia } from "@/lib/temporary-media-cleanup.server";
 import { assertPublishingEnabled } from "@/lib/publishing-controls.server";
-import { normalizeZernioRequestError, ZERNIO_CREATE_POST_TIMEOUT_MS } from "@/lib/zernio-timeout";
-import { readUnpublishedMarker } from "@/lib/published-post-management";
+import {
+  isZernioTimeoutError,
+  normalizeZernioRequestError,
+  ZERNIO_CREATE_POST_TIMEOUT_MS,
+} from "@/lib/zernio-timeout";
+import {
+  DUPLICATE_GUARD_ERROR_CODE,
+  DUPLICATE_GUARD_WINDOW_MS,
+  findDuplicatePublishes,
+  publishFingerprint,
+  type DuplicateGuardMatch,
+} from "@/lib/publish-fingerprint";
+import { snapshotAccountIds, unpublishBlockReason } from "@/lib/published-post-management";
 
 type ZernioTarget = {
   platform?: string;
@@ -23,7 +34,18 @@ type ZernioPost = {
   platforms?: ZernioTarget[];
 };
 
-export async function publishContentItemWithZernio(contentId: string, actorUserId?: string | null) {
+export type PublishContentResult = {
+  success: number;
+  failed: number;
+  pending: number;
+  duplicateGuard?: DuplicateGuardMatch[];
+};
+
+export async function publishContentItemWithZernio(
+  contentId: string,
+  actorUserId?: string | null,
+  options: { allowDuplicate?: boolean } = {},
+): Promise<PublishContentResult> {
   const { data: item, error } = await supabaseAdmin
     .from("content_items")
     .select("*")
@@ -236,8 +258,37 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
       ],
       publishNow: true,
     };
-    return { idempotencyKey, providerPlatform, requestBody, variant };
+    const fingerprintInput = {
+      workspaceId: item.workspace_id,
+      platform: variant.platform,
+      accountIds: selectedConnections.map((connection) => connection.provider_account_id!),
+      caption: requestBody.content,
+      mediaAssetIds: item.media_asset_ids ?? [],
+      contentType,
+    };
+    return { idempotencyKey, providerPlatform, requestBody, variant, fingerprintInput };
   });
+  const fingerprints = await Promise.all(
+    preparedVariants.map((prepared) => publishFingerprint(prepared.fingerprintInput)),
+  );
+
+  // Duplicate-content fail-safe. Runs before the content item is claimed and
+  // before any provider write. Networks this same item already published are
+  // skipped later as before, so they are not checked here.
+  const duplicateGuard = await checkDuplicatePublishes({
+    contentId,
+    workspaceId: item.workspace_id,
+    prepared: preparedVariants.map((prepared, index) => ({
+      platform: prepared.variant.platform,
+      idempotencyKey: prepared.idempotencyKey,
+      fingerprint: fingerprints[index]!,
+    })),
+    allowDuplicate: options.allowDuplicate === true,
+  });
+  if (duplicateGuard.length > 0) {
+    if (!actorUserId) await holdScheduledDuplicate(item, duplicateGuard, preparedVariants, fingerprints);
+    return { success: 0, failed: 0, pending: 0, duplicateGuard };
+  }
 
   const { data: claimed, error: claimError } = await supabaseAdmin
     .from("content_items")
@@ -255,7 +306,10 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
   let pending = 0;
 
   try {
-    for (const { idempotencyKey, providerPlatform, requestBody, variant } of preparedVariants) {
+    for (const [
+      index,
+      { idempotencyKey, providerPlatform, requestBody, variant },
+    ] of preparedVariants.entries()) {
       const { data: existing, error: existingError } = await supabaseAdmin
         .from("publish_attempts")
         .select("id,status")
@@ -280,7 +334,10 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
             provider: "zernio",
             status: "sending",
             idempotency_key: idempotencyKey,
-            request_snapshot: requestBody as unknown as Json,
+            request_snapshot: {
+              ...requestBody,
+              waveosFingerprint: fingerprints[index],
+            } as unknown as Json,
             attempted_at: new Date().toISOString(),
             error_code: null,
             error_message: null,
@@ -394,15 +451,11 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
 export async function refreshZernioPublishAttempt(attemptId: string) {
   const { data: attempt, error } = await supabaseAdmin
     .from("publish_attempts")
-    .select("id,content_item_id,platform,provider,provider_post_id,response_snapshot")
+    .select("id,content_item_id,platform,provider,provider_post_id")
     .eq("id", attemptId)
     .maybeSingle();
   if (error) throw error;
   if (!attempt) throw new Error("Publishing attempt not found.");
-  // A refresh would overwrite the stored removal record and restore the link.
-  if (readUnpublishedMarker(attempt.response_snapshot)) {
-    throw new Error("This post was removed from the platform, so there is nothing to refresh.");
-  }
   if (attempt.provider !== "zernio" || !attempt.provider_post_id) {
     throw new Error("This attempt does not have a Zernio post reference.");
   }
@@ -498,5 +551,246 @@ async function reconcileContentStatus(contentItemId: string) {
     statuses.every((value) => value === "success")
   ) {
     await cleanupConfirmedTemporaryMedia(contentItemId);
+  }
+}
+
+type PreparedDuplicateCheck = { platform: string; idempotencyKey: string; fingerprint: string };
+
+async function checkDuplicatePublishes(input: {
+  contentId: string;
+  workspaceId: string;
+  prepared: PreparedDuplicateCheck[];
+  allowDuplicate: boolean;
+}): Promise<DuplicateGuardMatch[]> {
+  if (input.allowDuplicate || input.prepared.length === 0) return [];
+  const { data: own, error: ownError } = await supabaseAdmin
+    .from("publish_attempts")
+    .select("platform,status")
+    .eq("content_item_id", input.contentId)
+    .eq("workspace_id", input.workspaceId)
+    .in(
+      "idempotency_key",
+      input.prepared.map((entry) => entry.idempotencyKey),
+    );
+  if (ownError) throw ownError;
+  const alreadyPublished = new Set(
+    (own ?? []).filter((row) => row.status === "success").map((row) => row.platform as string),
+  );
+  const candidates = input.prepared.filter((entry) => !alreadyPublished.has(entry.platform));
+  if (candidates.length === 0) return [];
+  const { data: prior, error: priorError } = await supabaseAdmin
+    .from("publish_attempts")
+    .select("id,content_item_id,platform,status,attempted_at,post_url,unpublished_at,request_snapshot")
+    .eq("workspace_id", input.workspaceId)
+    .eq("status", "success")
+    .is("unpublished_at", null)
+    .neq("content_item_id", input.contentId)
+    .in("platform", candidates.map((entry) => entry.platform) as never)
+    .gte("attempted_at", new Date(Date.now() - DUPLICATE_GUARD_WINDOW_MS).toISOString())
+    .limit(200);
+  if (priorError) throw priorError;
+  return findDuplicatePublishes({
+    contentItemId: input.contentId,
+    prepared: candidates,
+    prior: (prior ?? []).map((row) => {
+      const snapshot = (row.request_snapshot ?? {}) as Record<string, unknown>;
+      return {
+        id: row.id,
+        content_item_id: row.content_item_id,
+        platform: row.platform as string,
+        status: row.status as string,
+        attempted_at: row.attempted_at,
+        post_url: row.post_url,
+        unpublished_at: row.unpublished_at,
+        fingerprint:
+          typeof snapshot.waveosFingerprint === "string" ? snapshot.waveosFingerprint : null,
+      };
+    }),
+  });
+}
+
+/**
+ * Scheduled publishing has nobody to confirm a possible duplicate, so the item
+ * is held as failed with a clear reason instead of retrying on every run. The
+ * earlier successful post is never touched.
+ */
+async function holdScheduledDuplicate(
+  item: { id: string; workspace_id: string; status: string },
+  matches: DuplicateGuardMatch[],
+  preparedVariants: Array<{
+    idempotencyKey: string;
+    requestBody: Record<string, unknown>;
+    variant: { platform: string };
+  }>,
+  fingerprints: string[],
+) {
+  const { data: held, error: holdError } = await supabaseAdmin
+    .from("content_items")
+    .update({ status: "failed" })
+    .eq("id", item.id)
+    .eq("workspace_id", item.workspace_id)
+    .eq("status", item.status as never)
+    .select("id")
+    .maybeSingle();
+  if (holdError) throw holdError;
+  if (!held) return;
+  const now = new Date().toISOString();
+  for (const match of matches) {
+    const index = preparedVariants.findIndex((entry) => entry.variant.platform === match.platform);
+    const prepared = preparedVariants[index];
+    if (!prepared) continue;
+    const label = platformDisplayName(match.platform);
+    const { error } = await supabaseAdmin.from("publish_attempts").upsert(
+      {
+        content_item_id: item.id,
+        workspace_id: item.workspace_id,
+        platform: match.platform as never,
+        provider: "zernio",
+        status: "failed",
+        idempotency_key: prepared.idempotencyKey,
+        request_snapshot: {
+          ...prepared.requestBody,
+          waveosFingerprint: fingerprints[index],
+        } as unknown as Json,
+        attempted_at: now,
+        completed_at: now,
+        error_code: DUPLICATE_GUARD_ERROR_CODE,
+        error_message: `WaveOS held this ${label} post as a possible duplicate: the same caption and media were already published to ${label} from another post at ${match.attemptedAt.slice(0, 16).replace("T", " ")} UTC. Open and retry post to confirm before publishing another copy.`,
+      },
+      { onConflict: "idempotency_key,platform" },
+    );
+    if (error) throw error;
+  }
+  await supabaseAdmin.from("activity_logs").insert({
+    workspace_id: item.workspace_id,
+    actor_user_id: null,
+    action: "content_publish_held_duplicate",
+    entity_type: "content_item",
+    entity_id: item.id,
+    safe_metadata: {
+      provider: "zernio",
+      platforms: matches.map((match) => match.platform),
+      existing_attempt_ids: matches.map((match) => match.existingAttemptId),
+    },
+  });
+}
+
+function platformDisplayName(platform: string) {
+  const names: Record<string, string> = {
+    x: "X",
+    gmb: "Google Business",
+    youtube: "YouTube",
+    linkedin: "LinkedIn",
+    tiktok: "TikTok",
+  };
+  return names[platform] ?? platform.charAt(0).toUpperCase() + platform.slice(1);
+}
+
+const ZERNIO_UNPUBLISH_TIMEOUT_MS = 60_000;
+
+/**
+ * Delete one live platform post through Zernio. The caller must already have
+ * loaded the attempt through RLS and verified workspace-manager authority.
+ * The WaveOS attempt row is kept as history either way.
+ */
+export async function unpublishZernioPublishAttempt(input: {
+  attemptId: string;
+  workspaceId: string;
+  actorUserId: string;
+}) {
+  const { data: attempt, error } = await supabaseAdmin
+    .from("publish_attempts")
+    .select(
+      "id,workspace_id,content_item_id,platform,provider,provider_post_id,status,post_url,unpublished_at,request_snapshot",
+    )
+    .eq("id", input.attemptId)
+    .eq("workspace_id", input.workspaceId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!attempt) throw new Error("Publishing attempt not found.");
+  const label = platformDisplayName(attempt.platform);
+  const blocked = unpublishBlockReason(
+    {
+      platform: attempt.platform,
+      provider: attempt.provider,
+      provider_post_id: attempt.provider_post_id,
+      status: attempt.status,
+      post_url: attempt.post_url,
+      unpublished_at: attempt.unpublished_at,
+    },
+    label,
+  );
+  if (blocked) throw new Error(blocked);
+  const providerPlatform = toZernioPlatform(attempt.platform);
+  if (snapshotAccountIds(attempt.request_snapshot, providerPlatform).length > 1) {
+    throw new Error(
+      `This post went to several ${label} accounts. Remove each copy on ${label} so the right one is deleted.`,
+    );
+  }
+
+  const logBase = {
+    workspace_id: attempt.workspace_id,
+    actor_user_id: input.actorUserId,
+    entity_type: "publish_attempt",
+    entity_id: attempt.id,
+  };
+  try {
+    const response = await zernioRequest<Record<string, unknown>>(
+      `/posts/${encodeURIComponent(attempt.provider_post_id!)}/unpublish`,
+      {
+        method: "POST",
+        body: JSON.stringify({ platform: providerPlatform }),
+        signal: AbortSignal.timeout(ZERNIO_UNPUBLISH_TIMEOUT_MS),
+      },
+    );
+    const unpublishedAt = new Date().toISOString();
+    const { error: updateError } = await supabaseAdmin
+      .from("publish_attempts")
+      .update({
+        unpublished_at: unpublishedAt,
+        unpublished_by: input.actorUserId,
+        unpublish_response: response as unknown as Json,
+        unpublish_error: null,
+      })
+      .eq("id", attempt.id)
+      .eq("workspace_id", attempt.workspace_id)
+      .is("unpublished_at", null);
+    if (updateError) throw updateError;
+    await supabaseAdmin.from("activity_logs").insert({
+      ...logBase,
+      action: "published_post_removed",
+      safe_metadata: {
+        provider: "zernio",
+        platform: attempt.platform,
+        content_item_id: attempt.content_item_id,
+        provider_post_id: attempt.provider_post_id,
+      },
+    });
+    return { unpublishedAt, platform: attempt.platform };
+  } catch (reason) {
+    const message = isZernioTimeoutError(reason)
+      ? `Zernio did not answer in time. The removal may still complete, so check the post on ${label} before trying again.`
+      : `${label} removal failed: ${
+          reason instanceof Error && reason.message
+            ? reason.message.slice(0, 300)
+            : "Zernio did not remove the post."
+        }`;
+    await supabaseAdmin
+      .from("publish_attempts")
+      .update({ unpublish_error: message })
+      .eq("id", attempt.id)
+      .eq("workspace_id", attempt.workspace_id)
+      .is("unpublished_at", null);
+    await supabaseAdmin.from("activity_logs").insert({
+      ...logBase,
+      action: "published_post_remove_failed",
+      safe_metadata: {
+        provider: "zernio",
+        platform: attempt.platform,
+        content_item_id: attempt.content_item_id,
+        timeout: isZernioTimeoutError(reason),
+      },
+    });
+    throw new Error(message);
   }
 }
