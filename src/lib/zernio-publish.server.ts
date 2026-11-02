@@ -235,8 +235,37 @@ export async function publishContentItemWithZernio(contentId: string, actorUserI
       ],
       publishNow: true,
     };
-    return { idempotencyKey, providerPlatform, requestBody, variant };
+    const fingerprintInput = {
+      workspaceId: item.workspace_id,
+      platform: variant.platform,
+      accountIds: selectedConnections.map((connection) => connection.provider_account_id!),
+      caption: requestBody.content,
+      mediaAssetIds: item.media_asset_ids ?? [],
+      contentType,
+    };
+    return { idempotencyKey, providerPlatform, requestBody, variant, fingerprintInput };
   });
+  const fingerprints = await Promise.all(
+    preparedVariants.map((prepared) => publishFingerprint(prepared.fingerprintInput)),
+  );
+
+  // Duplicate-content fail-safe. Runs before the content item is claimed and
+  // before any provider write. Networks this same item already published are
+  // skipped later as before, so they are not checked here.
+  const duplicateGuard = await checkDuplicatePublishes({
+    contentId,
+    workspaceId: item.workspace_id,
+    prepared: preparedVariants.map((prepared, index) => ({
+      platform: prepared.variant.platform,
+      idempotencyKey: prepared.idempotencyKey,
+      fingerprint: fingerprints[index]!,
+    })),
+    allowDuplicate: options.allowDuplicate === true,
+  });
+  if (duplicateGuard.length > 0) {
+    if (!actorUserId) await holdScheduledDuplicate(item, duplicateGuard, preparedVariants, fingerprints);
+    return { success: 0, failed: 0, pending: 0, duplicateGuard };
+  }
 
   const { data: claimed, error: claimError } = await supabaseAdmin
     .from("content_items")
