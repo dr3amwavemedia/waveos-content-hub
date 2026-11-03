@@ -5,7 +5,7 @@ import { Check, Loader2, Sparkles, Users2, WandSparkles } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { sendAccountSupportRequest, tryEmail } from "@/lib/transactional-email";
-import { lovable } from "@/integrations/lovable";
+import { signInWithGoogle } from "@/lib/google-auth";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
 const POST_AUTH_NEXT_KEY = "waveos.postAuthNext";
@@ -279,12 +279,9 @@ function AuthPage() {
         sessionStorage.removeItem(PUBLIC_SIGNUP_PLAN_KEY);
       }
 
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth-callback${mode === "signup" ? "?public_signup=1" : ""}`,
-        extraParams: {
-          prompt: "select_account",
-          ...(email ? { login_hint: email } : {}),
-        },
+      const result = await signInWithGoogle({
+        redirectTo: `${window.location.origin}/auth-callback${mode === "signup" ? "?public_signup=1" : ""}`,
+        ...(email ? { loginHint: email } : {}),
       });
 
       if (result.error) throw result.error;
