@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { FileText, Home, Images, Menu, Plus } from "lucide-react";
+import type { CSSProperties } from "react";
 
 import { MobileCommandCenter } from "@/components/app/mobile-command-center";
 import type { FeatureKey } from "@/lib/permissions";
@@ -14,8 +15,19 @@ function MobileDesignReview() {
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString();
 
   return (
-    <div className="waveos-app-shell min-h-screen overflow-x-clip bg-background pb-24 text-foreground">
-      <header className="mobile-classic-header sticky top-0 z-30 flex h-[calc(4rem+env(safe-area-inset-top))] items-center px-3 pt-[env(safe-area-inset-top)]">
+    <div
+      className="waveos-app-shell min-h-screen overflow-x-clip bg-[radial-gradient(95%_42rem_at_50%_-10%,oklch(0.44_0.18_295/.32),transparent_72%)] pb-24 text-foreground"
+      style={
+        {
+          "--primary": "oklch(0.69 0.2 295)",
+          "--primary-glow": "oklch(0.78 0.18 310)",
+          "--primary-foreground": "oklch(0.98 0.006 260)",
+          "--border": "oklch(0.7 0.16 295 / 0.18)",
+          "--border-strong": "oklch(0.72 0.18 295 / 0.34)",
+        } as CSSProperties
+      }
+    >
+      <header className="mobile-classic-header sticky top-0 z-30 mx-auto flex h-[calc(4rem+env(safe-area-inset-top))] max-w-md items-center border-b border-violet-300/20 bg-[#1a112b]/95 px-3 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-violet-500/25 text-violet-100">
           ≈
         </div>
@@ -31,29 +43,31 @@ function MobileDesignReview() {
             <p className="mt-1 text-sm text-muted-foreground">What do you want to work on today?</p>
           </header>
 
-          <MobileCommandCenter
-            can={allowAll}
-            workspaceName="Dream Wave Media"
-            loading={false}
-            approvalsTo="/approvals"
-            stats={{
-              scheduledCount: 3,
-              awaitingCount: 2,
-              draftCount: 5,
-              failedCount: 0,
-              publishedCount: 18,
-              upcoming: [
-                {
-                  id: "review-next",
-                  title: "Behind the scenes: fall campaign",
-                  scheduled_at: tomorrow,
-                  status: "scheduled",
-                  metadata: { platforms: ["instagram", "facebook"] },
-                  media_asset_ids: [],
-                },
-              ],
-            }}
-          />
+          <div className="[&>div]:!block">
+            <MobileCommandCenter
+              can={allowAll}
+              workspaceName="Dream Wave Media"
+              loading={false}
+              approvalsTo="/approvals"
+              stats={{
+                scheduledCount: 3,
+                awaitingCount: 2,
+                draftCount: 5,
+                failedCount: 0,
+                publishedCount: 18,
+                upcoming: [
+                  {
+                    id: "review-next",
+                    title: "Behind the scenes: fall campaign",
+                    scheduled_at: tomorrow,
+                    status: "scheduled",
+                    metadata: { platforms: ["instagram", "facebook"] },
+                    media_asset_ids: [],
+                  },
+                ],
+              }}
+            />
+          </div>
 
           <section className="space-y-2">
             <div className="flex items-center justify-between">
@@ -76,7 +90,7 @@ function MobileDesignReview() {
         </section>
       </main>
 
-      <nav className="mobile-classic-nav fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[calc(5rem+env(safe-area-inset-bottom))] max-w-md items-center justify-around px-2 pb-[env(safe-area-inset-bottom)]">
+      <nav className="mobile-classic-nav fixed inset-x-0 bottom-0 z-30 mx-auto flex h-[calc(5rem+env(safe-area-inset-bottom))] max-w-md items-center justify-around rounded-t-3xl border-t border-violet-300/20 bg-[#1c132e]/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-18px_50px_-28px_oklch(0.65_0.22_300/.7)] backdrop-blur-xl">
         <Link to="/mobile-design-review" className="flex min-w-0 flex-1 flex-col items-center gap-1 text-violet-300">
           <Home className="h-5 w-5" />
           <span className="text-[10px]">Overview</span>
