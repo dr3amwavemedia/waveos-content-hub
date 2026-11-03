@@ -394,6 +394,14 @@ function textValue(row: Record<string, unknown>, names: readonly string[]) {
   return null;
 }
 
+export function formatAnalyticsPlatform(value: string) {
+  const normalized = value.trim().toLowerCase().replaceAll("_", " ");
+  if (normalized === "linkedin") return "LinkedIn";
+  if (normalized === "youtube") return "YouTube";
+  if (normalized === "tiktok") return "TikTok";
+  return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 /**
  * Reads one post/ad metric object per provider record. The provider may expose
  * clicks or message starts under different documented field names; missing
@@ -428,6 +436,7 @@ export function extractContentLeadSignals(
       textValue(row, ["platform", "network", "provider"]) ??
       (platformEntry ? textValue(platformEntry, ["platform", "network", "provider"]) : null) ??
       "Platform not reported";
+    const publishedAt = textValue(row, ["publishedAt", "published_at", "date", "createdAt"]);
     const rawTitle =
       textValue(row, [
         "title",
@@ -450,13 +459,13 @@ export function extractContentLeadSignals(
           .replace(/<[^>]+>/g, " ")
           .replace(/\s+/g, " ")
           .trim()
-      : `${platform.replaceAll("_", " ")} post`;
+      : `${formatAnalyticsPlatform(platform)} post${publishedAt ? ` from ${publishedAt.slice(0, 10)}` : ""}`;
     return [
       {
         contentId,
         title: title.length > 100 ? `${title.slice(0, 97)}…` : title,
         platform,
-        publishedAt: textValue(row, ["publishedAt", "published_at", "date", "createdAt"]),
+        publishedAt,
         clicks,
         messages,
         source,
