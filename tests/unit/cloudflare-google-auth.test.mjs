@@ -22,3 +22,16 @@ test("Cloudflare Google auth uses Supabase with the exact callback while Lovable
   assert.match(source, /return lovable\.auth\.signInWithOAuth/);
   assert.doesNotMatch(source, /service_role|SUPABASE_SERVICE_ROLE/);
 });
+
+test("Google sign-in has a no-hydration Lovable broker fallback", async () => {
+  const [auth, root] = await Promise.all([
+    readFile(new URL("../../src/routes/auth.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(auth, /data-google-oauth-fallback/);
+  assert.match(auth, /href="\/~oauth\/initiate\?provider=google"/);
+  assert.match(root, /redirect_uri:location\.origin\+"\/auth-callback"/);
+  assert.match(root, /crypto\.getRandomValues/);
+  assert.match(root, /GOOGLE_OAUTH_FALLBACK_SCRIPT/);
+});

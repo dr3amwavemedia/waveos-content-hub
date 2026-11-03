@@ -267,6 +267,7 @@ function AuthPage() {
   }
 
   async function handleGoogle() {
+    if (busy) return;
     setBusy(true);
 
     try {
@@ -335,14 +336,20 @@ function AuthPage() {
           </div>
           {mode === "signin" && (
             <>
-              <button
-                type="button"
-                onClick={handleGoogle}
-                disabled={busy || !hydrated}
-                className="mb-4 flex min-h-11 w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-elevated disabled:opacity-60"
+              <a
+                href="/~oauth/initiate?provider=google"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-google-oauth-fallback
+                aria-disabled={busy}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (!busy) void handleGoogle();
+                }}
+                className="mb-4 flex min-h-11 w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-elevated aria-disabled:pointer-events-none aria-disabled:opacity-60"
               >
                 <GoogleIcon /> Continue with Google
-              </button>
+              </a>
               <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
                 <div className="h-px flex-1 bg-border" />
                 or

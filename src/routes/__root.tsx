@@ -18,6 +18,8 @@ import {
   clearAuthenticatedBrowserState,
 } from "@/lib/auth-session-state";
 
+const GOOGLE_OAUTH_FALLBACK_SCRIPT = `(function(){function state(){try{var b=new Uint8Array(16);crypto.getRandomValues(b);return Array.from(b,function(v){return v.toString(16).padStart(2,"0")}).join("")}catch(e){return Math.random().toString(36).slice(2)+Date.now().toString(36)}}function apply(){document.querySelectorAll("[data-google-oauth-fallback]").forEach(function(link){var params=new URLSearchParams({provider:"google",redirect_uri:location.origin+"/auth-callback",prompt:"select_account",state:state()});link.setAttribute("href","/~oauth/initiate?"+params.toString())})}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",apply,{once:true});else apply()})();`;
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -145,6 +147,7 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="dark">
       <head>
+        <script dangerouslySetInnerHTML={{ __html: GOOGLE_OAUTH_FALLBACK_SCRIPT }} />
         <HeadContent />
       </head>
       <body>
