@@ -11,6 +11,8 @@ const campaign = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf
 const studio = fs.readFileSync("src/routes/_authenticated/creative-studio.tsx", "utf8");
 const videoMaker = fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8");
 const aiUsage = fs.readFileSync("src/lib/ai-usage.server.ts", "utf8");
+const agent = fs.readFileSync("src/lib/wave-assist.functions.ts", "utf8");
+const analytics = fs.readFileSync("src/lib/zernio.functions.ts", "utf8");
 
 test("AI telemetry is server-only and contains no prompt or generated-content columns", () => {
   assert.match(migration, /ALTER TABLE public\.ai_usage_events ENABLE ROW LEVEL SECURITY/);
@@ -30,6 +32,18 @@ test("campaign behavior stays approval-first while exposing explicit optimizatio
   assert.match(campaign, /Corrections stay private to this workspace/);
   assert.match(campaign, /Published posts are never altered/);
   assert.match(campaign, /optimization_mode: input\.optimizationMode/);
+  assert.match(campaign, /Campaign content/);
+  assert.match(campaign, /contentFormats: \["feed", "story"\]/);
+  assert.match(campaign, /Use both to balance lasting feed content/);
+});
+
+test("analytics exposes six- and twelve-month windows and My Agent stays evidence-first", () => {
+  assert.match(analytics, /z\.literal\(180\)/);
+  assert.match(analytics, /z\.literal\(365\)/);
+  assert.match(agent, /social_intelligence_snapshots/);
+  assert.match(agent, /Missing and unavailable are not zero/);
+  assert.match(agent, /never shame low results/);
+  assert.match(agent, /Compare only equal-length periods/);
 });
 
 test("admin health is owner-gated and reports AI plus analytics without secrets", () => {

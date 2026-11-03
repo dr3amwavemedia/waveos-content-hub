@@ -128,7 +128,7 @@ export function AnalyticsCheckup({
 }) {
   const analyticsFn = useServerFn(getZernioAnalytics);
   const intelligenceFn = useServerFn(getSocialIntelligenceProfile);
-  const [days, setDays] = useState<7 | 30 | 90>(30);
+  const [days, setDays] = useState<7 | 30 | 90 | 180 | 365>(30);
   const [graphMetric, setGraphMetric] = useState("reach");
   const [mode, setMode] = useState<AnalyticsMode>("combined");
   const [refreshing, setRefreshing] = useState(false);
@@ -211,11 +211,15 @@ export function AnalyticsCheckup({
               aria-label="Performance period"
               className="ocean-control px-3"
               value={days}
-              onChange={(event) => setDays(Number(event.target.value) as 7 | 30 | 90)}
+              onChange={(event) => setDays(Number(event.target.value) as 7 | 30 | 90 | 180 | 365)}
             >
-              {[7, 30, 90].map((value) => (
+              {[7, 30, 90, 180, 365].map((value) => (
                 <option key={value} value={value}>
-                  Last {value} days
+                  {value === 365
+                    ? "Last 12 months"
+                    : value === 180
+                      ? "Last 6 months"
+                      : `Last ${value} days`}
                 </option>
               ))}
             </select>
