@@ -66,7 +66,7 @@ test("authentication and payment providers return through dedicated WaveOS route
       readFile(new URL("src/lib/outlook.server.ts", root), "utf8"),
     ]);
 
-  assert.match(auth, /redirect_uri: `\$\{window\.location\.origin\}\/auth-callback/);
+  assert.match(auth, /redirectTo: `\$\{window\.location\.origin\}\/auth-callback/);
   assert.match(authCallback, /safeNext/);
   assert.match(subscriptions, /success_url: `\$\{origin\}\/settings\?subscription=started/);
   assert.match(subscriptions, /return_url: `\$\{origin\}\/settings\?billing=updated`/);

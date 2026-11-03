@@ -71,11 +71,14 @@ test.describe("Google sign-in", () => {
     // Wait for hydration — the button is inert until React attaches handlers.
     await expect(page.getByRole("button", { name: /continue with google/i })).toBeEnabled();
 
-    const oauthRequest = page.waitForRequest((request) => request.url().includes("/~oauth/initiate"));
+    const oauthRequest = page.waitForRequest((request) =>
+      /\/~oauth\/initiate|\/auth\/v1\/authorize/.test(request.url()),
+    );
     await page.getByRole("button", { name: /continue with google/i }).click();
 
     const request = await oauthRequest;
     const url = new URL(request.url());
-    expect(url.searchParams.get("redirect_uri")).toBe(`${new URL(page.url()).origin}/auth-callback`);
+    const callback = url.searchParams.get("redirect_uri") ?? url.searchParams.get("redirect_to");
+    expect(callback).toBe(`${new URL(page.url()).origin}/auth-callback`);
   });
 });

@@ -6,9 +6,9 @@ import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
 import { clearAuthenticatedBrowserState } from "@/lib/auth-session-state";
+import { signInWithGoogle } from "@/lib/google-auth";
 import { sendMemberJoinedEmail, tryEmail } from "@/lib/transactional-email";
 
-import { lovable } from "@/integrations/lovable";
 import { WaveLogo } from "@/components/branding/wave-logo";
 
 const INVITE_TOKEN_STORAGE_KEY = "waveos.inviteToken";
@@ -192,12 +192,9 @@ function AcceptInvitePage() {
       const next = `/accept-invite?token=${encodeURIComponent(token)}`;
       sessionStorage.setItem("waveos.postAuthNext", next);
 
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: `${window.location.origin}/auth-callback`,
-        extraParams: {
-          prompt: "select_account",
-          login_hint: invite.email,
-        },
+      const result = await signInWithGoogle({
+        redirectTo: `${window.location.origin}/auth-callback`,
+        loginHint: invite.email,
       });
       if (result.error) throw result.error;
       if (!result.redirected) {
