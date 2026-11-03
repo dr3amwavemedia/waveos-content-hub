@@ -156,8 +156,8 @@ test("Tidal supports duplicate-network accounts without losing the eight-account
 test("caption suite uses Brand Voice and Story selection is explicit", () => {
   assert.match(assistant, /Saved Brand Voice/);
   assert.match(assistant, /caption_suite/);
-  assert.match(assistant, /google\/gemini-3\.1-flash-lite/);
-  assert.match(createRoute, /Draft with Brand Voice/);
+  assert.match(assistant, /google\/gemini-3\.8-flash/);
+  assert.match(createRoute, /Wave Assist · Brand Voice Draft/);
   assert.match(createRoute, /\["feed", "story"\]/);
   assert.match(createRoute, /PublishFormatPicker/);
   assert.match(createRoute, /Choose Feed or Story before saving or publishing/);

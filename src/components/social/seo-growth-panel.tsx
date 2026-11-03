@@ -45,7 +45,7 @@ export function SeoGrowthPanel({
       <div className="rounded-2xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card p-4 sm:p-5">
         <div className="flex items-center gap-2 text-primary">
           <Sparkles className="h-4 w-4" />
-          <p className="text-xs font-semibold uppercase tracking-[0.18em]">SEO Growth</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em]">Wave Assist · SEO Growth</p>
         </div>
         <h2 className="mt-2 text-xl font-semibold">What should I improve next?</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
