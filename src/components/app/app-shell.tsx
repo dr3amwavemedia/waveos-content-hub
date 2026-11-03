@@ -490,7 +490,7 @@ function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="ocean-dashboard min-h-screen bg-background text-foreground"
+      className="ocean-dashboard waveos-app-shell min-h-screen bg-background text-foreground"
       style={workspaceThemeStyle(branding.data?.accentColor)}
     >
       {/* Sidebar — desktop */}
@@ -524,7 +524,7 @@ function Shell({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <header
         data-global-mobile-header
-        className="sticky top-0 z-20 border-b border-cyan-200/10 bg-[#04172b]/90 backdrop-blur-xl lg:hidden"
+        className="mobile-classic-header sticky top-0 z-20 border-b border-cyan-200/10 bg-[#04172b]/90 backdrop-blur-xl lg:hidden"
       >
         <div className="flex min-h-14 items-center justify-between px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
           <WaveLogo compact />
@@ -548,7 +548,7 @@ function Shell({ children }: { children: ReactNode }) {
             className="absolute inset-0 bg-background/70 backdrop-blur"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 flex w-[min(18rem,82vw)] flex-col border-r border-cyan-200/10 bg-[#031326]/98 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] shadow-2xl">
+          <div className="mobile-classic-drawer absolute inset-y-0 left-0 flex w-[min(18rem,82vw)] flex-col border-r border-cyan-200/10 bg-[#031326]/98 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] shadow-2xl">
             <div className="flex items-center justify-between">
               <WaveLogo />
               <button
@@ -691,7 +691,7 @@ function Shell({ children }: { children: ReactNode }) {
       )}
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-end justify-around rounded-t-3xl border-t border-cyan-200/10 bg-[#04172b]/92 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[var(--shadow-elevated)] backdrop-blur-xl lg:hidden">
+      <nav className="mobile-classic-nav fixed inset-x-0 bottom-0 z-20 flex items-end justify-around rounded-t-3xl border-t border-cyan-200/10 bg-[#04172b]/92 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[var(--shadow-elevated)] backdrop-blur-xl lg:hidden">
         {(showCreateFab ? barNav.slice(0, 2) : barNav).map((item) => (
           <MobileNavLink key={`${item.to}#${item.hash ?? ""}`} item={item} />
         ))}
