@@ -37,6 +37,7 @@ import {
   Radar,
   Flame,
   Lock,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { clearAuthenticatedBrowserState } from "@/lib/auth-session-state";
@@ -561,14 +562,13 @@ function Shell({ children }: { children: ReactNode }) {
             <div className="mt-4">
               <WorkspaceSwitcher />
             </div>
-            <div
-              className="mt-2 min-h-0 flex-1 overflow-y-auto"
-              onClick={() => setMobileOpen(false)}
-            >
+            <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
               {isStaff ? (
-                <MobileAdminNav items={mobileDrawerNav} />
+                <MobileAdminNav items={mobileDrawerNav} onNavigate={() => setMobileOpen(false)} />
               ) : (
-                <NavGroup items={mobileDrawerNav} className="mt-2" />
+                <div onClick={() => setMobileOpen(false)}>
+                  <NavGroup items={mobileDrawerNav} className="mt-2" />
+                </div>
               )}
             </div>
             <UserFooter />
@@ -843,8 +843,9 @@ const MOBILE_BUSINESS_PATHS = new Set([
 ]);
 const MOBILE_OS_PATHS = new Set(["/os-data", "/saas-dashboard"]);
 
-function MobileAdminNav({ items }: { items: NavItem[] }) {
+function MobileAdminNav({ items, onNavigate }: { items: NavItem[]; onNavigate: () => void }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
+  const [openGroups, setOpenGroups] = useState(() => new Set(["Personal", "Business"]));
   const orderedItems = (paths: Set<string>) =>
     [...paths].flatMap((path) => items.filter((item) => !item.hash && item.to === path));
   const groupedPaths = new Set([
@@ -861,53 +862,77 @@ function MobileAdminNav({ items }: { items: NavItem[] }) {
 
   return (
     <div className="space-y-2 py-2">
-      {groups.map((group, groupIndex) => (
-        <details
-          key={group.label}
-          open={groupIndex < 2}
-          className="group overflow-hidden rounded-xl border border-cyan-200/10 bg-background/20"
-        >
-          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80 marker:content-none">
-            {group.label}
-            <span className="text-base text-muted-foreground transition-transform group-open:rotate-45">
-              +
-            </span>
-          </summary>
-          <ul className="space-y-0.5 border-t border-cyan-200/10 p-1.5">
-            {group.items.map((item) => {
-              const active =
-                !item.hash && (pathname === item.to || pathname.startsWith(item.to + "/"));
-              const Icon = item.icon;
-              const labels: Record<string, string> = {
-                "/social": "Social Accounts",
-                "/analytics": "Analytics",
-                "/competitive-intelligence": "Competitive Intelligence",
-                "/content": "Content",
-                "/templates": "Documents",
-                "/admin": "Staff/Admin",
-              };
-              const label = labels[item.to] ?? item.label;
-              return (
-                <li key={`${item.to}#${item.hash ?? ""}`} className="min-w-0">
-                  <Link
-                    to={item.to}
-                    hash={item.hash}
-                    className={cn(
-                      "grid min-h-10 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium leading-tight transition-colors",
-                      active
-                        ? "bg-primary/12 text-foreground ring-1 ring-inset ring-primary/30"
-                        : "text-muted-foreground hover:bg-surface/60 hover:text-foreground",
-                    )}
-                  >
-                    <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "")} />
-                    <span className="min-w-0 whitespace-normal break-words">{label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </details>
-      ))}
+      {groups.map((group) => {
+        const open = openGroups.has(group.label);
+        return (
+          <section
+            key={group.label}
+            className="overflow-hidden rounded-xl border border-cyan-200/10 bg-background/20"
+          >
+            <button
+              type="button"
+              className="flex min-h-11 w-full items-center justify-between px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80"
+              aria-expanded={open}
+              aria-controls={`mobile-nav-${group.label.toLowerCase()}`}
+              onClick={() =>
+                setOpenGroups((current) => {
+                  const next = new Set(current);
+                  if (next.has(group.label)) next.delete(group.label);
+                  else next.add(group.label);
+                  return next;
+                })
+              }
+            >
+              {group.label}
+              <ChevronDown
+                className={cn(
+                  "size-4 text-muted-foreground transition-transform",
+                  open && "rotate-180",
+                )}
+              />
+            </button>
+            {open && (
+              <ul
+                id={`mobile-nav-${group.label.toLowerCase()}`}
+                className="space-y-0.5 border-t border-cyan-200/10 p-1.5"
+              >
+                {group.items.map((item) => {
+                  const active =
+                    !item.hash && (pathname === item.to || pathname.startsWith(item.to + "/"));
+                  const Icon = item.icon;
+                  const labels: Record<string, string> = {
+                    "/social": "Social Accounts",
+                    "/analytics": "Analytics",
+                    "/competitive-intelligence": "Competitive Intelligence",
+                    "/content": "Content",
+                    "/templates": "Documents",
+                    "/admin": "Staff/Admin",
+                  };
+                  const label = labels[item.to] ?? item.label;
+                  return (
+                    <li key={`${item.to}#${item.hash ?? ""}`} className="min-w-0">
+                      <Link
+                        to={item.to}
+                        hash={item.hash}
+                        onClick={onNavigate}
+                        className={cn(
+                          "grid min-h-10 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium leading-tight transition-colors",
+                          active
+                            ? "bg-primary/12 text-foreground ring-1 ring-inset ring-primary/30"
+                            : "text-muted-foreground hover:bg-surface/60 hover:text-foreground",
+                        )}
+                      >
+                        <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "")} />
+                        <span className="min-w-0 whitespace-normal break-words">{label}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
 }

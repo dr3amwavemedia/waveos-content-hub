@@ -63,3 +63,22 @@ test("duplicate provider records use the largest rollup instead of double counti
   assert.equal(merged[0].clicks, 10);
   assert.equal(merged[0].messages, 2);
 });
+
+test("provider content and nested platform metadata identify attributed posts", () => {
+  const [signal] = extractContentLeadSignals(
+    {
+      posts: [
+        {
+          postId: "post-2",
+          content: "Behind the scenes at today’s brand shoot",
+          platforms: [{ platform: "youtube" }],
+          publishedAt: "2026-11-02T12:00:00Z",
+          analytics: { linkClicks: 7 },
+        },
+      ],
+    },
+    "organic",
+  );
+  assert.equal(signal.title, "Behind the scenes at today’s brand shoot");
+  assert.equal(signal.platform, "youtube");
+});
