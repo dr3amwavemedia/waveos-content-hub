@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   buildTrendSearchQueries,
+  canonicalTrendVideoUrl,
   normalizeTrendResults,
   trendIsStale,
   trendDraftBrief,
@@ -10,6 +11,16 @@ import {
   tiktokPublishedAt,
   trendDiscoveryStatus,
 } from "../../src/lib/trending-now.ts";
+test("canonical video URLs remove tracking variants without losing video identity", () => {
+  assert.equal(
+    canonicalTrendVideoUrl("https://www.instagram.com/reel/DfNbW5NS31Z/?hl=en&utm_source=test"),
+    "https://www.instagram.com/reel/DfNbW5NS31Z",
+  );
+  assert.equal(
+    canonicalTrendVideoUrl("https://www.youtube.com/watch?v=abcdefghijk&feature=share"),
+    "https://www.youtube.com/watch?v=abcdefghijk",
+  );
+});
 test("provider search queries stay concise and avoid unsupported site operators", () => {
   const queries = buildTrendSearchQueries(
     "cinematic small business storytelling ideas",
@@ -147,6 +158,22 @@ test("extracts direct social video URLs found inside Parallel excerpts", () => {
   const trends = normalizeTrendResults(rows, "2026-10-29T00:00:00Z", "topic", "2026-10-22");
   assert.equal(trends.length, 2);
   assert.deepEqual(new Set(trends.map((item) => item.platform)), new Set(["YouTube", "Instagram"]));
+});
+
+test("a direct video result does not create misattributed cards from links in its excerpt", () => {
+  const rows = [
+    {
+      url: "https://www.youtube.com/watch?v=abcdefghijk&feature=share",
+      title: "Original YouTube result",
+      excerpts: [
+        "Watch https://www.youtube.com/watch?v=abcdefghijk and related https://www.instagram.com/reel/Other_123/?hl=en",
+      ],
+    },
+  ];
+  const trends = normalizeTrendResults(rows, "2026-11-02T00:00:00Z", "topic", "2026-10-03");
+  assert.equal(trends.length, 1);
+  assert.equal(trends[0].url, "https://www.youtube.com/watch?v=abcdefghijk");
+  assert.doesNotMatch(trends[0].excerpt, /https:\/\//);
 });
 
 test("extracts direct social video URLs from supported provider text fields", () => {

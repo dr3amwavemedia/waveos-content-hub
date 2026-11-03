@@ -169,6 +169,32 @@ function safeHttpsUrl(raw: string): string | null {
     return null;
   }
 }
+export function canonicalTrendVideoUrl(raw: string): string | null {
+  const safe = safeHttpsUrl(raw);
+  if (!safe || !trendVideoSource(safe)) return null;
+  const url = new URL(safe);
+  url.hash = "";
+  const host = url.hostname.replace(/^www\./, "");
+  if (host === "youtube.com" && url.pathname.replace(/\/+$/, "") === "/watch") {
+    const videoId = url.searchParams.get("v");
+    url.search = videoId ? `?v=${videoId}` : "";
+  } else if (host === "facebook.com" && url.pathname.replace(/\/+$/, "") === "/watch") {
+    const videoId = url.searchParams.get("v");
+    url.search = videoId ? `?v=${videoId}` : "";
+  } else {
+    url.search = "";
+  }
+  if (url.pathname !== "/") url.pathname = url.pathname.replace(/\/+$/, "");
+  return url.href;
+}
+function cleanTrendExcerpt(raw: string) {
+  const lines = raw
+    .split(/\n+/)
+    .map((line) => line.replace(/https:\/\/\S+/gi, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const unique = [...new Set(lines)];
+  return unique.join("\n").slice(0, 420) || "Open the public source to review this video idea.";
+}
 function embeddedVideoUrls(text: string) {
   const matches =
     text.match(
@@ -178,7 +204,7 @@ function embeddedVideoUrls(text: string) {
     ...new Set(
       matches
         .map((value) => value.replace(/[),.;!?]+$/, ""))
-        .map((value) => safeHttpsUrl(value))
+        .map((value) => canonicalTrendVideoUrl(value))
         .filter((value): value is string => Boolean(value))
         .filter((value) => Boolean(trendVideoSource(value))),
     ),
@@ -205,13 +231,15 @@ export function normalizeTrendResults(
         (text): text is string => typeof text === "string",
       ),
     ].join("\n");
-    const topLevel = typeof row.url === "string" ? safeHttpsUrl(row.url) : null;
-    const candidateUrls = [
-      ...(topLevel && trendVideoSource(topLevel) ? [topLevel] : []),
-      ...embeddedVideoUrls(
-        [typeof row.url === "string" ? row.url : "", title, excerpts].join("\n"),
-      ),
-    ];
+    const topLevel =
+      typeof row.url === "string" ? canonicalTrendVideoUrl(row.url) : null;
+    // A direct video result owns its title and excerpt. Do not fan links mentioned in
+    // that excerpt into extra cards, which would misattribute the same copy to them.
+    const candidateUrls = topLevel
+      ? [topLevel]
+      : embeddedVideoUrls(
+          [typeof row.url === "string" ? row.url : "", title, excerpts].join("\n"),
+        );
     const uniqueCandidates = [...new Set(candidateUrls)];
     if (!uniqueCandidates.length) return [];
     const reportedDate =
@@ -267,7 +295,7 @@ export function normalizeTrendResults(
           title,
           url,
           source: new URL(url).hostname,
-          excerpt: excerpts,
+          excerpt: cleanTrendExcerpt(excerpts),
           publishedAt,
           observedAt,
           type,
