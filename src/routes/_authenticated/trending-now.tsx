@@ -1,38 +1,589 @@
-import {createFileRoute,useNavigate} from "@tanstack/react-router";
-import {useServerFn} from "@tanstack/react-start";
-import {useEffect,useState,useRef} from "react";
-import {Flame,Music2,Bookmark,ArrowRight,ExternalLink,RefreshCw,Loader2,Film,Quote,Lightbulb,Search,SlidersHorizontal,Play,ChevronDown} from "lucide-react";
-import {Button} from "@/components/ui/button";
-import {RequireFeature} from "@/components/app/require-feature";
-import {useWorkspace} from "@/components/app/workspace-context";
-import {discoverTrends} from "@/lib/trending-now.functions";
-import {DEFAULT_TREND_FILTERS,videoTrendResults,type TrendFilters,TREND_VIEWS,trendDraftBrief,trendIsStale,type Trend,type TrendView} from "@/lib/trending-now";
-import {cn} from "@/lib/utils";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
+import { useEffect, useState, useRef } from "react";
+import {
+  Flame,
+  Music2,
+  Bookmark,
+  ArrowRight,
+  ExternalLink,
+  RefreshCw,
+  Loader2,
+  Film,
+  Quote,
+  Lightbulb,
+  Search,
+  SlidersHorizontal,
+  Play,
+  ChevronDown,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { RequireFeature } from "@/components/app/require-feature";
+import { useWorkspace } from "@/components/app/workspace-context";
+import { discoverTrends } from "@/lib/trending-now.functions";
+import {
+  DEFAULT_TREND_FILTERS,
+  videoTrendResults,
+  type TrendFilters,
+  TREND_VIEWS,
+  trendDraftBrief,
+  trendIsStale,
+  type Trend,
+  type TrendView,
+} from "@/lib/trending-now";
+import { cn } from "@/lib/utils";
+import { OceanHeader, OceanPage, OceanPanel, OceanStatus } from "@/components/app/ocean-ui";
 
-export const Route=createFileRoute("/_authenticated/trending-now")({component:()=> <RequireFeature feature="can_use_competitive_intelligence" title="Trending Now is available with Current or Tidal" description="Upgrade your WaveOS plan to explore sourced social trends and adapt ideas for your brand."><TrendingNow/></RequireFeature>,head:()=>({meta:[{title:"Trending Now — WaveOS"},{name:"description",content:"Explore sourced social ideas and adapt original content for your business."},{property:"og:title",content:"Trending Now — WaveOS"},{property:"og:description",content:"Fresh public observations with source evidence and honest audio licensing states."},{property:"og:type",content:"website"},{name:"twitter:card",content:"summary"},{name:"robots",content:"noindex"}]})});
+export const Route = createFileRoute("/_authenticated/trending-now")({
+  component: () => (
+    <RequireFeature
+      feature="can_use_competitive_intelligence"
+      title="Trending Now is available with Current or Tidal"
+      description="Upgrade your WaveOS plan to explore sourced social trends and adapt ideas for your brand."
+    >
+      <TrendingNow />
+    </RequireFeature>
+  ),
+  head: () => ({
+    meta: [
+      { title: "Trending Now — WaveOS" },
+      {
+        name: "description",
+        content: "Explore sourced social ideas and adapt original content for your business.",
+      },
+      { property: "og:title", content: "Trending Now — WaveOS" },
+      {
+        property: "og:description",
+        content:
+          "Fresh public observations with source evidence and honest audio licensing states.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { name: "robots", content: "noindex" },
+    ],
+  }),
+});
 
-function TrendingNow(){
- const {activeWorkspace}=useWorkspace(),navigate=useNavigate(),discover=useServerFn(discoverTrends);
- const [view,setView]=useState<TrendView>("For You"),[trends,setTrends]=useState<Trend[]>([]),[saved,setSaved]=useState<Trend[]>([]),[selected,setSelected]=useState<Trend|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState("Sources have not been checked yet.");
- const [query,setQuery]=useState(""),[filters,setFilters]=useState<TrendFilters>(DEFAULT_TREND_FILTERS),[showFilters,setShowFilters]=useState(false),[supporting,setSupporting]=useState<Trend[]>([]);
- const currentWorkspace=useRef(activeWorkspace?.id);currentWorkspace.current=activeWorkspace?.id;
- const key=activeWorkspace?`waveos-trends-v3-${activeWorkspace.id}`:null;
- useEffect(()=>{setTrends([]);setSaved([]);setSelected(null);setQuery("");setFilters(DEFAULT_TREND_FILTERS);setSupporting([]);setMessage("Sources have not been checked yet.");if(!key)return;let hasStoredTrends=false;try{const stored=JSON.parse(sessionStorage.getItem(key)??"{}");if(Array.isArray(stored.trends)){const restored=videoTrendResults(stored.trends);setTrends(restored);hasStoredTrends=restored.length>0;}if(Array.isArray(stored.saved))setSaved(videoTrendResults(stored.saved));}catch{/* Discard malformed session cache. */}if(!hasStoredTrends){queueMicrotask(()=>{void refresh();});}},[key]);
- async function refresh(){if(!activeWorkspace||busy)return;const requestWorkspace=activeWorkspace.id,requestKey=key;setBusy(true);setSelected(null);try{const result=await discover({data:{workspaceId:activeWorkspace.id,query,filters,type:view==="Trending Audio"?"audio":view==="Viral Formats"?"format":view==="Trending Hooks"?"hook":"topic"}});if(requestWorkspace!==currentWorkspace.current)return;setTrends(result.trends);setSupporting("supporting" in result?result.supporting??[]:[]);setMessage(result.message);if(requestKey)sessionStorage.setItem(requestKey,JSON.stringify({trends:result.trends,saved}));}catch{setMessage("Trend research is unavailable for this workspace. No sample data was substituted.");}finally{setBusy(false);}}
- const visible=videoTrendResults(view==="Saved Trends"?saved:trends,filters.platform);
- 
- return <div className="space-y-4 pb-8"><header><h1 className="flex items-center gap-2 text-2xl font-semibold"><Flame className="text-intelligence"/>Trending Now</h1><p className="mt-1 text-sm text-muted-foreground">High-traction short-form inspiration matched to {activeWorkspace?.name} by audience and creative style — not just keywords.</p></header>
- <form className="flex gap-2" onSubmit={event=>{event.preventDefault();void refresh();}}><div className="relative min-w-0 flex-1"><Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground"/><input aria-label="Search trends" placeholder="Search trends, niches, styles, languages..." value={query} maxLength={600} onChange={event=>setQuery(event.target.value)} className="h-11 w-full rounded-lg border border-border bg-elevated pl-9 pr-3 text-sm"/></div><Button type="submit" size="icon" disabled={busy||!activeWorkspace} aria-label="Search videos">{busy?<Loader2 className="animate-spin"/>:<Search/>}</Button><Button type="button" size="icon" variant="outline" aria-label="Trend filters" aria-expanded={showFilters} onClick={()=>setShowFilters(value=>!value)}><SlidersHorizontal/></Button></form>
- <div className="flex gap-2 overflow-x-auto pb-1">{['All videos','TikTok','Instagram','YouTube','Facebook'].map(platform=><Button key={platform} size="sm" variant={filters.platform===platform?'secondary':'ghost'} aria-pressed={filters.platform===platform} onClick={()=>setFilters(current=>({...current,platform}))}>{platform}</Button>)}</div>
- {showFilters&&<section aria-label="Search filters" className="grid grid-cols-2 gap-3 border-y border-border py-4">{([['style','Content style',['Any style','Cinematic','Funny','Educational','Luxury','UGC','Testimonial','Before / after','POV','Storytelling']],['language','Language',['Any language','English','Spanish','English + Spanish']],['kind','Trend type',['Any type','Audio','Hook','Format','Editing style','Meme','Challenge','Caption pattern','CTA style']]] as const).map(([field,label,options])=><label key={field} className="min-w-0 text-xs text-muted-foreground">{label}<select value={filters[field]} onChange={event=>setFilters(current=>({...current,[field]:event.target.value}))} className="mt-1 h-11 w-full rounded-lg border border-border bg-elevated px-2 text-sm text-foreground">{options.map(option=><option key={option}>{option}</option>)}</select></label>)}<label className="text-xs text-muted-foreground">Recency<select className="mt-1 h-11 w-full rounded-lg border border-border bg-elevated px-2 text-sm text-foreground" value={filters.days} onChange={event=>setFilters(current=>({...current,days:Number(event.target.value)}))}>{[3,7,30].map(days=><option key={days} value={days}>Past {days} days</option>)}</select></label>{([['niche','Industry / niche'],['businessType','Business type'],['market','Location / market'],['audience','Audience']] as const).map(([field,label])=><label key={field} className="text-xs text-muted-foreground">{label}<input className="mt-1 h-11 w-full rounded-lg border border-border bg-elevated px-2 text-sm text-foreground" value={filters[field]} maxLength={120} onChange={event=>setFilters(current=>({...current,[field]:event.target.value}))}/></label>)}</section>}
- <div className="flex gap-1 overflow-x-auto pb-2" role="tablist" aria-label="Trend views">{TREND_VIEWS.map(tab=><Button key={tab} size="sm" role="tab" aria-selected={view===tab} variant={view===tab?'secondary':'ghost'} onClick={()=>{setView(tab);setSelected(null);}}>{tab}</Button>)}</div>
- <p role="status" className="text-xs text-muted-foreground">{busy?'Finding recent public videos…':message}</p>
- {selected?<section className="space-y-4 border-t border-border pt-4"><Button variant="ghost" onClick={()=>setSelected(null)}>Back to videos</Button><TrendPreview trend={selected}/><h2 className="text-xl font-semibold">{selected.title}</h2><details><summary className="cursor-pointer text-sm font-medium">Sources & evidence</summary><div className="space-y-2 py-3 text-sm text-muted-foreground"><p className="whitespace-pre-line">{selected.excerpt}</p><p>Published {selected.publishedAt?.slice(0,10)??'date not reported'} · Checked {selected.observedAt.slice(0,10)}</p><p>Example, not a verified trend ranking. Performance and commercial audio rights are unavailable.</p><a className="text-primary" href={selected.url} target="_blank" rel="noopener noreferrer">Original video ↗</a>{supporting.map(source=><a key={source.id} className="block text-primary" href={source.url} target="_blank" rel="noopener noreferrer">{source.title} · {source.publishedAt?.slice(0,10)}</a>)}</div></details><h3 className="font-semibold">Adapt for {activeWorkspace?.name}</h3><p className="whitespace-pre-line text-sm text-muted-foreground">{trendDraftBrief(selected,activeWorkspace?.name??'your business')}</p><Button onClick={()=>{if(activeWorkspace)void navigate({to:'/create',search:{brief:trendDraftBrief(selected,activeWorkspace.name).slice(0,6000),briefWorkspace:activeWorkspace.id}});}}>Create Post<ArrowRight/></Button></section>:<div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{visible.map(trend=><article key={trend.id} className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface"><TrendPreview trend={trend}/><div className="space-y-3 p-4"><div className="flex items-start gap-2"><h2 className="min-w-0 flex-1 break-words font-semibold">{trend.title}</h2><Button size="icon" variant={saved.some(item=>item.id===trend.id)?'secondary':'ghost'} aria-label={`Save ${trend.title}`} onClick={()=>{const next=saved.some(item=>item.id===trend.id)?saved.filter(item=>item.id!==trend.id):[...saved,trend];setSaved(next);if(key)sessionStorage.setItem(key,JSON.stringify({trends,saved:next}));}}><Bookmark/></Button></div><p className="text-xs text-muted-foreground">{trend.creator??trend.source} · {trend.publishedAt?.slice(0,10)}</p>{trend.engagementEvidence&&<p className="text-xs font-semibold text-success">Public traction: {trend.engagementEvidence}</p>}<p className={cn('text-xs',trend.publishedAt&&trendIsStale(trend)?'text-warning':'text-muted-foreground')}>{!trend.publishedAt?'Date not reported · public example':trendIsStale(trend)?'Recheck source date':'Recent public example'}</p><p className="line-clamp-2 text-sm text-muted-foreground">{trend.excerpt}</p><Button variant="outline" onClick={()=>setSelected(trend)}>Adapt for my brand<ArrowRight/></Button></div></article>)}</div>}
- {!busy&&!selected&&visible.length>0&&<div className="flex justify-center pt-1"><Button variant="outline" onClick={()=>void refresh()}><RefreshCw/>Find more ideas</Button></div>}
- {!busy&&!selected&&!visible.length&&<div className="flex min-h-56 flex-col items-center justify-center gap-3 border-y border-border text-center"><Film className="size-9 text-intelligence"/><h2 className="font-semibold">{view==='Saved Trends'?'No saved videos yet':'Find your next idea'}</h2><p className="max-w-xs text-sm text-muted-foreground">{view==='Saved Trends'?'Saved videos stay in this workspace for this session.':'Recent TikToks, Reels and Shorts for your business.'}</p><Button disabled={!activeWorkspace} onClick={()=>void refresh()}><Search/>Find videos</Button></div>}
- </div>;
+function TrendingNow() {
+  const { activeWorkspace } = useWorkspace(),
+    navigate = useNavigate(),
+    discover = useServerFn(discoverTrends);
+  const [view, setView] = useState<TrendView>("For You"),
+    [trends, setTrends] = useState<Trend[]>([]),
+    [saved, setSaved] = useState<Trend[]>([]),
+    [selected, setSelected] = useState<Trend | null>(null),
+    [busy, setBusy] = useState(false),
+    [message, setMessage] = useState("Sources have not been checked yet."),
+    [sourceStatus, setSourceStatus] = useState<
+      "idle" | "available" | "no_matches" | "provider_unavailable" | "connection_unavailable"
+    >("idle");
+  const [query, setQuery] = useState(""),
+    [filters, setFilters] = useState<TrendFilters>(DEFAULT_TREND_FILTERS),
+    [showFilters, setShowFilters] = useState(false),
+    [supporting, setSupporting] = useState<Trend[]>([]);
+  const currentWorkspace = useRef(activeWorkspace?.id);
+  currentWorkspace.current = activeWorkspace?.id;
+  const key = activeWorkspace ? `waveos-trends-v3-${activeWorkspace.id}` : null;
+  useEffect(() => {
+    setTrends([]);
+    setSaved([]);
+    setSelected(null);
+    setQuery("");
+    setFilters(DEFAULT_TREND_FILTERS);
+    setSupporting([]);
+    setSourceStatus("idle");
+    setMessage("Sources have not been checked yet.");
+    if (!key) return;
+    let hasStoredTrends = false;
+    try {
+      const stored = JSON.parse(sessionStorage.getItem(key) ?? "{}");
+      if (Array.isArray(stored.trends)) {
+        const restored = videoTrendResults(stored.trends);
+        setTrends(restored);
+        hasStoredTrends = restored.length > 0;
+        if (hasStoredTrends) setSourceStatus("available");
+      }
+      if (Array.isArray(stored.saved)) setSaved(videoTrendResults(stored.saved));
+    } catch {
+      /* Discard malformed session cache. */
+    }
+    if (!hasStoredTrends) {
+      queueMicrotask(() => {
+        void refresh();
+      });
+    }
+  }, [key]);
+  async function refresh() {
+    if (!activeWorkspace || busy) return;
+    const requestWorkspace = activeWorkspace.id,
+      requestKey = key;
+    setBusy(true);
+    setSelected(null);
+    try {
+      const result = await discover({
+        data: {
+          workspaceId: activeWorkspace.id,
+          query,
+          filters,
+          type:
+            view === "Trending Audio"
+              ? "audio"
+              : view === "Viral Formats"
+                ? "format"
+                : view === "Trending Hooks"
+                  ? "hook"
+                  : "topic",
+        },
+      });
+      if (requestWorkspace !== currentWorkspace.current) return;
+      setTrends(result.trends);
+      setSupporting("supporting" in result ? (result.supporting ?? []) : []);
+      setSourceStatus("status" in result ? result.status : "no_matches");
+      setMessage(result.message);
+      if (requestKey)
+        sessionStorage.setItem(requestKey, JSON.stringify({ trends: result.trends, saved }));
+    } catch {
+      setSourceStatus("provider_unavailable");
+      setMessage(
+        "Trend research could not complete for this workspace. Retry later; no sample data was substituted.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+  const visible = videoTrendResults(view === "Saved Trends" ? saved : trends, filters.platform);
+
+  return (
+    <OceanPage className="pb-8">
+      <OceanHeader
+        eyebrow={
+          <span className="flex items-center gap-2">
+            <Flame className="size-4" />
+            Public-source discovery
+          </span>
+        }
+        title="Trending Now"
+        description={
+          <>
+            Original TikToks, Reels and Shorts matched to {activeWorkspace?.name}. Evidence is shown
+            only when the public source reports it.
+          </>
+        }
+      />
+      <form
+        className="flex gap-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void refresh();
+        }}
+      >
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-3 size-4 text-muted-foreground" />
+          <input
+            aria-label="Search trends"
+            placeholder="Search trends, niches, styles, languages..."
+            value={query}
+            maxLength={600}
+            onChange={(event) => setQuery(event.target.value)}
+            className="h-11 w-full rounded-lg border border-border bg-elevated pl-9 pr-3 text-sm"
+          />
+        </div>
+        <Button
+          type="submit"
+          size="icon"
+          disabled={busy || !activeWorkspace}
+          aria-label="Search videos"
+        >
+          {busy ? <Loader2 className="animate-spin" /> : <Search />}
+        </Button>
+        <Button
+          type="button"
+          size="icon"
+          variant="outline"
+          aria-label="Trend filters"
+          aria-expanded={showFilters}
+          onClick={() => setShowFilters((value) => !value)}
+        >
+          <SlidersHorizontal />
+        </Button>
+      </form>
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {["All videos", "TikTok", "Instagram", "YouTube", "Facebook"].map((platform) => (
+          <Button
+            key={platform}
+            size="sm"
+            variant={filters.platform === platform ? "secondary" : "ghost"}
+            aria-pressed={filters.platform === platform}
+            onClick={() => setFilters((current) => ({ ...current, platform }))}
+          >
+            {platform}
+          </Button>
+        ))}
+      </div>
+      {showFilters && (
+        <section
+          aria-label="Search filters"
+          className="grid grid-cols-2 gap-3 border-y border-border py-4"
+        >
+          {(
+            [
+              [
+                "style",
+                "Content style",
+                [
+                  "Any style",
+                  "Cinematic",
+                  "Funny",
+                  "Educational",
+                  "Luxury",
+                  "UGC",
+                  "Testimonial",
+                  "Before / after",
+                  "POV",
+                  "Storytelling",
+                ],
+              ],
+              ["language", "Language", ["Any language", "English", "Spanish", "English + Spanish"]],
+              [
+                "kind",
+                "Trend type",
+                [
+                  "Any type",
+                  "Audio",
+                  "Hook",
+                  "Format",
+                  "Editing style",
+                  "Meme",
+                  "Challenge",
+                  "Caption pattern",
+                  "CTA style",
+                ],
+              ],
+            ] as const
+          ).map(([field, label, options]) => (
+            <label key={field} className="min-w-0 text-xs text-muted-foreground">
+              {label}
+              <select
+                value={filters[field]}
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, [field]: event.target.value }))
+                }
+                className="mt-1 h-11 w-full rounded-lg border border-border bg-elevated px-2 text-sm text-foreground"
+              >
+                {options.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+          <label className="text-xs text-muted-foreground">
+            Recency
+            <select
+              className="mt-1 h-11 w-full rounded-lg border border-border bg-elevated px-2 text-sm text-foreground"
+              value={filters.days}
+              onChange={(event) =>
+                setFilters((current) => ({ ...current, days: Number(event.target.value) }))
+              }
+            >
+              {[3, 7, 30].map((days) => (
+                <option key={days} value={days}>
+                  Past {days} days
+                </option>
+              ))}
+            </select>
+          </label>
+          {(
+            [
+              ["niche", "Industry / niche"],
+              ["businessType", "Business type"],
+              ["market", "Location / market"],
+              ["audience", "Audience"],
+            ] as const
+          ).map(([field, label]) => (
+            <label key={field} className="text-xs text-muted-foreground">
+              {label}
+              <input
+                className="mt-1 h-11 w-full rounded-lg border border-border bg-elevated px-2 text-sm text-foreground"
+                value={filters[field]}
+                maxLength={120}
+                onChange={(event) =>
+                  setFilters((current) => ({ ...current, [field]: event.target.value }))
+                }
+              />
+            </label>
+          ))}
+        </section>
+      )}
+      <div className="flex gap-1 overflow-x-auto pb-2" role="tablist" aria-label="Trend views">
+        {TREND_VIEWS.map((tab) => (
+          <Button
+            key={tab}
+            size="sm"
+            role="tab"
+            aria-selected={view === tab}
+            variant={view === tab ? "secondary" : "ghost"}
+            onClick={() => {
+              setView(tab);
+              setSelected(null);
+            }}
+          >
+            {tab}
+          </Button>
+        ))}
+      </div>
+      <div
+        role="status"
+        className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+      >
+        <OceanStatus
+          tone={
+            sourceStatus === "available"
+              ? "positive"
+              : sourceStatus === "idle"
+                ? "neutral"
+                : "warning"
+          }
+        >
+          {busy ? "Searching" : sourceStatus.replaceAll("_", " ")}
+        </OceanStatus>
+        <span>{busy ? "Finding recent public videos…" : message}</span>
+      </div>
+      {selected ? (
+        <section className="space-y-4 border-t border-border pt-4">
+          <Button variant="ghost" onClick={() => setSelected(null)}>
+            Back to videos
+          </Button>
+          <TrendPreview trend={selected} />
+          <h2 className="text-xl font-semibold">{selected.title}</h2>
+          <details>
+            <summary className="cursor-pointer text-sm font-medium">Sources & evidence</summary>
+            <div className="space-y-2 py-3 text-sm text-muted-foreground">
+              <p className="whitespace-pre-line">{selected.excerpt}</p>
+              <p>
+                Published {selected.publishedAt?.slice(0, 10) ?? "date not reported"} · Checked{" "}
+                {selected.observedAt.slice(0, 10)}
+              </p>
+              <p>
+                Example, not a verified trend ranking. Performance and commercial audio rights are
+                unavailable.
+              </p>
+              <a
+                className="text-primary"
+                href={selected.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Original video ↗
+              </a>
+              {supporting.map((source) => (
+                <a
+                  key={source.id}
+                  className="block text-primary"
+                  href={source.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {source.title} · {source.publishedAt?.slice(0, 10)}
+                </a>
+              ))}
+            </div>
+          </details>
+          <h3 className="font-semibold">Adapt for {activeWorkspace?.name}</h3>
+          <p className="whitespace-pre-line text-sm text-muted-foreground">
+            {trendDraftBrief(selected, activeWorkspace?.name ?? "your business")}
+          </p>
+          <Button
+            onClick={() => {
+              if (activeWorkspace)
+                void navigate({
+                  to: "/create",
+                  search: {
+                    brief: trendDraftBrief(selected, activeWorkspace.name).slice(0, 6000),
+                    briefWorkspace: activeWorkspace.id,
+                  },
+                });
+            }}
+          >
+            Create Post
+            <ArrowRight />
+          </Button>
+        </section>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {visible.map((trend) => (
+            <article
+              key={trend.id}
+              className="min-w-0 overflow-hidden rounded-lg border border-border bg-surface"
+            >
+              <TrendPreview trend={trend} />
+              <div className="space-y-3 p-4">
+                <div className="flex items-start gap-2">
+                  <h2 className="min-w-0 flex-1 break-words font-semibold">{trend.title}</h2>
+                  <Button
+                    size="icon"
+                    variant={saved.some((item) => item.id === trend.id) ? "secondary" : "ghost"}
+                    aria-label={`Save ${trend.title}`}
+                    onClick={() => {
+                      const next = saved.some((item) => item.id === trend.id)
+                        ? saved.filter((item) => item.id !== trend.id)
+                        : [...saved, trend];
+                      setSaved(next);
+                      if (key) sessionStorage.setItem(key, JSON.stringify({ trends, saved: next }));
+                    }}
+                  >
+                    <Bookmark />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {trend.creator ?? trend.source} · {trend.publishedAt?.slice(0, 10)}
+                </p>
+                {trend.engagementEvidence && (
+                  <p className="text-xs font-semibold text-success">
+                    Public traction: {trend.engagementEvidence}
+                  </p>
+                )}
+                <p
+                  className={cn(
+                    "text-xs",
+                    trend.publishedAt && trendIsStale(trend)
+                      ? "text-warning"
+                      : "text-muted-foreground",
+                  )}
+                >
+                  {!trend.publishedAt
+                    ? "Date not reported · public example"
+                    : trendIsStale(trend)
+                      ? "Recheck source date"
+                      : "Recent public example"}
+                </p>
+                <p className="line-clamp-2 text-sm text-muted-foreground">{trend.excerpt}</p>
+                <Button variant="outline" onClick={() => setSelected(trend)}>
+                  Adapt for my brand
+                  <ArrowRight />
+                </Button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+      {!busy && !selected && visible.length > 0 && (
+        <div className="flex justify-center pt-1">
+          <Button variant="outline" onClick={() => void refresh()}>
+            <RefreshCw />
+            Find more ideas
+          </Button>
+        </div>
+      )}
+      {!busy && !selected && !visible.length && (
+        <OceanPanel className="flex flex-col items-center gap-3 py-8 text-center">
+          <Film className="size-9 text-intelligence" />
+          <h2 className="font-semibold">
+            {view === "Saved Trends"
+              ? "No saved videos yet"
+              : sourceStatus === "connection_unavailable"
+                ? "Research connection unavailable"
+                : sourceStatus === "provider_unavailable"
+                  ? "Research provider unavailable"
+                  : "No supported original videos found"}
+          </h2>
+          <p className="max-w-xl text-sm text-muted-foreground">
+            {view === "Saved Trends"
+              ? "Saved videos stay in this workspace for this session."
+              : message}
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button disabled={!activeWorkspace} onClick={() => void refresh()}>
+              <RefreshCw />
+              Retry source check
+            </Button>
+            {view !== "Saved Trends" && (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setQuery("behind the scenes storytelling");
+                  setFilters((current) => ({ ...current, platform: "All videos", days: 30 }));
+                }}
+              >
+                Use broader discovery
+              </Button>
+            )}
+          </div>
+        </OceanPanel>
+      )}
+    </OceanPage>
+  );
 }
-function TrendPreview({trend}:{trend:Trend}){
- const [playing,setPlaying]=useState(false),[failed,setFailed]=useState(false),hasImage=Boolean(trend.thumbnail&&!failed);
- return <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-elevated">{playing&&trend.embedUrl?<iframe className="absolute inset-0 h-full w-full" src={trend.embedUrl} title={trend.title} loading="lazy" allow="encrypted-media; picture-in-picture" allowFullScreen/>:<>{hasImage&&<img src={trend.thumbnail} alt={trend.title} className="absolute inset-0 h-full w-full object-cover" loading="lazy" onError={()=>setFailed(true)}/>} {hasImage?<div className="absolute inset-x-0 bottom-0 flex items-end justify-end bg-gradient-to-t from-background/85 via-background/20 to-transparent p-3 pt-12">{trend.embedUrl?<Button size="sm" variant="secondary" onClick={()=>setPlaying(true)}><Play/>Preview</Button>:<a className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-background/90 px-3 text-sm font-semibold text-primary" href={trend.url} target="_blank" rel="noopener noreferrer"><Play className="size-4"/>Watch on {trend.platform}</a>}</div>:<div className="relative flex flex-col items-center gap-3 rounded-lg bg-background/90 p-4"><Film className="size-8 text-intelligence"/>{trend.embedUrl?<Button variant="secondary" onClick={()=>setPlaying(true)}><Play/>Watch preview</Button>:<a className="inline-flex items-center gap-2 text-sm font-semibold text-primary" href={trend.url} target="_blank" rel="noopener noreferrer"><Play className="size-4"/>Watch on {trend.platform}</a>}</div>}</>}<span className="absolute left-3 top-3 rounded bg-background/90 px-2 py-1 text-xs font-semibold">{trend.platform}</span></div>;
+function TrendPreview({ trend }: { trend: Trend }) {
+  const [playing, setPlaying] = useState(false),
+    [failed, setFailed] = useState(false),
+    hasImage = Boolean(trend.thumbnail && !failed);
+  return (
+    <div className="relative flex aspect-[4/3] items-center justify-center overflow-hidden bg-elevated">
+      {playing && trend.embedUrl ? (
+        <iframe
+          className="absolute inset-0 h-full w-full"
+          src={trend.embedUrl}
+          title={trend.title}
+          loading="lazy"
+          allow="encrypted-media; picture-in-picture"
+          allowFullScreen
+        />
+      ) : (
+        <>
+          {hasImage && (
+            <img
+              src={trend.thumbnail}
+              alt={trend.title}
+              className="absolute inset-0 h-full w-full object-cover"
+              loading="lazy"
+              onError={() => setFailed(true)}
+            />
+          )}{" "}
+          {hasImage ? (
+            <div className="absolute inset-x-0 bottom-0 flex items-end justify-end bg-gradient-to-t from-background/85 via-background/20 to-transparent p-3 pt-12">
+              {trend.embedUrl ? (
+                <Button size="sm" variant="secondary" onClick={() => setPlaying(true)}>
+                  <Play />
+                  Preview
+                </Button>
+              ) : (
+                <a
+                  className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-background/90 px-3 text-sm font-semibold text-primary"
+                  href={trend.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Play className="size-4" />
+                  Watch on {trend.platform}
+                </a>
+              )}
+            </div>
+          ) : (
+            <div className="relative flex flex-col items-center gap-3 rounded-lg bg-background/90 p-4">
+              <Film className="size-8 text-intelligence" />
+              {trend.embedUrl ? (
+                <Button variant="secondary" onClick={() => setPlaying(true)}>
+                  <Play />
+                  Watch preview
+                </Button>
+              ) : (
+                <a
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-primary"
+                  href={trend.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Play className="size-4" />
+                  Watch on {trend.platform}
+                </a>
+              )}
+            </div>
+          )}
+        </>
+      )}
+      <span className="absolute left-3 top-3 rounded bg-background/90 px-2 py-1 text-xs font-semibold">
+        {trend.platform}
+      </span>
+    </div>
+  );
 }

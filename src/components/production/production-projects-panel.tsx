@@ -21,6 +21,7 @@ import { ProjectNavigationGuard } from "./project-navigation-guard";
 import { errorMessage } from "@/lib/error-message";
 import { saveProductionStatus } from "@/lib/production-status";
 import { formatInTimeZone, zonedDateTimeToIso } from "@/lib/date-time";
+import { cn } from "@/lib/utils";
 
 type ClientContact = {
   first_name: string;
@@ -273,17 +274,27 @@ export function ProductionProjectsPanel() {
       toast.error(error instanceof Error ? error.message : "Could not update production."),
   });
 
+  const productionCounts = ["current", "upcoming", "past"].map((name) => ({
+    name,
+    count: (projectsQ.data ?? []).filter((project) => folderFor(project.status) === name).length,
+  }));
+  const dueSoon = (projectsQ.data ?? []).filter((project) => {
+    if (!project.scheduled_at || project.status === "complete") return false;
+    const distance = Date.parse(project.scheduled_at) - Date.now();
+    return distance >= 0 && distance <= 7 * 86400000;
+  }).length;
+
   return (
-    <section className="rounded-2xl border border-border bg-surface shadow-sm">
+    <section className="ocean-panel overflow-hidden">
       <ProjectNavigationGuard dirty={hasUnsavedNotes} />
       <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
           <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
             <Users2 className="h-5 w-5 text-primary" />
-            Your projects
+            Production pipeline
           </h2>
           <p className="mt-1 text-xs text-muted-foreground">
-            Choose a folder, then open a project to see its details.
+            Current work first, with upcoming deadlines and completed handoffs close by.
           </p>
         </div>
         <button
@@ -294,6 +305,30 @@ export function ProductionProjectsPanel() {
           <Plus className="h-4 w-4" />
           Assign production
         </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-px border-b border-border bg-border/60 sm:grid-cols-4">
+        {productionCounts.map((item) => (
+          <div key={item.name} className="bg-background/45 px-4 py-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {item.name}
+            </p>
+            <p className="mt-1 text-xl font-semibold text-foreground">{item.count}</p>
+          </div>
+        ))}
+        <div className="bg-background/45 px-4 py-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Due in 7 days
+          </p>
+          <p
+            className={cn(
+              "mt-1 text-xl font-semibold",
+              dueSoon ? "text-warning" : "text-foreground",
+            )}
+          >
+            {dueSoon}
+          </p>
+        </div>
       </div>
 
       {creating && (
@@ -380,8 +415,11 @@ export function ProductionProjectsPanel() {
       )}
 
       <div className="space-y-3 border-b border-border p-4">
-        <nav aria-label="Project folders" className="grid grid-cols-3 gap-2">
-          {["upcoming", "current", "past"].map((item) => (
+        <nav
+          aria-label="Project folders"
+          className="grid grid-cols-3 gap-1 rounded-xl border border-cyan-200/10 bg-background/35 p-1"
+        >
+          {["current", "upcoming", "past"].map((item) => (
             <button
               key={item}
               type="button"
@@ -393,7 +431,7 @@ export function ProductionProjectsPanel() {
                 setFolder(item);
                 setExpandedId(null);
               }}
-              className={`min-h-12 rounded-xl border px-2 py-3 text-sm capitalize ${folder === item ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
+              className={`min-h-11 rounded-lg px-2 py-2 text-sm capitalize ${folder === item ? "bg-primary/15 text-foreground ring-1 ring-inset ring-primary/30" : "text-muted-foreground"}`}
             >
               {item}{" "}
               <span className="text-xs">
@@ -472,7 +510,7 @@ export function ProductionProjectsPanel() {
                 return (
                   <article
                     key={project.id}
-                    className="rounded-2xl border border-border bg-elevated/35 p-4"
+                    className="rounded-xl border border-cyan-200/10 bg-background/30 p-4"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
@@ -527,51 +565,55 @@ export function ProductionProjectsPanel() {
                       </select>
                     </div>
 
-                    <div
-                      className="mt-3 flex flex-wrap items-center gap-2"
-                      aria-label={`Move ${project.title} to folder`}
-                    >
-                      <span className="text-xs text-muted-foreground">Move to…</span>
-                      {(
-                        [
-                          ["upcoming", "pre_production", "Upcoming"],
-                          ["current", "shooting", "Current"],
-                          ["past", "complete", "Past"],
-                        ] as const
-                      )
-                        .filter(([destination]) => destination !== folderFor(project.status))
-                        .map(([destination, status, label]) => (
-                          <button
-                            key={destination}
-                            type="button"
-                            disabled={updateStatus.isPending}
-                            className="min-h-11 rounded-xl border border-border px-3 py-2 text-xs disabled:opacity-50"
-                            onClick={() => {
-                              if (
-                                !window.confirm(
-                                  `Move “${project.title}” to ${label}? This changes its status to ${STATUS_LABEL[status]}.`,
-                                ) ||
-                                !mayLeaveProject()
-                              )
-                                return;
-                              updateStatus.mutate(
-                                { project, status },
-                                {
-                                  onSuccess: () => {
-                                    setHasUnsavedNotes(false);
-                                    setExpandedId(null);
-                                    setFolder(destination);
-                                    setSearch("");
-                                    toast.success(`Project moved to ${label}.`);
+                    <details className="mt-3 rounded-lg border border-border/70 bg-background/25 px-3 py-2">
+                      <summary className="min-h-8 cursor-pointer text-xs font-medium text-muted-foreground">
+                        Project organization
+                      </summary>
+                      <div
+                        className="mt-2 flex flex-wrap items-center gap-2"
+                        aria-label={`Move ${project.title} to folder`}
+                      >
+                        {(
+                          [
+                            ["upcoming", "pre_production", "Upcoming"],
+                            ["current", "shooting", "Current"],
+                            ["past", "complete", "Past"],
+                          ] as const
+                        )
+                          .filter(([destination]) => destination !== folderFor(project.status))
+                          .map(([destination, status, label]) => (
+                            <button
+                              key={destination}
+                              type="button"
+                              disabled={updateStatus.isPending}
+                              className="min-h-11 rounded-xl border border-border px-3 py-2 text-xs disabled:opacity-50"
+                              onClick={() => {
+                                if (
+                                  !window.confirm(
+                                    `Move “${project.title}” to ${label}? This changes its status to ${STATUS_LABEL[status]}.`,
+                                  ) ||
+                                  !mayLeaveProject()
+                                )
+                                  return;
+                                updateStatus.mutate(
+                                  { project, status },
+                                  {
+                                    onSuccess: () => {
+                                      setHasUnsavedNotes(false);
+                                      setExpandedId(null);
+                                      setFolder(destination);
+                                      setSearch("");
+                                      toast.success(`Project moved to ${label}.`);
+                                    },
                                   },
-                                },
-                              );
-                            }}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                    </div>
+                                );
+                              }}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                      </div>
+                    </details>
 
                     <div id={`project-${project.id}`} hidden={expandedId !== project.id}>
                       {expandedId === project.id && (

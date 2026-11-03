@@ -50,15 +50,43 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { MobileToolPanel } from "@/components/app/mobile-tool-panel";
 import { Slider } from "@/components/ui/slider";
-import { clamp, containsPoint, cornerHit, snapPosition, ratioCrop, zoomCrop } from "@/lib/studio-geometry";
-import { STUDIO_FORMATS as FORMATS, STUDIO_FONTS, applyStudioBrand, studioDocumentSize, type BrandApplyMode, type DesignFormat, type DesignDocument, type DesignElement, type TextElement, type ShapeElement, type ImageElement } from "@/lib/studio-template-model";
+import {
+  clamp,
+  containsPoint,
+  cornerHit,
+  snapPosition,
+  ratioCrop,
+  zoomCrop,
+} from "@/lib/studio-geometry";
+import {
+  STUDIO_FORMATS as FORMATS,
+  STUDIO_FONTS,
+  applyStudioBrand,
+  studioDocumentSize,
+  type BrandApplyMode,
+  type DesignFormat,
+  type DesignDocument,
+  type DesignElement,
+  type TextElement,
+  type ShapeElement,
+  type ImageElement,
+} from "@/lib/studio-template-model";
 import { TEMPLATE_LIBRARY, createStudioTemplate } from "@/lib/studio-template-library";
-import { loadStudioImage, renderStudioArtwork, studioImageUrl } from "@/lib/studio-artwork-renderer";
+import {
+  loadStudioImage,
+  renderStudioArtwork,
+  studioImageUrl,
+} from "@/lib/studio-artwork-renderer";
 import { replaceStudioMedia, studioMediaSlots, supportedBrandFont } from "@/lib/studio-media";
-import { studioPostKey,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
+import { studioPostKey, type StudioPostSnapshot } from "@/lib/studio-post-handoff";
 
 export const Route = createFileRoute("/_authenticated/creative-studio")({
-  validateSearch:(s:Record<string,unknown>)=>({post:typeof s.post==='string'?s.post:undefined,workspace:typeof s.workspace==='string'?s.workspace:undefined,media:typeof s.media==='string'?s.media:undefined,photo:s.photo===true}),
+  validateSearch: (s: Record<string, unknown>) => ({
+    post: typeof s.post === "string" ? s.post : undefined,
+    workspace: typeof s.workspace === "string" ? s.workspace : undefined,
+    media: typeof s.media === "string" ? s.media : undefined,
+    photo: s.photo === true,
+  }),
   component: () => (
     <RequireFeature
       feature="can_use_creative_studio"
@@ -69,7 +97,12 @@ export const Route = createFileRoute("/_authenticated/creative-studio")({
     </RequireFeature>
   ),
   head: () => ({
-    links: [{ rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Caveat:wght@400;600;700&family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;600;700&family=Manrope:wght@400;600;700&display=swap" }],
+    links: [
+      {
+        rel: "stylesheet",
+        href: "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Caveat:wght@400;600;700&family=Cormorant+Garamond:wght@400;600;700&family=DM+Sans:wght@400;600;700&family=Manrope:wght@400;600;700&display=swap",
+      },
+    ],
     meta: [
       { title: "Creative Studio — WaveOS" },
       {
@@ -78,7 +111,10 @@ export const Route = createFileRoute("/_authenticated/creative-studio")({
       },
       { name: "robots", content: "noindex" },
       { property: "og:title", content: "Creative Studio — WaveOS" },
-      { property: "og:description", content: "Create and edit branded social graphics in your workspace." },
+      {
+        property: "og:description",
+        content: "Create and edit branded social graphics in your workspace.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -136,31 +172,62 @@ function nativePhotoCanvasSize(sourceWidth: number, sourceHeight: number) {
 }
 
 function CreativeStudioPage() {
-  const postSearch=Route.useSearch();
-  const incoming=useRef<string|null>(null);
+  const postSearch = Route.useSearch();
+  const incoming = useRef<string | null>(null);
   const navigate = useNavigate();
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id ?? null;
   const branding = useWorkspaceBranding(activeWorkspace?.id);
   const palette = workspacePalette(branding.data?.accentColor);
   const [templateFormat, setTemplateFormat] = useState<DesignFormat>("story");
-  const [brandChoices,setBrandChoices]=useState(false);
-  const [brandMode,setBrandMode]=useState<BrandApplyMode>("light");
-  const brandProfile = useQuery({ queryKey: ["studio-brand-profile", workspaceId], enabled: Boolean(workspaceId), queryFn: async () => { if (!workspaceId) return null; const {data,error} = await supabase.from("brand_profiles").select("*").eq("workspace_id", workspaceId).maybeSingle(); if(error) throw error; return data; } });
-  const templates = useMemo(() => TEMPLATE_LIBRARY.map(template => ({...template,document:createStudioTemplate(template,templateFormat)})), [templateFormat]);
+  const [brandChoices, setBrandChoices] = useState(false);
+  const [brandMode, setBrandMode] = useState<BrandApplyMode>("light");
+  const brandProfile = useQuery({
+    queryKey: ["studio-brand-profile", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      if (!workspaceId) return null;
+      const { data, error } = await supabase
+        .from("brand_profiles")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+  const templates = useMemo(
+    () =>
+      TEMPLATE_LIBRARY.map((template) => ({
+        ...template,
+        document: createStudioTemplate(template, templateFormat),
+      })),
+    [templateFormat],
+  );
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const transactionRef = useRef<DesignDocument | null>(null);
-  const adjustmentTransactionRef = useRef<{ id: string; before: DesignDocument; historyIndex: number } | null>(null);
-  const resizeRef = useRef<{ id: string; distance: number; width: number; height: number } | null>(null);
+  const adjustmentTransactionRef = useRef<{
+    id: string;
+    before: DesignDocument;
+    historyIndex: number;
+  } | null>(null);
+  const resizeRef = useRef<{ id: string; distance: number; width: number; height: number } | null>(
+    null,
+  );
   const viewportGestureRef = useRef<{ distance: number; zoom: number } | null>(null);
   const lastTapRef = useRef<{ id: string; at: number } | null>(null);
   const [viewportZoom, setViewportZoom] = useState(1);
   const [cropId, setCropId] = useState<string | null>(null);
-  const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({ x: null, y: null });
+  const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({
+    x: null,
+    y: null,
+  });
   const [mediaTab, setMediaTab] = useState("All");
   const [mediaPickerLimit, setMediaPickerLimit] = useState(MEDIA_PICKER_PAGE);
-  useEffect(() => { setMediaPickerLimit(MEDIA_PICKER_PAGE); }, [mediaTab]);
+  useEffect(() => {
+    setMediaPickerLimit(MEDIA_PICKER_PAGE);
+  }, [mediaTab]);
   const [replaceId, setReplaceId] = useState<string | null>(null);
   const [adjustment, setAdjustment] = useState("brightness");
   const [renderReady, setRenderReady] = useState(false);
@@ -185,7 +252,7 @@ function CreativeStudioPage() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [autoSaveState, setAutoSaveState] = useState<"idle"|"saving"|"saved"|"error">("idle");
+  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const currentDraftSignatureRef = useRef("");
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
   const [mobileStarted, setMobileStarted] = useState(false);
@@ -208,18 +275,20 @@ function CreativeStudioPage() {
     entityId: designId,
   });
   const autoSaveDraft = workflowDraft.save.mutateAsync;
-  currentDraftSignatureRef.current = JSON.stringify({name,designId,document});
+  currentDraftSignatureRef.current = JSON.stringify({ name, designId, document });
 
   useEffect(() => {
     if (!dirty || !workspaceId || !name.trim()) return;
-    const payload = {name,designId,document};
+    const payload = { name, designId, document };
     const signature = JSON.stringify(payload);
     setAutoSaveState("saving");
     const timer = window.setTimeout(() => {
-      void autoSaveDraft(payload).then(() => {
-        if (currentDraftSignatureRef.current === signature) setDirty(false);
-        setAutoSaveState("saved");
-      }).catch(() => setAutoSaveState("error"));
+      void autoSaveDraft(payload)
+        .then(() => {
+          if (currentDraftSignatureRef.current === signature) setDirty(false);
+          setAutoSaveState("saved");
+        })
+        .catch(() => setAutoSaveState("error"));
     }, 900);
     return () => window.clearTimeout(timer);
   }, [autoSaveDraft, designId, dirty, document, name, workspaceId]);
@@ -323,17 +392,25 @@ function CreativeStudioPage() {
         (asset) =>
           mediaTab === "All" ||
           mediaTab === "Uploads" ||
-          (mediaTab === "Recent" && document.elements.some((item) => item.type === "image" && item.assetId === asset.id)) ||
+          (mediaTab === "Recent" &&
+            document.elements.some((item) => item.type === "image" && item.assetId === asset.id)) ||
           (mediaTab === "Brand" && asset.tags?.includes("brand")),
       ),
     [mediaAssets.data, mediaTab, document.elements],
   );
   const brandPhotoAssets = useMemo(
-    () => (mediaAssets.data ?? []).filter((asset) => asset.tags?.some((tag) => ["brand", "product", "team", "background"].includes(tag))).slice(0, MEDIA_PICKER_PAGE),
+    () =>
+      (mediaAssets.data ?? [])
+        .filter((asset) =>
+          asset.tags?.some((tag) => ["brand", "product", "team", "background"].includes(tag)),
+        )
+        .slice(0, MEDIA_PICKER_PAGE),
     [mediaAssets.data],
   );
   const visiblePickerAssets = pickerAssets.slice(0, mediaPickerLimit);
-  const warmIds = [...visiblePickerAssets, ...brandPhotoAssets].map((asset) => asset.id).filter((id) => !assetUrls[id]);
+  const warmIds = [...visiblePickerAssets, ...brandPhotoAssets]
+    .map((asset) => asset.id)
+    .filter((id) => !assetUrls[id]);
   const warmKey = Array.from(new Set(warmIds)).join(",");
 
   useEffect(() => {
@@ -357,10 +434,14 @@ function CreativeStudioPage() {
       if (cancelled) return;
       setAssetUrls((current) => ({
         ...current,
-        ...Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => Boolean(entry))),
+        ...Object.fromEntries(
+          entries.filter((entry): entry is readonly [string, string] => Boolean(entry)),
+        ),
       }));
     });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [warmKey, mediaAssets.data]);
 
   useEffect(() => {
@@ -369,11 +450,13 @@ function CreativeStudioPage() {
     if (!canvas) return;
     setRenderReady(false);
     const artwork = window.document.createElement("canvas");
-    void renderStudioArtwork(artwork, document, assetUrls, branding.data?.logoUrl).then(ready => {
+    void renderStudioArtwork(artwork, document, assetUrls, branding.data?.logoUrl).then((ready) => {
       if (cancelled) return;
-      const displayed=canvasRef.current;if(!displayed)return;
-      displayed.width=artwork.width;displayed.height=artwork.height;
-      displayed.getContext("2d")?.drawImage(artwork,0,0);
+      const displayed = canvasRef.current;
+      if (!displayed) return;
+      displayed.width = artwork.width;
+      displayed.height = artwork.height;
+      displayed.getContext("2d")?.drawImage(artwork, 0, 0);
       setRenderReady(ready);
     });
     return () => {
@@ -384,21 +467,40 @@ function CreativeStudioPage() {
   useEffect(() => {
     const overlay = overlayRef.current;
     if (!overlay) return;
-    overlay.width = format.width; overlay.height = format.height;
-    const ctx = overlay.getContext("2d"); if (!ctx) return;
+    overlay.width = format.width;
+    overlay.height = format.height;
+    const ctx = overlay.getContext("2d");
+    if (!ctx) return;
     const item = document.elements.find((element) => element.id === selectedId);
     if (item) {
       const box = elementBox(item);
-      ctx.save(); ctx.translate(box.x, box.y); ctx.rotate(box.rotation * Math.PI / 180);
-      ctx.strokeStyle = palette.primary; ctx.fillStyle = palette.primary; ctx.lineWidth = format.width / 350;
+      ctx.save();
+      ctx.translate(box.x, box.y);
+      ctx.rotate((box.rotation * Math.PI) / 180);
+      ctx.strokeStyle = palette.primary;
+      ctx.fillStyle = palette.primary;
+      ctx.lineWidth = format.width / 350;
       ctx.strokeRect(-box.width / 2, -box.height / 2, box.width, box.height);
       const size = format.width / 45;
-      for (const x of [-box.width / 2, box.width / 2]) for (const y of [-box.height / 2, box.height / 2]) ctx.fillRect(x-size/2,y-size/2,size,size);
+      for (const x of [-box.width / 2, box.width / 2])
+        for (const y of [-box.height / 2, box.height / 2])
+          ctx.fillRect(x - size / 2, y - size / 2, size, size);
       ctx.restore();
     }
-    ctx.strokeStyle = palette.primary; ctx.lineWidth = format.width / 500;
-    if (guides.x !== null) { ctx.beginPath(); ctx.moveTo(guides.x, 0); ctx.lineTo(guides.x, format.height); ctx.stroke(); }
-    if (guides.y !== null) { ctx.beginPath(); ctx.moveTo(0, guides.y); ctx.lineTo(format.width, guides.y); ctx.stroke(); }
+    ctx.strokeStyle = palette.primary;
+    ctx.lineWidth = format.width / 500;
+    if (guides.x !== null) {
+      ctx.beginPath();
+      ctx.moveTo(guides.x, 0);
+      ctx.lineTo(guides.x, format.height);
+      ctx.stroke();
+    }
+    if (guides.y !== null) {
+      ctx.beginPath();
+      ctx.moveTo(0, guides.y);
+      ctx.lineTo(format.width, guides.y);
+      ctx.stroke();
+    }
   }, [document, selectedId, guides, format, palette.primary, mobileStarted]);
 
   function commit(next: DesignDocument) {
@@ -453,21 +555,31 @@ function CreativeStudioPage() {
     const asset = mediaAssets.data?.find((candidate) => candidate.id === assetId);
     let loadedImage: HTMLImageElement;
     try {
-      const url=assetUrls[assetId] ?? (asset ? await getMediaPreviewUrl(asset,60*60*6):null);
-      if(!url)throw new Error("Image unavailable");
+      const url =
+        assetUrls[assetId] ?? (asset ? await getMediaPreviewUrl(asset, 60 * 60 * 6) : null);
+      if (!url) throw new Error("Image unavailable");
       loadedImage = await loadStudioImage(url);
-      setAssetUrls(current=>({...current,[assetId]:url}));
-    }catch{toast.error("This photo cannot be loaded for editing. The existing design is unchanged. Try another image or reconnect its media source.");return;}
+      setAssetUrls((current) => ({ ...current, [assetId]: url }));
+    } catch {
+      toast.error(
+        "This photo cannot be loaded for editing. The existing design is unchanged. Try another image or reconnect its media source.",
+      );
+      return;
+    }
     if (replaceId) {
-      changeDocument(current => replaceStudioMedia(current, replaceId, {assetId}));
+      changeDocument((current) => replaceStudioMedia(current, replaceId, { assetId }));
       setSelectedId(replaceId);
-      setReplaceId(null); setMobileTool(null); return;
+      setReplaceId(null);
+      setMobileTool(null);
+      return;
     }
     const sourceWidth = asset?.width ?? loadedImage.naturalWidth ?? 800;
     const sourceHeight = asset?.height ?? loadedImage.naturalHeight ?? 800;
-    const useNativePhotoCanvas = (options?.photoEditor ?? photoMode) && !document.elements.some(
-      (item) => item.type === "image" && item.sourceType !== "workspace-logo",
-    );
+    const useNativePhotoCanvas =
+      (options?.photoEditor ?? photoMode) &&
+      !document.elements.some(
+        (item) => item.type === "image" && item.sourceType !== "workspace-logo",
+      );
     const photoCanvas = nativePhotoCanvasSize(sourceWidth, sourceHeight);
     const workingFormat = useNativePhotoCanvas ? photoCanvas : format;
     const maxWidth = workingFormat.width * 0.72;
@@ -481,33 +593,61 @@ function CreativeStudioPage() {
       assetId,
       x: 0.5,
       y: 0.5,
-      width: useNativePhotoCanvas ? photoCanvas.width : Math.max(80, Math.round(sourceWidth * scale)),
-      height: useNativePhotoCanvas ? photoCanvas.height : Math.max(80, Math.round(sourceHeight * scale)),
+      width: useNativePhotoCanvas
+        ? photoCanvas.width
+        : Math.max(80, Math.round(sourceWidth * scale)),
+      height: useNativePhotoCanvas
+        ? photoCanvas.height
+        : Math.max(80, Math.round(sourceHeight * scale)),
       opacity: 1,
       rotation: 0,
-      ...(useNativePhotoCanvas ? { mediaRole: "background" as const, crop: { x: 0, y: 0, width: 1, height: 1 } } : {}),
+      ...(useNativePhotoCanvas
+        ? { mediaRole: "background" as const, crop: { x: 0, y: 0, width: 1, height: 1 } }
+        : {}),
     };
-    changeDocument((current) => useNativePhotoCanvas
-      ? {
-          ...current,
-          customWidth: photoCanvas.width,
-          customHeight: photoCanvas.height,
-          background: "#000000",
-          elements: [...current.elements, element],
-        }
-      : { ...current, elements: [...current.elements, element] });
+    changeDocument((current) =>
+      useNativePhotoCanvas
+        ? {
+            ...current,
+            customWidth: photoCanvas.width,
+            customHeight: photoCanvas.height,
+            background: "#000000",
+            elements: [...current.elements, element],
+          }
+        : { ...current, elements: [...current.elements, element] },
+    );
     setSelectedId(element.id);
     setMobileStarted(true);
     setMobileTool(null);
   }
-  useEffect(()=>{if(!postSearch.post||postSearch.workspace!==workspaceId||!postSearch.media||incoming.current===postSearch.post||!mediaAssets.data)return;
-    incoming.current=postSearch.post;setPhotoMode(postSearch.photo);void addImage(postSearch.media,{photoEditor:postSearch.photo});
-  },[postSearch.post,postSearch.workspace,postSearch.media,workspaceId,mediaAssets.data]);
-  function returnToPost(assetId?:string){
-    if(!workspaceId||!postSearch.post||postSearch.workspace!==workspaceId)return;
-    try{const snapshot=JSON.parse(sessionStorage.getItem(studioPostKey(workspaceId,postSearch.post))??'null') as StudioPostSnapshot|null;if(!snapshot||snapshot.workspaceId!==workspaceId)return;
-      setDirty(false);void navigate({to:'/create',search:{id:snapshot.id,studio:postSearch.post,media:assetId}});
-    }catch{toast.error('The originating post is unavailable. Your saved posts are unchanged.');}
+  useEffect(() => {
+    if (
+      !postSearch.post ||
+      postSearch.workspace !== workspaceId ||
+      !postSearch.media ||
+      incoming.current === postSearch.post ||
+      !mediaAssets.data
+    )
+      return;
+    incoming.current = postSearch.post;
+    setPhotoMode(postSearch.photo);
+    void addImage(postSearch.media, { photoEditor: postSearch.photo });
+  }, [postSearch.post, postSearch.workspace, postSearch.media, workspaceId, mediaAssets.data]);
+  function returnToPost(assetId?: string) {
+    if (!workspaceId || !postSearch.post || postSearch.workspace !== workspaceId) return;
+    try {
+      const snapshot = JSON.parse(
+        sessionStorage.getItem(studioPostKey(workspaceId, postSearch.post)) ?? "null",
+      ) as StudioPostSnapshot | null;
+      if (!snapshot || snapshot.workspaceId !== workspaceId) return;
+      setDirty(false);
+      void navigate({
+        to: "/create",
+        search: { id: snapshot.id, studio: postSearch.post, media: assetId },
+      });
+    } catch {
+      toast.error("The originating post is unavailable. Your saved posts are unchanged.");
+    }
   }
 
   function addWorkspaceLogo() {
@@ -515,9 +655,14 @@ function CreativeStudioPage() {
       toast.error("Add a workspace logo in Settings before placing it here.");
       return;
     }
-    if(replaceId) {
-      changeDocument(current => replaceStudioMedia(current,replaceId,{assetId:null,sourceType:"workspace-logo"}));
-      setSelectedId(replaceId);setReplaceId(null);setMobileTool(null);return;
+    if (replaceId) {
+      changeDocument((current) =>
+        replaceStudioMedia(current, replaceId, { assetId: null, sourceType: "workspace-logo" }),
+      );
+      setSelectedId(replaceId);
+      setReplaceId(null);
+      setMobileTool(null);
+      return;
     }
     const element: ImageElement = {
       id: crypto.randomUUID(),
@@ -536,17 +681,63 @@ function CreativeStudioPage() {
     setSelectedId(element.id);
   }
 
-  function applyBrand() { setMobileTool(null);setBrandChoices(true); }
+  function applyBrand() {
+    setMobileTool(null);
+    setBrandChoices(true);
+  }
   function confirmBrand() {
-    const extended = profile as unknown as Record<string,unknown> | null;
-    const font = (key:string) => supportedBrandFont(extended?.[key]);
-    changeDocument(current => {
-      const next=applyStudioBrand(current,{primary:branding.data?.accentColor??palette.primary,secondary:typeof extended?.secondary_color === "string" ? extended.secondary_color : undefined,logoUrl:branding.data?.logoUrl,headingFont:font("heading_font"),bodyFont:font("body_font"),accentFont:font("accent_font"),businessName:profile?.business_name??activeWorkspace?.name,cta:profile?.default_ctas?.[0],website:profile?.website??undefined,services:profile?.primary_services??undefined,serviceArea:profile?.service_area??undefined},brandMode);
-      if(brandMode==="full" && branding.data?.logoUrl && !next.elements.some(e=>e.brandRole === "logo" || e.type === "image" && (e.sourceType === "workspace-logo" || e.mediaRole === "logo"))) {const bounds=studioDocumentSize(current);next.elements.push({id:crypto.randomUUID(),type:"image",name:"Workspace logo",sourceType:"workspace-logo",assetId:null,x:.80,y:.12,width:bounds.width*.24,height:bounds.height*.12,opacity:1,rotation:0,brandRole:"logo",mediaRole:"logo"});}
+    const extended = profile as unknown as Record<string, unknown> | null;
+    const font = (key: string) => supportedBrandFont(extended?.[key]);
+    changeDocument((current) => {
+      const next = applyStudioBrand(
+        current,
+        {
+          primary: branding.data?.accentColor ?? palette.primary,
+          secondary:
+            typeof extended?.secondary_color === "string" ? extended.secondary_color : undefined,
+          logoUrl: branding.data?.logoUrl,
+          headingFont: font("heading_font"),
+          bodyFont: font("body_font"),
+          accentFont: font("accent_font"),
+          businessName: profile?.business_name ?? activeWorkspace?.name,
+          cta: profile?.default_ctas?.[0],
+          website: profile?.website ?? undefined,
+          services: profile?.primary_services ?? undefined,
+          serviceArea: profile?.service_area ?? undefined,
+        },
+        brandMode,
+      );
+      if (
+        brandMode === "full" &&
+        branding.data?.logoUrl &&
+        !next.elements.some(
+          (e) =>
+            e.brandRole === "logo" ||
+            (e.type === "image" && (e.sourceType === "workspace-logo" || e.mediaRole === "logo")),
+        )
+      ) {
+        const bounds = studioDocumentSize(current);
+        next.elements.push({
+          id: crypto.randomUUID(),
+          type: "image",
+          name: "Workspace logo",
+          sourceType: "workspace-logo",
+          assetId: null,
+          x: 0.8,
+          y: 0.12,
+          width: bounds.width * 0.24,
+          height: bounds.height * 0.12,
+          opacity: 1,
+          rotation: 0,
+          brandRole: "logo",
+          mediaRole: "logo",
+        });
+      }
       return next;
     });
     toast.success("Available workspace branding applied. Undo restores the previous design.");
-    setBrandChoices(false);setMobileTool(null);
+    setBrandChoices(false);
+    setMobileTool(null);
   }
 
   async function uploadImage(file: File | undefined) {
@@ -677,7 +868,10 @@ function CreativeStudioPage() {
 
   function exportPng() {
     const canvas = canvasRef.current;
-    if (!canvas || !renderReady) { toast.error("Wait until all artwork images have loaded before exporting."); return; }
+    if (!canvas || !renderReady) {
+      toast.error("Wait until all artwork images have loaded before exporting.");
+      return;
+    }
     canvas.toBlob((blob) => {
       if (!blob) {
         toast.error("The PNG could not be created.");
@@ -701,7 +895,10 @@ function CreativeStudioPage() {
 
   async function sendToPost(destination: "feed" | "story" = "feed") {
     const canvas = canvasRef.current;
-    if (!canvas || !renderReady) { toast.error("Wait until all artwork images have loaded before sending to a post."); return; }
+    if (!canvas || !renderReady) {
+      toast.error("Wait until all artwork images have loaded before sending to a post.");
+      return;
+    }
     try {
       const blob = await new Promise<Blob>((resolve, reject) =>
         canvas.toBlob(
@@ -722,7 +919,10 @@ function CreativeStudioPage() {
         folderId: null,
         tags: ["creative-studio", "export"],
       });
-      if(postSearch.post && postSearch.workspace===workspaceId){returnToPost(asset.id);return;}
+      if (postSearch.post && postSearch.workspace === workspaceId) {
+        returnToPost(asset.id);
+        return;
+      }
       toast.success(
         destination === "story"
           ? "Design saved. Opening an Instagram Story draft…"
@@ -750,30 +950,68 @@ function CreativeStudioPage() {
   }
 
   function elementBox(element: DesignElement) {
-    return { x: element.x * format.width, y: element.y * format.height,
-      width: element.type === "text" ? Math.min(format.width * .88, Math.max(element.fontSize * 2, element.text.length * element.fontSize * .5)) : element.width,
-      height: element.type === "text" ? Math.max(element.fontSize * 1.2, element.text.split("\n").length * element.fontSize * 1.2) : element.height,
-      rotation: element.rotation ?? 0 };
+    return {
+      x: element.x * format.width,
+      y: element.y * format.height,
+      width:
+        element.type === "text"
+          ? Math.min(
+              format.width * 0.88,
+              Math.max(element.fontSize * 2, element.text.length * element.fontSize * 0.5),
+            )
+          : element.width,
+      height:
+        element.type === "text"
+          ? Math.max(
+              element.fontSize * 1.2,
+              element.text.split("\n").length * element.fontSize * 1.2,
+            )
+          : element.height,
+      rotation: element.rotation ?? 0,
+    };
   }
   function hitElement(point: { x: number; y: number }) {
-    return [...document.elements].reverse().find((element) => containsPoint(elementBox(element), { x: point.x * format.width, y: point.y * format.height }));
+    return [...document.elements].reverse().find((element) =>
+      containsPoint(elementBox(element), {
+        x: point.x * format.width,
+        y: point.y * format.height,
+      }),
+    );
   }
   function startTransaction() {
     if (transactionRef.current) return;
     transactionRef.current = cloneDocument(document);
-
   }
   function gesturePatch(id: string, patch: Partial<DesignElement>) {
-    const original = transactionRef.current; if (!original) return;
+    const original = transactionRef.current;
+    if (!original) return;
     let target = dragHistoryIndexRef.current;
     if (target === null) {
-      const changed = { ...original, elements: original.elements.map(element=>element.id===id?{...element,...patch} as DesignElement:element) };
+      const changed = {
+        ...original,
+        elements: original.elements.map((element) =>
+          element.id === id ? ({ ...element, ...patch } as DesignElement) : element,
+        ),
+      };
       if (JSON.stringify(changed) === JSON.stringify(original)) return;
       const next = [...history.slice(0, historyIndex + 1), changed].slice(-50);
-      target = next.length - 1; dragHistoryIndexRef.current = target;
-      setHistory(next); setHistoryIndex(target);
+      target = next.length - 1;
+      dragHistoryIndexRef.current = target;
+      setHistory(next);
+      setHistoryIndex(target);
     } else {
-      setHistory(current=>current.map((item,index)=>index===target?{...item,elements:item.elements.map(element=>element.id===id?{...element,...patch} as DesignElement:element)}:item));
+      setHistory((current) =>
+        current.map((item, index) =>
+          index === target
+            ? {
+                ...item,
+                elements: item.elements.map((element) =>
+                  element.id === id ? ({ ...element, ...patch } as DesignElement) : element,
+                ),
+              }
+            : item,
+        ),
+      );
     }
     setDirty(true);
   }
@@ -783,23 +1021,70 @@ function CreativeStudioPage() {
     event.currentTarget.setPointerCapture(event.pointerId);
     if (activePointersRef.current.size === 2) {
       const points = [...activePointersRef.current.values()];
-      const dx = (points[1].x - points[0].x) * format.width, dy = (points[1].y - points[0].y) * format.height;
+      const dx = (points[1].x - points[0].x) * format.width,
+        dy = (points[1].y - points[0].y) * format.height;
       const element = document.elements.find((item) => item.id === selectedId);
-      if (!element) { viewportGestureRef.current = { distance: Math.max(1, Math.hypot(dx, dy)), zoom: viewportZoom }; return; }
+      if (!element) {
+        viewportGestureRef.current = {
+          distance: Math.max(1, Math.hypot(dx, dy)),
+          zoom: viewportZoom,
+        };
+        return;
+      }
       startTransaction();
-      gestureRef.current = { id: element.id, startDistance: Math.max(1, Math.hypot(dx, dy)), startAngle: Math.atan2(dy, dx), startWidth: element.type === "text" ? element.fontSize : element.width, startHeight: element.type === "text" ? element.fontSize : element.height, startRotation: element.rotation, crop: element.type === "image" ? element.crop : undefined };
-      resizeRef.current = null; return;
+      gestureRef.current = {
+        id: element.id,
+        startDistance: Math.max(1, Math.hypot(dx, dy)),
+        startAngle: Math.atan2(dy, dx),
+        startWidth: element.type === "text" ? element.fontSize : element.width,
+        startHeight: element.type === "text" ? element.fontSize : element.height,
+        startRotation: element.rotation,
+        crop: element.type === "image" ? element.crop : undefined,
+      };
+      resizeRef.current = null;
+      return;
     }
     const prior = document.elements.find((item) => item.id === selectedId);
-    const corner = prior && cornerHit(elementBox(prior), { x: point.x * format.width, y: point.y * format.height }, format.width / 30);
+    const corner =
+      prior &&
+      cornerHit(
+        elementBox(prior),
+        { x: point.x * format.width, y: point.y * format.height },
+        format.width / 30,
+      );
     const element = corner ? prior : hitElement(point);
-    if (!element) { setSelectedId(null); setCropId(null); return; }
-    setSelectedId(element.id); startTransaction();
+    if (!element) {
+      setSelectedId(null);
+      setCropId(null);
+      return;
+    }
+    setSelectedId(element.id);
+    startTransaction();
     const now = Date.now();
-    if (element.type === "image" && lastTapRef.current?.id === element.id && now - lastTapRef.current.at < 350) { setCropId(element.id); setMobileTool(null); }
+    if (
+      element.type === "image" &&
+      lastTapRef.current?.id === element.id &&
+      now - lastTapRef.current.at < 350
+    ) {
+      setCropId(element.id);
+      setMobileTool(null);
+    }
     lastTapRef.current = { id: element.id, at: now };
-    dragRef.current = { id: element.id, offsetX: point.x - element.x, offsetY: point.y - element.y };
-    if (corner) resizeRef.current = { id: element.id, distance: Math.max(1, Math.hypot((point.x-element.x)*format.width,(point.y-element.y)*format.height)), width: element.type === "text" ? element.fontSize : element.width, height: element.type === "text" ? element.fontSize : element.height };
+    dragRef.current = {
+      id: element.id,
+      offsetX: point.x - element.x,
+      offsetY: point.y - element.y,
+    };
+    if (corner)
+      resizeRef.current = {
+        id: element.id,
+        distance: Math.max(
+          1,
+          Math.hypot((point.x - element.x) * format.width, (point.y - element.y) * format.height),
+        ),
+        width: element.type === "text" ? element.fontSize : element.width,
+        height: element.type === "text" ? element.fontSize : element.height,
+      };
   }
   function moveCanvasElement(event: ReactPointerEvent<HTMLCanvasElement>) {
     const point = canvasPoint(event);
@@ -807,46 +1092,139 @@ function CreativeStudioPage() {
     activePointersRef.current.set(event.pointerId, point);
     const points = [...activePointersRef.current.values()].slice(0, 2);
     if (points.length === 2) {
-      const dx = (points[1].x-points[0].x)*format.width, dy = (points[1].y-points[0].y)*format.height;
-      const distance = Math.max(1,Math.hypot(dx,dy));
+      const dx = (points[1].x - points[0].x) * format.width,
+        dy = (points[1].y - points[0].y) * format.height;
+      const distance = Math.max(1, Math.hypot(dx, dy));
       const viewport = viewportGestureRef.current;
-      if (viewport) { setViewportZoom(clamp(viewport.zoom*distance/viewport.distance, .5, 3)); return; }
-      const gesture = gestureRef.current; if (!gesture) return;
-      const scale = clamp(distance/gesture.startDistance, .15, 6);
-      const element = document.elements.find((item) => item.id === gesture.id); if (!element) return;
-      if (cropId === element.id && element.type === "image") { gesturePatch(element.id, { crop: zoomCrop(gesture.crop ?? {x:0,y:0,width:1,height:1}, scale) }); return; }
-      const rotation = gesture.startRotation + (Math.atan2(dy,dx)-gesture.startAngle)*180/Math.PI;
-      gesturePatch(element.id, element.type === "text" ? {fontSize:clamp(gesture.startWidth*scale,12,240),rotation} : {width:Math.max(20,gesture.startWidth*scale),height:Math.max(20,gesture.startHeight*scale),rotation}); return;
+      if (viewport) {
+        setViewportZoom(clamp((viewport.zoom * distance) / viewport.distance, 0.5, 3));
+        return;
+      }
+      const gesture = gestureRef.current;
+      if (!gesture) return;
+      const scale = clamp(distance / gesture.startDistance, 0.15, 6);
+      const element = document.elements.find((item) => item.id === gesture.id);
+      if (!element) return;
+      if (cropId === element.id && element.type === "image") {
+        gesturePatch(element.id, {
+          crop: zoomCrop(gesture.crop ?? { x: 0, y: 0, width: 1, height: 1 }, scale),
+        });
+        return;
+      }
+      const rotation =
+        gesture.startRotation + ((Math.atan2(dy, dx) - gesture.startAngle) * 180) / Math.PI;
+      gesturePatch(
+        element.id,
+        element.type === "text"
+          ? { fontSize: clamp(gesture.startWidth * scale, 12, 240), rotation }
+          : {
+              width: Math.max(20, gesture.startWidth * scale),
+              height: Math.max(20, gesture.startHeight * scale),
+              rotation,
+            },
+      );
+      return;
     }
     if (viewportGestureRef.current || gestureRef.current) return;
-    const drag = dragRef.current; if (!drag) return;
-    const item = document.elements.find((element) => element.id === drag.id); if (!item) return;
+    const drag = dragRef.current;
+    if (!drag) return;
+    const item = document.elements.find((element) => element.id === drag.id);
+    if (!item) return;
     const resize = resizeRef.current;
     if (resize) {
-      const scale = clamp(Math.hypot((point.x-item.x)*format.width,(point.y-item.y)*format.height)/resize.distance,.15,6);
-      gesturePatch(item.id,item.type === "text" ? {fontSize:clamp(resize.width*scale,12,240)} : {width:resize.width*scale,height:resize.height*scale}); return;
+      const scale = clamp(
+        Math.hypot((point.x - item.x) * format.width, (point.y - item.y) * format.height) /
+          resize.distance,
+        0.15,
+        6,
+      );
+      gesturePatch(
+        item.id,
+        item.type === "text"
+          ? { fontSize: clamp(resize.width * scale, 12, 240) }
+          : { width: resize.width * scale, height: resize.height * scale },
+      );
+      return;
     }
     if (cropId === item.id && item.type === "image") {
       const original = transactionRef.current?.elements.find((element) => element.id === item.id);
-      const crop = original?.type === "image" ? original.crop ?? {x:0,y:0,width:1,height:1} : {x:0,y:0,width:1,height:1};
-      gesturePatch(item.id,{crop:{...crop,x:clamp(crop.x-(point.x-item.x-drag.offsetX)*format.width/item.width*crop.width,0,1-crop.width),y:clamp(crop.y-(point.y-item.y-drag.offsetY)*format.height/item.height*crop.height,0,1-crop.height)}}); return;
+      const crop =
+        original?.type === "image"
+          ? (original.crop ?? { x: 0, y: 0, width: 1, height: 1 })
+          : { x: 0, y: 0, width: 1, height: 1 };
+      gesturePatch(item.id, {
+        crop: {
+          ...crop,
+          x: clamp(
+            crop.x - (((point.x - item.x - drag.offsetX) * format.width) / item.width) * crop.width,
+            0,
+            1 - crop.width,
+          ),
+          y: clamp(
+            crop.y -
+              (((point.y - item.y - drag.offsetY) * format.height) / item.height) * crop.height,
+            0,
+            1 - crop.height,
+          ),
+        },
+      });
+      return;
     }
-    const box = elementBox(item), others = document.elements.filter((element) => element.id !== item.id).map(elementBox);
-    const sx = snapPosition((point.x-drag.offsetX)*format.width,box.width,[0,format.width/2,format.width,...others.flatMap((b)=>[b.x,b.x-b.width/2,b.x+b.width/2])],format.width*.008);
-    const sy = snapPosition((point.y-drag.offsetY)*format.height,box.height,[0,format.height/2,format.height,...others.flatMap((b)=>[b.y,b.y-b.height/2,b.y+b.height/2])],format.height*.008);
-    setGuides({x:sx.guide,y:sy.guide}); gesturePatch(item.id,{x:clamp(sx.value/format.width,0,1),y:clamp(sy.value/format.height,0,1)});
+    const box = elementBox(item),
+      others = document.elements.filter((element) => element.id !== item.id).map(elementBox);
+    const sx = snapPosition(
+      (point.x - drag.offsetX) * format.width,
+      box.width,
+      [
+        0,
+        format.width / 2,
+        format.width,
+        ...others.flatMap((b) => [b.x, b.x - b.width / 2, b.x + b.width / 2]),
+      ],
+      format.width * 0.008,
+    );
+    const sy = snapPosition(
+      (point.y - drag.offsetY) * format.height,
+      box.height,
+      [
+        0,
+        format.height / 2,
+        format.height,
+        ...others.flatMap((b) => [b.y, b.y - b.height / 2, b.y + b.height / 2]),
+      ],
+      format.height * 0.008,
+    );
+    setGuides({ x: sx.guide, y: sy.guide });
+    gesturePatch(item.id, {
+      x: clamp(sx.value / format.width, 0, 1),
+      y: clamp(sy.value / format.height, 0, 1),
+    });
   }
   function endCanvasMove(event: ReactPointerEvent<HTMLCanvasElement>) {
     activePointersRef.current.delete(event.pointerId);
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
     if (activePointersRef.current.size) {
-      gestureRef.current = null; viewportGestureRef.current = null; resizeRef.current = null;
+      gestureRef.current = null;
+      viewportGestureRef.current = null;
+      resizeRef.current = null;
       const remaining = [...activePointersRef.current.values()][0];
-      const item = document.elements.find(element=>element.id===selectedId);
-      if (remaining && item) dragRef.current = {id:item.id,offsetX:remaining.x-item.x,offsetY:remaining.y-item.y};
+      const item = document.elements.find((element) => element.id === selectedId);
+      if (remaining && item)
+        dragRef.current = {
+          id: item.id,
+          offsetX: remaining.x - item.x,
+          offsetY: remaining.y - item.y,
+        };
       return;
     }
-    transactionRef.current = null; dragRef.current = null; gestureRef.current = null; resizeRef.current = null; viewportGestureRef.current = null; dragHistoryIndexRef.current = null; setGuides({x:null,y:null});
+    transactionRef.current = null;
+    dragRef.current = null;
+    gestureRef.current = null;
+    resizeRef.current = null;
+    viewportGestureRef.current = null;
+    dragHistoryIndexRef.current = null;
+    setGuides({ x: null, y: null });
   }
 
   async function saveServerDraft() {
@@ -868,17 +1246,119 @@ function CreativeStudioPage() {
 
   return (
     <div className="space-y-5" data-studio-focused={mobileStarted ? "true" : "false"}>
-      <Dialog open={brandChoices} onOpenChange={setBrandChoices}><DialogContent className="max-w-sm"><DialogHeader><DialogTitle>Apply My Brand</DialogTitle></DialogHeader><div className="grid grid-cols-2 gap-2" role="group" aria-label="Brand application mode">{([['colors','Colors only'],['fonts','Colors + fonts'],['light','Light Apply'],['full','Full Apply'],['logo','Replace existing logo']] as const).map(([value,label])=><Button key={value} className="h-auto min-h-11 whitespace-normal" variant={brandMode===value?'secondary':'outline'} aria-pressed={brandMode===value} onClick={()=>setBrandMode(value)}>{label}</Button>)}</div><div className="flex items-center gap-2 text-sm"><Layers3 className="size-4 text-primary"/>Keep current layout</div><Button onClick={confirmBrand} disabled={brandMode==='logo'&&!branding.data?.logoUrl}><WandSparkles/>Apply</Button></DialogContent></Dialog>
+      <Dialog open={brandChoices} onOpenChange={setBrandChoices}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Apply My Brand</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-2" role="group" aria-label="Brand application mode">
+            {(
+              [
+                ["colors", "Colors only"],
+                ["fonts", "Colors + fonts"],
+                ["light", "Light Apply"],
+                ["full", "Full Apply"],
+                ["logo", "Replace existing logo"],
+              ] as const
+            ).map(([value, label]) => (
+              <Button
+                key={value}
+                className="h-auto min-h-11 whitespace-normal"
+                variant={brandMode === value ? "secondary" : "outline"}
+                aria-pressed={brandMode === value}
+                onClick={() => setBrandMode(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 text-sm">
+            <Layers3 className="size-4 text-primary" />
+            Keep current layout
+          </div>
+          <Button onClick={confirmBrand} disabled={brandMode === "logo" && !branding.data?.logoUrl}>
+            <WandSparkles />
+            Apply
+          </Button>
+        </DialogContent>
+      </Dialog>
       <UnsavedChangesGuard dirty={dirty} subject="this design" />
-      {postSearch.post&&<div className="flex gap-2"><Button variant="ghost" onClick={()=>returnToPost()}><ArrowLeft/>Back to post</Button><Button disabled={uploadAsset.isPending||!renderReady} onClick={()=>void sendToPost()}><ImagePlus/>Done — Add to post</Button></div>}
-      {mobileStarted && <header className="studio-focus-header sticky top-0 z-20 flex items-center gap-1 border-b border-border bg-background py-2 sm:hidden">
-        <Button size="icon" variant="ghost" aria-label="Leave focused editor" onClick={() => { setMobileStarted(false); setMobileTool(null); setCropId(null); }}><ArrowLeft /></Button>
-        <h1 className="min-w-0 flex-1 text-sm font-semibold">Creative Studio</h1>
-        <Button size="icon" variant="ghost" aria-label="Undo" disabled={historyIndex === 0} onClick={() => {setHistoryIndex(i=>Math.max(0,i-1));setDirty(true);}}><Undo2 /></Button>
-        <Button size="icon" variant="ghost" aria-label="Redo" disabled={historyIndex === history.length-1} onClick={() => {setHistoryIndex(i=>Math.min(history.length-1,i+1));setDirty(true);}}><Redo2 /></Button>
-        <Button variant="ghost" disabled={uploadAsset.isPending} onClick={() => { if(postSearch.post)void sendToPost();else {setMobileStarted(false);setMobileTool(null);setCropId(null);} }}>Done</Button>
-      </header>}
-      <header className={cn("flex-col gap-4 sm:flex-row sm:items-start sm:justify-between", mobileStarted ? "hidden sm:flex" : "flex")}>
+      {postSearch.post && (
+        <div className="flex gap-2">
+          <Button variant="ghost" onClick={() => returnToPost()}>
+            <ArrowLeft />
+            Back to post
+          </Button>
+          <Button
+            disabled={uploadAsset.isPending || !renderReady}
+            onClick={() => void sendToPost()}
+          >
+            <ImagePlus />
+            Done — Add to post
+          </Button>
+        </div>
+      )}
+      {mobileStarted && (
+        <header className="studio-focus-header sticky top-0 z-20 flex items-center gap-1 border-b border-border bg-background py-2 sm:hidden">
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Leave focused editor"
+            onClick={() => {
+              setMobileStarted(false);
+              setMobileTool(null);
+              setCropId(null);
+            }}
+          >
+            <ArrowLeft />
+          </Button>
+          <h1 className="min-w-0 flex-1 text-sm font-semibold">Creative Studio</h1>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Undo"
+            disabled={historyIndex === 0}
+            onClick={() => {
+              setHistoryIndex((i) => Math.max(0, i - 1));
+              setDirty(true);
+            }}
+          >
+            <Undo2 />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label="Redo"
+            disabled={historyIndex === history.length - 1}
+            onClick={() => {
+              setHistoryIndex((i) => Math.min(history.length - 1, i + 1));
+              setDirty(true);
+            }}
+          >
+            <Redo2 />
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={uploadAsset.isPending}
+            onClick={() => {
+              if (postSearch.post) void sendToPost();
+              else {
+                setMobileStarted(false);
+                setMobileTool(null);
+                setCropId(null);
+              }
+            }}
+          >
+            Done
+          </Button>
+        </header>
+      )}
+      <header
+        className={cn(
+          "flex-col gap-4 sm:flex-row sm:items-start sm:justify-between",
+          mobileStarted ? "hidden sm:flex" : "flex",
+        )}
+      >
         <div>
           <div className="hidden items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary sm:flex">
             <ImageIcon className="h-4 w-4" /> Static images only
@@ -890,7 +1370,15 @@ function CreativeStudioPage() {
           </p>
         </div>
         <div className="hidden flex-wrap gap-2 sm:flex">
-          <span className="self-center text-xs text-muted-foreground" role="status">{autoSaveState==="saving"?"Saving draft…":autoSaveState==="saved"?"Draft saved":autoSaveState==="error"?"Auto-save paused":""}</span>
+          <span className="self-center text-xs text-muted-foreground" role="status">
+            {autoSaveState === "saving"
+              ? "Saving draft…"
+              : autoSaveState === "saved"
+                ? "Draft saved"
+                : autoSaveState === "error"
+                  ? "Auto-save paused"
+                  : ""}
+          </span>
           <Button
             variant="outline"
             onClick={() => void saveServerDraft()}
@@ -925,13 +1413,46 @@ function CreativeStudioPage() {
         </div>
       </header>
 
-      {!mobileStarted && <section className="grid gap-3 sm:hidden" aria-label="Creative Studio tools">
-        {[
-          { label: "Graphic Design", icon: WandSparkles, tool: "Templates", photo: false, video: false },
-          { label: "Photo Editor", icon: ImageIcon, tool: "Media", photo: true, video: false },
-          { label: "Video Editor", icon: Video, tool: "Media", photo: false, video: true },
-        ].map(({ label, icon: Icon, tool, photo, video }) => <Button key={label} variant="outline" className="min-h-28 flex-row justify-start gap-4 whitespace-normal rounded-2xl border-border-strong bg-gradient-to-br from-secondary to-surface px-6 text-left" onClick={() => { if(video){void navigate({to:"/create"});return;} setPhotoMode(photo); setMobileStarted(true); setMobileTool(tool); }}><Icon className="size-8 shrink-0 text-primary" /><span><span className="block text-base font-semibold">{label}</span>{video&&<span className="mt-1 block text-xs font-normal text-muted-foreground">Open the mobile video creation workflow</span>}</span></Button>)}
-      </section>}
+      {!mobileStarted && (
+        <section className="grid gap-3 sm:hidden" aria-label="Creative Studio tools">
+          {[
+            {
+              label: "Graphic Design",
+              icon: WandSparkles,
+              tool: "Templates",
+              photo: false,
+              video: false,
+            },
+            { label: "Photo Editor", icon: ImageIcon, tool: "Media", photo: true, video: false },
+            { label: "Video Editor", icon: Video, tool: "Media", photo: false, video: true },
+          ].map(({ label, icon: Icon, tool, photo, video }) => (
+            <Button
+              key={label}
+              variant="outline"
+              className="min-h-28 flex-row justify-start gap-4 whitespace-normal rounded-2xl border-border-strong bg-gradient-to-br from-secondary to-surface px-6 text-left"
+              onClick={() => {
+                if (video) {
+                  void navigate({ to: "/create" });
+                  return;
+                }
+                setPhotoMode(photo);
+                setMobileStarted(true);
+                setMobileTool(tool);
+              }}
+            >
+              <Icon className="size-8 shrink-0 text-primary" />
+              <span>
+                <span className="block text-base font-semibold">{label}</span>
+                {video && (
+                  <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                    Open the mobile video creation workflow
+                  </span>
+                )}
+              </span>
+            </Button>
+          ))}
+        </section>
+      )}
 
       {workflowDraft.data?.payload && (
         <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
@@ -965,7 +1486,12 @@ function CreativeStudioPage() {
         </div>
       )}
 
-      <section className={cn("flex flex-wrap items-end gap-3 sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-4", "hidden sm:flex")}>
+      <section
+        className={cn(
+          "flex flex-wrap items-end gap-3 sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-4",
+          "hidden sm:flex",
+        )}
+      >
         <Field label="Design name">
           <input
             className={`${inputClass} min-w-0 sm:min-w-56`}
@@ -1031,9 +1557,23 @@ function CreativeStudioPage() {
         </div>
       </section>
 
-      <div className={cn("grid gap-5 xl:grid-cols-[14rem_minmax(0,1fr)_18rem]", !mobileStarted && "hidden sm:grid")}>
-        <MobileToolPanel open={["Add", "Media", "Brand", "Templates", "Layers"].includes(mobileTool ?? "")} title={mobileTool ?? "Tools"} onClose={() => setMobileTool(null)}>
-          <section className={cn("surface-card p-4", mobileTool && !["Add", "Brand"].includes(mobileTool) && "hidden sm:block")}>
+      <div
+        className={cn(
+          "grid gap-5 xl:grid-cols-[14rem_minmax(0,1fr)_18rem]",
+          !mobileStarted && "hidden sm:grid",
+        )}
+      >
+        <MobileToolPanel
+          open={["Add", "Media", "Brand", "Templates", "Layers"].includes(mobileTool ?? "")}
+          title={mobileTool ?? "Tools"}
+          onClose={() => setMobileTool(null)}
+        >
+          <section
+            className={cn(
+              "surface-card p-4",
+              mobileTool && !["Add", "Brand"].includes(mobileTool) && "hidden sm:block",
+            )}
+          >
             <h2 className="text-sm font-semibold">Add</h2>
             <input
               ref={uploadInputRef}
@@ -1055,38 +1595,256 @@ function CreativeStudioPage() {
               <ToolButton icon={WandSparkles} label="Apply my brand" onClick={applyBrand} />
             </div>
           </section>
-          <section className={cn("surface-card p-4", mobileTool !== "Brand" && "hidden sm:block")}>
-            <h2 className="text-sm font-semibold">Brand Assist</h2>
-            <p className="mt-2 text-sm font-medium">{profile?.business_name ?? activeWorkspace?.name}</p>
-            <Button className="mt-3 w-full" variant="outline" onClick={applyBrand}><WandSparkles /> Apply My Brand</Button>
-            <dl className="mt-3 space-y-2 text-xs"><div><dt className="text-muted-foreground">Preferred CTA</dt><dd className="break-words">{profile?.default_ctas?.[0] ?? "Not saved"}</dd></div><div><dt className="text-muted-foreground">Website</dt><dd className="break-words">{profile?.website ?? "Not saved"}</dd></div><div><dt className="text-muted-foreground">Brand voice</dt><dd>{profile?.tone_traits?.join(" · ") || "Not saved"}</dd></div><div><dt className="text-muted-foreground">Saved fonts</dt><dd>Not available — template fonts preserved</dd></div></dl>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {branding.data?.logoUrl && <Button variant="outline" className="h-20" onClick={()=>{const slot=mediaSlots.find(item=>item.role==="logo");if(slot){changeDocument(current=>replaceStudioMedia(current,slot.layer.id,{assetId:null,sourceType:"workspace-logo"}));}else addWorkspaceLogo();}}><img src={branding.data.logoUrl} alt="Primary logo" className="max-h-14 max-w-full object-contain" /></Button>}
-              {brandPhotoAssets.map(asset=><Button key={asset.id} variant="outline" className="h-20 overflow-hidden p-0" aria-label={`Use brand photo ${asset.name}`} onClick={()=>{const slot=selectedId?mediaSlots.find(item=>item.layer.id===selectedId):mediaSlots.find(item=>item.role==="background");if(slot){changeDocument(current=>replaceStudioMedia(current,slot.layer.id,{assetId:asset.id}));}else addImage(asset.id);}}>{assetUrls[asset.id]?<img src={assetUrls[asset.id]} alt={asset.name} className="h-full w-full object-cover"/>:<ImageIcon/>}</Button>)}
+          <details
+            className={cn("ocean-disclosure group", mobileTool !== "Brand" && "hidden sm:block")}
+          >
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-sm font-semibold marker:content-none">
+              <span>Brand Assist</span>
+              <span className="max-w-28 truncate text-xs font-normal text-muted-foreground">
+                {profile?.business_name ?? activeWorkspace?.name}
+              </span>
+            </summary>
+            <div className="border-t border-cyan-200/10 p-3">
+              <Button className="w-full" variant="outline" onClick={applyBrand}>
+                <WandSparkles /> Apply My Brand
+              </Button>
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <dt className="text-muted-foreground">Preferred CTA</dt>
+                  <dd className="break-words">{profile?.default_ctas?.[0] ?? "Not saved"}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Website</dt>
+                  <dd className="break-words">{profile?.website ?? "Not saved"}</dd>
+                </div>
+                <div className="col-span-2">
+                  <dt className="text-muted-foreground">Brand voice</dt>
+                  <dd>{profile?.tone_traits?.join(" · ") || "Not saved"}</dd>
+                </div>
+              </dl>
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {branding.data?.logoUrl && (
+                  <Button
+                    variant="outline"
+                    className="h-20"
+                    onClick={() => {
+                      const slot = mediaSlots.find((item) => item.role === "logo");
+                      if (slot) {
+                        changeDocument((current) =>
+                          replaceStudioMedia(current, slot.layer.id, {
+                            assetId: null,
+                            sourceType: "workspace-logo",
+                          }),
+                        );
+                      } else addWorkspaceLogo();
+                    }}
+                  >
+                    <img
+                      src={branding.data.logoUrl}
+                      alt="Primary logo"
+                      className="max-h-14 max-w-full object-contain"
+                    />
+                  </Button>
+                )}
+                {brandPhotoAssets.map((asset) => (
+                  <Button
+                    key={asset.id}
+                    variant="outline"
+                    className="h-20 overflow-hidden p-0"
+                    aria-label={`Use brand photo ${asset.name}`}
+                    onClick={() => {
+                      const slot = selectedId
+                        ? mediaSlots.find((item) => item.layer.id === selectedId)
+                        : mediaSlots.find((item) => item.role === "background");
+                      if (slot) {
+                        changeDocument((current) =>
+                          replaceStudioMedia(current, slot.layer.id, { assetId: asset.id }),
+                        );
+                      } else addImage(asset.id);
+                    }}
+                  >
+                    {assetUrls[asset.id] ? (
+                      <img
+                        src={assetUrls[asset.id]}
+                        alt={asset.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <ImageIcon />
+                    )}
+                  </Button>
+                ))}
+              </div>
             </div>
-          </section>
-          <section className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}>
-            <div className="flex items-center justify-between gap-2"><h2 className="text-sm font-semibold">Templates</h2><Button size="sm" variant="outline" onClick={applyBrand}><WandSparkles /> Apply My Brand</Button></div>
+          </details>
+          <section
+            className={cn("ocean-panel p-4", mobileTool !== "Templates" && "hidden sm:block")}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">Templates</h2>
+              <Button size="sm" variant="outline" onClick={applyBrand}>
+                <WandSparkles /> Apply My Brand
+              </Button>
+            </div>
             <div className="mt-3 flex gap-1" role="group" aria-label="Template format">
-              {(["story","square","portrait"] as const).map(value=><Button key={value} size="sm" variant={templateFormat===value?"secondary":"ghost"} onClick={()=>setTemplateFormat(value)}>{value==="story"?"9:16":value==="square"?"1:1":"4:5"}</Button>)}
+              {(["story", "square", "portrait"] as const).map((value) => (
+                <Button
+                  key={value}
+                  size="sm"
+                  variant={templateFormat === value ? "secondary" : "ghost"}
+                  onClick={() => setTemplateFormat(value)}
+                >
+                  {value === "story" ? "9:16" : value === "square" ? "1:1" : "4:5"}
+                </Button>
+              ))}
             </div>
             <div className="mt-3 grid grid-cols-2 items-start gap-3" aria-label="Template library">
-              {templates.map(template => <Button key={template.id} variant="outline" aria-label={`Use ${template.name} template`} className="h-auto min-w-0 w-full flex-col items-stretch gap-0 overflow-hidden p-0 text-left" onClick={()=>{
-                const next=cloneDocument(template.document);next.elements=next.elements.map(e=>({...e,id:crypto.randomUUID()}));
-                setMobileTool(null);setMobileStarted(true);commit(next);setName(template.name);setDesignId(null);setSelectedId(null);
-              }}>
-                <DesignThumbnail document={template.document} urls={assetUrls} logo={branding.data?.logoUrl} />
-                <span className="block whitespace-normal px-2 pt-2 text-xs font-semibold">{template.name}</span><span className="block whitespace-normal px-2 pb-2 pt-1 text-[10px] text-muted-foreground">{template.category}</span>
-              </Button>)}
+              {templates.map((template) => (
+                <Button
+                  key={template.id}
+                  variant="outline"
+                  aria-label={`Use ${template.name} template`}
+                  className="h-auto min-w-0 w-full flex-col items-stretch gap-0 overflow-hidden p-0 text-left"
+                  onClick={() => {
+                    const next = cloneDocument(template.document);
+                    next.elements = next.elements.map((e) => ({ ...e, id: crypto.randomUUID() }));
+                    setMobileTool(null);
+                    setMobileStarted(true);
+                    commit(next);
+                    setName(template.name);
+                    setDesignId(null);
+                    setSelectedId(null);
+                  }}
+                >
+                  <DesignThumbnail
+                    document={template.document}
+                    urls={assetUrls}
+                    logo={branding.data?.logoUrl}
+                  />
+                  <span className="block whitespace-normal px-2 pt-2 text-xs font-semibold">
+                    {template.name}
+                  </span>
+                  <span className="block whitespace-normal px-2 pb-2 pt-1 text-[10px] text-muted-foreground">
+                    {template.category}
+                  </span>
+                </Button>
+              ))}
             </div>
           </section>
           <section className={cn("surface-card p-4", mobileTool !== "Media" && "hidden sm:block")}>
-            <h2 className="text-sm font-semibold">{replaceId ? "Replace image" : "Media Library"}</h2>
-            {mediaSlots.length>0 && <div className="mt-3 space-y-2" aria-label="Replaceable media slots">{mediaSlots.map(({layer,role})=><div key={layer.id} className="flex min-w-0 items-center gap-2"><Button variant={replaceId===layer.id?"secondary":"outline"} className="min-h-11 min-w-0 flex-1 justify-start whitespace-normal text-left text-xs" aria-label={role==="background"?"Replace Background":`Replace ${layer.name}`} onClick={()=>{setReplaceId(layer.id);setSelectedId(layer.id);setMediaTab("All");}}><ImageIcon className="shrink-0"/>{role==="background"?"Replace Background":role==="logo"?"Replace Logo":`Replace ${layer.name}`}</Button><Button size="icon" variant="ghost" aria-label={`Edit ${layer.name}`} onClick={()=>{setSelectedId(layer.id);setCropId(role==="logo"?null:layer.id);setMobileTool(role==="logo"?"Edit":"Crop");}}><Crop/></Button></div>)}{replaceId && <Button variant="ghost" size="sm" onClick={()=>setReplaceId(null)}>Cancel replacement</Button>}</div>}
-            <div className="mt-2 flex flex-wrap gap-1">{["All","Uploads","Brand","Recent"].map(tab=><Button key={tab} size="sm" variant={mediaTab === tab ? "secondary" : "ghost"} onClick={()=>setMediaTab(tab)}>{tab}</Button>)}</div>
-            {mediaTab === "Brand" && branding.data?.logoUrl && <Button variant="outline" className="mt-3 h-20 w-full" onClick={addWorkspaceLogo}><img src={branding.data.logoUrl} alt="Workspace logo" className="max-h-14 max-w-full object-contain" /></Button>}
-            <Button variant="outline" className="mt-3 min-h-11 w-full sm:hidden" onClick={() => uploadInputRef.current?.click()}><Upload /> Upload image</Button>
-            {replaceId && <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Sample photography · generated, not business-owned</summary><div className="mt-2 grid grid-cols-3 gap-2">{Array.from(new Set(TEMPLATE_LIBRARY.map(item=>item.photo))).map((url,index)=><Button key={url} variant="outline" className="aspect-square h-auto overflow-hidden p-0" aria-label={`Replace with sample photo ${index+1}`} onClick={()=>{if(replaceId){changeDocument(current=>replaceStudioMedia(current,replaceId,{assetId:null,templateUrl:url}));setSelectedId(replaceId);setReplaceId(null);setMobileTool(null);}}}><img src={url} alt={`Sample photo ${index+1}`} className="h-full w-full object-cover"/></Button>)}</div></details>}
+            <h2 className="text-sm font-semibold">
+              {replaceId ? "Replace image" : "Media Library"}
+            </h2>
+            {mediaSlots.length > 0 && (
+              <div className="mt-3 space-y-2" aria-label="Replaceable media slots">
+                {mediaSlots.map(({ layer, role }) => (
+                  <div key={layer.id} className="flex min-w-0 items-center gap-2">
+                    <Button
+                      variant={replaceId === layer.id ? "secondary" : "outline"}
+                      className="min-h-11 min-w-0 flex-1 justify-start whitespace-normal text-left text-xs"
+                      aria-label={
+                        role === "background" ? "Replace Background" : `Replace ${layer.name}`
+                      }
+                      onClick={() => {
+                        setReplaceId(layer.id);
+                        setSelectedId(layer.id);
+                        setMediaTab("All");
+                      }}
+                    >
+                      <ImageIcon className="shrink-0" />
+                      {role === "background"
+                        ? "Replace Background"
+                        : role === "logo"
+                          ? "Replace Logo"
+                          : `Replace ${layer.name}`}
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      aria-label={`Edit ${layer.name}`}
+                      onClick={() => {
+                        setSelectedId(layer.id);
+                        setCropId(role === "logo" ? null : layer.id);
+                        setMobileTool(role === "logo" ? "Edit" : "Crop");
+                      }}
+                    >
+                      <Crop />
+                    </Button>
+                  </div>
+                ))}
+                {replaceId && (
+                  <Button variant="ghost" size="sm" onClick={() => setReplaceId(null)}>
+                    Cancel replacement
+                  </Button>
+                )}
+              </div>
+            )}
+            <div className="mt-2 flex flex-wrap gap-1">
+              {["All", "Uploads", "Brand", "Recent"].map((tab) => (
+                <Button
+                  key={tab}
+                  size="sm"
+                  variant={mediaTab === tab ? "secondary" : "ghost"}
+                  onClick={() => setMediaTab(tab)}
+                >
+                  {tab}
+                </Button>
+              ))}
+            </div>
+            {mediaTab === "Brand" && branding.data?.logoUrl && (
+              <Button variant="outline" className="mt-3 h-20 w-full" onClick={addWorkspaceLogo}>
+                <img
+                  src={branding.data.logoUrl}
+                  alt="Workspace logo"
+                  className="max-h-14 max-w-full object-contain"
+                />
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              className="mt-3 min-h-11 w-full sm:hidden"
+              onClick={() => uploadInputRef.current?.click()}
+            >
+              <Upload /> Upload image
+            </Button>
+            {replaceId && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs text-muted-foreground">
+                  Sample photography · generated, not business-owned
+                </summary>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {Array.from(new Set(TEMPLATE_LIBRARY.map((item) => item.photo))).map(
+                    (url, index) => (
+                      <Button
+                        key={url}
+                        variant="outline"
+                        className="aspect-square h-auto overflow-hidden p-0"
+                        aria-label={`Replace with sample photo ${index + 1}`}
+                        onClick={() => {
+                          if (replaceId) {
+                            changeDocument((current) =>
+                              replaceStudioMedia(current, replaceId, {
+                                assetId: null,
+                                templateUrl: url,
+                              }),
+                            );
+                            setSelectedId(replaceId);
+                            setReplaceId(null);
+                            setMobileTool(null);
+                          }
+                        }}
+                      >
+                        <img
+                          src={url}
+                          alt={`Sample photo ${index + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                      </Button>
+                    ),
+                  )}
+                </div>
+              </details>
+            )}
             <div className="mt-3 grid max-h-[55dvh] grid-cols-3 gap-2 overflow-y-auto sm:max-h-72 sm:grid-cols-2">
               {visiblePickerAssets.map((asset) => (
                 <button
@@ -1098,11 +1856,19 @@ function CreativeStudioPage() {
                   onClick={() => addImage(asset.id)}
                 >
                   {assetUrls[asset.id] ? (
-                    <img src={assetUrls[asset.id]} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+                    <img
+                      src={assetUrls[asset.id]}
+                      alt=""
+                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    />
                   ) : (
-                    <span className="grid h-full w-full place-items-center"><ImageIcon className="h-6 w-6 text-muted-foreground" /></span>
+                    <span className="grid h-full w-full place-items-center">
+                      <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                    </span>
                   )}
-                  <span className="absolute inset-x-0 bottom-0 truncate bg-background/80 px-2 py-1 text-[10px] text-foreground backdrop-blur">{asset.name}</span>
+                  <span className="absolute inset-x-0 bottom-0 truncate bg-background/80 px-2 py-1 text-[10px] text-foreground backdrop-blur">
+                    {asset.name}
+                  </span>
                 </button>
               ))}
               {!mediaAssets.isLoading && !mediaAssets.data?.length && (
@@ -1110,7 +1876,12 @@ function CreativeStudioPage() {
               )}
             </div>
             {pickerAssets.length > visiblePickerAssets.length && (
-              <Button variant="outline" size="sm" className="mt-2 min-h-11 w-full" onClick={() => setMediaPickerLimit((limit) => limit + MEDIA_PICKER_PAGE)}>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 min-h-11 w-full"
+                onClick={() => setMediaPickerLimit((limit) => limit + MEDIA_PICKER_PAGE)}
+              >
                 Show more ({pickerAssets.length - visiblePickerAssets.length} more)
               </Button>
             )}
@@ -1124,7 +1895,10 @@ function CreativeStudioPage() {
                 <button
                   key={element.id}
                   type="button"
-                  onClick={() => { setSelectedId(element.id); setMobileTool("Edit"); }}
+                  onClick={() => {
+                    setSelectedId(element.id);
+                    setMobileTool("Edit");
+                  }}
                   className={cn(
                     "flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-left text-xs",
                     selectedId === element.id
@@ -1132,13 +1906,24 @@ function CreativeStudioPage() {
                       : "text-muted-foreground hover:bg-elevated",
                   )}
                 >
-                  <span className="w-12 shrink-0 overflow-hidden rounded border border-border"><DesignThumbnail document={{...document, elements:[{...element,x:.5,y:.5} as DesignElement]}} urls={assetUrls} logo={branding.data?.logoUrl} /></span>
+                  <span className="w-12 shrink-0 overflow-hidden rounded border border-border">
+                    <DesignThumbnail
+                      document={{
+                        ...document,
+                        elements: [{ ...element, x: 0.5, y: 0.5 } as DesignElement],
+                      }}
+                      urls={assetUrls}
+                      logo={branding.data?.logoUrl}
+                    />
+                  </span>
                   <span className="truncate">{element.name}</span>
                 </button>
               ))}
             </div>
           </section>
-          <section className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}>
+          <section
+            className={cn("surface-card p-4", mobileTool !== "Templates" && "hidden sm:block")}
+          >
             <h2 className="text-sm font-semibold">Saved designs</h2>
             <div className="mt-3 space-y-1">
               {(designs.data ?? []).map((row) => (
@@ -1148,7 +1933,12 @@ function CreativeStudioPage() {
                   className="w-full rounded-lg px-3 py-2 text-left hover:bg-elevated"
                   onClick={() => loadDesign(row)}
                 >
-                  <DesignThumbnail document={row.document} urls={assetUrls} logo={branding.data?.logoUrl} /><div className="mt-2 truncate text-xs font-semibold">{row.name}</div>
+                  <DesignThumbnail
+                    document={row.document}
+                    urls={assetUrls}
+                    logo={branding.data?.logoUrl}
+                  />
+                  <div className="mt-2 truncate text-xs font-semibold">{row.name}</div>
                   <div className="text-[10px] text-muted-foreground">
                     {FORMATS[row.format]?.label ?? row.format}
                   </div>
@@ -1163,28 +1953,83 @@ function CreativeStudioPage() {
 
         <section className="relative flex min-h-64 items-center justify-center overflow-hidden sm:surface-card sm:sticky sm:top-4 sm:min-h-[30rem] sm:self-start sm:p-6">
           <div className="w-full max-w-3xl">
-            {document.elements.length === 0 && <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center"><div className="rounded-full border border-border/80 bg-background/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">Tap Add, Media, or Templates to start creating</div></div>}
-            <div className="relative mx-auto w-fit max-w-full" style={{ transform: `scale(${viewportZoom})` }}><canvas
-              ref={canvasRef}
-              aria-label={`${name} design preview`}
-              className="mx-auto h-auto max-h-[calc(100dvh-13rem)] w-auto max-w-full touch-none cursor-move ring-1 ring-border-strong sm:max-h-none sm:w-full sm:rounded-lg"
-              style={{ aspectRatio: `${format.width}/${format.height}` }}
-              onPointerDown={beginCanvasMove}
-              onPointerMove={moveCanvasElement}
-              onPointerUp={endCanvasMove}
-              onPointerCancel={endCanvasMove}
-            />
-            <canvas ref={overlayRef} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full" />
+            {document.elements.length === 0 && (
+              <div className="pointer-events-none absolute inset-0 z-10 grid place-items-center">
+                <div className="rounded-full border border-border/80 bg-background/80 px-4 py-2 text-xs text-muted-foreground backdrop-blur">
+                  Tap Add, Media, or Templates to start creating
+                </div>
+              </div>
+            )}
+            <div
+              className="relative mx-auto w-fit max-w-full"
+              style={{ transform: `scale(${viewportZoom})` }}
+            >
+              <canvas
+                ref={canvasRef}
+                aria-label={`${name} design preview`}
+                className="mx-auto h-auto max-h-[calc(100dvh-13rem)] w-auto max-w-full touch-none cursor-move ring-1 ring-border-strong sm:max-h-none sm:w-full sm:rounded-lg"
+                style={{ aspectRatio: `${format.width}/${format.height}` }}
+                onPointerDown={beginCanvasMove}
+                onPointerMove={moveCanvasElement}
+                onPointerUp={endCanvasMove}
+                onPointerCancel={endCanvasMove}
+              />
+              <canvas
+                ref={overlayRef}
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 h-full w-full"
+              />
             </div>
-            {cropId && <div className="absolute left-3 top-3 flex gap-2"><Button variant="secondary" onClick={() => setMobileTool("Crop")}><Crop /> Ratio</Button><Button onClick={() => { setCropId(null); setMobileTool(null); }}>Done cropping</Button></div>}
+            {cropId && (
+              <div className="absolute left-3 top-3 flex gap-2">
+                <Button variant="secondary" onClick={() => setMobileTool("Crop")}>
+                  <Crop /> Ratio
+                </Button>
+                <Button
+                  onClick={() => {
+                    setCropId(null);
+                    setMobileTool(null);
+                  }}
+                >
+                  Done cropping
+                </Button>
+              </div>
+            )}
             <div className="mt-3 hidden text-center text-xs text-muted-foreground sm:block">
               Preview scaled to fit · export is {format.width} × {format.height}px
             </div>
           </div>
         </section>
 
-        <MobileToolPanel open={["Canvas", "Adjust", "Crop", "Edit", "Looks", "Auto", "More", "Font", "Size", "Color", "Style", "Align", "Fill", "Border", "Opacity", "Arrange", "Position"].includes(mobileTool ?? "")} title={mobileTool ?? "Canvas"} onClose={() => setMobileTool(null)}>
-          <section className={cn("surface-card space-y-4 p-4", mobileTool !== "Canvas" && "hidden sm:block")}>
+        <MobileToolPanel
+          open={[
+            "Canvas",
+            "Adjust",
+            "Crop",
+            "Edit",
+            "Looks",
+            "Auto",
+            "More",
+            "Font",
+            "Size",
+            "Color",
+            "Style",
+            "Align",
+            "Fill",
+            "Border",
+            "Opacity",
+            "Arrange",
+            "Position",
+          ].includes(mobileTool ?? "")}
+          title={mobileTool ?? "Canvas"}
+          onClose={() => setMobileTool(null)}
+        >
+          <section
+            className={cn(
+              "surface-card space-y-4 p-4",
+              mobileTool !== "Canvas" && "hidden sm:block",
+            )}
+          >
             <h2 className="text-sm font-semibold">Canvas</h2>
             <Field label="Background">
               <input
@@ -1213,65 +2058,351 @@ function CreativeStudioPage() {
             </div>
           </section>
 
-          {selected?.type === "image" && <section className={cn("space-y-4", !["Crop","Adjust","Looks","Auto"].includes(mobileTool ?? "") && "hidden sm:block")}>
-            {mobileTool === "Crop" ? <>
-              <div className="grid grid-cols-3 gap-2">{[{label:"Free",ratio:null},{label:"Original",ratio:null},{label:"1:1",ratio:1},{label:"4:5",ratio:.8},{label:"9:16",ratio:9/16},{label:"16:9",ratio:16/9}].map(({label,ratio})=><Button key={label} variant="outline" onClick={()=>{const asset=mediaAssets.data?.find(item=>item.id===selected.assetId);const sourceRatio=(asset?.width??selected.width)/(asset?.height??selected.height);updateElement(selected.id,{crop:ratioCrop(sourceRatio,ratio),...(ratio?{height:selected.width/ratio}:label==="Original"?{height:selected.width/sourceRatio}:{})});setCropId(selected.id);setMobileTool(null);}}>{label}</Button>)}</div>
-              <Button variant="outline" onClick={()=>updateElement(selected.id,{rotation:(selected.rotation+90)%360})}><RotateCw /> Rotate</Button>
-            </> : mobileTool === "Looks" ? <div className="flex gap-2 overflow-x-auto">{[{name:"Original",brightness:100,contrast:100,saturation:100},{name:"Clean",brightness:105,contrast:108,saturation:95},{name:"Warm",brightness:104,contrast:103,saturation:115},{name:"Cool",brightness:100,contrast:105,saturation:85},{name:"Bright",brightness:118,contrast:102,saturation:105},{name:"Moody",brightness:85,contrast:120,saturation:80},{name:"Cinematic",brightness:95,contrast:125,saturation:75},{name:"Soft",brightness:108,contrast:88,saturation:92}].map(look=><Button key={look.name} variant="outline" className="h-auto w-20 shrink-0 flex-col p-1" onClick={()=>updateElement(selected.id,{brightness:look.brightness,contrast:look.contrast,saturation:look.saturation})}><img src={studioImageUrl(selected,assetUrls,branding.data?.logoUrl)??""} alt={look.name} className="aspect-square w-full object-cover" style={{filter:`brightness(${look.brightness}%) contrast(${look.contrast}%) saturate(${look.saturation}%)`}}/><span>{look.name}</span></Button>)}</div>
-            : mobileTool === "Auto" ? <><p className="text-sm text-muted-foreground">AI image analysis is temporarily unavailable. These are optional manual presets, not image analysis.</p>{["brightness","contrast","saturation"].map(key=><label key={key} className="flex min-h-11 items-center gap-3"><input type="checkbox" checked={lookChoices.includes(key)} onChange={e=>setLookChoices(v=>e.target.checked?[...v,key]:v.filter(k=>k!==key))}/><span className="capitalize">{key === "brightness" ? "Slight brightness" : key === "contrast" ? "Gentle contrast" : "Subtle saturation"}</span></label>)}<Button onClick={()=>updateElement(selected.id,Object.fromEntries(lookChoices.map(key=>[key,key === "brightness"?108:105])))}>Apply selected presets</Button></>
-: <PhotoAdjustments
-                selected={selected}
-                adjustment={adjustment}
-                setAdjustment={setAdjustment}
-                onPreview={(patch)=>previewElementAdjustment(selected.id,patch)}
-                onCommit={(patch)=>commitElementAdjustment(selected.id,patch)}
-                onChange={(patch)=>updateElement(selected.id,patch)}
-              />}
-          </section>}
-          {mobileTool === "More" && <div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>setMobileTool("Layers")}><Layers3 /> Layers</Button><Button variant="outline" onClick={()=>setMobileTool("Canvas")}><Square /> Canvas</Button>{selected?.type === "image" && <Button variant="outline" onClick={()=>{setReplaceId(selected.id);setMobileTool("Media");}}><ImageIcon /> Replace</Button>}<Button variant="outline" onClick={exportPng}><Download /> Export</Button></div>}
-
-          <div className={cn(!["Edit","More","Font","Size","Color","Style","Align","Fill","Border","Opacity","Arrange","Position"].includes(mobileTool ?? "") && "hidden sm:block")}>
-          {selected ? (
-            <ElementInspector
-              availableFonts={STUDIO_FONTS}
-              element={selected}
-              canvasWidth={format.width}
-              canvasHeight={format.height}
-              onChange={(patch) => updateElement(selected.id, patch)}
-              onDuplicate={() => duplicateElement(selected.id)}
-              onRemove={() => removeElement(selected.id)}
-              canMoveBack={selectedIndex > 0}
-              canMoveFront={selectedIndex < document.elements.length - 1}
-              onMoveBack={() => moveLayer(selected.id, -1)}
-              onMoveFront={() => moveLayer(selected.id, 1)}
-            />
-          ) : (
-            <section className="surface-card p-4 text-sm text-muted-foreground">
-              Select a layer to edit it.
+          {selected?.type === "image" && (
+            <section
+              className={cn(
+                "space-y-4",
+                !["Crop", "Adjust", "Looks", "Auto"].includes(mobileTool ?? "") &&
+                  "hidden sm:block",
+              )}
+            >
+              {mobileTool === "Crop" ? (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { label: "Free", ratio: null },
+                      { label: "Original", ratio: null },
+                      { label: "1:1", ratio: 1 },
+                      { label: "4:5", ratio: 0.8 },
+                      { label: "9:16", ratio: 9 / 16 },
+                      { label: "16:9", ratio: 16 / 9 },
+                    ].map(({ label, ratio }) => (
+                      <Button
+                        key={label}
+                        variant="outline"
+                        onClick={() => {
+                          const asset = mediaAssets.data?.find(
+                            (item) => item.id === selected.assetId,
+                          );
+                          const sourceRatio =
+                            (asset?.width ?? selected.width) / (asset?.height ?? selected.height);
+                          updateElement(selected.id, {
+                            crop: ratioCrop(sourceRatio, ratio),
+                            ...(ratio
+                              ? { height: selected.width / ratio }
+                              : label === "Original"
+                                ? { height: selected.width / sourceRatio }
+                                : {}),
+                          });
+                          setCropId(selected.id);
+                          setMobileTool(null);
+                        }}
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      updateElement(selected.id, { rotation: (selected.rotation + 90) % 360 })
+                    }
+                  >
+                    <RotateCw /> Rotate
+                  </Button>
+                </>
+              ) : mobileTool === "Looks" ? (
+                <div className="flex gap-2 overflow-x-auto">
+                  {[
+                    { name: "Original", brightness: 100, contrast: 100, saturation: 100 },
+                    { name: "Clean", brightness: 105, contrast: 108, saturation: 95 },
+                    { name: "Warm", brightness: 104, contrast: 103, saturation: 115 },
+                    { name: "Cool", brightness: 100, contrast: 105, saturation: 85 },
+                    { name: "Bright", brightness: 118, contrast: 102, saturation: 105 },
+                    { name: "Moody", brightness: 85, contrast: 120, saturation: 80 },
+                    { name: "Cinematic", brightness: 95, contrast: 125, saturation: 75 },
+                    { name: "Soft", brightness: 108, contrast: 88, saturation: 92 },
+                  ].map((look) => (
+                    <Button
+                      key={look.name}
+                      variant="outline"
+                      className="h-auto w-20 shrink-0 flex-col p-1"
+                      onClick={() =>
+                        updateElement(selected.id, {
+                          brightness: look.brightness,
+                          contrast: look.contrast,
+                          saturation: look.saturation,
+                        })
+                      }
+                    >
+                      <img
+                        src={studioImageUrl(selected, assetUrls, branding.data?.logoUrl) ?? ""}
+                        alt={look.name}
+                        className="aspect-square w-full object-cover"
+                        style={{
+                          filter: `brightness(${look.brightness}%) contrast(${look.contrast}%) saturate(${look.saturation}%)`,
+                        }}
+                      />
+                      <span>{look.name}</span>
+                    </Button>
+                  ))}
+                </div>
+              ) : mobileTool === "Auto" ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    AI image analysis is temporarily unavailable. These are optional manual presets,
+                    not image analysis.
+                  </p>
+                  {["brightness", "contrast", "saturation"].map((key) => (
+                    <label key={key} className="flex min-h-11 items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={lookChoices.includes(key)}
+                        onChange={(e) =>
+                          setLookChoices((v) =>
+                            e.target.checked ? [...v, key] : v.filter((k) => k !== key),
+                          )
+                        }
+                      />
+                      <span className="capitalize">
+                        {key === "brightness"
+                          ? "Slight brightness"
+                          : key === "contrast"
+                            ? "Gentle contrast"
+                            : "Subtle saturation"}
+                      </span>
+                    </label>
+                  ))}
+                  <Button
+                    onClick={() =>
+                      updateElement(
+                        selected.id,
+                        Object.fromEntries(
+                          lookChoices.map((key) => [key, key === "brightness" ? 108 : 105]),
+                        ),
+                      )
+                    }
+                  >
+                    Apply selected presets
+                  </Button>
+                </>
+              ) : (
+                <PhotoAdjustments
+                  selected={selected}
+                  adjustment={adjustment}
+                  setAdjustment={setAdjustment}
+                  onPreview={(patch) => previewElementAdjustment(selected.id, patch)}
+                  onCommit={(patch) => commitElementAdjustment(selected.id, patch)}
+                  onChange={(patch) => updateElement(selected.id, patch)}
+                />
+              )}
             </section>
           )}
+          {mobileTool === "More" && (
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => setMobileTool("Layers")}>
+                <Layers3 /> Layers
+              </Button>
+              <Button variant="outline" onClick={() => setMobileTool("Canvas")}>
+                <Square /> Canvas
+              </Button>
+              {selected?.type === "image" && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setReplaceId(selected.id);
+                    setMobileTool("Media");
+                  }}
+                >
+                  <ImageIcon /> Replace
+                </Button>
+              )}
+              <Button variant="outline" onClick={exportPng}>
+                <Download /> Export
+              </Button>
+            </div>
+          )}
+
+          <div
+            className={cn(
+              ![
+                "Edit",
+                "More",
+                "Font",
+                "Size",
+                "Color",
+                "Style",
+                "Align",
+                "Fill",
+                "Border",
+                "Opacity",
+                "Arrange",
+                "Position",
+              ].includes(mobileTool ?? "") && "hidden sm:block",
+            )}
+          >
+            {selected ? (
+              <ElementInspector
+                availableFonts={STUDIO_FONTS}
+                element={selected}
+                canvasWidth={format.width}
+                canvasHeight={format.height}
+                onChange={(patch) => updateElement(selected.id, patch)}
+                onDuplicate={() => duplicateElement(selected.id)}
+                onRemove={() => removeElement(selected.id)}
+                canMoveBack={selectedIndex > 0}
+                canMoveFront={selectedIndex < document.elements.length - 1}
+                onMoveBack={() => moveLayer(selected.id, -1)}
+                onMoveFront={() => moveLayer(selected.id, 1)}
+              />
+            ) : (
+              <section className="surface-card p-4 text-sm text-muted-foreground">
+                Select a layer to edit it.
+              </section>
+            )}
           </div>
         </MobileToolPanel>
       </div>
 
-      {mobileStarted && <div className="studio-context-toolbar sticky bottom-0 z-10 border-t border-border bg-background pb-[max(.5rem,env(safe-area-inset-bottom))] sm:hidden">
-        {photoMode && !document.elements.some(element => element.type === "image" && element.sourceType !== "workspace-logo") && (
-          <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-foreground">Choose a photo to edit</p>
-              <p className="truncate text-[10px] text-muted-foreground">You can add text or shapes anytime, but photo controls appear after media is added.</p>
-            </div>
-            <Button size="sm" variant="secondary" onClick={()=>setMobileTool("Media")}><ImagePlus/>Choose media</Button>
+      {mobileStarted && (
+        <div className="studio-context-toolbar sticky bottom-0 z-10 border-t border-border bg-background pb-[max(.5rem,env(safe-area-inset-bottom))] sm:hidden">
+          {photoMode &&
+            !document.elements.some(
+              (element) => element.type === "image" && element.sourceType !== "workspace-logo",
+            ) && (
+              <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-foreground">Choose a photo to edit</p>
+                  <p className="truncate text-[10px] text-muted-foreground">
+                    You can add text or shapes anytime, but photo controls appear after media is
+                    added.
+                  </p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => setMobileTool("Media")}>
+                  <ImagePlus />
+                  Choose media
+                </Button>
+              </div>
+            )}
+          <div className="flex items-center gap-1 overflow-x-auto px-1" aria-label="Editing tools">
+            <Button
+              variant="ghost"
+              className="h-auto min-h-16 min-w-[4.5rem] flex-col gap-1 px-1 text-[10px]"
+              onClick={() => {
+                setSelectedId(null);
+                setReplaceId(null);
+                setCropId(null);
+                setMobileTool(null);
+              }}
+            >
+              <ArrowLeft />
+              Tools
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-auto min-h-16 min-w-[4.5rem] flex-col gap-1 px-1 text-[10px]"
+              onClick={() => {
+                if (selected?.type === "image") {
+                  setReplaceId(selected.id);
+                }
+                setMobileTool("Media");
+              }}
+            >
+              <ImageIcon />
+              Media
+            </Button>
+            {(selected?.type === "image"
+              ? selected.sourceType === "workspace-logo"
+                ? ["Replace", "Size", "Opacity", "Position", "More"]
+                : ["Auto", "Crop", "Adjust", "Looks", "Remove", "More"]
+              : selected?.type === "text"
+                ? ["Font", "Size", "Color", "Style", "Align", "More"]
+                : selected?.type === "shape"
+                  ? ["Fill", "Border", "Opacity", "Arrange", "More"]
+                  : ["Add", "Templates", "Brand", "More"]
+            ).map((label) => (
+              <Button
+                key={label}
+                variant="ghost"
+                className="h-auto min-h-16 min-w-[4.5rem] flex-col gap-1 px-1 text-[10px]"
+                onClick={() => {
+                  if (label === "Remove" && selected) {
+                    removeElement(selected.id);
+                    return;
+                  }
+                  if (label === "Replace" && selected) {
+                    setReplaceId(selected.id);
+                    setMobileTool("Media");
+                    return;
+                  }
+                  setMobileTool(label);
+                }}
+              >
+                {label === "More" ? (
+                  <MoreHorizontal />
+                ) : label === "Crop" ? (
+                  <Crop />
+                ) : label === "Font" ? (
+                  <Type />
+                ) : label === "Replace" ? (
+                  <ImageIcon />
+                ) : label === "Color" || label === "Fill" || label === "Looks" ? (
+                  <Palette />
+                ) : label === "Remove" ? (
+                  <Trash2 />
+                ) : label === "Auto" || label === "Brand" ? (
+                  <WandSparkles />
+                ) : (
+                  <SlidersHorizontal />
+                )}
+                {label}
+              </Button>
+            ))}
           </div>
-        )}
-        <div className="flex items-center gap-1 overflow-x-auto px-1" aria-label="Editing tools">
-          <Button variant="ghost" className="h-auto min-h-16 min-w-[4.5rem] flex-col gap-1 px-1 text-[10px]" onClick={()=>{setSelectedId(null);setReplaceId(null);setCropId(null);setMobileTool(null);}}><ArrowLeft />Tools</Button>
-          <Button variant="ghost" className="h-auto min-h-16 min-w-[4.5rem] flex-col gap-1 px-1 text-[10px]" onClick={()=>{if(selected?.type==="image"){setReplaceId(selected.id);}setMobileTool("Media");}}><ImageIcon />Media</Button>
-          {(selected?.type === "image" ? selected.sourceType === "workspace-logo" ? ["Replace","Size","Opacity","Position","More"] : ["Auto","Crop","Adjust","Looks","Remove","More"] : selected?.type === "text" ? ["Font","Size","Color","Style","Align","More"] : selected?.type === "shape" ? ["Fill","Border","Opacity","Arrange","More"] : ["Add","Templates","Brand","More"]).map(label=><Button key={label} variant="ghost" className="h-auto min-h-16 min-w-[4.5rem] flex-col gap-1 px-1 text-[10px]" onClick={()=>{if(label === "Remove" && selected){removeElement(selected.id);return;}if(label === "Replace" && selected){setReplaceId(selected.id);setMobileTool("Media");return;}setMobileTool(label);}}>{label === "More" ? <MoreHorizontal /> : label === "Crop" ? <Crop /> : label === "Font" ? <Type /> : label === "Replace" ? <ImageIcon /> : label === "Color" || label === "Fill" || label === "Looks" ? <Palette /> : label === "Remove" ? <Trash2 /> : label === "Auto" || label === "Brand" ? <WandSparkles /> : <SlidersHorizontal />}{label}</Button>)}
         </div>
-      </div>}
-      {!mobileStarted && document.elements.length > 0 && <section className="space-y-3 sm:hidden"><Button className="w-full" onClick={()=>setMobileStarted(true)}>Continue editing</Button><div className="grid grid-cols-2 gap-2"><Button variant="outline" onClick={()=>void saveServerDraft()} disabled={workflowDraft.save.isPending}><Save /> Save draft</Button><Button variant="outline" onClick={exportPng}><Download /> Export</Button><Button variant="outline" aria-label="Send to post" onClick={()=>void sendToPost("feed")} disabled={uploadAsset.isPending}><ImagePlus /> Post to feed</Button><Button variant="outline" onClick={()=>void sendToPost("story")} disabled={uploadAsset.isPending}><ImagePlus /> Post to story</Button></div><Button variant="outline" className="w-full" onClick={()=>saveDesign.mutate()} disabled={saveDesign.isPending}><Save /> Save editable design</Button></section>}
-
+      )}
+      {!mobileStarted && document.elements.length > 0 && (
+        <section className="space-y-3 sm:hidden">
+          <Button className="w-full" onClick={() => setMobileStarted(true)}>
+            Continue editing
+          </Button>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              onClick={() => void saveServerDraft()}
+              disabled={workflowDraft.save.isPending}
+            >
+              <Save /> Save draft
+            </Button>
+            <Button variant="outline" onClick={exportPng}>
+              <Download /> Export
+            </Button>
+            <Button
+              variant="outline"
+              aria-label="Send to post"
+              onClick={() => void sendToPost("feed")}
+              disabled={uploadAsset.isPending}
+            >
+              <ImagePlus /> Post to feed
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => void sendToPost("story")}
+              disabled={uploadAsset.isPending}
+            >
+              <ImagePlus /> Post to story
+            </Button>
+          </div>
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => saveDesign.mutate()}
+            disabled={saveDesign.isPending}
+          >
+            <Save /> Save editable design
+          </Button>
+        </section>
+      )}
     </div>
   );
 }
@@ -1377,7 +2508,10 @@ function PhotoAdjustments({
       <label className="block space-y-4">
         <span className="flex justify-between text-sm">
           {control.label}
-          <span>{value > 0 ? "+" : ""}{Math.round(value)}</span>
+          <span>
+            {value > 0 ? "+" : ""}
+            {Math.round(value)}
+          </span>
         </span>
         <Slider
           aria-label={control.label}
@@ -1390,11 +2524,7 @@ function PhotoAdjustments({
         />
       </label>
       <div className="flex flex-wrap justify-between gap-2">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onChange(control.patch(control.neutral))}
-        >
+        <Button variant="ghost" size="sm" onClick={() => onChange(control.patch(control.neutral))}>
           Reset {control.label}
         </Button>
         <Button
@@ -1416,7 +2546,8 @@ function PhotoAdjustments({
         </Button>
       </div>
       <p className="text-[11px] text-muted-foreground">
-        Drag for live preview. Each completed slider move is saved as one edit, so Undo stays useful.
+        Drag for live preview. Each completed slider move is saved as one edit, so Undo stays
+        useful.
       </p>
     </>
   );
@@ -1471,8 +2602,31 @@ function ElementInspector({
               onChange={(event) => onChange({ text: event.target.value })}
             />
           </Field>
-          <Field label="Font"><select aria-label="Font" className={inputClass} value={element.fontFamily ?? "Inter"} onChange={event=>onChange({fontFamily:event.target.value})}>{Array.from(new Set([...availableFonts,element.fontFamily??"Inter"])).map(font=><option key={font}>{font}</option>)}</select></Field>
-          <Field label="Letter spacing"><input aria-label="Letter spacing" className={inputClass} type="number" min={0} max={30} value={element.letterSpacing??0} onChange={event=>onChange({letterSpacing:Math.max(0,number(event))})}/></Field>
+          <Field label="Font">
+            <select
+              aria-label="Font"
+              className={inputClass}
+              value={element.fontFamily ?? "Inter"}
+              onChange={(event) => onChange({ fontFamily: event.target.value })}
+            >
+              {Array.from(new Set([...availableFonts, element.fontFamily ?? "Inter"])).map(
+                (font) => (
+                  <option key={font}>{font}</option>
+                ),
+              )}
+            </select>
+          </Field>
+          <Field label="Letter spacing">
+            <input
+              aria-label="Letter spacing"
+              className={inputClass}
+              type="number"
+              min={0}
+              max={30}
+              value={element.letterSpacing ?? 0}
+              onChange={(event) => onChange({ letterSpacing: Math.max(0, number(event)) })}
+            />
+          </Field>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Size">
               <input
@@ -1544,7 +2698,30 @@ function ElementInspector({
           />
         </Field>
       )}
-      {element.type === "shape" && <div className="grid grid-cols-2 gap-3"><Field label="Border color"><input aria-label="Border color" type="color" className={inputClass} value={element.borderColor??element.color} onChange={event=>onChange({borderColor:event.target.value})}/></Field><Field label="Border width"><input aria-label="Border width" type="number" min={0} max={60} className={inputClass} value={element.borderWidth??0} onChange={event=>onChange({borderWidth:clamp(number(event),0,60)})}/></Field></div>}
+      {element.type === "shape" && (
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Border color">
+            <input
+              aria-label="Border color"
+              type="color"
+              className={inputClass}
+              value={element.borderColor ?? element.color}
+              onChange={(event) => onChange({ borderColor: event.target.value })}
+            />
+          </Field>
+          <Field label="Border width">
+            <input
+              aria-label="Border width"
+              type="number"
+              min={0}
+              max={60}
+              className={inputClass}
+              value={element.borderWidth ?? 0}
+              onChange={(event) => onChange({ borderWidth: clamp(number(event), 0, 60) })}
+            />
+          </Field>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Opacity">
           <input
@@ -1614,7 +2791,8 @@ function ToolButton({
   onClick: () => void;
 }) {
   return (
-    <Button variant="outline"
+    <Button
+      variant="outline"
       type="button"
       onClick={onClick}
       className="flex min-h-12 items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold hover:bg-elevated"
@@ -1638,9 +2816,39 @@ const inputClass =
 const textareaClass =
   "w-full rounded-lg border border-border bg-background p-3 text-sm outline-none focus:border-primary";
 
-function DesignThumbnail({document,urls,logo}:{document:DesignDocument;urls:Record<string,string>;logo?:string|null}) {
-  const ref=useRef<HTMLCanvasElement>(null);
-  useEffect(()=>{let cancelled=false;const target=ref.current;if(!target)return;const artwork=window.document.createElement("canvas");void renderStudioArtwork(artwork,document,urls,logo,320).then(()=>{if(cancelled)return;target.width=artwork.width;target.height=artwork.height;target.getContext("2d")?.drawImage(artwork,0,0);});return()=>{cancelled=true;};},[document,urls,logo]);
-  const size=studioDocumentSize(document);
-  return <canvas ref={ref} width={320} height={Math.round(320*size.height/size.width)} aria-label="Design thumbnail" className="block w-full"/>;
+function DesignThumbnail({
+  document,
+  urls,
+  logo,
+}: {
+  document: DesignDocument;
+  urls: Record<string, string>;
+  logo?: string | null;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const target = ref.current;
+    if (!target) return;
+    const artwork = window.document.createElement("canvas");
+    void renderStudioArtwork(artwork, document, urls, logo, 320).then(() => {
+      if (cancelled) return;
+      target.width = artwork.width;
+      target.height = artwork.height;
+      target.getContext("2d")?.drawImage(artwork, 0, 0);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [document, urls, logo]);
+  const size = studioDocumentSize(document);
+  return (
+    <canvas
+      ref={ref}
+      width={320}
+      height={Math.round((320 * size.height) / size.width)}
+      aria-label="Design thumbnail"
+      className="block w-full"
+    />
+  );
 }

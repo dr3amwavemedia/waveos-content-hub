@@ -7,7 +7,7 @@ import { test, expect } from "@playwright/test";
  * rate limits, iframe/consent state), so this suite verifies everything up
  * to — and including — the moment the app hands the user to Google:
  *
- *   1. /auth renders the "Continue with Google" button and it is enabled.
+ *   1. /auth renders the "Continue with Google" link and it is enabled.
  *   2. Clicking it starts the Lovable-managed OAuth flow: either a popup is
  *      opened, or the top-level location changes toward the OAuth broker.
  *   3. The intended post-auth destination is preserved in sessionStorage
@@ -17,15 +17,15 @@ import { test, expect } from "@playwright/test";
 test.describe("Google sign-in", () => {
   test("renders the Google sign-in link", async ({ page }) => {
     await page.goto("/auth");
-    const btn = page.getByRole("link", { name: /continue with google/i });
-    await expect(btn).toBeVisible();
-    await expect(btn).toBeEnabled();
+    const link = page.getByRole("link", { name: /continue with google/i });
+    await expect(link).toBeVisible();
+    await expect(link).toBeEnabled();
+    await expect(link).toHaveAttribute("href", /\/~oauth\/initiate\?/);
   });
 
   test("preserves ?next= destination in sessionStorage before OAuth", async ({ page }) => {
     await page.goto("/auth?next=/calendar");
     const btn = page.getByRole("link", { name: /continue with google/i });
-    // The button stays disabled until hydration attaches the handler.
     await expect(btn).toBeEnabled();
     // sessionStorage is written when the click handler runs so the callback can finish routing.
     await btn.click().catch(() => {});
@@ -39,7 +39,6 @@ test.describe("Google sign-in", () => {
 
   test("clicking Google starts the managed OAuth hand-off", async ({ context, page }) => {
     await page.goto("/auth");
-    // Wait for hydration — the button is inert until React attaches handlers.
     await expect(page.getByRole("link", { name: /continue with google/i })).toBeEnabled();
 
     // Capture whichever hand-off happens first: popup, top-level nav, or
@@ -69,7 +68,6 @@ test.describe("Google sign-in", () => {
   test("Google hand-off uses the public callback route", async ({ page }) => {
     await page.goto("/auth?next=/home");
     const appOrigin = new URL(page.url()).origin;
-    // Wait for hydration — the button is inert until React attaches handlers.
     await expect(page.getByRole("link", { name: /continue with google/i })).toBeEnabled();
 
     const oauthRequest = page.waitForRequest((request) =>

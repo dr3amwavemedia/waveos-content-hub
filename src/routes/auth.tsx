@@ -267,6 +267,7 @@ function AuthPage() {
   }
 
   async function handleGoogle() {
+    if (busy) return;
     setBusy(true);
 
     try {
@@ -335,19 +336,15 @@ function AuthPage() {
           </div>
           {mode === "signin" && (
             <>
-              {/* Real link so the server-rendered page can still reach the OAuth broker
-                  if React never hydrates; once hydrated, the secure SDK flow takes over. */}
               <a
                 href="/~oauth/initiate?provider=google"
                 target="_blank"
-                rel="noopener"
-                data-google-oauth-fallback=""
-                suppressHydrationWarning
-                aria-disabled={busy || undefined}
+                rel="noopener noreferrer"
+                data-google-oauth-fallback
+                aria-disabled={busy}
                 onClick={(event) => {
                   event.preventDefault();
-                  if (busy || !hydrated) return;
-                  void handleGoogle();
+                  if (!busy) void handleGoogle();
                 }}
                 className="mb-4 flex min-h-11 w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-elevated aria-disabled:pointer-events-none aria-disabled:opacity-60"
               >

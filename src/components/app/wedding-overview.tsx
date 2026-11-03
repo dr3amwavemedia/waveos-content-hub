@@ -216,12 +216,12 @@ export function WeddingOverview() {
 
   return (
     <div
-      className="w-full space-y-6 overflow-x-hidden pb-10"
+      className="wedding-ocean ocean-page w-full space-y-6 overflow-x-hidden pb-10"
       style={{ paddingBottom: "max(2.5rem, env(safe-area-inset-bottom))" }}
     >
       {/* Warm, personalized header */}
       <header
-        className="relative overflow-hidden rounded-[2rem] border px-5 py-5 sm:px-9 sm:py-10"
+        className="ocean-hero relative overflow-hidden px-5 py-5 sm:px-9 sm:py-10"
         style={{
           borderColor: palette.border,
           background: `linear-gradient(160deg, ${palette.soft} 0%, #ffffff 62%)`,
