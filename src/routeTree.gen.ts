@@ -15,6 +15,7 @@ import { Route as AcceptInviteRouteImport } from './routes/accept-invite'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthCallbackRouteImport } from './routes/auth-callback'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as MobileDesignReviewRouteImport } from './routes/mobile-design-review'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
@@ -114,6 +115,11 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MobileDesignReviewRoute = MobileDesignReviewRouteImport.update({
+  id: '/mobile-design-review',
+  path: '/mobile-design-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -499,6 +505,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/auth-callback': typeof AuthCallbackRoute
   '/mcp': typeof McpRoute
+  '/mobile-design-review': typeof MobileDesignReviewRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -577,6 +584,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/auth-callback': typeof AuthCallbackRoute
   '/mcp': typeof McpRoute
+  '/mobile-design-review': typeof MobileDesignReviewRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -657,6 +665,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/auth-callback': typeof AuthCallbackRoute
   '/mcp': typeof McpRoute
+  '/mobile-design-review': typeof MobileDesignReviewRoute
   '/privacy': typeof PrivacyRoute
   '/reset-password': typeof ResetPasswordRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -737,6 +746,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/auth-callback'
     | '/mcp'
+    | '/mobile-design-review'
     | '/privacy'
     | '/reset-password'
     | '/sitemap.xml'
@@ -815,6 +825,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/auth-callback'
     | '/mcp'
+    | '/mobile-design-review'
     | '/privacy'
     | '/reset-password'
     | '/sitemap.xml'
@@ -894,6 +905,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/auth-callback'
     | '/mcp'
+    | '/mobile-design-review'
     | '/privacy'
     | '/reset-password'
     | '/sitemap.xml'
@@ -974,6 +986,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   McpRoute: typeof McpRoute
+  MobileDesignReviewRoute: typeof MobileDesignReviewRoute
   PrivacyRoute: typeof PrivacyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -1044,6 +1057,13 @@ declare module '@tanstack/react-router' {
       path: '/mcp'
       fullPath: '/mcp'
       preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mobile-design-review': {
+      id: '/mobile-design-review'
+      path: '/mobile-design-review'
+      fullPath: '/mobile-design-review'
+      preLoaderRoute: typeof MobileDesignReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -1688,6 +1708,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   McpRoute: McpRoute,
+  MobileDesignReviewRoute: MobileDesignReviewRoute,
   PrivacyRoute: PrivacyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
