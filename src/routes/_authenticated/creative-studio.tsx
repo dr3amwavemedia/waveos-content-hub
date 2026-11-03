@@ -551,7 +551,7 @@ function CreativeStudioPage() {
     setSelectedId(element.id);
   }
 
-  async function addImage(assetId: string, options?: { photoEditor?: boolean }) {
+  async function addImage(assetId: string, options?: { photoEditor?: boolean; replaceTargetId?: string }) {
     const asset = mediaAssets.data?.find((candidate) => candidate.id === assetId);
     let loadedImage: HTMLImageElement;
     try {
@@ -566,9 +566,33 @@ function CreativeStudioPage() {
       );
       return;
     }
-    if (replaceId) {
-      changeDocument((current) => replaceStudioMedia(current, replaceId, { assetId }));
-      setSelectedId(replaceId);
+    // Selecting the background directly on the canvas is also a replacement
+    // action. Never append the chosen image as a new foreground layer.
+    const selectedBackground = document.elements.find(
+      (layer) => layer.id === selectedId && layer.type === "image" && layer.mediaRole === "background",
+    );
+    const targetId = options?.replaceTargetId ?? replaceId ?? selectedBackground?.id;
+    if (targetId) {
+      changeDocument((current) => ({
+        ...current,
+        elements: current.elements.map((layer) => {
+          if (layer.id !== targetId || layer.type !== "image") return layer;
+          const sourceWidth = loadedImage.naturalWidth || 1;
+          const sourceHeight = loadedImage.naturalHeight || 1;
+          return {
+            ...layer,
+            assetId,
+            templateUrl: undefined,
+            sourceType: "media" as const,
+            // Cover the original template frame without stretching the image.
+            // Crop is source-relative and must be recalculated for each photo.
+            crop: layer.mediaRole === "logo"
+              ? { x: 0, y: 0, width: 1, height: 1 }
+              : ratioCrop(sourceWidth / sourceHeight, layer.width / layer.height),
+          };
+        }),
+      }));
+      setSelectedId(targetId);
       setReplaceId(null);
       setMobileTool(null);
       return;
@@ -1659,13 +1683,10 @@ function CreativeStudioPage() {
                         ? mediaSlots.find((item) => item.layer.id === replaceId)
                         : mediaSlots.find((item) => item.layer.id === selectedId && item.role === "background") ??
                           mediaSlots.find((item) => item.role === "background");
-                      if (slot) {
-                        changeDocument((current) =>
-                          replaceStudioMedia(current, slot.layer.id, { assetId: asset.id }),
-                        );
-                        setSelectedId(slot.layer.id);
-                        setReplaceId(null);
-                      } else void addImage(asset.id);
+                      if (slot) setReplaceId(slot.layer.id);
+                      // Resolve image dimensions before replacing so the photo
+                      // fills the original template frame with a correct crop.
+                      void addImage(asset.id, { replaceTargetId: slot?.layer.id });
                     }}
                   >
                     {assetUrls[asset.id] ? (
