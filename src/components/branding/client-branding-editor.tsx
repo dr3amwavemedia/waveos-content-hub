@@ -4,7 +4,7 @@ import { Image, Loader2, Palette, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { supabase } from "@/integrations/supabase/client";
-import { DEFAULT_WORKSPACE_ACCENT, useWorkspaceBranding, workspaceBrandingError, workspaceThemeStyle } from "@/hooks/use-workspace-branding";
+import { DEFAULT_WORKSPACE_ACCENT, useWorkspaceBranding, workspaceBrandingError, workspacePalette, workspaceThemeStyle } from "@/hooks/use-workspace-branding";
 
 const db = supabase as unknown as {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,6 +53,7 @@ export function ClientBrandingEditor({ workspaceId, workspaceName }: { workspace
   });
 
   const previewUrl = pendingLogo ? URL.createObjectURL(pendingLogo) : branding.data?.logoUrl;
+  const palette = workspacePalette(accentColor);
   return (
     <div className="space-y-5" style={workspaceThemeStyle(accentColor)}>
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
@@ -60,7 +61,7 @@ export function ClientBrandingEditor({ workspaceId, workspaceName }: { workspace
           <Palette className="mt-0.5 h-5 w-5 text-primary" />
           <div>
             <h3 className="text-sm font-semibold text-foreground">{workspaceName} workspace identity</h3>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">The logo appears on the client overview and workspace switcher. The accent color personalizes buttons, highlights, and glow effects.</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">The logo appears on the client overview and workspace switcher. The selected color generates a coordinated palette across web and mobile without changing either dashboard layout.</p>
           </div>
         </div>
       </div>
@@ -77,7 +78,7 @@ export function ClientBrandingEditor({ workspaceId, workspaceName }: { workspace
             <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => setPendingLogo(event.target.files?.[0] ?? null)} />
           </label>
           <label className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Brand accent</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Workspace color</span>
             <span className="flex items-center gap-3 rounded-xl border border-border bg-elevated px-3 py-2">
               <input type="color" value={accentColor} onChange={(event) => setAccentColor(event.target.value)} className="h-8 w-10 cursor-pointer rounded border-0 bg-transparent p-0" aria-label="Brand accent color" />
               <input value={accentColor} onChange={(event) => setAccentColor(event.target.value)} maxLength={7} className="min-w-0 flex-1 bg-transparent font-mono text-sm uppercase text-foreground outline-none" aria-label="Brand accent hex value" />
@@ -94,6 +95,11 @@ export function ClientBrandingEditor({ workspaceId, workspaceName }: { workspace
                 />
               ))}
             </span>
+            <span className="flex items-center gap-1.5" aria-label="Generated workspace palette">
+              {Object.values(palette).map((color, index) => (
+                <span key={`${color}-${index}`} className="h-2.5 flex-1 rounded-full" style={{ background: color }} />
+              ))}
+            </span>
           </label>
         </div>
       </div>
@@ -102,7 +108,7 @@ export function ClientBrandingEditor({ workspaceId, workspaceName }: { workspace
           {save.isPending && <Loader2 className="h-4 w-4 animate-spin" />} Save client branding
         </button>
       </div>
-      <p className="text-right text-xs text-muted-foreground">The preview changes immediately. Select Save to apply it to this client's workspace.</p>
+      <p className="text-right text-xs text-muted-foreground">The preview changes immediately. Save once to apply the palette to this client workspace on every device.</p>
     </div>
   );
 }

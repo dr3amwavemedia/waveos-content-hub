@@ -89,11 +89,11 @@ export function MobileClassicHome() {
 
   return (
     <section className="mobile-classic-home space-y-5 sm:hidden" aria-label="Mobile overview">
-      <header className="rounded-3xl border border-violet-300/20 bg-gradient-to-br from-violet-500/20 via-fuchsia-500/10 to-transparent p-4 shadow-[0_18px_50px_rgba(109,40,217,.16)]">
+      <header className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/20 via-primary-glow/10 to-transparent p-4 shadow-[var(--shadow-glow)]">
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event("waveos:open-menu"))}
-          className="flex max-w-full items-center gap-1 text-sm font-semibold text-violet-200"
+          className="flex max-w-full items-center gap-1 text-sm font-semibold text-primary-glow"
           aria-label="Switch workspace"
         >
           <span className="truncate">{activeWorkspace?.name ?? "WaveOS"}</span>
@@ -115,7 +115,7 @@ export function MobileClassicHome() {
       {stats.isError && (
         <button
           type="button"
-          className="min-h-11 w-full rounded-2xl border border-violet-300/25 bg-violet-400/10 px-4 text-sm font-semibold text-violet-100"
+          className="min-h-11 w-full rounded-2xl border border-primary/25 bg-primary/10 px-4 text-sm font-semibold text-primary-glow"
           onClick={() => void stats.refetch()}
         >
           Reload workspace activity

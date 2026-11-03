@@ -66,7 +66,6 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 }
-
 :root {
   --radius: 0.75rem;
 
@@ -181,33 +180,36 @@
 /* Preserve the established purple, quick-action-first phone identity while
    tablet and desktop retain the Ocean Intelligence visual system. */
 @media (max-width: 639px) {
-  .waveos-app-shell {
+  .waveos-app-shell:not([data-workspace-color-customized="true"]) {
     --primary: oklch(0.69 0.2 295) !important;
     --primary-glow: oklch(0.78 0.18 310) !important;
     --primary-foreground: oklch(0.98 0.006 260) !important;
     --border: oklch(0.7 0.16 295 / 0.18) !important;
     --border-strong: oklch(0.72 0.18 295 / 0.34) !important;
     --ring: oklch(0.7 0.2 295 / 0.58) !important;
+  }
+
+  .waveos-app-shell {
     background:
-      radial-gradient(95% 42rem at 50% -10%, oklch(0.44 0.18 295 / 0.32), transparent 72%),
+      radial-gradient(95% 42rem at 50% -10%, color-mix(in oklab, var(--primary) 32%, transparent), transparent 72%),
       var(--background);
   }
 
   .mobile-classic-header {
-    border-color: oklch(0.72 0.18 295 / 0.2);
-    background: oklch(0.16 0.045 285 / 0.94);
+    border-color: color-mix(in oklab, var(--primary) 22%, transparent);
+    background: color-mix(in oklab, var(--primary) 12%, #0b1020);
   }
 
   .mobile-classic-drawer {
-    border-color: oklch(0.72 0.18 295 / 0.2);
+    border-color: color-mix(in oklab, var(--primary) 22%, transparent);
     background:
-      radial-gradient(100% 55% at 0% 0%, oklch(0.46 0.2 300 / 0.3), transparent 72%),
-      oklch(0.145 0.035 278 / 0.99);
+      radial-gradient(100% 55% at 0% 0%, color-mix(in oklab, var(--primary) 30%, transparent), transparent 72%),
+      color-mix(in oklab, var(--primary) 7%, #09101d);
   }
 
   .mobile-classic-nav {
-    background: oklch(0.17 0.045 282 / 0.94);
-    box-shadow: 0 -18px 50px -28px oklch(0.65 0.22 300 / 0.7);
+    background: color-mix(in oklab, var(--primary) 12%, #101321);
+    box-shadow: 0 -18px 50px -28px color-mix(in oklab, var(--primary) 70%, transparent);
   }
 
   .mobile-classic-header button,
@@ -281,14 +283,14 @@ html {
 
 .ocean-dashboard {
   background:
-    radial-gradient(circle at 42% -8%, rgba(30, 232, 220, 0.11), transparent 31rem),
-    radial-gradient(circle at 100% 18%, rgba(103, 82, 255, 0.1), transparent 27rem),
+    radial-gradient(circle at 42% -8%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 31rem),
+    radial-gradient(circle at 100% 18%, color-mix(in oklab, var(--primary-glow) 10%, transparent), transparent 27rem),
     linear-gradient(145deg, #020b1b 0%, #04182e 52%, #031125 100%);
 }
 
 .ocean-dashboard .surface-card {
   background: linear-gradient(145deg, rgba(8, 33, 58, 0.9), rgba(5, 22, 43, 0.82));
-  border-color: rgba(129, 222, 239, 0.13);
+  border-color: color-mix(in oklab, var(--primary) 13%, transparent);
   border-radius: 1rem;
   box-shadow: inset 0 1px 0 rgba(208, 249, 255, 0.035), 0 16px 34px rgba(0, 5, 18, 0.2);
   backdrop-filter: blur(18px);
@@ -338,7 +340,7 @@ html {
 }
 
 .ocean-panel {
-  border: 1px solid rgba(129, 222, 239, 0.12);
+  border: 1px solid color-mix(in oklab, var(--primary) 12%, transparent);
   border-radius: 1rem;
   background: linear-gradient(145deg, rgba(8, 33, 58, 0.86), rgba(5, 22, 43, 0.74));
   box-shadow:

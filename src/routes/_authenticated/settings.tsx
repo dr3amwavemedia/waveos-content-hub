@@ -30,6 +30,7 @@ import {
   DEFAULT_WORKSPACE_ACCENT,
   useWorkspaceBranding,
   workspaceBrandingError,
+  workspacePalette,
   workspaceThemeStyle,
 } from "@/hooks/use-workspace-branding";
 import {
@@ -918,6 +919,7 @@ function WorkspaceBrandingEditor({
   });
 
   const previewUrl = pendingLogo ? URL.createObjectURL(pendingLogo) : branding.data?.logoUrl;
+  const palette = workspacePalette(accentColor);
 
   return (
     <section className="surface-card overflow-hidden" style={workspaceThemeStyle(accentColor)}>
@@ -927,10 +929,10 @@ function WorkspaceBrandingEditor({
             <Palette className="h-5 w-5" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground">Workspace identity</h2>
+            <h2 className="text-lg font-semibold text-foreground">Workspace style</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              Give {workspaceName} a private, recognizable welcome while keeping the WaveOS luxury
-              foundation.
+              Personalize {workspaceName} with its own color palette on web and mobile. Dashboard
+              structure, navigation, and features stay unchanged.
             </p>
           </div>
         </div>
@@ -969,7 +971,7 @@ function WorkspaceBrandingEditor({
           </label>
           <label className="space-y-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Brand accent
+              Workspace color
             </span>
             <span className="flex items-center gap-3 rounded-xl border border-border bg-elevated px-3 py-2">
               <input
@@ -999,6 +1001,15 @@ function WorkspaceBrandingEditor({
                 />
               ))}
             </span>
+            <span className="flex items-center gap-1.5" aria-label="Generated workspace palette">
+              {Object.values(palette).map((color, index) => (
+                <span
+                  key={`${color}-${index}`}
+                  className="h-2.5 flex-1 rounded-full"
+                  style={{ background: color }}
+                />
+              ))}
+            </span>
           </label>
           <div className="flex justify-end sm:col-span-2">
             <button
@@ -1012,7 +1023,8 @@ function WorkspaceBrandingEditor({
             </button>
           </div>
           <p className="text-right text-xs text-muted-foreground sm:col-span-2">
-            The preview changes immediately. Select Save to apply it throughout this workspace.
+            Preview changes immediately. Save once to apply the palette to this workspace on every
+            device.
           </p>
         </div>
       </div>

@@ -18,6 +18,7 @@ export type WorkspaceBranding = {
   logoPath: string | null;
   logoUrl: string | null;
   accentColor: string;
+  hasSavedAccent: boolean;
 };
 
 export function workspaceBrandingError(error: unknown) {
@@ -109,6 +110,7 @@ export function useWorkspaceBranding(workspaceId: string | undefined) {
         logoUrl: await workspaceLogoUrl(logoPath),
         accentColor:
           typeof data?.accent_color === "string" ? data.accent_color : DEFAULT_WORKSPACE_ACCENT,
+        hasSavedAccent: typeof data?.accent_color === "string",
       };
     },
   });
