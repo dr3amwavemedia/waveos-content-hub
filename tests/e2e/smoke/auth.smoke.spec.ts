@@ -12,7 +12,12 @@ test.describe("smoke: authentication", () => {
   test("/auth renders the managed Google sign-in", async ({ page }) => {
     await page.context().clearCookies();
     await page.goto("/auth");
-    await expect(page.getByRole("button", { name: /google/i }).first()).toBeVisible();
+    await expect(
+      page
+        .getByRole("button", { name: /google/i })
+        .or(page.getByRole("link", { name: /google/i }))
+        .first(),
+    ).toBeVisible();
   });
 
   test("a signed-in user lands on /home", async ({ context, page, baseURL }, testInfo) => {
