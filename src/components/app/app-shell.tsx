@@ -819,6 +819,7 @@ const MOBILE_PERSONAL_PATHS = new Set([
   "/create",
   "/social",
   "/creative-studio",
+  "/video-maker",
   "/campaigns",
   "/analytics",
   "/competitive-intelligence",

@@ -1432,7 +1432,7 @@ function CreativeStudioPage() {
               className="min-h-28 flex-row justify-start gap-4 whitespace-normal rounded-2xl border-border-strong bg-gradient-to-br from-secondary to-surface px-6 text-left"
               onClick={() => {
                 if (video) {
-                  void navigate({ to: "/create" });
+                  void navigate({ to: "/video-maker" });
                   return;
                 }
                 setPhotoMode(photo);
@@ -1445,7 +1445,7 @@ function CreativeStudioPage() {
                 <span className="block text-base font-semibold">{label}</span>
                 {video && (
                   <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                    Open the mobile video creation workflow
+                    Choose, preview, and prepare a video before creating the post
                   </span>
                 )}
               </span>

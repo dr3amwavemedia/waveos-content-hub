@@ -54,6 +54,7 @@ import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedToolsRouteImport } from './routes/_authenticated/tools'
 import { Route as AuthenticatedTrendingNowRouteImport } from './routes/_authenticated/trending-now'
 import { Route as AuthenticatedUpdatesRouteImport } from './routes/_authenticated/updates'
+import { Route as AuthenticatedVideoMakerRouteImport } from './routes/_authenticated/video-maker'
 import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
 import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
@@ -317,6 +318,11 @@ const AuthenticatedUpdatesRoute = AuthenticatedUpdatesRouteImport.update({
   path: '/updates',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedVideoMakerRoute = AuthenticatedVideoMakerRouteImport.update({
+  id: '/video-maker',
+  path: '/video-maker',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedVideographerRoute =
   AuthenticatedVideographerRouteImport.update({
     id: '/videographer',
@@ -526,6 +532,7 @@ export interface FileRoutesByFullPath {
   '/tools': typeof AuthenticatedToolsRoute
   '/trending-now': typeof AuthenticatedTrendingNowRoute
   '/updates': typeof AuthenticatedUpdatesRoute
+  '/video-maker': typeof AuthenticatedVideoMakerRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -602,6 +609,7 @@ export interface FileRoutesByTo {
   '/tools': typeof AuthenticatedToolsRoute
   '/trending-now': typeof AuthenticatedTrendingNowRoute
   '/updates': typeof AuthenticatedUpdatesRoute
+  '/video-maker': typeof AuthenticatedVideoMakerRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -680,6 +688,7 @@ export interface FileRoutesById {
   '/_authenticated/tools': typeof AuthenticatedToolsRoute
   '/_authenticated/trending-now': typeof AuthenticatedTrendingNowRoute
   '/_authenticated/updates': typeof AuthenticatedUpdatesRoute
+  '/_authenticated/video-maker': typeof AuthenticatedVideoMakerRoute
   '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
   '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -758,6 +767,7 @@ export interface FileRouteTypes {
     | '/tools'
     | '/trending-now'
     | '/updates'
+    | '/video-maker'
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
@@ -834,6 +844,7 @@ export interface FileRouteTypes {
     | '/tools'
     | '/trending-now'
     | '/updates'
+    | '/video-maker'
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
@@ -911,6 +922,7 @@ export interface FileRouteTypes {
     | '/_authenticated/tools'
     | '/_authenticated/trending-now'
     | '/_authenticated/updates'
+    | '/_authenticated/video-maker'
     | '/_authenticated/videographer'
     | '/_authenticated/vision-board'
     | '/_authenticated/vision-studio'
@@ -1295,6 +1307,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedUpdatesRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/video-maker': {
+      id: '/_authenticated/video-maker'
+      path: '/video-maker'
+      fullPath: '/video-maker'
+      preLoaderRoute: typeof AuthenticatedVideoMakerRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/videographer': {
       id: '/_authenticated/videographer'
       path: '/videographer'
@@ -1557,6 +1576,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedToolsRoute: typeof AuthenticatedToolsRoute
   AuthenticatedTrendingNowRoute: typeof AuthenticatedTrendingNowRoute
   AuthenticatedUpdatesRoute: typeof AuthenticatedUpdatesRoute
+  AuthenticatedVideoMakerRoute: typeof AuthenticatedVideoMakerRoute
   AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
   AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRouteWithChildren
   AuthenticatedVisionStudioRoute: typeof AuthenticatedVisionStudioRoute
@@ -1599,6 +1619,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedToolsRoute: AuthenticatedToolsRoute,
   AuthenticatedTrendingNowRoute: AuthenticatedTrendingNowRoute,
   AuthenticatedUpdatesRoute: AuthenticatedUpdatesRoute,
+  AuthenticatedVideoMakerRoute: AuthenticatedVideoMakerRoute,
   AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
   AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRouteWithChildren,
   AuthenticatedVisionStudioRoute: AuthenticatedVisionStudioRoute,

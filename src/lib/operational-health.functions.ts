@@ -41,7 +41,7 @@ export const getAdminOperationalHealth = createServerFn({ method: "GET" })
         .select("workspace_id,sync_state,last_attempt_at,last_success_at,safe_error_code"),
       supabaseAdmin
         .from("external_media_connections")
-        .select("workspace_id,provider,token_expires_at,updated_at"),
+        .select("workspace_id,provider,token_expires_at,updated_at,scopes"),
     ]);
 
     const mediaRows = media.data ?? [];
@@ -64,9 +64,16 @@ export const getAdminOperationalHealth = createServerFn({ method: "GET" })
         !row.last_success_at ||
         Date.parse(row.last_success_at) < Date.now() - 7 * 24 * 60 * 60 * 1000,
     ).length;
-    const unhealthyConnections = connectionRows.filter(
-      (row) => row.token_expires_at && Date.parse(row.token_expires_at) <= Date.now(),
-    ).length;
+    const unhealthyConnections = connectionRows.filter((row) => {
+      const scopes = typeof row.scopes === "string" ? row.scopes.split(/\s+/) : [];
+      const missingDrivePermission =
+        row.provider === "google_drive" &&
+        !scopes.includes("https://www.googleapis.com/auth/drive.file");
+      // Expired access tokens are normal: Google Drive and Dropbox refresh
+      // them on demand. Only a connection that cannot refresh truthfully
+      // belongs in the reconnect count.
+      return missingDrivePermission;
+    }).length;
 
     return {
       observedAt: new Date().toISOString(),
@@ -82,7 +89,8 @@ export const getAdminOperationalHealth = createServerFn({ method: "GET" })
         inputTokens30d: aiInputTokens,
         outputTokens30d: aiOutputTokens,
         estimatedCostMicros30d: estimatedCostMicros || null,
-        available: !ai.error,
+        available: Boolean(process.env.LOVABLE_API_KEY),
+        telemetryAvailable: !ai.error,
       },
       analytics: {
         profiles: analyticsRows.length,

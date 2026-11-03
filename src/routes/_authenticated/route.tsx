@@ -29,6 +29,7 @@ const MEDIA_MANAGER_ALLOWED_ROUTES = [
   "/create",
   "/analytics",
   "/creative-studio",
+  "/video-maker",
   "/campaigns",
   "/competitive-intelligence",
   "/social-accounts",

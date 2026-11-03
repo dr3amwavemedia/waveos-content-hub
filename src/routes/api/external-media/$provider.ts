@@ -38,6 +38,15 @@ export const Route = createFileRoute("/api/external-media/$provider")({
 
         if (action === "status") {
           const connection = await getExternalConnection(workspaceId, provider);
+          const hasRequiredDriveScope =
+            provider !== "google_drive" ||
+            connection?.scopes.split(/\s+/).includes(GOOGLE_DRIVE_SCOPE) === true;
+          const tokenExpired =
+            Boolean(connection?.token_expires_at) &&
+            Date.parse(connection!.token_expires_at as string) <= Date.now();
+          const reconnectRequired =
+            Boolean(connection) &&
+            (!hasRequiredDriveScope || (tokenExpired && !connection?.refresh_token_encrypted));
           return json({
             configured:
               provider === "google_drive"
@@ -45,14 +54,8 @@ export const Route = createFileRoute("/api/external-media/$provider")({
                     process.env.GOOGLE_DRIVE_CLIENT_ID && process.env.GOOGLE_DRIVE_CLIENT_SECRET,
                   )
                 : Boolean(process.env.DROPBOX_APP_KEY && process.env.DROPBOX_APP_SECRET),
-            connected:
-              Boolean(connection) &&
-              (provider !== "google_drive" ||
-                connection?.scopes.split(/\s+/).includes(GOOGLE_DRIVE_SCOPE)),
-            reconnectRequired:
-              provider === "google_drive" &&
-              Boolean(connection) &&
-              !connection?.scopes.split(/\s+/).includes(GOOGLE_DRIVE_SCOPE),
+            connected: Boolean(connection) && !reconnectRequired,
+            reconnectRequired,
             account: connection
               ? {
                   email: connection.account_email,

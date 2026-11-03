@@ -75,6 +75,7 @@ type HealthPayload = {
     outputTokens30d: number;
     estimatedCostMicros30d: number | null;
     available: boolean;
+    telemetryAvailable: boolean;
   };
   analytics: { profiles: number; unhealthy: number; stale: number; available: boolean };
   externalMedia: { connections: number; unhealthy: number; available: boolean };
@@ -813,9 +814,11 @@ function SystemHealthPanel({
           label: "AI",
           icon: Sparkles,
           healthy: data.ai.available && data.ai.failures30d === 0,
-          detail: data.ai.available
-            ? `${data.ai.requests30d} requests · ${data.ai.failures30d} failures`
-            : "Unavailable",
+          detail: !data.ai.available
+            ? "Service unavailable"
+            : data.ai.telemetryAvailable
+              ? `${data.ai.requests30d} requests · ${data.ai.failures30d} failures`
+              : "Ready · usage metering unavailable",
         },
         {
           label: "Analytics",
