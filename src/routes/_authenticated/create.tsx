@@ -47,11 +47,7 @@ import type { DuplicateGuardMatch } from "@/lib/publish-fingerprint";
 import {
   destinationHeadline,
   destinationLines,
-  META_SHARING_HELP_STEPS,
-  META_SHARING_HELP_URL,
-  META_SHARING_WARNING,
   sameDestinations,
-  showMetaSharingWarning,
 } from "@/lib/publish-targets";
 import {
   getExternalMediaStatus,
@@ -325,7 +321,6 @@ function CreatePost() {
   );
   const destinations = destinationLines(platforms, socialConnections.data ?? [], accountSelections);
   const destinationTitle = destinationHeadline(destinations);
-  const metaSharingWarning = showMetaSharingWarning(platforms, socialConnections.data ?? []);
   const status = existing.data?.item?.status ?? "draft";
   const locked = status === "published" || status === "publishing" || status === "in_review";
 
@@ -579,8 +574,6 @@ function CreatePost() {
       setDuplicateGuard({ contentId: id, matches: res.duplicateGuard, expectedPlatforms });
       return;
     }
-    const checkForMetaCopy =
-      res.success > 0 && showMetaSharingWarning(expectedPlatforms, socialConnections.data ?? []);
     if (res.failed === 0 && res.pending === 0)
       toast.success(`Published to ${res.success} channel${res.success === 1 ? "" : "s"}`);
     else if (res.failed === 0)
@@ -591,19 +584,6 @@ function CreatePost() {
       toast.warning(
         `Published to ${res.success}, ${res.failed} failed — open Posts & insights to retry`,
       );
-    if (checkForMetaCopy) {
-      // WaveOS cannot prevent Meta's own cross-sharing; offer a quick check.
-      toast.info("Sent only to Instagram. Want to check Facebook for an automatic Meta copy?", {
-        duration: 15000,
-        action: {
-          label: "Check Published",
-          onClick: () => {
-            void qc.invalidateQueries({ queryKey: ["live-posts", workspaceId] });
-            void navigate({ to: "/social", search: { view: "live" } });
-          },
-        },
-      });
-    }
     navigate({ to: "/social", search: { view: "posts" } });
   }
 
@@ -698,7 +678,7 @@ function CreatePost() {
       className={cn(
         "space-y-4 lg:space-y-6 lg:pb-0",
         // Room for the phone action bar, which also shows the destinations.
-        metaSharingWarning ? "pb-40" : "pb-24",
+        "pb-24",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -950,7 +930,6 @@ function CreatePost() {
             <PublishDestinations
               title={destinationTitle}
               lines={destinations}
-              metaWarning={metaSharingWarning}
             />
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
@@ -998,7 +977,6 @@ function CreatePost() {
           compact
           title={destinationTitle}
           lines={destinations}
-          metaWarning={metaSharingWarning}
         />
         <div className="mt-2 grid grid-cols-3 gap-2">
         <Button variant="outline" disabled={locked||create.isPending||update.isPending||publishing!==null} onClick={handleSaveDraft}><FileText className="size-4"/>Save Draft</Button>
@@ -1036,15 +1014,12 @@ function CreatePost() {
 function PublishDestinations({
   title,
   lines,
-  metaWarning,
   compact = false,
 }: {
   title: string;
   lines: Array<{ platform: string; text: string; connected: boolean }>;
-  metaWarning: boolean;
   compact?: boolean;
 }) {
-  const [showHelp, setShowHelp] = useState(false);
   return (
     <div
       className={cn(
@@ -1064,37 +1039,6 @@ function PublishDestinations({
       )}
       {lines.some((line) => !line.connected) && (
         <p className="mt-1 text-xs text-destructive">Connect every selected platform before publishing.</p>
-      )}
-      {metaWarning && (
-        <div
-          className={cn(
-            "border-t border-border text-muted-foreground",
-            compact ? "mt-1.5 pt-1.5 text-[11px] leading-4" : "mt-2 pt-2 text-xs leading-5",
-          )}
-        >
-          <p role="note">{META_SHARING_WARNING}</p>
-          <button
-            type="button"
-            onClick={() => setShowHelp((value) => !value)}
-            className="mt-1 font-semibold text-primary hover:underline"
-            aria-expanded={showHelp}
-          >
-            How to turn off Sharing across profiles
-          </button>
-          {showHelp && (
-            <p className="mt-1">
-              {META_SHARING_HELP_STEPS}{" "}
-              <a
-                href={META_SHARING_HELP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-semibold text-primary hover:underline"
-              >
-                Open Accounts Center
-              </a>
-            </p>
-          )}
-        </div>
       )}
     </div>
   );
