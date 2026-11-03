@@ -7,7 +7,7 @@ const permissions = read("src/hooks/use-permissions.ts");
 assert.match(permissions, /PUBLIC_OS_CURRENT_FEATURES/);
 assert.match(
   permissions,
-  /subscription\?\.plan === "full" \|\| subscription\?\.plan === "expanded"/,
+  /subscription\?\.status === "trialing" \|\|\s*subscription\?\.plan === "full" \|\|\s*subscription\?\.plan === "expanded"/,
 );
 assert.match(permissions, /can_view_analytics_checkup/);
 
