@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Film, Loader2, Play, Upload, Video } from "lucide-react";
+import { Check, CircleAlert, Film, Loader2, Play, RotateCw, Upload, Video } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 
@@ -34,24 +34,60 @@ function VideoMakerPage() {
   const videos = useMediaAssets(workspaceId, { kind: "video" });
   const upload = useUploadAsset(workspaceId);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const previewRef = useRef<HTMLElement | null>(null);
   const [selected, setSelected] = useState<MediaAsset | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewPending, setPreviewPending] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewAttempt, setPreviewAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
     if (!selected) {
       setPreviewUrl(null);
+      setPreviewPending(false);
+      setPreviewError(null);
       return () => {
         active = false;
       };
     }
-    void getMediaPreviewUrl(selected).then((url) => {
-      if (active) setPreviewUrl(url);
-    });
+    setPreviewUrl(null);
+    setPreviewPending(true);
+    setPreviewError(null);
+    void getMediaPreviewUrl(selected)
+      .then((url) => {
+        if (!active) return;
+        if (!url) throw new Error("No preview URL was returned for this video.");
+        setPreviewUrl(url);
+      })
+      .catch(() => {
+        if (active) {
+          setPreviewError(
+            "WaveOS could not open a browser preview for this clip. The original is still selected and can be added to a post.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setPreviewPending(false);
+      });
     return () => {
       active = false;
     };
-  }, [selected]);
+  }, [previewAttempt, selected]);
+
+  function selectVideo(asset: MediaAsset) {
+    setSelected(asset);
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      window.requestAnimationFrame(() =>
+        previewRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+    }
+  }
+
+  function continueToPost(destination: "feed" | "story") {
+    if (!selected) return;
+    void navigate({ to: "/create", search: { media: selected.id, destination } });
+  }
 
   async function uploadVideo(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -101,34 +137,104 @@ function VideoMakerPage() {
         />
       </header>
 
+      <section className="surface-card p-4 sm:p-5" aria-label="Video Maker steps">
+        <div className="grid gap-3 sm:grid-cols-3">
+          {[
+            ["1", "Choose a clip", "Pick an existing library video or upload one."],
+            ["2", "Check playback", "Review the selected file and confirm it is the right clip."],
+            ["3", "Create the post", "Choose feed or story, then select the connected accounts."],
+          ].map(([number, title, description], index) => {
+            const complete = index === 0 && !!selected;
+            const active = index === 0 ? !selected : index === 1 ? !!selected : !!previewUrl;
+            return (
+              <div
+                key={number}
+                className={cn(
+                  "rounded-2xl border p-4",
+                  active || complete
+                    ? "border-primary/35 bg-primary/10"
+                    : "border-border bg-surface/30",
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">
+                    {complete ? <Check className="h-4 w-4" /> : number}
+                  </span>
+                  <p className="font-semibold">{title}</p>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">{description}</p>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          Video Maker prepares the clip for the post composer. Nothing is published from this page.
+        </p>
+      </section>
+
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)]">
-        <section className="surface-card overflow-hidden p-4 sm:p-5" aria-label="Video preview">
-          {selected && previewUrl ? (
+        <section
+          ref={previewRef}
+          className="surface-card scroll-mt-24 overflow-hidden p-4 sm:p-5"
+          aria-label="Video preview"
+        >
+          {selected ? (
             <>
-              <video
-                key={selected.id}
-                controls
-                playsInline
-                preload="metadata"
-                src={previewUrl}
-                className="aspect-video w-full rounded-2xl bg-black object-contain"
-              />
+              {previewPending ? (
+                <div className="flex aspect-video w-full flex-col items-center justify-center rounded-2xl bg-black/70 text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="mt-3 font-semibold">Opening {selected.name}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Preparing a secure preview…</p>
+                </div>
+              ) : previewUrl && !previewError ? (
+                <video
+                  key={`${selected.id}-${previewAttempt}`}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  src={previewUrl}
+                  onError={() =>
+                    setPreviewError(
+                      "This browser cannot play the clip format, but the original can still be added to a post.",
+                    )
+                  }
+                  className="aspect-video w-full rounded-2xl bg-black object-contain"
+                />
+              ) : (
+                <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/5 p-6 text-center">
+                  <CircleAlert className="h-9 w-9 text-amber-300" />
+                  <p className="mt-3 font-semibold">Preview unavailable</p>
+                  <p className="mt-2 max-w-md text-sm text-muted-foreground">{previewError}</p>
+                  <Button
+                    className="mt-4"
+                    variant="outline"
+                    onClick={() => setPreviewAttempt((attempt) => attempt + 1)}
+                  >
+                    <RotateCw /> Retry preview
+                  </Button>
+                </div>
+              )}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                    Selected clip
+                  </p>
                   <p className="truncate font-semibold">{selected.name}</p>
                   <p className="text-xs text-muted-foreground">{videoDetails(selected)}</p>
                 </div>
-                <Button
-                  onClick={() =>
-                    void navigate({
-                      to: "/create",
-                      search: { media: selected.id, destination: "feed" },
-                    })
-                  }
-                >
-                  <Play /> Continue to post
-                </Button>
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                  <Button variant="outline" onClick={() => continueToPost("story")}>
+                    <Play /> Create story post
+                  </Button>
+                  <Button onClick={() => continueToPost("feed")}>
+                    <Play /> Create feed post
+                  </Button>
+                </div>
               </div>
+              <p className="mt-3 rounded-xl border border-border bg-surface/40 p-3 text-xs text-muted-foreground">
+                Next, WaveOS opens Create Post with this video attached. You will choose the exact
+                connected platforms and accounts before anything can publish.
+              </p>
             </>
           ) : (
             <button
@@ -168,7 +274,8 @@ function VideoMakerPage() {
                 <button
                   key={asset.id}
                   type="button"
-                  onClick={() => setSelected(asset)}
+                  onClick={() => selectVideo(asset)}
+                  aria-pressed={selected?.id === asset.id}
                   className={cn(
                     "w-full rounded-xl border p-3 text-left transition-colors",
                     selected?.id === asset.id
@@ -180,6 +287,11 @@ function VideoMakerPage() {
                   <span className="mt-1 block text-xs text-muted-foreground">
                     {videoDetails(asset)}
                   </span>
+                  {selected?.id === asset.id && (
+                    <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary">
+                      <Check className="h-3.5 w-3.5" /> Selected — review above
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
