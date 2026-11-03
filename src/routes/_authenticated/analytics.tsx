@@ -3,6 +3,7 @@ import { useState } from "react";
 import { BarChart3, Search, TrendingUp } from "lucide-react";
 
 import { EmptyState } from "@/components/app/empty-state";
+import { OceanHeader, OceanPage, OceanPanel } from "@/components/app/ocean-ui";
 import { RequireFeature } from "@/components/app/require-feature";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { AnalyticsCheckup, type ObservedCount } from "@/components/social/analytics-checkup";
@@ -21,7 +22,23 @@ export const Route = createFileRoute("/_authenticated/analytics")({
     </RequireFeature>
   ),
   head: () => ({
-    meta: [{ title: "Analytics — WaveOS" }, { name: "description", content: "Understand sourced social performance and historical growth in your WaveOS workspace." }, { property: "og:title", content: "Analytics — WaveOS" }, { property: "og:description", content: "Understand sourced social performance and historical growth in your WaveOS workspace." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }],
+    meta: [
+      { title: "Analytics — WaveOS" },
+      {
+        name: "description",
+        content:
+          "Understand sourced social performance and historical growth in your WaveOS workspace.",
+      },
+      { property: "og:title", content: "Analytics — WaveOS" },
+      {
+        property: "og:description",
+        content:
+          "Understand sourced social performance and historical growth in your WaveOS workspace.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { name: "robots", content: "noindex" },
+    ],
   }),
 });
 
@@ -73,18 +90,25 @@ function AnalyticsPage() {
   });
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div>
-        <div className="flex items-center gap-2 text-emerald-300">
-          <TrendingUp className="h-4 w-4" />
-          <p className="text-xs font-semibold uppercase tracking-[0.18em]">Performance & growth</p>
-        </div>
-        <h1 className="mt-1 text-2xl font-semibold text-foreground sm:text-3xl">Analytics</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          See how {activeWorkspace.name} is performing, where attention is growing, and which real provider metrics are available.
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-2 rounded-xl border border-border bg-surface/60 p-1 sm:w-fit">
+    <OceanPage className="mx-auto max-w-7xl">
+      <OceanHeader
+        eyebrow={
+          <span className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" /> Performance intelligence
+          </span>
+        }
+        title="Analytics"
+        description={
+          <>
+            See how {activeWorkspace.name} is performing using sourced provider observations, clear
+            coverage states, and compatible historical comparisons.
+          </>
+        }
+      />
+      <div
+        aria-label="Analytics view"
+        className="grid grid-cols-2 gap-1 rounded-xl border border-cyan-200/10 bg-[#03172b]/75 p-1 sm:w-fit"
+      >
         <Button
           type="button"
           variant={view === "social" ? "secondary" : "ghost"}
@@ -103,14 +127,18 @@ function AnalyticsPage() {
         </Button>
       </div>
 
-      {view === "social" && !connections.isPending &&
+      {view === "social" &&
+        !connections.isPending &&
         !connections.error &&
         (connections.data?.filter((connection) => connection.connected).length ?? 0) === 0 && (
-          <section className="rounded-2xl border border-primary/25 bg-primary/5 p-5 sm:flex sm:items-center sm:justify-between sm:gap-4">
+          <OceanPanel className="sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div>
-              <h2 className="font-semibold text-foreground">Connect a social account to start seeing performance insights</h2>
+              <h2 className="font-semibold text-foreground">
+                Connect a social account to start seeing performance insights
+              </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Once an account is connected and synced, WaveOS can begin showing the provider metrics available for this workspace.
+                Once an account is connected and synced, WaveOS can begin showing the provider
+                metrics available for this workspace.
               </p>
             </div>
             <Link
@@ -119,7 +147,7 @@ function AnalyticsPage() {
             >
               Connect account
             </Link>
-          </section>
+          </OceanPanel>
         )}
       {view === "social" ? (
         <AnalyticsCheckup
@@ -130,6 +158,6 @@ function AnalyticsPage() {
       ) : (
         <SeoGrowthPanel workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} />
       )}
-    </div>
+    </OceanPage>
   );
 }

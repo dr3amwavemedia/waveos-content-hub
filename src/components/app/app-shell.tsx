@@ -460,11 +460,11 @@ function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="min-h-screen bg-background text-foreground"
+      className="ocean-dashboard min-h-screen bg-background text-foreground"
       style={workspaceThemeStyle(branding.data?.accentColor)}
     >
       {/* Sidebar — desktop */}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-border bg-sidebar lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-cyan-200/10 bg-[#031326]/95 shadow-[16px_0_50px_rgba(0,5,18,.18)] backdrop-blur-xl lg:flex">
         <div className="px-5 py-5">
           <WaveLogo />
         </div>
@@ -485,7 +485,7 @@ function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <header data-global-mobile-header className="sticky top-0 z-20 border-b border-border bg-surface/90 backdrop-blur lg:hidden">
+      <header data-global-mobile-header className="sticky top-0 z-20 border-b border-cyan-200/10 bg-[#04172b]/90 backdrop-blur-xl lg:hidden">
         <div className="flex min-h-14 items-center justify-between px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
           <WaveLogo compact />
           <div className="flex items-center gap-2">
@@ -541,7 +541,7 @@ function Shell({ children }: { children: ReactNode }) {
         <AccountStatusBanner />
         <div
           className={cn(
-            "mx-auto px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:pt-8 lg:pb-10",
+            "mx-auto min-w-0 px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 lg:pt-8 lg:pb-10",
             useWideCanvas ? "max-w-none lg:px-8 xl:px-10" : "max-w-7xl lg:px-10",
           )}
         >
@@ -620,7 +620,7 @@ function Shell({ children }: { children: ReactNode }) {
       )}
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-end justify-around rounded-t-3xl border-t border-border-strong bg-surface/90 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[var(--shadow-elevated)] backdrop-blur-xl lg:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-end justify-around rounded-t-3xl border-t border-cyan-200/10 bg-[#04172b]/92 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[var(--shadow-elevated)] backdrop-blur-xl lg:hidden">
         {(showCreateFab ? barNav.slice(0, 2) : barNav).map((item) => (
           <MobileNavLink key={`${item.to}#${item.hash ?? ""}`} item={item} />
         ))}

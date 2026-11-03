@@ -205,10 +205,11 @@
 }
 
 @utility surface-card {
-  background-color: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-2xl);
-  box-shadow: var(--shadow-elevated);
+  background: linear-gradient(145deg, rgba(8, 33, 58, 0.9), rgba(5, 22, 43, 0.82));
+  border: 1px solid rgba(129, 222, 239, 0.13);
+  border-radius: 1rem;
+  box-shadow: inset 0 1px 0 rgba(208, 249, 255, 0.035), 0 16px 34px rgba(0, 5, 18, 0.2);
+  backdrop-filter: blur(18px);
 }
 
 @utility text-gradient-primary {
@@ -246,6 +247,49 @@ html {
     linear-gradient(145deg, #020b1b 0%, #04182e 52%, #031125 100%);
 }
 
+.ocean-page {
+  min-width: 0;
+  overflow-x: clip;
+}
+
+.ocean-hero {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+  overflow: hidden;
+  border: 1px solid rgba(129, 222, 239, 0.14);
+  border-radius: 1.25rem;
+  padding: clamp(1.25rem, 3vw, 2.25rem);
+  background:
+    radial-gradient(circle at 88% 12%, rgba(56, 232, 218, 0.16), transparent 17rem),
+    radial-gradient(circle at 68% 100%, rgba(95, 75, 255, 0.12), transparent 20rem),
+    linear-gradient(145deg, rgba(7, 37, 64, 0.94), rgba(3, 18, 38, 0.94));
+  box-shadow: inset 0 1px 0 rgba(220, 251, 255, 0.06), 0 24px 60px rgba(0, 5, 18, 0.25);
+}
+
+.ocean-hero::after {
+  content: "";
+  position: absolute;
+  right: -4rem;
+  bottom: -5rem;
+  width: 22rem;
+  height: 10rem;
+  border: 1px solid rgba(101, 234, 230, 0.13);
+  border-radius: 50%;
+  transform: rotate(-9deg);
+}
+
+.ocean-eyebrow {
+  color: #67e8e3;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
 .ocean-panel {
   border: 1px solid rgba(129, 222, 239, 0.12);
   border-radius: 1rem;
@@ -273,6 +317,82 @@ html {
   border-color: rgba(147, 225, 241, 0.34);
   background: rgba(89, 223, 231, 0.08);
 }
+
+.ocean-disclosure {
+  overflow: hidden;
+  border: 1px solid rgba(129, 222, 239, 0.13);
+  border-radius: 1rem;
+  background: linear-gradient(145deg, rgba(8, 33, 58, 0.82), rgba(5, 22, 43, 0.7));
+}
+
+.ocean-disclosure summary::-webkit-details-marker { display: none; }
+
+.ocean-status {
+  display: inline-flex;
+  min-height: 1.75rem;
+  align-items: center;
+  border: 1px solid rgba(147, 225, 241, 0.14);
+  border-radius: 9999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.7rem;
+  font-weight: 650;
+  color: rgba(217, 245, 251, 0.78);
+  background: rgba(8, 32, 55, 0.72);
+}
+
+.ocean-status-positive { border-color: rgba(52, 211, 153, 0.25); color: #86efac; }
+.ocean-status-warning { border-color: rgba(251, 191, 36, 0.25); color: #fde68a; }
+
+.ocean-control {
+  min-height: 2.75rem;
+  border: 1px solid rgba(129, 222, 239, 0.15);
+  border-radius: 0.75rem;
+  background: rgba(3, 18, 38, 0.7);
+  color: var(--color-foreground);
+}
+
+.ocean-control:focus-visible,
+.ocean-disclosure summary:focus-visible {
+  outline: 2px solid #5eead4;
+  outline-offset: 2px;
+}
+
+/* Wedding clients retain their configured accent, while the surrounding product
+   language stays consistent with the authenticated Ocean Intelligence system. */
+.wedding-ocean > section,
+.wedding-ocean > div:not(.sr-only),
+.wedding-ocean details {
+  border-color: rgba(129, 222, 239, 0.13) !important;
+}
+
+.wedding-ocean > section,
+.wedding-ocean .bg-white,
+.wedding-ocean details {
+  background: linear-gradient(145deg, rgba(8, 33, 58, 0.88), rgba(5, 22, 43, 0.78)) !important;
+  box-shadow: inset 0 1px 0 rgba(208, 249, 255, 0.035), 0 16px 34px rgba(0, 5, 18, 0.18);
+}
+
+.wedding-ocean > .ocean-hero {
+  border-color: rgba(129, 222, 239, 0.14) !important;
+  background:
+    radial-gradient(circle at 88% 12%, rgba(56, 232, 218, 0.16), transparent 17rem),
+    radial-gradient(circle at 68% 100%, rgba(95, 75, 255, 0.12), transparent 20rem),
+    linear-gradient(145deg, rgba(7, 37, 64, 0.96), rgba(3, 18, 38, 0.96)) !important;
+}
+
+.wedding-ocean > .ocean-hero h1 { color: var(--color-foreground) !important; }
+.wedding-ocean > .ocean-hero p:not(:first-of-type) { color: var(--color-muted-foreground) !important; }
+
+.wedding-ocean .text-stone-900,
+.wedding-ocean .text-stone-800,
+.wedding-ocean .text-stone-700 { color: var(--color-foreground) !important; }
+.wedding-ocean .text-stone-600,
+.wedding-ocean .text-stone-500 { color: var(--color-muted-foreground) !important; }
+.wedding-ocean section h2,
+.wedding-ocean section h3 { color: var(--color-foreground) !important; }
+.wedding-ocean section p { color: var(--color-muted-foreground) !important; }
+.wedding-ocean .bg-white { color: var(--color-foreground) !important; }
+.wedding-ocean .font-serif { font-family: inherit; letter-spacing: -0.025em; }
 
 @media (prefers-reduced-motion: reduce) {
   .ocean-dashboard *,
