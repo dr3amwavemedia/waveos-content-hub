@@ -420,13 +420,42 @@ export function extractContentLeadSignals(
     const contentId =
       textValue(row, ["platformPostId", "postId", "latePostId", "adId", "id", "_id"]) ??
       `${source}-${index}`;
-    const title =
-      textValue(row, ["title", "name", "caption", "text", "message"]) ?? "Untitled content";
+    const nestedContent = record(row.content);
+    const platformEntry = Array.isArray(row.platforms)
+      ? row.platforms.map(record).find(Boolean)
+      : null;
+    const platform =
+      textValue(row, ["platform", "network", "provider"]) ??
+      (platformEntry ? textValue(platformEntry, ["platform", "network", "provider"]) : null) ??
+      "Platform not reported";
+    const rawTitle =
+      textValue(row, [
+        "title",
+        "name",
+        "caption",
+        "primary_caption",
+        "primaryCaption",
+        "content",
+        "text",
+        "message",
+        "description",
+        "postText",
+        "post_text",
+      ]) ??
+      (nestedContent
+        ? textValue(nestedContent, ["title", "caption", "text", "message", "description"])
+        : null);
+    const title = rawTitle
+      ? rawTitle
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+      : `${platform.replaceAll("_", " ")} post`;
     return [
       {
         contentId,
         title: title.length > 100 ? `${title.slice(0, 97)}…` : title,
-        platform: textValue(row, ["platform", "network", "provider"]) ?? "Platform not reported",
+        platform,
         publishedAt: textValue(row, ["publishedAt", "published_at", "date", "createdAt"]),
         clicks,
         messages,

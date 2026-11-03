@@ -31,7 +31,8 @@ test("screenshot-targeted surfaces use the compact Ocean hierarchy", () => {
   const production = read("src/routes/_authenticated/videographer.tsx");
   const content = read("src/routes/_authenticated/content.tsx");
   const studio = read("src/routes/_authenticated/creative-studio.tsx");
-  assert.match(mobileShell, /<details/);
+  assert.match(mobileShell, /function MobileAdminNav/);
+  assert.match(mobileShell, /aria-expanded=\{open\}/);
   assert.match(mobileShell, /min\(18rem,82vw\)/);
   assert.match(production, /Today in production/);
   assert.match(production, /ProductionProjectsPanel/);
