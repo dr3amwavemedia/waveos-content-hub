@@ -18,6 +18,48 @@ export function historySeries(rows: HistoryObservation[], metric: string) {
   if (!latest) return [];
   return observations.filter(row=>row.provider===latest.provider && row.calculation_version===latest.calculation_version && row.unit===latest.unit && row.evidence?.coverage===latest.evidence?.coverage && row.evidence?.mode===latest.evidence?.mode && day(row.range_end)-day(row.range_start)===day(latest.range_end)-day(latest.range_start));
 }
+export function chartHistorySeries(rows: HistoryObservation[], metric: string) {
+  const valid = rows.filter(row =>
+    row.metric_key === metric &&
+    row.value !== null &&
+    Number.isFinite(row.value) &&
+    ["available", "true_zero"].includes(row.availability) &&
+    row.source_reference &&
+    row.calculation_version &&
+    row.unit &&
+    row.evidence?.coverage &&
+    row.evidence.mode &&
+    Number.isFinite(day(row.range_start)) &&
+    Number.isFinite(day(row.range_end)) &&
+    day(row.range_end) >= day(row.range_start),
+  );
+  const groups = new Map<string, HistoryObservation[]>();
+  for (const row of valid) {
+    const windowLength = day(row.range_end) - day(row.range_start);
+    const key = [
+      row.provider,
+      row.calculation_version,
+      row.unit,
+      row.evidence?.coverage,
+      row.evidence?.mode,
+      windowLength,
+    ].join(":");
+    const group = groups.get(key) ?? [];
+    group.push(row);
+    groups.set(key, group);
+  }
+  const candidates = [...groups.values()].map(group => {
+    const unique = new Map<string, HistoryObservation>();
+    for (const row of [...group].sort((a, b) => b.captured_at.localeCompare(a.captured_at))) {
+      const key = `${row.range_start}:${row.range_end}`;
+      if (!unique.has(key)) unique.set(key, row);
+    }
+    return [...unique.values()].sort((a, b) => day(a.range_end) - day(b.range_end));
+  });
+  return candidates.sort((a, b) =>
+    b.length - a.length || day(b.at(-1)?.range_end ?? null) - day(a.at(-1)?.range_end ?? null),
+  )[0] ?? [];
+}
 export function comparePeriods(rows: HistoryObservation[], metric: string) {
   const series = historySeries(rows,metric), current = series.at(-1);
   if (!current || current.value === null) return null;

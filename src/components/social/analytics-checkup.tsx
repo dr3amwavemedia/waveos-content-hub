@@ -37,7 +37,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { historySeries, comparePeriods } from "@/lib/analytics-history";
+import { chartHistorySeries, historySeries, comparePeriods } from "@/lib/analytics-history";
 import { Button } from "@/components/ui/button";
 import { OceanDisclosure, OceanPanel, OceanStatus } from "@/components/app/ocean-ui";
 
@@ -164,7 +164,7 @@ export function AnalyticsCheckup({
   const historicalRows = (intelligence.data?.snapshots ?? []).filter(
     (row) => row.evidence?.mode === mode && row.range_end && Date.parse(row.range_end) >= cutoff,
   );
-  const series = historySeries(historicalRows, graphMetric);
+  const series = chartHistorySeries(historicalRows, graphMetric);
   const comparison = comparePeriods(historicalRows, graphMetric);
   const chartData = series.map((row) => ({ date: row.range_end, value: row.value }));
   const comparisons = ["reach", "views", "followers", "likes", "comments"].flatMap((key) => {
