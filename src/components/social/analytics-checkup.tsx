@@ -173,6 +173,16 @@ export function AnalyticsCheckup({
   const historicalBackfill = intelligence.data?.profile?.metadata?.historicalBackfill;
   const topPosts = Array.isArray(historicalBackfill?.topPosts) ? historicalBackfill.topPosts : [];
   const leadSignals = analytics.data?.leadSignals ?? [];
+  const leadSignalsByPlatform = useMemo(() => {
+    const groups = new Map<string, typeof leadSignals>();
+    for (const signal of leadSignals) {
+      const label = signal.platform
+        .replaceAll("_", " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+      groups.set(label, [...(groups.get(label) ?? []), signal]);
+    }
+    return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right));
+  }, [leadSignals]);
   const clickSignals = leadSignals.filter((signal) => signal.clicks !== null);
   const messageSignals = leadSignals.filter((signal) => signal.messages !== null);
   const attributedClicks = clickSignals.length
@@ -459,29 +469,56 @@ export function AnalyticsCheckup({
             />
           </div>
           {leadSignals.length ? (
-            <div className="mt-4 overflow-hidden rounded-xl border border-border">
-              {leadSignals.slice(0, 8).map((signal) => (
-                <article
-                  key={`${signal.platform}-${signal.contentId}`}
-                  className="grid gap-2 border-b border-border bg-background/30 p-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
+            <div className="mt-4 space-y-3">
+              {leadSignalsByPlatform.map(([platform, signals]) => (
+                <section
+                  key={platform}
+                  className="overflow-hidden rounded-xl border border-border bg-background/20"
+                  aria-label={`${platform} lead actions`}
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{signal.title}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {signal.platform} · {formatDate(signal.publishedAt)}
-                    </p>
+                  <header className="flex items-center justify-between gap-3 border-b border-border bg-elevated/45 px-3 py-2.5">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                        {platform}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        {signals.length} attributed post{signals.length === 1 ? "" : "s"}
+                      </p>
+                    </div>
+                    <OceanStatus tone="positive">Provider data</OceanStatus>
+                  </header>
+                  <div className="divide-y divide-border">
+                    {signals.slice(0, 8).map((signal) => (
+                      <article
+                        key={`${signal.platform}-${signal.contentId}`}
+                        className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+                      >
+                        <div className="min-w-0">
+                          <p className="line-clamp-2 text-sm font-semibold text-foreground">
+                            {signal.title}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Published {formatDate(signal.publishedAt)}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2 sm:justify-end">
+                          <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-analytics/25 bg-analytics/10 px-2.5 text-xs text-foreground">
+                            <MousePointerClick className="size-3.5 text-analytics" />
+                            {signal.clicks === null
+                              ? "Clicks unavailable"
+                              : `${signal.clicks} clicks`}
+                          </span>
+                          <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-intelligence/25 bg-intelligence/10 px-2.5 text-xs text-foreground">
+                            <MessageCircle className="size-3.5 text-intelligence" />
+                            {signal.messages === null
+                              ? "Messages unavailable"
+                              : `${signal.messages} messages`}
+                          </span>
+                        </div>
+                      </article>
+                    ))}
                   </div>
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <MousePointerClick className="size-4 text-analytics" />
-                    {signal.clicks === null ? "Clicks unavailable" : `${signal.clicks} clicks`}
-                  </span>
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <MessageCircle className="size-4 text-intelligence" />
-                    {signal.messages === null
-                      ? "Messages unavailable"
-                      : `${signal.messages} messages`}
-                  </span>
-                </article>
+                </section>
               ))}
             </div>
           ) : (
