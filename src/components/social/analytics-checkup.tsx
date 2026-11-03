@@ -42,6 +42,7 @@ const METRICS: Array<{ key: AnalyticsMetricKey | "engagements"; label: string }>
   { key: "views", label: "Views" },
   { key: "comments", label: "Comments" },
   { key: "clicks", label: "Clicks" },
+  { key: "messages", label: "DMs / messages" },
   { key: "followers", label: "Followers" },
 ];
 
@@ -127,6 +128,19 @@ export function AnalyticsCheckup({
   const comparison = comparePeriods(historicalRows, graphMetric);
   const chartData = series.map(row=>({date:row.range_end,value:row.value}));
   const comparisons = ["reach","views","followers","likes","comments"].flatMap(key=>{const result=comparePeriods(historicalRows,key);return result?[{key,...result}]:[];});
+  const leadSignals = analytics.data?.leadSignals ?? [];
+  const clickSignals = leadSignals.filter((signal) => signal.clicks !== null);
+  const messageSignals = leadSignals.filter((signal) => signal.messages !== null);
+  const attributedClicks = clickSignals.length
+    ? clickSignals.reduce((sum, signal) => sum + (signal.clicks ?? 0), 0)
+    : null;
+  const attributedMessages = messageSignals.length
+    ? messageSignals.reduce((sum, signal) => sum + (signal.messages ?? 0), 0)
+    : null;
+  const leadActions =
+    attributedClicks === null && attributedMessages === null
+      ? null
+      : (attributedClicks ?? 0) + (attributedMessages ?? 0);
   return (
     <div className="space-y-6">
       <section className="space-y-5">
@@ -141,6 +155,76 @@ export function AnalyticsCheckup({
           {comparison&&<p className="mt-3 text-xs text-muted-foreground">Current observed period: {comparison.current.value?.toLocaleString()} · Previous non-overlapping period: {comparison.previous.value?.toLocaleString()}{comparison.change===null?" · Percentage unavailable: previous value is zero.":""}</p>}
         </section>
         <div className="flex snap-x gap-3 overflow-x-auto pb-2 sm:grid sm:grid-cols-4 sm:overflow-visible">{metricRows.filter(row=>["views","reach","engagements","followers"].includes(row.key)).map(({key,label,metric},index)=>{const trend=historySeries(historicalRows,key);const change=comparePeriods(historicalRows,key);return <article key={key} className="min-w-40 snap-start rounded-lg border border-border bg-surface p-4 sm:min-w-0"><div className="flex items-center justify-between"><p className="text-xs text-muted-foreground">{label}</p>{index===2?<Heart className="size-4 text-intelligence"/>:<Eye className="size-4 text-analytics"/>}</div><p className="mt-3 text-2xl font-semibold">{analytics.isPending?"…":metric.value===null?"—":metric.value.toLocaleString()}</p>{trend.length>=2?<div className="mt-3 h-8"><ResponsiveContainer width="100%" height="100%"><AreaChart data={trend}><Area dataKey="value" stroke="var(--analytics)" fill="var(--analytics)" fillOpacity={.1}/></AreaChart></ResponsiveContainer></div>:<p className="mt-3 text-[11px] text-muted-foreground">Historical trend unavailable</p>}<p className="mt-2 text-[11px] text-muted-foreground">{metric.value===null?STATUS_LABEL[metric.availability]:metric.coverage==="partial"?"Partial coverage":"Provider reported"}</p>{change?.change!==null&&change?.change!==undefined&&<p className={cn("mt-1 text-xs",change.change>=0?"text-success":"text-destructive")}>{change.change>=0?"+":""}{change.change.toFixed(1)}% across comparable stored periods</p>}</article>})}</div>
+        <section className="rounded-xl border border-border bg-background/25 p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase text-analytics">Content attribution</p>
+              <h3 className="mt-1 text-lg font-semibold">Lead actions from posted content</h3>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                Link clicks and DMs/messages attributed by the connected provider to individual
+                posts. Lead actions are interactions, not deduplicated people or confirmed sales.
+              </p>
+            </div>
+            <span
+              className={cn(
+                "rounded-full border px-2 py-1 text-[10px] font-semibold",
+                leadActions === null
+                  ? "border-warning/30 bg-warning/10 text-warning"
+                  : "border-success/30 bg-success/10 text-success",
+              )}
+            >
+              {leadActions === null ? "Attribution unavailable" : "Provider attributed"}
+            </span>
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <CompactMetric
+              label="Lead actions"
+              value={leadActions === null ? "Unavailable" : leadActions.toLocaleString()}
+            />
+            <CompactMetric
+              label="Link clicks"
+              value={attributedClicks === null ? "Unavailable" : attributedClicks.toLocaleString()}
+            />
+            <CompactMetric
+              label="DMs / messages"
+              value={
+                attributedMessages === null ? "Unavailable" : attributedMessages.toLocaleString()
+              }
+            />
+          </div>
+          {leadSignals.length ? (
+            <div className="mt-4 overflow-hidden rounded-xl border border-border">
+              {leadSignals.slice(0, 8).map((signal) => (
+                <article
+                  key={`${signal.platform}-${signal.contentId}`}
+                  className="grid gap-2 border-b border-border bg-background/30 p-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{signal.title}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {signal.platform} · {formatDate(signal.publishedAt)}
+                    </p>
+                  </div>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <MousePointerClick className="size-4 text-analytics" />
+                    {signal.clicks === null ? "Clicks unavailable" : `${signal.clicks} clicks`}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <MessageCircle className="size-4 text-intelligence" />
+                    {signal.messages === null
+                      ? "Messages unavailable"
+                      : `${signal.messages} messages`}
+                  </span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+              The connected provider has not returned post-level click or DM/message attribution for
+              this period. WaveOS will not substitute engagement totals or zeros.
+            </p>
+          )}
+        </section>
         {analytics.isPending&&<p role="status" className="text-sm text-muted-foreground"><Loader2 className="mr-2 inline size-4 animate-spin"/>Loading provider metrics…</p>}
         {analytics.isError&&<p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">Metrics are unavailable. No values were substituted. {providerError==="forbidden"?"This workspace does not grant analytics access.":"Retry when the provider connection is available."}<Button variant="ghost" onClick={()=>void analytics.refetch()}>Retry</Button></p>}
         <section className="border-t border-border pt-5"><h3 className="flex items-center gap-2 text-lg font-semibold"><Sparkles className="size-5 text-warning"/>Evidence-backed insights</h3>{comparisons.length?<ul className="mt-3 space-y-3">{comparisons.map(item=><li key={item.key} className="text-sm"><span className="capitalize">{item.key}</span> {item.change===null?`changed from ${item.previous.value} to ${item.current.value}`:`${item.change>=0?"increased":"declined"} by ${Math.abs(item.change).toFixed(1)}%`} across equal-length, non-overlapping observed periods.<p className="mt-1 text-xs text-muted-foreground">{item.current.source_reference} · {item.current.calculation_version}</p></li>)}</ul>:<p className="mt-3 text-sm text-muted-foreground">Not enough comparable evidence for a growth conclusion, best posting time or content-format recommendation.</p>}<p className="mt-3 text-xs text-muted-foreground">These are calculated observations, not AI conclusions. AI analysis is currently unavailable.</p></section>
