@@ -1299,7 +1299,7 @@ function CreativeStudioPage() {
         </div>
       )}
       {mobileStarted && (
-        <header className="studio-focus-header sticky top-0 z-20 flex items-center gap-1 border-b border-border bg-background py-2 sm:hidden">
+        <header className="studio-focus-header sticky top-[calc(4rem+env(safe-area-inset-top))] z-20 flex min-w-0 items-center gap-1 border-b border-border bg-background py-2 sm:hidden">
           <Button
             size="icon"
             variant="ghost"

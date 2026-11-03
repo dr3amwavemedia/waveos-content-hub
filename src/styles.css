@@ -178,6 +178,46 @@
   --sidebar-ring: oklch(0.72 0.16 240 / 0.55);
 }
 
+/* Preserve the established purple, quick-action-first phone identity while
+   tablet and desktop retain the Ocean Intelligence visual system. */
+@media (max-width: 639px) {
+  .waveos-app-shell {
+    --primary: oklch(0.69 0.2 295) !important;
+    --primary-glow: oklch(0.78 0.18 310) !important;
+    --primary-foreground: oklch(0.98 0.006 260) !important;
+    --border: oklch(0.7 0.16 295 / 0.18) !important;
+    --border-strong: oklch(0.72 0.18 295 / 0.34) !important;
+    --ring: oklch(0.7 0.2 295 / 0.58) !important;
+    background:
+      radial-gradient(95% 42rem at 50% -10%, oklch(0.44 0.18 295 / 0.32), transparent 72%),
+      var(--background);
+  }
+
+  .mobile-classic-header {
+    border-color: oklch(0.72 0.18 295 / 0.2);
+    background: oklch(0.16 0.045 285 / 0.94);
+  }
+
+  .mobile-classic-drawer {
+    border-color: oklch(0.72 0.18 295 / 0.2);
+    background:
+      radial-gradient(100% 55% at 0% 0%, oklch(0.46 0.2 300 / 0.3), transparent 72%),
+      oklch(0.145 0.035 278 / 0.99);
+  }
+
+  .mobile-classic-nav {
+    background: oklch(0.17 0.045 282 / 0.94);
+    box-shadow: 0 -18px 50px -28px oklch(0.65 0.22 300 / 0.7);
+  }
+
+  .mobile-classic-header button,
+  .mobile-classic-drawer button,
+  .mobile-classic-nav button,
+  .mobile-classic-nav a {
+    touch-action: manipulation;
+  }
+}
+
 @layer base {
   * {
     border-color: var(--color-border);

@@ -18,7 +18,7 @@ export function ImpersonationBanner() {
       acting.identity.email ||
       "staff member";
     return (
-      <div className="sticky top-0 z-30 flex flex-wrap items-center justify-center gap-3 border-b border-primary/30 bg-primary/10 px-4 py-2 text-xs backdrop-blur">
+      <div className="relative z-10 flex flex-wrap items-center justify-center gap-3 border-b border-primary/30 bg-primary/10 px-4 py-2 text-xs backdrop-blur sm:sticky sm:top-0 sm:z-30">
         <UserCog className="h-3.5 w-3.5 text-primary" />
         <span className="text-foreground">
           Admin acting as <span className="font-semibold">{name}</span> for WaveOS tasks. Email
@@ -53,7 +53,7 @@ export function ImpersonationBanner() {
 
   const clientBanner =
     canPreviewClients && on ? (
-      <div className="sticky top-0 z-30 flex flex-wrap items-center justify-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2 text-xs backdrop-blur">
+      <div className="relative z-10 flex flex-wrap items-center justify-center gap-2 border-b border-primary/30 bg-primary/10 px-3 py-2 text-xs backdrop-blur sm:sticky sm:top-0 sm:z-30">
         <Eye className="h-3.5 w-3.5 text-primary" />
         <span className="text-foreground">
           Viewing <span className="font-semibold">{activeWorkspace?.name ?? "workspace"}</span> as

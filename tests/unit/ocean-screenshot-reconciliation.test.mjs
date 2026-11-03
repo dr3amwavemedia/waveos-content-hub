@@ -39,3 +39,20 @@ test("screenshot-targeted surfaces use the compact Ocean hierarchy", () => {
   assert.match(content, /<details className="ocean-disclosure group"/);
   assert.match(studio, /cn\("ocean-disclosure group"/);
 });
+
+test("phone home preserves the classic purple command center without changing desktop Ocean", () => {
+  const home = read("src/routes/_authenticated/home.tsx");
+  const mobile = read("src/components/app/mobile-classic-home.tsx");
+  const shell = read("src/components/app/app-shell.tsx");
+  const styles = read("src/styles.css");
+  assert.match(home, /<MobileClassicHome \/>/);
+  assert.match(home, /hidden sm:block[\s\S]*<OceanIntelligenceDashboard \/>/);
+  assert.match(mobile, /<MobileCommandCenter/);
+  assert.match(mobile, /<MobileRecentMedia/);
+  assert.match(shell, /mobile-classic-header/);
+  assert.match(shell, /mobile-classic-nav/);
+  assert.match(
+    styles,
+    /@media \(max-width: 639px\)[\s\S]*--primary: oklch\(0\.69 0\.2 295\) !important/,
+  );
+});
