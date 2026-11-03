@@ -88,8 +88,12 @@ test("release links allow HTTPS only", () => {
 });
 
 test("dashboard, notifications, and mobile shell preserve truthful and scoped behavior", async () => {
-  const [home, notifications, releases, root, calendar, landing] = await Promise.all([
+  const [home, dashboard, notifications, releases, root, calendar, landing] = await Promise.all([
     readFile(new URL("../../src/routes/_authenticated/home.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../../src/components/app/ocean-intelligence-dashboard.tsx", import.meta.url),
+      "utf8",
+    ),
     readFile(new URL("../../src/components/app/notifications-bell.tsx", import.meta.url), "utf8"),
     readFile(new URL("../../src/hooks/use-product-releases.ts", import.meta.url), "utf8"),
     readFile(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8"),
@@ -97,10 +101,11 @@ test("dashboard, notifications, and mobile shell preserve truthful and scoped be
     readFile(new URL("../../src/routes/index.tsx", import.meta.url), "utf8"),
   ]);
 
-  assert.match(home, /enabled: !!wsId/);
-  assert.match(home, /if \(failed\?\.error\) throw failed\.error/);
-  assert.match(home, /can\("can_use_campaign_manager"\)/);
-  assert.match(home, /to="\/updates"/);
+  assert.match(home, /<OceanIntelligenceDashboard \/>/);
+  assert.match(dashboard, /enabled: Boolean\(workspaceId && canSeeAnalytics\)/);
+  assert.match(dashboard, /enabled: isOwner/);
+  assert.match(dashboard, /can\("can_use_campaign_manager"\)/);
+  assert.match(dashboard, /No privileged status was requested/);
 
   assert.match(notifications, /\.eq\("user_id", auth\.user\.id\)/);
   assert.match(notifications, /\.is\("read_at", null\)/);
