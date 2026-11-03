@@ -4,7 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { normalizeResearchSource } from "@/lib/competitive-research";
 import { recordAiUsage } from "@/lib/ai-usage.server";
 
-const SEO_MODEL = "google/gemini-3.1-flash-lite";
+const SEO_MODEL = "google/gemini-3.8-flash";
 
 const seoClaim = z.object({
   title: z.string().trim().min(1).max(180),
