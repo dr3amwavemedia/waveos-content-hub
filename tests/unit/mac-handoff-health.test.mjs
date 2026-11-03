@@ -55,4 +55,11 @@ test("Creative Studio mobile landing has only the three requested primary choice
   assert.match(videoMaker, /Choose or upload a video/);
   assert.match(videoMaker, /getMediaPreviewUrl/);
   assert.match(videoMaker, /to: "\/create"/);
+  assert.match(videoMaker, /Choose a clip/);
+  assert.match(videoMaker, /Check playback/);
+  assert.match(videoMaker, /Create the post/);
+  assert.match(videoMaker, /Create story post/);
+  assert.match(videoMaker, /Create feed post/);
+  assert.match(videoMaker, /Preview unavailable/);
+  assert.match(videoMaker, /\.catch\(\(\) =>/);
 });
