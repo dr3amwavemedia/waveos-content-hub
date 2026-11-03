@@ -14,7 +14,10 @@ test("AI assist requires validated workspace-scoped entitlement on every request
   assert.match(assistant, /input: z\.string\(\)\.trim\(\)\.min\(1\)\.max\(6_000\)/);
   assert.match(assistant, /_feature: "can_use_ai_tools"/);
   assert.match(assistant, /if \(!member && !staff\) throw new Error\("forbidden"\)/);
-  assert.match(assistant, /max_tokens: data\.mode === "advisor" \? 1_200 : 1_500/);
+  assert.match(
+    assistant,
+    /max_tokens: data\.mode === "advisor" \? 1_200 : data\.mode === "caption_suite" \? 3_000 : 1_500/,
+  );
   assert.match(assistant, /controller\.abort\(\)/);
 });
 

@@ -229,6 +229,6 @@ test("editor publishes the saved selection it showed and shows the destination a
   assert.ok(desktop > 0 && desktop < editor.indexOf("Post now", desktop));
   const mobile = editor.indexOf("<PublishDestinations\n          compact");
   assert.ok(mobile > 0 && mobile < editor.indexOf("onClick={handlePublishNow}><Send", mobile));
-  assert.match(editor, /metaWarning=\{metaSharingWarning\}/);
+  assert.doesNotMatch(editor, /metaWarning=\{metaSharingWarning\}/);
   assert.match(editor, /if \(draftStorageKey\) window\.localStorage\.removeItem\(draftStorageKey\);\s*return item\.id;/);
 });
