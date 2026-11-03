@@ -146,11 +146,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 // Reload once after a short pause instead of leaving disabled buttons on screen.
 const MODULE_LOAD_RECOVERY_SCRIPT = `(function(){var K="waveos:module-reload",P=/Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i;function h(m){if(!m||!P.test(String(m)))return;try{var l=Number(sessionStorage.getItem(K)||0);if(Date.now()-l<30000)return;sessionStorage.setItem(K,String(Date.now()))}catch(e){return}setTimeout(function(){location.reload()},1500)}window.addEventListener("unhandledrejection",function(e){h(e.reason&&(e.reason.message||e.reason))});window.addEventListener("error",function(e){h(e.message)})})();`;
 
+// No-hydration fallback: give the server-rendered Google link a complete broker URL
+// so it still works when React never starts. Hydrated clicks use the SDK flow instead.
+const GOOGLE_OAUTH_FALLBACK_SCRIPT = `document.addEventListener("DOMContentLoaded",function(){var b=new Uint8Array(16);crypto.getRandomValues(b);var s=Array.prototype.map.call(b,function(x){return x.toString(16).padStart(2,"0")}).join("");var q=new URLSearchParams({provider:"google",redirect_uri:location.origin+"/auth-callback",prompt:"select_account",state:s});document.querySelectorAll("a[data-google-oauth-fallback]").forEach(function(a){a.setAttribute("href","/~oauth/initiate?"+q.toString())})});`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="dark">
       <head>
         <script dangerouslySetInnerHTML={{ __html: MODULE_LOAD_RECOVERY_SCRIPT }} />
+        <script dangerouslySetInnerHTML={{ __html: GOOGLE_OAUTH_FALLBACK_SCRIPT }} />
         <HeadContent />
       </head>
       <body>

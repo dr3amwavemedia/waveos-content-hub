@@ -335,14 +335,24 @@ function AuthPage() {
           </div>
           {mode === "signin" && (
             <>
-              <button
-                type="button"
-                onClick={handleGoogle}
-                disabled={busy || !hydrated}
-                className="mb-4 flex min-h-11 w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-elevated disabled:opacity-60"
+              {/* Real link so the server-rendered page can still reach the OAuth broker
+                  if React never hydrates; once hydrated, the secure SDK flow takes over. */}
+              <a
+                href="/~oauth/initiate?provider=google"
+                target="_blank"
+                rel="noopener"
+                data-google-oauth-fallback=""
+                suppressHydrationWarning
+                aria-disabled={busy || undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (busy || !hydrated) return;
+                  void handleGoogle();
+                }}
+                className="mb-4 flex min-h-11 w-full items-center justify-center gap-3 rounded-lg border border-border bg-surface/60 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-elevated aria-disabled:pointer-events-none aria-disabled:opacity-60"
               >
                 <GoogleIcon /> Continue with Google
-              </button>
+              </a>
               <div className="mb-4 flex items-center gap-3 text-xs text-muted-foreground">
                 <div className="h-px flex-1 bg-border" />
                 or
