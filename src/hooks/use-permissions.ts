@@ -171,7 +171,10 @@ export function usePermissions(): WorkspacePermissions {
         subscription?.status === "trialing" ||
         subscription?.plan === "full" ||
         subscription?.plan === "expanded";
-      const currentOrTidal = subscription?.plan === "full" || subscription?.plan === "expanded";
+      const currentOrTidal =
+        subscription?.status === "trialing" ||
+        subscription?.plan === "full" ||
+        subscription?.plan === "expanded";
       const tidal = subscription?.plan === "expanded";
       const allowed = (feature: FeatureKey) =>
         active &&
