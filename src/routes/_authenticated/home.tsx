@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Mail } from "lucide-react";
 
 import { Layer1Overview } from "@/components/app/layer1-overview";
+import { MobileClassicHome } from "@/components/app/mobile-classic-home";
 import { OceanIntelligenceDashboard } from "@/components/app/ocean-intelligence-dashboard";
 import { ProductReleaseProvider } from "@/components/app/product-releases";
 import { WeddingOverview } from "@/components/app/wedding-overview";
@@ -76,5 +77,12 @@ function HomeRoute() {
 }
 
 function HomeDashboard() {
-  return <OceanIntelligenceDashboard />;
+  return (
+    <>
+      <MobileClassicHome />
+      <div className="hidden sm:block">
+        <OceanIntelligenceDashboard />
+      </div>
+    </>
+  );
 }
