@@ -30,3 +30,19 @@ test("mobile chrome fits narrow safe-area viewports without covering top control
   assert.match(previewBanner, /sm:sticky sm:top-0 sm:z-30/);
   assert.match(studio, /top-\[calc\(4rem\+env\(safe-area-inset-top\)\)\]/);
 });
+
+test("saved workspace colors theme both responsive experiences without changing their layouts", () => {
+  const shell = read("src/components/app/app-shell.tsx");
+  const branding = read("src/hooks/use-workspace-branding.ts");
+  const styles = read("src/styles.css");
+  const settings = read("src/routes/_authenticated/settings.tsx");
+
+  assert.match(shell, /data-workspace-color-customized=/);
+  assert.match(shell, /workspaceThemeStyle\(branding\.data\?\.accentColor\)/);
+  assert.match(branding, /hasSavedAccent: typeof data\?\.accent_color === "string"/);
+  assert.match(styles, /\.waveos-app-shell:not\(\[data-workspace-color-customized="true"\]\)/);
+  assert.match(styles, /color-mix\(in oklab, var\(--primary\) 32%, transparent\)/);
+  assert.match(styles, /\.ocean-dashboard[\s\S]*var\(--primary\)/);
+  assert.match(settings, /Personalize[\s\S]*color palette on web and mobile/);
+  assert.match(settings, /Dashboard[\s\S]*structure, navigation, and features stay unchanged/);
+});

@@ -495,6 +495,7 @@ function Shell({ children }: { children: ReactNode }) {
     <div
       className="ocean-dashboard waveos-app-shell min-h-screen overflow-x-clip bg-background text-foreground"
       style={workspaceThemeStyle(branding.data?.accentColor)}
+      data-workspace-color-customized={branding.data?.hasSavedAccent ? "true" : "false"}
     >
       {/* Sidebar — desktop */}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-cyan-200/10 bg-[#031326]/95 shadow-[16px_0_50px_rgba(0,5,18,.18)] backdrop-blur-xl lg:flex">
