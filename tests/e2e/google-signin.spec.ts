@@ -15,16 +15,16 @@ import { test, expect } from "@playwright/test";
  */
 
 test.describe("Google sign-in", () => {
-  test("renders the Google sign-in button", async ({ page }) => {
+  test("renders the Google sign-in link", async ({ page }) => {
     await page.goto("/auth");
-    const btn = page.getByRole("button", { name: /continue with google/i });
+    const btn = page.getByRole("link", { name: /continue with google/i });
     await expect(btn).toBeVisible();
     await expect(btn).toBeEnabled();
   });
 
   test("preserves ?next= destination in sessionStorage before OAuth", async ({ page }) => {
     await page.goto("/auth?next=/calendar");
-    const btn = page.getByRole("button", { name: /continue with google/i });
+    const btn = page.getByRole("link", { name: /continue with google/i });
     // The button stays disabled until hydration attaches the handler.
     await expect(btn).toBeEnabled();
     // sessionStorage is written when the click handler runs so the callback can finish routing.
@@ -40,7 +40,7 @@ test.describe("Google sign-in", () => {
   test("clicking Google starts the managed OAuth hand-off", async ({ context, page }) => {
     await page.goto("/auth");
     // Wait for hydration — the button is inert until React attaches handlers.
-    await expect(page.getByRole("button", { name: /continue with google/i })).toBeEnabled();
+    await expect(page.getByRole("link", { name: /continue with google/i })).toBeEnabled();
 
     // Capture whichever hand-off happens first: popup, top-level nav, or
     // an OAuth-related network request.
@@ -60,7 +60,7 @@ test.describe("Google sign-in", () => {
       .then(() => "req" as const)
       .catch(() => null);
 
-    await page.getByRole("button", { name: /continue with google/i }).click();
+    await page.getByRole("link", { name: /continue with google/i }).click();
 
     const [popup, nav, req] = await Promise.all([popupPromise, navPromise, reqPromise]);
     expect(popup || nav || req, "expected a popup, navigation, or OAuth request").toBeTruthy();
@@ -70,12 +70,12 @@ test.describe("Google sign-in", () => {
     await page.goto("/auth?next=/home");
     const appOrigin = new URL(page.url()).origin;
     // Wait for hydration — the button is inert until React attaches handlers.
-    await expect(page.getByRole("button", { name: /continue with google/i })).toBeEnabled();
+    await expect(page.getByRole("link", { name: /continue with google/i })).toBeEnabled();
 
     const oauthRequest = page.waitForRequest((request) =>
       /\/~oauth\/initiate|\/auth\/v1\/authorize/.test(request.url()),
     );
-    await page.getByRole("button", { name: /continue with google/i }).click();
+    await page.getByRole("link", { name: /continue with google/i }).click();
 
     const request = await oauthRequest;
     const url = new URL(request.url());
