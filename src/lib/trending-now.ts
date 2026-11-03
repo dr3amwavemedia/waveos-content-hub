@@ -40,6 +40,23 @@ export const DEFAULT_TREND_FILTERS: TrendFilters = {
   days: 7,
   kind: "Any type",
 };
+export function buildTrendSearchQueries(
+  terms: string,
+  platforms: string[],
+  angle: "direct" | "broad" = "direct",
+) {
+  const topic = terms
+    .replace(/\bsite:\S+/gi, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 3);
+  const base = topic.length ? topic : ["small", "business"];
+  const suffix = angle === "direct" ? "creator video" : "storytelling video";
+  return [...new Set(platforms.map((platform) => [...base, platform, suffix].join(" ")))]
+    .map((query) => query.split(/\s+/).slice(0, 6).join(" "))
+    .slice(0, 3);
+}
 export function trendDiscoveryStatus(
   matchCount: number,
   providerCalls: number,
@@ -59,7 +76,13 @@ export function trendVideoSource(
     const path = url.pathname.replace(/\/+$/, "");
     if ((host === "tiktok.com" || host === "m.tiktok.com") && /^\/@[^/]+\/video\/\d+$/.test(path))
       return { platform: "TikTok" };
-    if (host === "vm.tiktok.com" && /^\/[A-Za-z0-9_-]+$/.test(path)) return { platform: "TikTok" };
+    if (
+      (host === "vm.tiktok.com" || host === "vt.tiktok.com") &&
+      /^\/[A-Za-z0-9_-]+$/.test(path)
+    )
+      return { platform: "TikTok" };
+    if (host === "tiktok.com" && /^\/t\/[A-Za-z0-9_-]+$/.test(path))
+      return { platform: "TikTok" };
     if (
       (host === "instagram.com" || host === "m.instagram.com") &&
       /^\/reels?\/[A-Za-z0-9_-]+$/.test(path)
@@ -149,7 +172,7 @@ function safeHttpsUrl(raw: string): string | null {
 function embeddedVideoUrls(text: string) {
   const matches =
     text.match(
-      /https:\/\/(?:www\.|m\.)?(?:tiktok\.com\/@[^\s"'<>]+\/video\/\d+|instagram\.com\/reels?\/[A-Za-z0-9_-]+\/?|youtube\.com\/shorts\/[A-Za-z0-9_-]{11}|youtu\.be\/[A-Za-z0-9_-]{11}|facebook\.com\/(?:reel\/[^\s"'<>/?#]+|share\/r\/[^\s"'<>/?#]+|[^\s"'<>]+\/videos\/[^\s"'<>/?#]+))/gi,
+      /https:\/\/(?:www\.|m\.)?(?:tiktok\.com\/(?:@[^\s"'<>]+\/video\/\d+|t\/[A-Za-z0-9_-]+)|(?:vm\.|vt\.)tiktok\.com\/[A-Za-z0-9_-]+|instagram\.com\/reels?\/[A-Za-z0-9_-]+\/?|youtube\.com\/(?:shorts\/[A-Za-z0-9_-]{11}|watch\?v=[A-Za-z0-9_-]{11})|youtu\.be\/[A-Za-z0-9_-]{11}|facebook\.com\/(?:reel\/[^\s"'<>/?#]+|share\/r\/[^\s"'<>/?#]+|watch\?v=[^\s"'<>/?#]+|[^\s"'<>]+\/videos\/[^\s"'<>/?#]+))/gi,
     ) ?? [];
   return [
     ...new Set(

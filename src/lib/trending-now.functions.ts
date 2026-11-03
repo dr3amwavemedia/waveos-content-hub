@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
+  buildTrendSearchQueries,
   normalizeTrendResults,
   videoTrendResults,
   trendVideoSource,
@@ -11,7 +12,7 @@ import {
 
 export const discoverTrends = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input) =>
+  .validator((input) =>
     z
       .object({
         workspaceId: z.string().uuid(),
@@ -42,7 +43,8 @@ export const discoverTrends = createServerFn({ method: "POST" })
       "can_use_competitive_intelligence",
     );
     const key = process.env.PARALLEL_API_KEY;
-    if (!key)
+    const appKey = process.env.LOVABLE_API_KEY;
+    if (!key || !appKey)
       return {
         trends: [],
         supporting: [],
@@ -52,6 +54,7 @@ export const discoverTrends = createServerFn({ method: "POST" })
         observedAt: new Date().toISOString(),
       };
     const connectionKey: string = key;
+    const gatewayKey: string = appKey;
     const { data: brand, error } = await context.supabase
       .from("brand_profiles")
       .select("business_name,industry,primary_services,service_area,target_audience")
@@ -98,29 +101,54 @@ export const discoverTrends = createServerFn({ method: "POST" })
       objective: string,
       maxResults = 20,
       strictRecency = true,
+      includeDomains: string[] = [],
     ) {
       providerCalls++;
-      const advanced_settings: Record<string, unknown> = { max_results: maxResults };
-      if (strictRecency) advanced_settings.source_policy = { after_date: cutoff };
-      const response = await fetch("https://api.parallel.ai/v1/search", {
-        method: "POST",
-        headers: { "x-api-key": connectionKey, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "advanced",
-          objective,
-          search_queries: searchQueries,
-          advanced_settings,
-        }),
-      });
-      if (!response.ok) {
+      const queries = [...new Set(searchQueries)]
+        .map((query) => query.replace(/\bsite:\S+/gi, " ").trim())
+        .filter(Boolean)
+        .map((query) => query.split(/\s+/).slice(0, 6).join(" "))
+        .slice(0, 3);
+      if (!queries.length) return [] as unknown[];
+      const sourcePolicy: Record<string, unknown> = {};
+      if (strictRecency) sourcePolicy.after_date = cutoff;
+      if (includeDomains.length) sourcePolicy.include_domains = [...new Set(includeDomains)];
+      const advanced_settings: Record<string, unknown> = {
+        max_results: Math.max(1, Math.min(20, maxResults)),
+        ...(Object.keys(sourcePolicy).length ? { source_policy: sourcePolicy } : {}),
+      };
+      try {
+        const response = await fetch(
+          "https://connector-gateway.lovable.dev/parallel/v1/search",
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${gatewayKey}`,
+              "X-Connection-Api-Key": connectionKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              mode: "advanced",
+              objective,
+              search_queries: queries,
+              advanced_settings,
+            }),
+          },
+        );
+        if (!response.ok) {
+          providerFailures++;
+          console.warn("Trend research failed", { status: response.status });
+          return [] as unknown[];
+        }
+        const payload = (await response.json()) as { results?: unknown[]; warnings?: unknown[] };
+        if (payload.warnings?.length)
+          console.warn("Trend search returned warnings", { count: payload.warnings.length });
+        return payload.results ?? [];
+      } catch {
         providerFailures++;
-        console.warn("Trend research failed", response.status);
+        console.warn("Trend research request failed", { kind: "network_or_timeout" });
         return [] as unknown[];
       }
-      const payload = (await response.json()) as { results?: unknown[]; warnings?: unknown[] };
-      if (payload.warnings?.length)
-        console.warn("Trend search returned warnings", payload.warnings);
-      return payload.results ?? [];
     }
     async function enrichTrend(trend: Trend): Promise<Trend | null> {
       const source = trendVideoSource(trend.url);
@@ -176,24 +204,16 @@ export const discoverTrends = createServerFn({ method: "POST" })
       }
       return trend;
     }
-    const strictQueries = platforms
-      .flatMap((platform) => [
-        `${terms} ${platform} ${data.type}`,
-        `${terms} ${platform} creator video`,
-      ])
-      .map((value) => value.slice(0, 200));
-    const directVideoQueries = [
-      `site:tiktok.com/@ ${terms} video`,
-      `site:instagram.com/reel ${terms}`,
-      `site:youtube.com/shorts ${terms}`,
-      `site:facebook.com/reel ${terms}`,
-    ].map((value) => value.slice(0, 200));
+    const platformDomains: Record<string, string[]> = {
+      TikTok: ["tiktok.com"],
+      "Instagram Reels": ["instagram.com"],
+      "YouTube Shorts": ["youtube.com", "youtu.be"],
+      "Facebook Reels": ["facebook.com"],
+    };
+    const includeDomains = platforms.flatMap((platform) => platformDomains[platform] ?? []);
+    const strictQueries = buildTrendSearchQueries(terms, platforms, "direct");
     const strictObjective = `Find genuinely high-traction original public short videos within the requested ${data.filters?.days ?? 7} day window. Prioritize TikTok /@creator/video links, Instagram /reel links, YouTube /shorts links and Facebook /reel or /videos links. Search intent: ${direction}. Additional filters: ${JSON.stringify(data.filters)}. Brand context: ${JSON.stringify(brand)}. Treat brand context as personality, audience and creative-direction guidance, NOT a literal keyword requirement. Include adjacent formats that the audience could naturally adapt even when the video is not about the same industry. Prefer videos with explicit public evidence of meaningful traction (for example 50K+ views/plays, 2K+ likes, or stronger), widely repeated formats, or clearly documented viral momentum. Do not surface weak low-engagement examples merely because their keywords match. Never invent rankings, engagement, rights or dates.`;
-    const firstResults = await runSearch(
-      [...strictQueries, ...directVideoQueries],
-      strictObjective,
-      28,
-    );
+    const firstResults = await runSearch(strictQueries, strictObjective, 20, true, includeDomains);
     const broadTerms =
       [
         data.query,
@@ -206,25 +226,7 @@ export const discoverTrends = createServerFn({ method: "POST" })
         .join(" ") ||
       brand?.industry ||
       "business";
-    const shouldBroaden = true;
-    const broadQueries = platforms
-      .flatMap((platform) => [
-        `${broadTerms} ${platform} behind the scenes`,
-        `${broadTerms} ${platform} tips`,
-        `${broadTerms} ${platform} POV`,
-        `${broadTerms} ${platform} storytelling`,
-        `${broadTerms} ${platform} funny relatable`,
-        `${broadTerms} ${platform} brand story`,
-      ])
-      .map((value) => value.slice(0, 200));
-    const broadResults = shouldBroaden
-      ? await runSearch(
-          broadQueries,
-          `Find additional high-traction original short videos creatively adaptable to this goal: ${data.query || direction || "business content ideas"}. Preserve platform and recency preferences, but broaden semantically to adjacent storytelling, cinematic process, behind-the-scenes, POV, educational, funny/relatable, transformation, testimonial, service-demo and brand-story formats. Brand fit should come from personality/audience similarity rather than direct industry keywords. Prefer explicit public evidence of strong traction and original creator/video URLs; avoid low-view examples when stronger evidence exists. Do not invent dates, engagement, rankings or audio rights.`,
-          24,
-        )
-      : [];
-    let combined = [...firstResults, ...broadResults];
+    let combined = [...firstResults];
     let seen = new Set<string>();
     let observations = normalizeTrendResults(combined, observedAt, data.type, cutoff).filter(
       (item) => {
@@ -237,21 +239,20 @@ export const discoverTrends = createServerFn({ method: "POST" })
       ...trend,
       searchContext: direction,
     }));
-    if (candidates.length === 0) {
-      const fallbackQueries = [
-        ...directVideoQueries,
-        `${terms} TikTok reel short video`,
-        `${terms} Instagram Reel creator`,
-        `${terms} YouTube Short creator`,
-        `${terms} Facebook Reel creator`,
-      ].map((value) => value.slice(0, 200));
-      const fallbackResults = await runSearch(
-        fallbackQueries,
-        `Find original public short-form videos relevant to this creative search: ${data.query || direction || terms}. Return pages that contain or point directly to TikTok videos, Instagram Reels, YouTube Shorts, or Facebook Reels. High public traction is preferred when visible, but do not exclude a useful original video solely because the search result does not expose view/like counts or a publish date. Do not invent engagement, dates, rankings or audio rights.`,
-        36,
-        false,
+    if (candidates.length < 6) {
+      const broadQueries = buildTrendSearchQueries(
+        broadTerms,
+        [...platforms].reverse(),
+        "broad",
       );
-      combined = [...combined, ...fallbackResults];
+      const broadResults = await runSearch(
+        broadQueries,
+        `Find additional original short-form videos creatively adaptable to this goal: ${data.query || direction || "business content ideas"}. Broaden semantically to adjacent storytelling, cinematic process, behind-the-scenes, POV, educational, funny/relatable, transformation, testimonial, service-demo and brand-story formats. Prefer direct creator/video URLs and public traction evidence when available, but do not exclude a useful original video solely because the result omits counts or a publish date. Never invent dates, engagement, rankings or rights.`,
+        20,
+        false,
+        includeDomains,
+      );
+      combined = [...combined, ...broadResults];
       seen = new Set<string>();
       observations = normalizeTrendResults(combined, observedAt, data.type, cutoff).filter(
         (item) => {
@@ -272,14 +273,11 @@ export const discoverTrends = createServerFn({ method: "POST" })
         data.filters.platform === "YouTube")
     ) {
       const youtubeOnly = await runSearch(
-        [
-          `site:youtube.com/shorts ${terms}`,
-          `${terms} YouTube Shorts`,
-          `${broadTerms} YouTube Shorts creator`,
-        ].map((value) => value.slice(0, 200)),
+        buildTrendSearchQueries(terms, ["YouTube Shorts"], "direct"),
         `Find public YouTube Shorts that can inspire this content direction: ${data.query || direction || terms}. Prefer direct youtube.com/shorts URLs. Return useful original creator videos even when public view counts are not shown in search results. Do not invent metrics, dates, rankings or rights.`,
-        24,
+        20,
         false,
+        ["youtube.com", "youtu.be"],
       );
       combined = [...combined, ...youtubeOnly];
       seen = new Set<string>();

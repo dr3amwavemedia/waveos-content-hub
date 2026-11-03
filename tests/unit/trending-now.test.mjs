@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  buildTrendSearchQueries,
   normalizeTrendResults,
   trendIsStale,
   trendDraftBrief,
@@ -9,6 +10,18 @@ import {
   tiktokPublishedAt,
   trendDiscoveryStatus,
 } from "../../src/lib/trending-now.ts";
+test("provider search queries stay concise and avoid unsupported site operators", () => {
+  const queries = buildTrendSearchQueries(
+    "cinematic small business storytelling ideas",
+    ["TikTok", "Instagram Reels", "YouTube Shorts", "Facebook Reels"],
+  );
+  assert.equal(queries.length, 3);
+  for (const query of queries) {
+    const wordCount = query.split(/\s+/).length;
+    assert.ok(wordCount >= 3 && wordCount <= 6);
+    assert.doesNotMatch(query, /site:/i);
+  }
+});
 test("current trends require dated public sources and never infer metrics or licensing", () => {
   const rows = [
     {
@@ -115,6 +128,8 @@ test("common social share URLs are recognized as video candidates", () => {
     "TikTok",
   );
   assert.equal(trendVideoSource("https://vm.tiktok.com/ZM123abc/")?.platform, "TikTok");
+  assert.equal(trendVideoSource("https://vt.tiktok.com/ZM123abc/")?.platform, "TikTok");
+  assert.equal(trendVideoSource("https://www.tiktok.com/t/ZM123abc/")?.platform, "TikTok");
   assert.equal(trendVideoSource("https://m.instagram.com/reel/Abc_123/")?.platform, "Instagram");
   assert.equal(trendVideoSource("https://facebook.com/share/r/AbC123/")?.platform, "Facebook");
 });

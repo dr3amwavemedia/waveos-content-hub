@@ -10,6 +10,11 @@ test("trend discovery keeps workspace permission checks ahead of external provid
   assert.match(source, /small business storytelling/);
   assert.match(source, /connection_unavailable/);
   assert.match(source, /provider_unavailable/);
+  assert.match(source, /connector-gateway\.lovable\.dev\/parallel\/v1\/search/);
+  assert.match(source, /X-Connection-Api-Key/);
+  assert.match(source, /Math\.min\(20, maxResults\)/);
+  assert.match(source, /\.slice\(0, 3\)/);
+  assert.doesNotMatch(source, /`site:/);
 });
 
 test("analytics exposes stored backfill evidence without fabricating a chart", () => {
