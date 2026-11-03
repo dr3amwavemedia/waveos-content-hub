@@ -68,6 +68,7 @@ test.describe("Google sign-in", () => {
 
   test("Google hand-off uses the public callback route", async ({ page }) => {
     await page.goto("/auth?next=/home");
+    const appOrigin = new URL(page.url()).origin;
     // Wait for hydration — the button is inert until React attaches handlers.
     await expect(page.getByRole("button", { name: /continue with google/i })).toBeEnabled();
 
@@ -79,6 +80,6 @@ test.describe("Google sign-in", () => {
     const request = await oauthRequest;
     const url = new URL(request.url());
     const callback = url.searchParams.get("redirect_uri") ?? url.searchParams.get("redirect_to");
-    expect(callback).toBe(`${new URL(page.url()).origin}/auth-callback`);
+    expect(callback).toBe(`${appOrigin}/auth-callback`);
   });
 });
