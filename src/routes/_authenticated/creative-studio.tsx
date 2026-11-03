@@ -1653,14 +1653,19 @@ function CreativeStudioPage() {
                     className="h-20 overflow-hidden p-0"
                     aria-label={`Use brand photo ${asset.name}`}
                     onClick={() => {
-                      const slot = selectedId
-                        ? mediaSlots.find((item) => item.layer.id === selectedId)
-                        : mediaSlots.find((item) => item.role === "background");
+                      // Explicit replacement takes priority. Otherwise target the template
+                      // background, never silently insert a new foreground layer.
+                      const slot = replaceId
+                        ? mediaSlots.find((item) => item.layer.id === replaceId)
+                        : mediaSlots.find((item) => item.layer.id === selectedId && item.role === "background") ??
+                          mediaSlots.find((item) => item.role === "background");
                       if (slot) {
                         changeDocument((current) =>
                           replaceStudioMedia(current, slot.layer.id, { assetId: asset.id }),
                         );
-                      } else addImage(asset.id);
+                        setSelectedId(slot.layer.id);
+                        setReplaceId(null);
+                      } else void addImage(asset.id);
                     }}
                   >
                     {assetUrls[asset.id] ? (
