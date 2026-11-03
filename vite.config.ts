@@ -12,6 +12,9 @@ export default defineConfig({
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
+    // Use a project-local client entry so the preview never has to fetch the
+    // package's default client entry from node_modules.
+    client: { entry: "client" },
   },
   vite: {
     define: {
