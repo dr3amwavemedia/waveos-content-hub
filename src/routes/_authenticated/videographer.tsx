@@ -19,6 +19,7 @@ import { useCurrentUser } from "@/hooks/use-waveos";
 import { cn } from "@/lib/utils";
 import { ProductionProjectsPanel } from "@/components/production/production-projects-panel";
 import { ProductionTodayPanel } from "@/components/production/production-today-panel";
+import { OceanDisclosure, OceanHeader, OceanPage } from "@/components/app/ocean-ui";
 
 export const Route = createFileRoute("/_authenticated/videographer")({
   component: VideographerDashboard,
@@ -143,26 +144,25 @@ function VideographerDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-            <Camera className="h-4 w-4" />
-            Production
-          </div>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-foreground">
-            Videographer dashboard
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">{today} · Your shoot command center</p>
-        </div>
-        <Link
-          to="/calendar"
-          className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary sm:w-auto sm:rounded-full"
-        >
-          <CalendarDays className="h-4 w-4" />
-          View full schedule
-        </Link>
-      </header>
+    <OceanPage>
+      <OceanHeader
+        eyebrow={
+          <span className="flex items-center gap-2">
+            <Camera className="h-4 w-4" /> Production command center
+          </span>
+        }
+        title="Today in production"
+        description={`${today} · Prioritize shoots, blockers, handoffs, uploads, and client-ready delivery.`}
+        action={
+          <Link
+            to="/calendar"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-primary/40 bg-primary/10 px-4 py-3 text-sm font-semibold text-primary sm:w-auto sm:rounded-full"
+          >
+            <CalendarDays className="h-4 w-4" />
+            View full schedule
+          </Link>
+        }
+      />
 
       <nav
         className="grid w-full grid-cols-2 items-center gap-1 rounded-xl border border-border bg-surface p-1 sm:flex sm:w-fit"
@@ -210,17 +210,15 @@ function VideographerDashboard() {
         />
       </section>
 
+      <OceanDisclosure summary="Today & next 14 days" open>
+        <ProductionTodayPanel />
+      </OceanDisclosure>
+
       <ProductionProjectsPanel />
 
-      <details className="rounded-2xl border border-border bg-surface p-4">
-        <summary className="min-h-11 cursor-pointer font-semibold">Today's schedule</summary>
-        <ProductionTodayPanel />
-      </details>
-      <details className="rounded-2xl border border-border bg-surface p-4">
-        <summary className="min-h-11 cursor-pointer font-semibold">
-          Personal preparation tools
-        </summary>
-
+      <OceanDisclosure
+        summary={`Personal preparation tools · ${completed}/${checklist.length} ready`}
+      >
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)]">
           <section className="rounded-2xl border border-border bg-surface shadow-sm">
             <div className="flex items-center justify-between border-b border-border p-5">
@@ -419,8 +417,8 @@ function VideographerDashboard() {
             </div>
           </div>
         </section>
-      </details>
-    </div>
+      </OceanDisclosure>
+    </OceanPage>
   );
 }
 
@@ -438,7 +436,7 @@ function QuickAction({
   return (
     <Link
       to={to}
-      className="group flex min-h-28 flex-col items-start gap-2 rounded-2xl border border-border bg-surface p-3 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg sm:min-h-0 sm:flex-row sm:items-center sm:gap-3 sm:p-4"
+      className="ocean-panel group flex min-h-24 flex-col items-start gap-2 p-3 transition-all hover:-translate-y-0.5 hover:border-primary/40 sm:min-h-0 sm:flex-row sm:items-center sm:gap-3 sm:p-4"
     >
       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
         <Icon className="h-5 w-5" />

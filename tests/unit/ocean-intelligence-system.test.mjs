@@ -28,9 +28,9 @@ test("Ocean disclosures preserve native keyboard and screen-reader semantics", (
 test("analytics keeps unavailable values unavailable and comparisons evidence-bound", () => {
   const analytics = read("src/components/social/analytics-checkup.tsx");
   const history = read("src/lib/analytics-history.ts");
-  assert.match(analytics, /metric\.value===null\?"—"/);
+  assert.match(analytics, /metric\.value\s*===\s*null\s*\?\s*"—"/);
   assert.match(analytics, /Missing or failed sources remain unavailable/);
-  assert.match(analytics, /equal-length, non-overlapping observed periods/);
+  assert.match(analytics, /equal-length,\s+non-overlapping observed periods/);
   assert.match(analytics, /These are calculated observations, not AI conclusions/);
   assert.match(history, /calculation_version/);
   assert.match(history, /provider/);

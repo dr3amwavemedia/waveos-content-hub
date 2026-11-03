@@ -74,7 +74,17 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
           safeMessage: "No publishing-provider profile is connected to this workspace.",
         }),
       );
-      return { sources, requestedRangeStart, requestedRangeEnd, sync: {state:"profile_missing",message:"No provider profile is mapped to this workspace.",lastSuccessAt:null as string|null,accounts:0} };
+      return {
+        sources,
+        requestedRangeStart,
+        requestedRangeEnd,
+        sync: {
+          state: "profile_missing",
+          message: "No provider profile is mapped to this workspace.",
+          lastSuccessAt: null as string | null,
+          accounts: 0,
+        },
+      };
     }
     const base = new URLSearchParams({
       profileId: profile.profile_id,
@@ -82,37 +92,83 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
       toDate: requestedRangeEnd,
     });
 
-    const sync={state:"available",message:"Provider metrics read successfully.",lastSuccessAt:null as string|null,accounts:0};
+    const sync = {
+      state: "available",
+      message: "Provider metrics read successfully.",
+      lastSuccessAt: null as string | null,
+      accounts: 0,
+    };
     try {
-      const response=await zernioRequest<{accounts?:Array<{_id?:string;profileId?:string|{_id?:string};isActive?:boolean;needsReconnection?:boolean}>}>(`/accounts?profileId=${encodeURIComponent(profile.profile_id)}`);
-      const accounts=(response.accounts??[]).filter(account=>(typeof account.profileId === "string"?account.profileId:account.profileId?._id)===profile.profile_id);
-      sync.accounts=accounts.length;
-      if(!accounts.length){sync.state="not_synced";sync.message="No accounts resolve to this provider profile. Check Social Media accounts.";}
-      if(data.refresh) {
-        const outcomes=await Promise.all(accounts.map(async account=>{
-          if(!account._id)return {availability:"sync_failed",safeMessage:"A provider account identifier is missing."};
-          if(account.needsReconnection || account.isActive===false)return {availability:"connection_expired",safeMessage:"Reconnect this account in Social Media before refreshing."};
-          try{await zernioRequest("/posts/sync-external",{method:"POST",body:JSON.stringify({accountId:account._id})});return null;}
-          catch(reason){return classifyAnalyticsError(reason);}
-        }));
-        const failure=outcomes.find(result=>result!==null);if(failure){sync.state=failure.availability;sync.message=failure.safeMessage;}
+      const response = await zernioRequest<{
+        accounts?: Array<{
+          _id?: string;
+          profileId?: string | { _id?: string };
+          isActive?: boolean;
+          needsReconnection?: boolean;
+        }>;
+      }>(`/accounts?profileId=${encodeURIComponent(profile.profile_id)}`);
+      const accounts = (response.accounts ?? []).filter(
+        (account) =>
+          (typeof account.profileId === "string" ? account.profileId : account.profileId?._id) ===
+          profile.profile_id,
+      );
+      sync.accounts = accounts.length;
+      if (!accounts.length) {
+        sync.state = "not_synced";
+        sync.message = "No accounts resolve to this provider profile. Check Social Media accounts.";
       }
-    } catch(reason) {
-      const failure=classifyAnalyticsError(reason);sync.state=failure.availability;sync.message=failure.safeMessage;
+      if (data.refresh) {
+        const outcomes = await Promise.all(
+          accounts.map(async (account) => {
+            if (!account._id)
+              return {
+                availability: "sync_failed",
+                safeMessage: "A provider account identifier is missing.",
+              };
+            if (account.needsReconnection || account.isActive === false)
+              return {
+                availability: "connection_expired",
+                safeMessage: "Reconnect this account in Social Media before refreshing.",
+              };
+            try {
+              await zernioRequest("/posts/sync-external", {
+                method: "POST",
+                body: JSON.stringify({ accountId: account._id }),
+              });
+              return null;
+            } catch (reason) {
+              return classifyAnalyticsError(reason);
+            }
+          }),
+        );
+        const failure = outcomes.find((result) => result !== null);
+        if (failure) {
+          sync.state = failure.availability;
+          sync.message = failure.safeMessage;
+        }
+      }
+    } catch (reason) {
+      const failure = classifyAnalyticsError(reason);
+      sync.state = failure.availability;
+      sync.message = failure.safeMessage;
     }
 
     const loadSource = async (key: AnalyticsSourceKey, path: string): Promise<AnalyticsSource> => {
       try {
         const payload = await zernioRequest<Record<string, unknown>>(path);
-        const pagination=payload.pagination as {pages?:number}|undefined;
-        const field=key==="paid"?"ads":"posts";
-        if(Array.isArray(payload[field]) && pagination?.pages && pagination.pages>1){
-          const rows=[...payload[field] as unknown[]];
-          for(let page=2;page<=pagination.pages;page++){const next=await zernioRequest<Record<string,unknown>>(`${path}&page=${page}`);if(Array.isArray(next[field]))rows.push(...next[field] as unknown[]);}
-          payload[field]=rows;
+        const pagination = payload.pagination as { pages?: number } | undefined;
+        const field = key === "paid" ? "ads" : "posts";
+        if (Array.isArray(payload[field]) && pagination?.pages && pagination.pages > 1) {
+          const rows = [...(payload[field] as unknown[])];
+          for (let page = 2; page <= pagination.pages; page++) {
+            const next = await zernioRequest<Record<string, unknown>>(`${path}&page=${page}`);
+            if (Array.isArray(next[field])) rows.push(...(next[field] as unknown[]));
+          }
+          payload[field] = rows;
         }
-        const overview=payload.overview as {lastSync?:string}|undefined;
-        if(overview?.lastSync && (!sync.lastSuccessAt || overview.lastSync>sync.lastSuccessAt))sync.lastSuccessAt=overview.lastSync;
+        const overview = payload.overview as { lastSync?: string } | undefined;
+        if (overview?.lastSync && (!sync.lastSuccessAt || overview.lastSync > sync.lastSuccessAt))
+          sync.lastSuccessAt = overview.lastSync;
         return parseAnalyticsPayload({
           key,
           payload,
@@ -147,7 +203,10 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
         .eq("workspace_id", data.workspaceId)
         .maybeSingle();
 
-      let intelligenceProfile = profileLookup.data as { id: string; metadata?: Record<string, unknown> | null } | null;
+      let intelligenceProfile = profileLookup.data as {
+        id: string;
+        metadata?: Record<string, unknown> | null;
+      } | null;
       let historicalRangeStart: string | null = null;
       let historicalRangeEnd: string | null = null;
       let historicalRecordCount = 0;
@@ -167,13 +226,19 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
           } as never)
           .select("id")
           .single();
-        if (!created.error) intelligenceProfile = { ...(created.data as { id: string }), metadata: {} };
+        if (!created.error)
+          intelligenceProfile = { ...(created.data as { id: string }), metadata: {} };
       }
 
       if (intelligenceProfile) {
         const existingMetadata = intelligenceProfile.metadata ?? {};
         const previousBackfill = existingMetadata.historicalBackfill as
-          | { completedAt?: string; availableRangeStart?: string; availableRangeEnd?: string; dailyRecords?: number }
+          | {
+              completedAt?: string;
+              availableRangeStart?: string;
+              availableRangeEnd?: string;
+              dailyRecords?: number;
+            }
           | undefined;
         historicalRangeStart = previousBackfill?.availableRangeStart ?? null;
         historicalRangeEnd = previousBackfill?.availableRangeEnd ?? null;
@@ -234,7 +299,8 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
               );
             } catch (reason) {
               const failure = classifyAnalyticsError(reason);
-              if (!["unsupported", "permission_missing"].includes(failure.availability)) throw reason;
+              if (!["unsupported", "permission_missing"].includes(failure.availability))
+                throw reason;
             }
           }
 
@@ -256,26 +322,28 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
               return values.flatMap(([metricKey, rawValue]) => {
                 const value = Number(rawValue);
                 if (!Number.isFinite(value) || value < 0) return [];
-                return [{
-                  workspace_id: data.workspaceId,
-                  profile_id: intelligenceProfile!.id,
-                  metric_key: metricKey,
-                  provider: "zernio",
-                  availability: value === 0 ? "true_zero" : "available",
-                  value,
-                  unit: "count",
-                  range_start: row.date,
-                  range_end: row.date,
-                  record_count: 1,
-                  captured_at: capturedAt,
-                  source_reference: "zernio analytics dashboard daily",
-                  calculation_version: "waveos-zernio-dashboard-daily-v1",
-                  evidence: {
-                    coverage: "complete",
-                    mode: "combined",
-                    historicalBackfill: true,
+                return [
+                  {
+                    workspace_id: data.workspaceId,
+                    profile_id: intelligenceProfile!.id,
+                    metric_key: metricKey,
+                    provider: "zernio",
+                    availability: value === 0 ? "true_zero" : "available",
+                    value,
+                    unit: "count",
+                    range_start: row.date,
+                    range_end: row.date,
+                    record_count: 1,
+                    captured_at: capturedAt,
+                    source_reference: "zernio analytics dashboard daily",
+                    calculation_version: "waveos-zernio-dashboard-daily-v1",
+                    evidence: {
+                      coverage: "complete",
+                      mode: "combined",
+                      historicalBackfill: true,
+                    },
                   },
-                }];
+                ];
               });
             });
 
@@ -306,7 +374,11 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
                 availableRangeEnd: historicalRangeEnd,
                 dailyRecords: historicalRecordCount,
                 topPosts,
-                dataAsOf: dashboardResults.map((result) => result.dataAsOf).filter(Boolean).at(-1) ?? null,
+                dataAsOf:
+                  dashboardResults
+                    .map((result) => result.dataAsOf)
+                    .filter(Boolean)
+                    .at(-1) ?? null,
               },
             };
             const metadataUpdate = await supabaseAdmin
@@ -343,30 +415,31 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
           const snapshotRows = modes.flatMap(({ mode, selected }) => {
             const sourceReference = selected.map((source) => source.sourceReference).join(" + ");
             const recordCount = selected.reduce((sum, source) => sum + source.recordCount, 0);
-            const metricRows: Array<Record<string, unknown> & { metric_key: string }> = ANALYTICS_METRIC_KEYS.map((metricKey) => {
-              const metric = combineAnalyticsMetric(selected, metricKey);
-              return {
-                workspace_id: data.workspaceId,
-                profile_id: intelligenceProfile!.id,
-                metric_key: snapshotMetricKey(metricKey),
-                provider: "zernio",
-                availability: metric.availability,
-                value: metric.value,
-                unit: "count",
-                range_start: requestedRangeStart,
-                range_end: requestedRangeEnd,
-                record_count: recordCount,
-                captured_at: now,
-                source_reference: sourceReference || "publishing-provider",
-                calculation_version: "waveos-combined-provider-sources-v1",
-                evidence: {
-                  coverage: metric.coverage,
-                  mode,
-                  contributingSources: metric.contributingSources,
-                  expectedSources: metric.expectedSources,
-                },
-              };
-            });
+            const metricRows: Array<Record<string, unknown> & { metric_key: string }> =
+              ANALYTICS_METRIC_KEYS.map((metricKey) => {
+                const metric = combineAnalyticsMetric(selected, metricKey);
+                return {
+                  workspace_id: data.workspaceId,
+                  profile_id: intelligenceProfile!.id,
+                  metric_key: snapshotMetricKey(metricKey),
+                  provider: "zernio",
+                  availability: metric.availability,
+                  value: metric.value,
+                  unit: "count",
+                  range_start: requestedRangeStart,
+                  range_end: requestedRangeEnd,
+                  record_count: recordCount,
+                  captured_at: now,
+                  source_reference: sourceReference || "publishing-provider",
+                  calculation_version: "waveos-combined-provider-sources-v1",
+                  evidence: {
+                    coverage: metric.coverage,
+                    mode,
+                    contributingSources: metric.contributingSources,
+                    expectedSources: metric.expectedSources,
+                  },
+                };
+              });
             const engagements = deriveEngagements(selected);
             metricRows.push({
               workspace_id: data.workspaceId,
@@ -427,7 +500,8 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
             requested_range_end: requestedRangeEnd,
             available_range_start: historicalRangeStart ?? availableStarts[0] ?? null,
             available_range_end: historicalRangeEnd ?? availableEnds.at(-1) ?? null,
-            record_count: historicalRecordCount || sources.reduce((sum, source) => sum + source.recordCount, 0),
+            record_count:
+              historicalRecordCount || sources.reduce((sum, source) => sum + source.recordCount, 0),
             last_attempt_at: now,
             last_success_at: availableSources.length ? (sync.lastSuccessAt ?? now) : null,
             safe_error_code: availableSources.length ? null : String(sync.state),
@@ -459,7 +533,7 @@ export const getSocialIntelligenceProfile = createServerFn({ method: "POST" })
     const profileResult = await supabaseAdmin
       .from("social_intelligence_profiles" as never)
       .select(
-        "id,provider,sync_state,analyzed_sources,requested_range_start,requested_range_end,available_range_start,available_range_end,record_count,last_attempt_at,last_success_at,safe_error_code,safe_error_message,updated_at",
+        "id,provider,sync_state,analyzed_sources,requested_range_start,requested_range_end,available_range_start,available_range_end,record_count,last_attempt_at,last_success_at,safe_error_code,safe_error_message,updated_at,metadata",
       )
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
@@ -487,6 +561,22 @@ export const getSocialIntelligenceProfile = createServerFn({ method: "POST" })
       safe_error_code: string | null;
       safe_error_message: string | null;
       updated_at: string;
+      metadata: {
+        historicalBackfill?: {
+          requestedRangeStart?: string;
+          requestedRangeEnd?: string;
+          availableRangeStart?: string;
+          availableRangeEnd?: string;
+          dailyRecords?: number;
+          dataAsOf?: string | null;
+          topPosts?: Array<{
+            postId?: string;
+            platform?: string;
+            publishedAt?: string;
+            metrics?: Record<string, string | number | null>;
+          }>;
+        };
+      } | null;
     } | null;
     if (!profile) {
       return {

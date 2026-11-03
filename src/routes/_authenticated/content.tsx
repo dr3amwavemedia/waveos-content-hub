@@ -45,6 +45,7 @@ export const Route = createFileRoute("/_authenticated/content")({
 });
 
 type FolderFilter = "all" | "root" | string;
+const EXTERNAL_STORAGE_NOTE = "Google Drive and Dropbox references do not use this allowance.";
 
 function ContentLibrary() {
   const { activeWorkspace } = useWorkspace();
@@ -113,7 +114,7 @@ function ContentLibrary() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="ocean-page space-y-5">
       <Header title="Content library">
         <div className="flex items-center gap-2">
           <button
@@ -146,102 +147,124 @@ function ContentLibrary() {
         </div>
       </Header>
 
-      <div className="grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
-        {/* Folder sidebar */}
-        <aside className="surface-card p-3">
-          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Sources
-          </p>
-          <FolderRow
-            active={source === "all"}
-            onClick={() => setSource("all")}
-            label="All sources"
-            icon={Images}
-          />
-          <FolderRow
-            active={source === "waveos"}
-            onClick={() => setSource("waveos")}
-            label="Local device"
-            icon={HardDrive}
-          />
-          <FolderRow
-            active={source === "google_drive"}
-            onClick={() => setSource("google_drive")}
-            label="Google Drive"
-            icon={Cloud}
-          />
-          <FolderRow
-            active={source === "dropbox"}
-            onClick={() => setSource("dropbox")}
-            label="Dropbox"
-            icon={Cloud}
-          />
-          <div className="my-2 h-px bg-border" />
-          <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            WaveOS folders
-          </p>
-          <FolderRow
-            active={folderFilter === "all"}
-            onClick={() => setFolderFilter("all")}
-            label="All media"
-            icon={Images}
-          />
-          <FolderRow
-            active={folderFilter === "root"}
-            onClick={() => setFolderFilter("root")}
-            label="Uncategorized"
-            icon={Folder}
-          />
-          {(foldersQ.data ?? []).map((f) => (
-            <FolderRow
-              key={f.id}
-              active={folderFilter === f.id}
-              onClick={() => setFolderFilter(f.id)}
-              label={f.name}
-              icon={Folder}
-            />
-          ))}
-          {(foldersQ.data ?? []).length === 0 && (
-            <p className="px-2 py-3 text-xs text-muted-foreground">
-              No folders yet. Create one to keep assets organized.
-            </p>
-          )}
-        </aside>
+      <div className="space-y-4">
+        <details className="ocean-disclosure group">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 text-sm font-semibold marker:content-none">
+            <span>Sources & folders</span>
+            <span className="text-xs font-normal text-muted-foreground">
+              {source === "all" ? "All sources" : source.replaceAll("_", " ")} ·{" "}
+              {folderFilter === "all"
+                ? "All media"
+                : folderFilter === "root"
+                  ? "Uncategorized"
+                  : "Folder"}
+            </span>
+          </summary>
+          <div className="grid gap-4 border-t border-cyan-200/10 p-3 sm:grid-cols-2">
+            <div>
+              <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Sources
+              </p>
+              <FolderRow
+                active={source === "all"}
+                onClick={() => setSource("all")}
+                label="All sources"
+                icon={Images}
+              />
+              <FolderRow
+                active={source === "waveos"}
+                onClick={() => setSource("waveos")}
+                label="Local device"
+                icon={HardDrive}
+              />
+              <FolderRow
+                active={source === "google_drive"}
+                onClick={() => setSource("google_drive")}
+                label="Google Drive"
+                icon={Cloud}
+              />
+              <FolderRow
+                active={source === "dropbox"}
+                onClick={() => setSource("dropbox")}
+                label="Dropbox"
+                icon={Cloud}
+              />
+            </div>
+            <div>
+              <p className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                WaveOS folders
+              </p>
+              <FolderRow
+                active={folderFilter === "all"}
+                onClick={() => setFolderFilter("all")}
+                label="All media"
+                icon={Images}
+              />
+              <FolderRow
+                active={folderFilter === "root"}
+                onClick={() => setFolderFilter("root")}
+                label="Uncategorized"
+                icon={Folder}
+              />
+              {(foldersQ.data ?? []).map((f) => (
+                <FolderRow
+                  key={f.id}
+                  active={folderFilter === f.id}
+                  onClick={() => setFolderFilter(f.id)}
+                  label={f.name}
+                  icon={Folder}
+                />
+              ))}
+              {(foldersQ.data ?? []).length === 0 && (
+                <p className="px-2 py-3 text-xs text-muted-foreground">
+                  No folders yet. Create one to keep assets organized.
+                </p>
+              )}
+            </div>
+          </div>
+        </details>
 
         {/* Main */}
         <div className="space-y-4">
-          <div className="surface-card p-3">
-            <div className="flex items-center justify-between gap-3 text-xs">
-              <span className="font-medium text-foreground">Local storage</span>
+          <details className="ocean-disclosure group">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 text-xs font-medium marker:content-none">
+              <span>Storage status</span>
               <span className="text-muted-foreground">
-                {formatBytes(storageUsage.data?.usedBytes ?? 0)} of 500 MB used ·{" "}
-                {formatBytes(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available
+                {formatBytes(storageUsage.data?.usedBytes ?? 0)} of 500 MB
               </span>
-            </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-elevated">
-              <div
-                className="h-full rounded-full bg-primary transition-[width]"
-                style={{
-                  width: `${Math.min(
-                    100,
-                    ((storageUsage.data?.usedBytes ?? 0) / (500 * 1024 * 1024)) * 100,
-                  )}%`,
-                }}
-              />
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              Local files are limited to 300 MB each. Google Drive and Dropbox references do not use
-              this allowance.
-            </p>
-            {(storageUsage.data?.usedBytes ?? 0) >= 400 * 1024 * 1024 && (
-              <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
-                Local storage is nearly full. Remove unused uploads or link new media from Google
-                Drive or Dropbox. New uploads will stop at 500 MB.
+            </summary>
+            <div className="border-t border-cyan-200/10 p-3">
+              <div className="flex items-center justify-between gap-3 text-xs">
+                <span className="font-medium text-foreground">Local storage</span>
+                <span className="text-muted-foreground">
+                  {formatBytes(storageUsage.data?.usedBytes ?? 0)} of 500 MB used ·{" "}
+                  {formatBytes(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available
+                </span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-elevated">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width]"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      ((storageUsage.data?.usedBytes ?? 0) / (500 * 1024 * 1024)) * 100,
+                    )}%`,
+                  }}
+                />
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                Local files are limited to 300 MB each. {EXTERNAL_STORAGE_NOTE}
               </p>
-            )}
-          </div>
+              {(storageUsage.data?.usedBytes ?? 0) >= 400 * 1024 * 1024 && (
+                <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+                  Local storage is nearly full. Remove unused uploads or link new media from Google
+                  Drive or Dropbox. New uploads will stop at 500 MB.
+                </p>
+              )}
+            </div>
+          </details>
           {/* Filters */}
-          <div className="surface-card flex flex-wrap items-center gap-2 p-3">
+          <div className="ocean-panel flex flex-wrap items-center gap-2 p-3">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input

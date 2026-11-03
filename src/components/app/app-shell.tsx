@@ -75,7 +75,12 @@ interface NavItem {
 }
 
 const CLIENT_NAV: NavItem[] = [
-  { to: "/trending-now", label: "Trending Now", icon: Flame, feature: "can_use_competitive_intelligence" },
+  {
+    to: "/trending-now",
+    label: "Trending Now",
+    icon: Flame,
+    feature: "can_use_competitive_intelligence",
+  },
   { to: "/home", label: "Overview", icon: Home },
   { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
@@ -118,7 +123,12 @@ const CLIENT_NAV: NavItem[] = [
 ];
 
 const PUBLIC_OS_NAV: NavItem[] = [
-  { to: "/trending-now", label: "Trending Now", icon: Flame, feature: "can_use_competitive_intelligence" },
+  {
+    to: "/trending-now",
+    label: "Trending Now",
+    icon: Flame,
+    feature: "can_use_competitive_intelligence",
+  },
   { to: "/home", label: "Overview", icon: Home },
   { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
   { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
@@ -168,7 +178,13 @@ const STAFF_NAV: NavItem[] = [
     : []),
   { to: "/clients", label: "Clients", icon: Users2, staffOnly: true, ownerOnly: true },
   { to: "/os-data", label: "OS Data", icon: Database, staffOnly: true, ownerOnly: true },
-  { to: "/saas-dashboard", label: "SaaS Dashboard", icon: BarChart3, staffOnly: true, ownerOnly: true },
+  {
+    to: "/saas-dashboard",
+    label: "SaaS Dashboard",
+    icon: BarChart3,
+    staffOnly: true,
+    ownerOnly: true,
+  },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
   { to: "/templates", label: "DOCUMENTS", icon: FileStack, staffOnly: true, ownerOnly: true },
@@ -399,8 +415,12 @@ function Shell({ children }: { children: ReactNode }) {
               : filterByFeature(MOBILE_NAV);
   const mobilePrimaryNav = mobileNav.filter((item) => item.label !== "More").slice(0, 4);
   const showCreateFab =
-    !isWeddingClient && !isLayer1 && !isCrew &&
-    (isStaff ? can("can_create_content") : !permsLoading && visibility("can_create_content") !== "hidden");
+    !isWeddingClient &&
+    !isLayer1 &&
+    !isCrew &&
+    (isStaff
+      ? can("can_create_content")
+      : !permsLoading && visibility("can_create_content") !== "hidden");
   const barNav: NavItem[] = showCreateFab
     ? mobilePrimaryNav.filter((item) => item.to !== "/create")
     : mobilePrimaryNav;
@@ -408,7 +428,8 @@ function Shell({ children }: { children: ReactNode }) {
   // such as Approvals.
   const nav = [...clientNav, ...staffNav].filter(
     (item, index, items) =>
-      items.findIndex((candidate) => candidate.to === item.to && candidate.hash === item.hash) === index,
+      items.findIndex((candidate) => candidate.to === item.to && candidate.hash === item.hash) ===
+      index,
   );
   // Staff get Documents and Services & Pricing in the grouped phone menu; client menus
   // stay task-focused.
@@ -453,8 +474,16 @@ function Shell({ children }: { children: ReactNode }) {
   })();
 
   const mobileDrawerNav = isStaff
-    ? [...nav, ...filterByFeature([{ to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" }])].filter(
-        (item, index, items) => items.findIndex((candidate) => candidate.to === item.to && candidate.hash === item.hash) === index,
+    ? [
+        ...nav,
+        ...filterByFeature([
+          { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
+        ]),
+      ].filter(
+        (item, index, items) =>
+          items.findIndex(
+            (candidate) => candidate.to === item.to && candidate.hash === item.hash,
+          ) === index,
       )
     : nav.filter((item) => item.to !== "/templates" && item.to !== "/catalog");
 
@@ -476,8 +505,15 @@ function Shell({ children }: { children: ReactNode }) {
               <div className="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 Dream Wave Media
               </div>
-              <NavGroup items={staffNav.filter(item => item.to !== '/saas-dashboard')} />
-              {isOwner && <><div className="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">WaveOS App</div><NavGroup items={staffNav.filter(item => item.to === '/saas-dashboard')} /></>}
+              <NavGroup items={staffNav.filter((item) => item.to !== "/saas-dashboard")} />
+              {isOwner && (
+                <>
+                  <div className="mt-6 mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    WaveOS App
+                  </div>
+                  <NavGroup items={staffNav.filter((item) => item.to === "/saas-dashboard")} />
+                </>
+              )}
             </>
           )}
         </nav>
@@ -485,18 +521,21 @@ function Shell({ children }: { children: ReactNode }) {
       </aside>
 
       {/* Mobile top bar */}
-      <header data-global-mobile-header className="sticky top-0 z-20 border-b border-cyan-200/10 bg-[#04172b]/90 backdrop-blur-xl lg:hidden">
+      <header
+        data-global-mobile-header
+        className="sticky top-0 z-20 border-b border-cyan-200/10 bg-[#04172b]/90 backdrop-blur-xl lg:hidden"
+      >
         <div className="flex min-h-14 items-center justify-between px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
           <WaveLogo compact />
           <div className="flex items-center gap-2">
-          <NotificationsBell />
-          <button
-            onClick={() => setMobileOpen(true)}
-            className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-elevated text-foreground"
-            aria-label="Open menu"
-          >
-            <Menu className="h-5 w-5" />
-          </button>
+            <NotificationsBell />
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-elevated text-foreground"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </header>
@@ -508,7 +547,7 @@ function Shell({ children }: { children: ReactNode }) {
             className="absolute inset-0 bg-background/70 backdrop-blur"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-border bg-sidebar px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
+          <div className="absolute inset-y-0 left-0 flex w-[min(18rem,82vw)] flex-col border-r border-cyan-200/10 bg-[#031326]/98 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] shadow-2xl">
             <div className="flex items-center justify-between">
               <WaveLogo />
               <button
@@ -526,7 +565,11 @@ function Shell({ children }: { children: ReactNode }) {
               className="mt-2 min-h-0 flex-1 overflow-y-auto"
               onClick={() => setMobileOpen(false)}
             >
-              {isStaff ? <MobileAdminNav items={mobileDrawerNav} /> : <NavGroup items={mobileDrawerNav} className="mt-2" />}
+              {isStaff ? (
+                <MobileAdminNav items={mobileDrawerNav} />
+              ) : (
+                <NavGroup items={mobileDrawerNav} className="mt-2" />
+              )}
             </div>
             <UserFooter />
           </div>
@@ -550,7 +593,13 @@ function Shell({ children }: { children: ReactNode }) {
               key={`${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
               userId={user.userId}
               storageKey={`waveos.tour.v1:${user.userId}:${activeWorkspace.id}:${access?.tier}:${user.staffType}:${isStaff}`}
-              audience={isPublicOs ? "the WaveOS tools included with your plan" : isWeddingClient ? "your wedding" : "your projects"}
+              audience={
+                isPublicOs
+                  ? "the WaveOS tools included with your plan"
+                  : isWeddingClient
+                    ? "your wedding"
+                    : "your projects"
+              }
               planName={isPublicOs ? publicPlanName : undefined}
               destinations={guideDestinations}
             />
@@ -586,7 +635,10 @@ function Shell({ children }: { children: ReactNode }) {
 
       {createSheetOpen && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-label="Create">
-          <div className="absolute inset-0 bg-background/70 backdrop-blur" onClick={() => setCreateSheetOpen(false)} />
+          <div
+            className="absolute inset-0 bg-background/70 backdrop-blur"
+            onClick={() => setCreateSheetOpen(false)}
+          />
           <div className="absolute inset-x-0 bottom-0 rounded-t-3xl border-t border-border-strong bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border-strong" />
             <div className="mb-2 flex items-center justify-between gap-3 px-1">
@@ -603,13 +655,32 @@ function Shell({ children }: { children: ReactNode }) {
             <div className="grid grid-cols-2 gap-2" onClick={() => setCreateSheetOpen(false)}>
               {[
                 { to: "/create", label: "Create Post", icon: Plus, show: true },
-                { to: "/content", label: "Upload Media", icon: Upload, show: can("can_upload_media") },
-                { to: "/creative-studio", label: "Creative Studio", icon: Wand2, show: can("can_use_creative_studio") },
-                { to: "/campaigns", label: "Create Campaign", icon: Megaphone, show: can("can_use_campaign_manager") },
+                {
+                  to: "/content",
+                  label: "Upload Media",
+                  icon: Upload,
+                  show: can("can_upload_media"),
+                },
+                {
+                  to: "/creative-studio",
+                  label: "Creative Studio",
+                  icon: Wand2,
+                  show: can("can_use_creative_studio"),
+                },
+                {
+                  to: "/campaigns",
+                  label: "Create Campaign",
+                  icon: Megaphone,
+                  show: can("can_use_campaign_manager"),
+                },
               ]
                 .filter((a) => a.show)
                 .map(({ to, label, icon: Icon }) => (
-                  <Link key={to} to={to} className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-elevated px-3 text-sm font-medium text-foreground">
+                  <Link
+                    key={to}
+                    to={to}
+                    className="flex min-h-14 items-center gap-3 rounded-2xl border border-border bg-elevated px-3 text-sm font-medium text-foreground"
+                  >
                     <Icon className="h-5 w-5 text-primary" />
                     {label}
                   </Link>
@@ -722,7 +793,10 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
               />
               <span className="min-w-0 flex-1">{item.label}</span>
               {!isLoading && item.feature && !can(item.feature) && (
-                <Lock className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Upgrade required" />
+                <Lock
+                  className="ml-auto h-3.5 w-3.5 shrink-0 text-muted-foreground"
+                  aria-label="Upgrade required"
+                />
               )}
               {active && (
                 <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px] shadow-primary" />
@@ -741,19 +815,43 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
 // OS = administering the WaveOS platform.
 // Routes and permissions stay unchanged; this only controls mobile organization.
 const MOBILE_PERSONAL_PATHS = new Set([
-  "/home", "/create", "/social", "/creative-studio", "/campaigns", "/analytics",
-  "/competitive-intelligence", "/trending-now", "/brand-voice", "/content", "/calendar", "/approvals", "/deliveries",
+  "/home",
+  "/create",
+  "/social",
+  "/creative-studio",
+  "/campaigns",
+  "/analytics",
+  "/competitive-intelligence",
+  "/trending-now",
+  "/brand-voice",
+  "/content",
+  "/calendar",
+  "/approvals",
+  "/deliveries",
 ]);
 const MOBILE_BUSINESS_PATHS = new Set([
-  "/clients", "/projects", "/crm", "/payments", "/templates", "/catalog",
-  "/videographer", "/vision-studio", "/admin", "/tools",
+  "/clients",
+  "/projects",
+  "/crm",
+  "/payments",
+  "/templates",
+  "/catalog",
+  "/videographer",
+  "/vision-studio",
+  "/admin",
+  "/tools",
 ]);
 const MOBILE_OS_PATHS = new Set(["/os-data", "/saas-dashboard"]);
 
 function MobileAdminNav({ items }: { items: NavItem[] }) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
-  const orderedItems = (paths: Set<string>) => [...paths].flatMap((path) => items.filter((item) => !item.hash && item.to === path));
-  const groupedPaths = new Set([...MOBILE_PERSONAL_PATHS, ...MOBILE_BUSINESS_PATHS, ...MOBILE_OS_PATHS]);
+  const orderedItems = (paths: Set<string>) =>
+    [...paths].flatMap((path) => items.filter((item) => !item.hash && item.to === path));
+  const groupedPaths = new Set([
+    ...MOBILE_PERSONAL_PATHS,
+    ...MOBILE_BUSINESS_PATHS,
+    ...MOBILE_OS_PATHS,
+  ]);
   const groups = [
     { label: "Personal", items: orderedItems(MOBILE_PERSONAL_PATHS) },
     { label: "Business", items: orderedItems(MOBILE_BUSINESS_PATHS) },
@@ -762,26 +860,45 @@ function MobileAdminNav({ items }: { items: NavItem[] }) {
   ].filter((group) => group.items.length);
 
   return (
-    <div className="space-y-5 py-2">
-      {groups.map((group) => (
-        <section key={group.label}>
-          <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80">{group.label}</p>
-          <ul className="grid grid-cols-2 gap-2">
+    <div className="space-y-2 py-2">
+      {groups.map((group, groupIndex) => (
+        <details
+          key={group.label}
+          open={groupIndex < 2}
+          className="group overflow-hidden rounded-xl border border-cyan-200/10 bg-background/20"
+        >
+          <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-primary/80 marker:content-none">
+            {group.label}
+            <span className="text-base text-muted-foreground transition-transform group-open:rotate-45">
+              +
+            </span>
+          </summary>
+          <ul className="space-y-0.5 border-t border-cyan-200/10 p-1.5">
             {group.items.map((item) => {
-              const active = !item.hash && (pathname === item.to || pathname.startsWith(item.to + "/"));
+              const active =
+                !item.hash && (pathname === item.to || pathname.startsWith(item.to + "/"));
               const Icon = item.icon;
               const labels: Record<string, string> = {
-                "/social": "Social Accounts", "/analytics": "Analytics",
-                "/competitive-intelligence": "Competitive Intelligence", "/content": "Content",
-                "/templates": "Documents", "/admin": "Staff/Admin",
+                "/social": "Social Accounts",
+                "/analytics": "Analytics",
+                "/competitive-intelligence": "Competitive Intelligence",
+                "/content": "Content",
+                "/templates": "Documents",
+                "/admin": "Staff/Admin",
               };
               const label = labels[item.to] ?? item.label;
               return (
                 <li key={`${item.to}#${item.hash ?? ""}`} className="min-w-0">
-                  <Link to={item.to} hash={item.hash} className={cn(
-                    "grid min-h-14 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-xl border px-2.5 py-2 text-xs font-medium leading-tight transition-colors",
-                    active ? "border-primary/40 bg-primary/12 text-foreground" : "border-border/60 bg-surface/50 text-muted-foreground hover:text-foreground",
-                  )}>
+                  <Link
+                    to={item.to}
+                    hash={item.hash}
+                    className={cn(
+                      "grid min-h-10 min-w-0 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-lg px-2.5 py-2 text-xs font-medium leading-tight transition-colors",
+                      active
+                        ? "bg-primary/12 text-foreground ring-1 ring-inset ring-primary/30"
+                        : "text-muted-foreground hover:bg-surface/60 hover:text-foreground",
+                    )}
+                  >
                     <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "")} />
                     <span className="min-w-0 whitespace-normal break-words">{label}</span>
                   </Link>
@@ -789,7 +906,7 @@ function MobileAdminNav({ items }: { items: NavItem[] }) {
               );
             })}
           </ul>
-        </section>
+        </details>
       ))}
     </div>
   );

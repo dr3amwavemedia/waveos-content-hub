@@ -1,6 +1,21 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { AlertTriangle, BarChart3, CheckCircle2, Database, Loader2, Sparkles, Eye, Heart, Users, MousePointerClick, MessageCircle, TrendingUp, ArrowUpRight, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  BarChart3,
+  CheckCircle2,
+  Database,
+  Loader2,
+  Sparkles,
+  Eye,
+  Heart,
+  Users,
+  MousePointerClick,
+  MessageCircle,
+  TrendingUp,
+  ArrowUpRight,
+  RefreshCw,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -12,7 +27,15 @@ import {
 } from "@/lib/analytics-transparency";
 import { getSocialIntelligenceProfile, getZernioAnalytics } from "@/lib/zernio.functions";
 import { cn } from "@/lib/utils";
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from "recharts";
 import { historySeries, comparePeriods } from "@/lib/analytics-history";
 import { Button } from "@/components/ui/button";
 import { OceanDisclosure, OceanPanel, OceanStatus } from "@/components/app/ocean-ui";
@@ -46,6 +69,9 @@ const METRICS: Array<{ key: AnalyticsMetricKey | "engagements"; label: string }>
   { key: "followers", label: "Followers" },
 ];
 
+const ANALYTICS_TRUTH_NOTE =
+  "Missing or failed sources remain unavailable. WaveOS does not replace them with zero.";
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "Not reported";
   const date = new Date(`${value.slice(0, 10)}T00:00:00Z`);
@@ -69,6 +95,16 @@ function observedValue(count: ObservedCount) {
     : "Unavailable";
 }
 
+function formatTopPostMetrics(metrics: Record<string, string | number | null> | undefined) {
+  if (!metrics) return "Post metrics were not reported.";
+  const values = Object.entries(metrics).flatMap(([key, value]) => {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return [];
+    return [`${key.replaceAll(/[_.-]/g, " ")} ${numeric.toLocaleString()}`];
+  });
+  return values.length ? values.slice(0, 4).join(" · ") : "Post metrics were not reported.";
+}
+
 function sourceStatusTone(state: AnalyticsAvailability) {
   if (state === "available" || state === "true_zero") {
     return "border-success/30 bg-success/10 text-success";
@@ -90,11 +126,11 @@ export function AnalyticsCheckup({
 }) {
   const analyticsFn = useServerFn(getZernioAnalytics);
   const intelligenceFn = useServerFn(getSocialIntelligenceProfile);
-  const [days, setDays] = useState<7|30|90>(30);
+  const [days, setDays] = useState<7 | 30 | 90>(30);
   const [graphMetric, setGraphMetric] = useState("reach");
   const [mode, setMode] = useState<AnalyticsMode>("combined");
-  const [refreshing,setRefreshing]=useState(false);
-  const queryClient=useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
   const analytics = useQuery({
     queryKey: ["analytics-checkup", workspaceId, days],
     queryFn: () => analyticsFn({ data: { workspaceId, days } }),
@@ -123,31 +159,423 @@ export function AnalyticsCheckup({
   });
   const providerError = analytics.error instanceof Error ? analytics.error.message : null;
   const cutoff = Date.now() - days * 86400000;
-  const historicalRows = (intelligence.data?.snapshots ?? []).filter(row=>row.evidence?.mode===mode && row.range_end && Date.parse(row.range_end)>=cutoff);
+  const historicalRows = (intelligence.data?.snapshots ?? []).filter(
+    (row) => row.evidence?.mode === mode && row.range_end && Date.parse(row.range_end) >= cutoff,
+  );
   const series = historySeries(historicalRows, graphMetric);
   const comparison = comparePeriods(historicalRows, graphMetric);
-  const chartData = series.map(row=>({date:row.range_end,value:row.value}));
-  const comparisons = ["reach","views","followers","likes","comments"].flatMap(key=>{const result=comparePeriods(historicalRows,key);return result?[{key,...result}]:[];});
+  const chartData = series.map((row) => ({ date: row.range_end, value: row.value }));
+  const comparisons = ["reach", "views", "followers", "likes", "comments"].flatMap((key) => {
+    const result = comparePeriods(historicalRows, key);
+    return result ? [{ key, ...result }] : [];
+  });
+  const historicalBackfill = intelligence.data?.profile?.metadata?.historicalBackfill;
+  const topPosts = Array.isArray(historicalBackfill?.topPosts) ? historicalBackfill.topPosts : [];
   return (
     <div className="space-y-6">
       <OceanPanel className="space-y-5">
-        <header className="flex flex-wrap items-center justify-between gap-3"><div><p className="ocean-eyebrow">Performance & growth</p><h2 className="mt-1 text-xl font-semibold">Your business at a glance</h2><p className="mt-1 text-sm text-muted-foreground">Provider observations for the selected window. Unavailable data stays unavailable.</p></div><label className="text-xs text-muted-foreground"><span className="sr-only">Performance period</span><select aria-label="Performance period" className="ocean-control px-3" value={days} onChange={event=>setDays(Number(event.target.value) as 7|30|90)}>{[7,30,90].map(value=><option key={value} value={value}>Last {value} days</option>)}</select></label></header>
-        <div className="flex flex-wrap items-center gap-3"><Button variant="outline" disabled={refreshing||analytics.isFetching} onClick={async()=>{setRefreshing(true);try{const result=await analyticsFn({data:{workspaceId,days,refresh:true}});queryClient.setQueryData(["analytics-checkup",workspaceId,days],result);await queryClient.invalidateQueries({queryKey:["social-intelligence",workspaceId]});}catch{await analytics.refetch();await queryClient.invalidateQueries({queryKey:["social-intelligence",workspaceId]});}finally{setRefreshing(false);}}}>{refreshing?<Loader2 className="animate-spin"/>:<RefreshCw/>}{refreshing?"Refreshing…":"Refresh analytics"}</Button><span className="text-xs text-muted-foreground">Last provider sync: {formatDateTime(analytics.data?.sync.lastSuccessAt)}</span></div>
-        {analytics.data?.sync.state!=="available" && analytics.data?.sync && <p role="status" className="border-l-2 border-warning pl-3 text-sm">{analytics.data.sync.message}</p>}
-        <div aria-label="Metric coverage" className="flex gap-1 rounded-lg border border-cyan-200/10 bg-background/35 p-1">{(["combined","organic","paid"] as AnalyticsMode[]).map(value=><Button key={value} variant={mode===value?"secondary":"ghost"} className="min-w-0 flex-1 capitalize" onClick={()=>setMode(value)}>{value}</Button>)}</div>
+        <header className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="ocean-eyebrow">Performance & growth</p>
+            <h2 className="mt-1 text-xl font-semibold">Your business at a glance</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Provider observations for the selected window. Unavailable data stays unavailable.
+            </p>
+          </div>
+          <label className="text-xs text-muted-foreground">
+            <span className="sr-only">Performance period</span>
+            <select
+              aria-label="Performance period"
+              className="ocean-control px-3"
+              value={days}
+              onChange={(event) => setDays(Number(event.target.value) as 7 | 30 | 90)}
+            >
+              {[7, 30, 90].map((value) => (
+                <option key={value} value={value}>
+                  Last {value} days
+                </option>
+              ))}
+            </select>
+          </label>
+        </header>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            disabled={refreshing || analytics.isFetching}
+            onClick={async () => {
+              setRefreshing(true);
+              try {
+                const result = await analyticsFn({ data: { workspaceId, days, refresh: true } });
+                queryClient.setQueryData(["analytics-checkup", workspaceId, days], result);
+                await queryClient.invalidateQueries({
+                  queryKey: ["social-intelligence", workspaceId],
+                });
+              } catch {
+                await analytics.refetch();
+                await queryClient.invalidateQueries({
+                  queryKey: ["social-intelligence", workspaceId],
+                });
+              } finally {
+                setRefreshing(false);
+              }
+            }}
+          >
+            {refreshing ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+            {refreshing ? "Refreshing…" : "Refresh analytics"}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Last provider sync: {formatDateTime(analytics.data?.sync.lastSuccessAt)}
+          </span>
+        </div>
+        {analytics.data?.sync.state !== "available" && analytics.data?.sync && (
+          <p role="status" className="border-l-2 border-warning pl-3 text-sm">
+            {analytics.data.sync.message}
+          </p>
+        )}
+        <div
+          aria-label="Metric coverage"
+          className="flex gap-1 rounded-lg border border-cyan-200/10 bg-background/35 p-1"
+        >
+          {(["combined", "organic", "paid"] as AnalyticsMode[]).map((value) => (
+            <Button
+              key={value}
+              variant={mode === value ? "secondary" : "ghost"}
+              className="min-w-0 flex-1 capitalize"
+              onClick={() => setMode(value)}
+            >
+              {value}
+            </Button>
+          ))}
+        </div>
         <section className="rounded-xl border border-cyan-200/10 bg-background/25 p-4 sm:p-5">
-          <div className="flex items-start justify-between gap-3"><div><h3 className="text-lg font-semibold">Growth over time</h3><p className="mt-1 text-xs text-muted-foreground">{series.length?`${series[0].range_start} – ${series.at(-1)?.range_end} · ${series.at(-1)?.provider}`:"Awaiting sourced historical observations"}</p></div>{comparison?.change!==null&&comparison?.change!==undefined&&<span className={cn("text-lg font-semibold",comparison.change>=0?"text-success":"text-destructive")}>{comparison.change>=0?"+":""}{comparison.change.toFixed(1)}%</span>}</div>
-          <div className="mt-3 flex gap-1 overflow-x-auto">{["reach","views","likes","followers"].map(key=><Button size="sm" key={key} className="capitalize" variant={graphMetric===key?"secondary":"ghost"} onClick={()=>setGraphMetric(key)}>{key}</Button>)}</div>
-          <div className="mt-4 h-56 min-w-0 sm:h-80">{series.length>=2?<ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData} margin={{top:10,right:12,left:0,bottom:8}}><CartesianGrid stroke="var(--border)" vertical={false}/><XAxis dataKey="date" tick={{fill:"var(--muted-foreground)",fontSize:10}} tickFormatter={value=>String(value).slice(5)}/><YAxis width={42} tick={{fill:"var(--muted-foreground)",fontSize:10}}/><Tooltip contentStyle={{background:"var(--surface)",borderColor:"var(--border)",color:"var(--foreground)"}}/><Area type="monotone" dataKey="value" name={graphMetric} stroke="var(--analytics)" fill="var(--analytics)" fillOpacity={.12} connectNulls={false}/></AreaChart></ResponsiveContainer>:<div className="flex h-full flex-col items-center justify-center gap-3 border border-dashed border-border p-6 text-center"><TrendingUp className="h-8 w-8 text-analytics"/><p className="text-sm text-muted-foreground">{intelligence.isPending?"Loading historical observations…":"Growth history not available yet"}</p><p className="max-w-sm text-xs text-muted-foreground">{series.length===1?"One sourced observation is available. A trend needs at least two compatible observations.":"Current totals remain below. A historical line will appear only when dated, compatible observations are available."}</p></div>}</div>
-          {comparison&&<p className="mt-3 text-xs text-muted-foreground">Current observed period: {comparison.current.value?.toLocaleString()} · Previous non-overlapping period: {comparison.previous.value?.toLocaleString()}{comparison.change===null?" · Percentage unavailable: previous value is zero.":""}</p>}
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-semibold">Growth over time</h3>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {series.length
+                  ? `${series[0].range_start} – ${series.at(-1)?.range_end} · ${series.at(-1)?.provider}`
+                  : "Awaiting sourced historical observations"}
+              </p>
+            </div>
+            {comparison?.change !== null && comparison?.change !== undefined && (
+              <span
+                className={cn(
+                  "text-lg font-semibold",
+                  comparison.change >= 0 ? "text-success" : "text-destructive",
+                )}
+              >
+                {comparison.change >= 0 ? "+" : ""}
+                {comparison.change.toFixed(1)}%
+              </span>
+            )}
+          </div>
+          <div className="mt-3 flex gap-1 overflow-x-auto">
+            {["reach", "views", "likes", "followers"].map((key) => (
+              <Button
+                size="sm"
+                key={key}
+                className="capitalize"
+                variant={graphMetric === key ? "secondary" : "ghost"}
+                onClick={() => setGraphMetric(key)}
+              >
+                {key}
+              </Button>
+            ))}
+          </div>
+          {series.length >= 2 ? (
+            <div className="mt-4 h-56 min-w-0 sm:h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 8 }}>
+                  <CartesianGrid stroke="var(--border)" vertical={false} />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
+                    tickFormatter={(value) => String(value).slice(5)}
+                  />
+                  <YAxis width={42} tick={{ fill: "var(--muted-foreground)", fontSize: 10 }} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--surface)",
+                      borderColor: "var(--border)",
+                      color: "var(--foreground)",
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="value"
+                    name={graphMetric}
+                    stroke="var(--analytics)"
+                    fill="var(--analytics)"
+                    fillOpacity={0.12}
+                    connectNulls={false}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="mt-4 grid gap-3 rounded-xl border border-dashed border-border bg-background/30 p-4 sm:grid-cols-[auto_1fr]">
+              <TrendingUp className="size-6 text-analytics" />
+              <div>
+                <p className="text-sm font-medium">
+                  {intelligence.isPending
+                    ? "Checking historical observations…"
+                    : "History collection in progress"}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {series.length === 1
+                    ? `One sourced ${graphMetric} observation is available for ${formatDate(series[0]?.range_end)}. A trend needs at least two compatible, non-overlapping observations.`
+                    : "Current totals remain available below. A line appears only when the provider supplies dated, compatible observations."}
+                </p>
+                {historicalBackfill?.requestedRangeStart && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Backfill requested: {formatDate(historicalBackfill.requestedRangeStart)} –{" "}
+                    {formatDate(historicalBackfill.requestedRangeEnd)} ·{" "}
+                    {historicalBackfill.dailyRecords?.toLocaleString() ?? 0} daily records stored
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+          {comparison && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Current observed period: {comparison.current.value?.toLocaleString()} · Previous
+              non-overlapping period: {comparison.previous.value?.toLocaleString()}
+              {comparison.change === null
+                ? " · Percentage unavailable: previous value is zero."
+                : ""}
+            </p>
+          )}
         </section>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{metricRows.filter(row=>["views","reach","engagements","followers"].includes(row.key)).map(({key,label,metric},index)=>{const trend=historySeries(historicalRows,key);const change=comparePeriods(historicalRows,key);return <article key={key} className="min-w-0 rounded-xl border border-cyan-200/10 bg-background/30 p-4"><div className="flex items-center justify-between"><p className="text-xs text-muted-foreground">{label}</p>{index===2?<Heart className="size-4 text-intelligence"/>:<Eye className="size-4 text-analytics"/>}</div><p className="mt-3 text-2xl font-semibold">{analytics.isPending?"…":metric.value===null?"—":metric.value.toLocaleString()}</p>{trend.length>=2?<div className="mt-3 h-8"><ResponsiveContainer width="100%" height="100%"><AreaChart data={trend}><Area dataKey="value" stroke="var(--analytics)" fill="var(--analytics)" fillOpacity={.1}/></AreaChart></ResponsiveContainer></div>:<p className="mt-3 text-[11px] text-muted-foreground">Historical trend unavailable</p>}<div className="mt-2"><OceanStatus tone={metric.value===null?"warning":"positive"}>{metric.value===null?STATUS_LABEL[metric.availability]:metric.coverage==="partial"?"Partial coverage":"Provider reported"}</OceanStatus></div>{change?.change!==null&&change?.change!==undefined&&<p className={cn("mt-2 text-xs",change.change>=0?"text-success":"text-destructive")}>{change.change>=0?"+":""}{change.change.toFixed(1)}% across comparable stored periods</p>}</article>})}</div>
-        {analytics.isPending&&<p role="status" className="text-sm text-muted-foreground"><Loader2 className="mr-2 inline size-4 animate-spin"/>Loading provider metrics…</p>}
-        {analytics.isError&&<p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">Metrics are unavailable. No values were substituted. {providerError==="forbidden"?"This workspace does not grant analytics access.":"Retry when the provider connection is available."}<Button variant="ghost" onClick={()=>void analytics.refetch()}>Retry</Button></p>}
-        <section className="border-t border-border pt-5"><h3 className="flex items-center gap-2 text-lg font-semibold"><Sparkles className="size-5 text-warning"/>Evidence-backed insights</h3>{comparisons.length?<ul className="mt-3 space-y-3">{comparisons.map(item=><li key={item.key} className="text-sm"><span className="capitalize">{item.key}</span> {item.change===null?`changed from ${item.previous.value} to ${item.current.value}`:`${item.change>=0?"increased":"declined"} by ${Math.abs(item.change).toFixed(1)}%`} across equal-length, non-overlapping observed periods.<p className="mt-1 text-xs text-muted-foreground">{item.current.source_reference} · {item.current.calculation_version}</p></li>)}</ul>:<p className="mt-3 text-sm text-muted-foreground">Not enough comparable evidence for a growth conclusion, best posting time or content-format recommendation.</p>}<p className="mt-3 text-xs text-muted-foreground">These are calculated observations, not AI conclusions. AI analysis is currently unavailable.</p></section>
-        <section className="grid gap-5 border-t border-border pt-5 sm:grid-cols-2"><div><h3 className="font-semibold">Content breakdown</h3><p className="mt-2 text-sm text-muted-foreground">Reel, photo, story and carousel performance is not available from the current metric response.</p></div><div><h3 className="font-semibold">Platform performance</h3><div className="mt-2 space-y-3">{selectedSources.map(source=><div key={source.key}><div className="flex justify-between gap-2 text-sm"><span>{source.label}</span><span>{source.metrics.reach.value?.toLocaleString()??"Unavailable"}</span></div><p className="mt-1 text-xs text-muted-foreground">Reach · {STATUS_LABEL[source.availability]}</p></div>)}</div></div><div><h3 className="font-semibold">Competitive benchmark</h3><p className="mt-2 text-sm text-muted-foreground">Comparable competitor platform metrics are not available. Public research is not a performance benchmark.</p></div><div><h3 className="font-semibold">Brand consistency</h3><p className="mt-2 text-sm text-muted-foreground">Not evaluated. A score requires a review of recent content against your saved Brand Voice.</p></div></section>
-        <section className="border-t border-border pt-5"><h3 className="text-lg font-semibold">What should I do next?</h3><p className="mt-2 text-sm text-muted-foreground">{comparisons.length?"Review the observed changes above before choosing a content direction. These totals alone cannot identify which topic or format caused growth.":"Collect comparable historical observations before making performance-driven content decisions."}</p></section>
-        <OceanDisclosure summary="All metrics and calculation details"><div className="grid grid-cols-2 gap-3 sm:grid-cols-4"><MetricCard label="WaveOS-published posts" value={observedValue(publishedPosts)}/><MetricCard label="Connected channels" value={observedValue(connectedChannels)}/>{metricRows.map(({key,label,metric})=><MetricCard key={key} label={label} value={metric.value===null?"Unavailable":metric.value.toLocaleString()} hint={metric.coverage==="partial"?"Partial coverage":STATUS_LABEL[metric.availability]}/>)}</div><p className="mt-3 text-xs text-muted-foreground">Combined adds available provider sources. Provider analytics can include content published directly on connected social networks after the provider syncs it. The WaveOS-published posts count is local and only counts posts published through WaveOS. Paid uses paid-media only. Engagements is reported likes plus comments (waveos-engagements-likes-plus-comments-v1). Missing or failed sources remain unavailable. WaveOS does not replace them with zero. Historical comparisons use one compatible provider/calculation series; they are separate from the requested current totals and do not mix organic/paid observations.</p></OceanDisclosure>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {metricRows
+            .filter((row) => ["views", "reach", "engagements", "followers"].includes(row.key))
+            .map(({ key, label, metric }, index) => {
+              const trend = historySeries(historicalRows, key);
+              const change = comparePeriods(historicalRows, key);
+              return (
+                <article
+                  key={key}
+                  className="min-w-0 rounded-xl border border-cyan-200/10 bg-background/30 p-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    {index === 2 ? (
+                      <Heart className="size-4 text-intelligence" />
+                    ) : (
+                      <Eye className="size-4 text-analytics" />
+                    )}
+                  </div>
+                  <p className="mt-3 text-2xl font-semibold">
+                    {analytics.isPending
+                      ? "…"
+                      : metric.value === null
+                        ? "—"
+                        : metric.value.toLocaleString()}
+                  </p>
+                  {trend.length >= 2 ? (
+                    <div className="mt-3 h-8">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={trend}>
+                          <Area
+                            dataKey="value"
+                            stroke="var(--analytics)"
+                            fill="var(--analytics)"
+                            fillOpacity={0.1}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-[11px] text-muted-foreground">
+                      Historical trend unavailable
+                    </p>
+                  )}
+                  <div className="mt-2">
+                    <OceanStatus tone={metric.value === null ? "warning" : "positive"}>
+                      {metric.value === null
+                        ? STATUS_LABEL[metric.availability]
+                        : metric.coverage === "partial"
+                          ? "Partial coverage"
+                          : "Provider reported"}
+                    </OceanStatus>
+                  </div>
+                  {change?.change !== null && change?.change !== undefined && (
+                    <p
+                      className={cn(
+                        "mt-2 text-xs",
+                        change.change >= 0 ? "text-success" : "text-destructive",
+                      )}
+                    >
+                      {change.change >= 0 ? "+" : ""}
+                      {change.change.toFixed(1)}% across comparable stored periods
+                    </p>
+                  )}
+                </article>
+              );
+            })}
+        </div>
+        {analytics.isPending && (
+          <p role="status" className="text-sm text-muted-foreground">
+            <Loader2 className="mr-2 inline size-4 animate-spin" />
+            Loading provider metrics…
+          </p>
+        )}
+        {analytics.isError && (
+          <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">
+            Metrics are unavailable. No values were substituted.{" "}
+            {providerError === "forbidden"
+              ? "This workspace does not grant analytics access."
+              : "Retry when the provider connection is available."}
+            <Button variant="ghost" onClick={() => void analytics.refetch()}>
+              Retry
+            </Button>
+          </p>
+        )}
+        <section className="border-t border-border pt-5">
+          <h3 className="flex items-center gap-2 text-lg font-semibold">
+            <Sparkles className="size-5 text-warning" />
+            Evidence-backed insights
+          </h3>
+          {comparisons.length ? (
+            <ul className="mt-3 space-y-3">
+              {comparisons.map((item) => (
+                <li key={item.key} className="text-sm">
+                  <span className="capitalize">{item.key}</span>{" "}
+                  {item.change === null
+                    ? `changed from ${item.previous.value} to ${item.current.value}`
+                    : `${item.change >= 0 ? "increased" : "declined"} by ${Math.abs(item.change).toFixed(1)}%`}{" "}
+                  across equal-length, non-overlapping observed periods.
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {item.current.source_reference} · {item.current.calculation_version}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Not enough comparable evidence for a growth conclusion, best posting time or
+              content-format recommendation.
+            </p>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            These are calculated observations, not AI conclusions. AI analysis is currently
+            unavailable.
+          </p>
+        </section>
+        <section className="grid gap-5 border-t border-border pt-5 sm:grid-cols-2">
+          <div>
+            <h3 className="font-semibold">Top provider-reported content</h3>
+            {topPosts.length ? (
+              <div className="mt-2 space-y-2">
+                {topPosts.slice(0, 5).map((post, index) => (
+                  <article
+                    key={post.postId ?? `${post.platform}-${post.publishedAt}-${index}`}
+                    className="rounded-lg border border-border bg-background/30 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span>{post.platform || "Platform not reported"}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(post.publishedAt)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {formatTopPostMetrics(post.metrics)}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-muted-foreground">
+                The provider has not returned ranked post-level metrics. No content winners are
+                inferred from account totals.
+              </p>
+            )}
+          </div>
+          <div>
+            <h3 className="font-semibold">Source performance</h3>
+            <div className="mt-2 space-y-3">
+              {selectedSources.map((source) => (
+                <article
+                  key={source.key}
+                  className="rounded-lg border border-border bg-background/30 p-3"
+                >
+                  <div className="flex justify-between gap-2 text-sm">
+                    <span>{source.label}</span>
+                    <OceanStatus
+                      tone={
+                        ["available", "true_zero"].includes(source.availability)
+                          ? "positive"
+                          : "warning"
+                      }
+                    >
+                      {STATUS_LABEL[source.availability]}
+                    </OceanStatus>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Reach {source.metrics.reach.value?.toLocaleString() ?? "unavailable"} · Views{" "}
+                    {source.metrics.views.value?.toLocaleString() ?? "unavailable"} · Likes{" "}
+                    {source.metrics.likes.value?.toLocaleString() ?? "unavailable"} · Comments{" "}
+                    {source.metrics.comments.value?.toLocaleString() ?? "unavailable"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {source.recordCount.toLocaleString()} records ·{" "}
+                    {formatDate(source.availableRangeStart)} –{" "}
+                    {formatDate(source.availableRangeEnd)}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h3 className="font-semibold">Competitive benchmark</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Comparable competitor platform metrics are not available. Public research is not a
+              performance benchmark.
+            </p>
+          </div>
+          <div>
+            <h3 className="font-semibold">Brand consistency</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Not evaluated. A score requires a review of recent content against your saved Brand
+              Voice.
+            </p>
+          </div>
+        </section>
+        <section className="border-t border-border pt-5">
+          <h3 className="text-lg font-semibold">What should I do next?</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {comparisons.length
+              ? "Review the observed changes above before choosing a content direction. These totals alone cannot identify which topic or format caused growth."
+              : "Collect comparable historical observations before making performance-driven content decisions."}
+          </p>
+        </section>
+        <OceanDisclosure summary="All metrics and calculation details">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <MetricCard label="WaveOS-published posts" value={observedValue(publishedPosts)} />
+            <MetricCard label="Connected channels" value={observedValue(connectedChannels)} />
+            {metricRows.map(({ key, label, metric }) => (
+              <MetricCard
+                key={key}
+                label={label}
+                value={metric.value === null ? "Unavailable" : metric.value.toLocaleString()}
+                hint={
+                  metric.coverage === "partial"
+                    ? "Partial coverage"
+                    : STATUS_LABEL[metric.availability]
+                }
+              />
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Combined adds available provider sources. Provider analytics can include content
+            published directly on connected social networks after the provider syncs it. The
+            WaveOS-published posts count is local and only counts posts published through WaveOS.
+            Paid uses paid-media only. Engagements is reported likes plus comments
+            (waveos-engagements-likes-plus-comments-v1). {ANALYTICS_TRUTH_NOTE} Historical
+            comparisons use one compatible provider/calculation series; they are separate from the
+            requested current totals and do not mix organic/paid observations.
+          </p>
+        </OceanDisclosure>
       </OceanPanel>
 
       <OceanDisclosure summary="Source details">
@@ -224,7 +652,9 @@ export function AnalyticsCheckup({
 function CompactMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="p-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </p>
       <p className="mt-1 text-xl font-semibold text-foreground">{value}</p>
     </div>
   );
@@ -270,6 +700,22 @@ type IntelligenceData = {
     safe_error_code: string | null;
     safe_error_message: string | null;
     updated_at: string;
+    metadata: {
+      historicalBackfill?: {
+        requestedRangeStart?: string;
+        requestedRangeEnd?: string;
+        availableRangeStart?: string;
+        availableRangeEnd?: string;
+        dailyRecords?: number;
+        dataAsOf?: string | null;
+        topPosts?: Array<{
+          postId?: string;
+          platform?: string;
+          publishedAt?: string;
+          metrics?: Record<string, string | number | null>;
+        }>;
+      };
+    } | null;
   } | null;
   snapshots: Array<{
     id: string;
