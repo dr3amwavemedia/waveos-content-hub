@@ -7,6 +7,7 @@ export const ANALYTICS_METRIC_KEYS = [
   "shares",
   "saves",
   "clicks",
+  "messages",
   "views",
   "storyViews",
 ] as const;
@@ -66,6 +67,17 @@ const METRIC_ALIASES: Record<AnalyticsMetricKey, readonly string[]> = {
   shares: ["shares", "share_count", "shareCount"],
   saves: ["saves", "save_count", "saveCount"],
   clicks: ["clicks", "click_count", "clickCount", "link_clicks", "linkClicks"],
+  messages: [
+    "messages",
+    "message_count",
+    "messageCount",
+    "direct_messages",
+    "directMessages",
+    "dm_count",
+    "dmCount",
+    "conversation_starts",
+    "conversationStarts",
+  ],
   views: ["views", "view_count", "viewCount", "video_views", "videoViews"],
   storyViews: ["storyViews", "story_views"],
 };
@@ -120,14 +132,20 @@ function hasMetric(row: Record<string, unknown>) {
 function metricRows(payload: Record<string, unknown>) {
   // Zernio overview contains counts, not metrics. Read one per-post rollup;
   // platforms[].analytics repeats that rollup and must not be added again.
-  if(Array.isArray(payload.posts)) return payload.posts.flatMap(item=>{
-    const post=record(item);if(!post)return [];
-    const analytics=record(post.analytics);return analytics && hasMetric(analytics)?[analytics]:hasMetric(post)?[post]:[];
-  });
-  if(Array.isArray(payload.ads)) return payload.ads.flatMap(item=>{
-    const ad=record(item);if(!ad)return [];
-    const metrics=record(ad.metrics);return metrics && hasMetric(metrics)?[metrics]:[];
-  });
+  if (Array.isArray(payload.posts))
+    return payload.posts.flatMap((item) => {
+      const post = record(item);
+      if (!post) return [];
+      const analytics = record(post.analytics);
+      return analytics && hasMetric(analytics) ? [analytics] : hasMetric(post) ? [post] : [];
+    });
+  if (Array.isArray(payload.ads))
+    return payload.ads.flatMap((item) => {
+      const ad = record(item);
+      if (!ad) return [];
+      const metrics = record(ad.metrics);
+      return metrics && hasMetric(metrics) ? [metrics] : [];
+    });
   const preferred = [
     payload.analytics,
     payload.overview,
@@ -208,10 +226,21 @@ export function parseAnalyticsPayload(input: {
   ) as Record<AnalyticsMetricKey, AnalyticsMetric>;
   // Account follower totals are an inventory, not per-post metrics. Include
   // once in the network source so Combined cannot double-count accounts.
-  if(input.key === "external" && Array.isArray(input.payload.accounts)) {
-    const seen=new Set<string>();
-    const followers=input.payload.accounts.flatMap(item=>{const account=record(item);if(!account)return [];const id=String(account._id??account.id??"");if(!id||seen.has(id))return [];seen.add(id);const value=numericMetric({...account,followers:account.followersCount},"followers");return value===null?[]:[value];});
-    if(followers.length){const value=followers.reduce((sum,current)=>sum+current,0);metrics.followers={value,availability:value===0?"true_zero":"available"};}
+  if (input.key === "external" && Array.isArray(input.payload.accounts)) {
+    const seen = new Set<string>();
+    const followers = input.payload.accounts.flatMap((item) => {
+      const account = record(item);
+      if (!account) return [];
+      const id = String(account._id ?? account.id ?? "");
+      if (!id || seen.has(id)) return [];
+      seen.add(id);
+      const value = numericMetric({ ...account, followers: account.followersCount }, "followers");
+      return value === null ? [] : [value];
+    });
+    if (followers.length) {
+      const value = followers.reduce((sum, current) => sum + current, 0);
+      metrics.followers = { value, availability: value === 0 ? "true_zero" : "available" };
+    }
   }
   const availableMetrics = Object.values(metrics).filter((metric) => metric.value !== null);
 
@@ -345,4 +374,98 @@ export function deriveEngagements(
     expectedSources: sources.length * 2,
     calculationVersion: "waveos-engagements-likes-plus-comments-v1",
   };
+}
+
+export type ContentLeadSignal = {
+  contentId: string;
+  title: string;
+  platform: string;
+  publishedAt: string | null;
+  clicks: number | null;
+  messages: number | null;
+  source: AnalyticsSourceKey;
+};
+
+function textValue(row: Record<string, unknown>, names: readonly string[]) {
+  for (const name of names) {
+    const value = row[name];
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+/**
+ * Reads one post/ad metric object per provider record. The provider may expose
+ * clicks or message starts under different documented field names; missing
+ * fields stay null and are never converted to zero.
+ */
+export function extractContentLeadSignals(
+  payload: Record<string, unknown>,
+  source: AnalyticsSourceKey,
+): ContentLeadSignal[] {
+  const values = Array.isArray(payload.posts)
+    ? payload.posts
+    : Array.isArray(payload.ads)
+      ? payload.ads
+      : [];
+
+  return values.flatMap((value, index) => {
+    const row = record(value);
+    if (!row) return [];
+    const metrics = record(row.analytics) ?? record(row.metrics) ?? row;
+    const clicks = numericMetric(metrics, "clicks");
+    const messages = numericMetric(metrics, "messages");
+    if (clicks === null && messages === null) return [];
+
+    const contentId =
+      textValue(row, ["platformPostId", "postId", "latePostId", "adId", "id", "_id"]) ??
+      `${source}-${index}`;
+    const title =
+      textValue(row, ["title", "name", "caption", "text", "message"]) ?? "Untitled content";
+    return [
+      {
+        contentId,
+        title: title.length > 100 ? `${title.slice(0, 97)}…` : title,
+        platform: textValue(row, ["platform", "network", "provider"]) ?? "Platform not reported",
+        publishedAt: textValue(row, ["publishedAt", "published_at", "date", "createdAt"]),
+        clicks,
+        messages,
+        source,
+      },
+    ];
+  });
+}
+
+export function mergeContentLeadSignals(signals: readonly ContentLeadSignal[]) {
+  const merged = new Map<string, ContentLeadSignal>();
+  for (const signal of signals) {
+    const key = `${signal.platform.toLowerCase()}::${signal.contentId}`;
+    const previous = merged.get(key);
+    if (!previous) {
+      merged.set(key, signal);
+      continue;
+    }
+    merged.set(key, {
+      ...previous,
+      title: previous.title === "Untitled content" ? signal.title : previous.title,
+      publishedAt: previous.publishedAt ?? signal.publishedAt,
+      // The same provider post can appear in more than one response. Use the
+      // largest reported rollup rather than adding the duplicate record.
+      clicks:
+        previous.clicks === null
+          ? signal.clicks
+          : signal.clicks === null
+            ? previous.clicks
+            : Math.max(previous.clicks, signal.clicks),
+      messages:
+        previous.messages === null
+          ? signal.messages
+          : signal.messages === null
+            ? previous.messages
+            : Math.max(previous.messages, signal.messages),
+    });
+  }
+  return [...merged.values()].sort(
+    (a, b) => (b.clicks ?? 0) + (b.messages ?? 0) - ((a.clicks ?? 0) + (a.messages ?? 0)),
+  );
 }

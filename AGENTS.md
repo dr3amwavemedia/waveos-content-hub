@@ -1,4 +1,5 @@
 <!-- LOVABLE:BEGIN -->
+
 > [!IMPORTANT]
 > This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
 > published git history — force pushing, or rebasing/amending/squashing commits
@@ -7,6 +8,7 @@
 >
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
+
 <!-- LOVABLE:END -->
 
 Mobile guided workflows wrap existing fields and actions with shared step controls; desktop keeps all fields visible, so presentation changes do not fork business logic.
@@ -17,6 +19,7 @@ Public competitor research runs through authenticated workspace-entitled server 
 Competitor report URL fields share pre-validation sanitation and consulted-source matching; malformed citations cannot invalidate supported findings, and customer errors never expose provider or validation payloads.
 Research results are scoped to the active workspace in session storage and included only in explicit existing workflow-draft saves, so navigation does not authorize live-record writes.
 Analytics historical comparisons require matching provider, calculation, coverage and non-overlapping equal-length periods; unsupported observations remain unavailable.
+Content lead attribution counts provider-reported post clicks plus DM/message starts as lead actions, deduplicates repeated provider post records, and never presents actions as unique people or confirmed sales.
 
 Creative Studio templates produce native document layers and share one artwork renderer with editor, thumbnails and export, so previews never diverge from editable artwork.
 Creative Studio replaceable media slots use image-layer metadata and document commits, preserving geometry, crop and undo history when media sources change.

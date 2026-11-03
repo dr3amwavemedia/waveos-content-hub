@@ -9,6 +9,8 @@ import {
   unavailableAnalyticsSource,
   combineAnalyticsMetric,
   deriveEngagements,
+  extractContentLeadSignals,
+  mergeContentLeadSignals,
   ANALYTICS_METRIC_KEYS,
   snapshotMetricKey,
   type AnalyticsSource,
@@ -153,7 +155,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
       sync.message = failure.safeMessage;
     }
 
-    const loadSource = async (key: AnalyticsSourceKey, path: string): Promise<AnalyticsSource> => {
+    const loadSource = async (key: AnalyticsSourceKey, path: string) => {
       try {
         const payload = await zernioRequest<Record<string, unknown>>(path);
         const pagination = payload.pagination as { pages?: number } | undefined;
@@ -169,28 +171,38 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
         const overview = payload.overview as { lastSync?: string } | undefined;
         if (overview?.lastSync && (!sync.lastSuccessAt || overview.lastSync > sync.lastSuccessAt))
           sync.lastSuccessAt = overview.lastSync;
-        return parseAnalyticsPayload({
-          key,
-          payload,
-          requestedRangeStart,
-          requestedRangeEnd,
-        });
+        return {
+          source: parseAnalyticsPayload({
+            key,
+            payload,
+            requestedRangeStart,
+            requestedRangeEnd,
+          }),
+          leadSignals: extractContentLeadSignals(payload, key),
+        };
       } catch (reason) {
         const unavailable = classifyAnalyticsError(reason);
-        return unavailableAnalyticsSource({
-          key,
-          ...unavailable,
-          requestedRangeStart,
-          requestedRangeEnd,
-        });
+        return {
+          source: unavailableAnalyticsSource({
+            key,
+            ...unavailable,
+            requestedRangeStart,
+            requestedRangeEnd,
+          }),
+          leadSignals: [],
+        };
       }
     };
 
-    const sources = await Promise.all([
+    const sourceResults = await Promise.all([
       loadSource("organic", `/analytics?${base}&source=late`),
       loadSource("external", `/analytics?${base}&source=external`),
       loadSource("paid", `/ads?${base}`),
     ]);
+    const sources = sourceResults.map((result) => result.source) as AnalyticsSource[];
+    const leadSignals = mergeContentLeadSignals(
+      sourceResults.flatMap((result) => result.leadSignals),
+    );
 
     // Persist one sourced observation per day/range so the analytics UI can
     // build real history instead of showing live totals with no timeline.
@@ -515,7 +527,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
       console.warn("Historical analytics snapshot persistence failed", historyError);
     }
 
-    return { sources, requestedRangeStart, requestedRangeEnd, sync };
+    return { sources, leadSignals, requestedRangeStart, requestedRangeEnd, sync };
   });
 
 export const getSocialIntelligenceProfile = createServerFn({ method: "POST" })
