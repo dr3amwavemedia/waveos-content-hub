@@ -83,6 +83,7 @@ const CLIENT_NAV: NavItem[] = [
     feature: "can_use_competitive_intelligence",
   },
   { to: "/home", label: "Overview", icon: Home },
+  { to: "/my-agent", label: "My Agent", icon: Sparkles, feature: "can_use_ai_tools" },
   { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
   { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
@@ -131,6 +132,7 @@ const PUBLIC_OS_NAV: NavItem[] = [
     feature: "can_use_competitive_intelligence",
   },
   { to: "/home", label: "Overview", icon: Home },
+  { to: "/my-agent", label: "My Agent", icon: Sparkles, feature: "can_use_ai_tools" },
   { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
   { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
   {
@@ -457,6 +459,7 @@ function Shell({ children }: { children: ReactNode }) {
 
     const priority = [
       "Overview",
+      "My Agent",
       "Create Post",
       "Social Media",
       "Analytics",
@@ -816,6 +819,7 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
 // Routes and permissions stay unchanged; this only controls mobile organization.
 const MOBILE_PERSONAL_PATHS = new Set([
   "/home",
+  "/my-agent",
   "/create",
   "/social",
   "/creative-studio",

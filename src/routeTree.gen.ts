@@ -37,6 +37,7 @@ import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/cr
 import { Route as AuthenticatedDeliveriesRouteImport } from './routes/_authenticated/deliveries'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
+import { Route as AuthenticatedMyAgentRouteImport } from './routes/_authenticated/my-agent'
 import { Route as AuthenticatedMyProjectsRouteImport } from './routes/_authenticated/my-projects'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedOsDataRouteImport } from './routes/_authenticated/os-data'
@@ -227,6 +228,11 @@ const AuthenticatedFeedbackRoute = AuthenticatedFeedbackRouteImport.update({
 const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
   id: '/home',
   path: '/home',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMyAgentRoute = AuthenticatedMyAgentRouteImport.update({
+  id: '/my-agent',
+  path: '/my-agent',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedMyProjectsRoute = AuthenticatedMyProjectsRouteImport.update({
@@ -515,6 +521,7 @@ export interface FileRoutesByFullPath {
   '/deliveries': typeof AuthenticatedDeliveriesRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/my-agent': typeof AuthenticatedMyAgentRoute
   '/my-projects': typeof AuthenticatedMyProjectsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/os-data': typeof AuthenticatedOsDataRoute
@@ -592,6 +599,7 @@ export interface FileRoutesByTo {
   '/deliveries': typeof AuthenticatedDeliveriesRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/my-agent': typeof AuthenticatedMyAgentRoute
   '/my-projects': typeof AuthenticatedMyProjectsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/os-data': typeof AuthenticatedOsDataRoute
@@ -671,6 +679,7 @@ export interface FileRoutesById {
   '/_authenticated/deliveries': typeof AuthenticatedDeliveriesRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
+  '/_authenticated/my-agent': typeof AuthenticatedMyAgentRoute
   '/_authenticated/my-projects': typeof AuthenticatedMyProjectsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/os-data': typeof AuthenticatedOsDataRoute
@@ -750,6 +759,7 @@ export interface FileRouteTypes {
     | '/deliveries'
     | '/feedback'
     | '/home'
+    | '/my-agent'
     | '/my-projects'
     | '/onboarding'
     | '/os-data'
@@ -827,6 +837,7 @@ export interface FileRouteTypes {
     | '/deliveries'
     | '/feedback'
     | '/home'
+    | '/my-agent'
     | '/my-projects'
     | '/onboarding'
     | '/os-data'
@@ -905,6 +916,7 @@ export interface FileRouteTypes {
     | '/_authenticated/deliveries'
     | '/_authenticated/feedback'
     | '/_authenticated/home'
+    | '/_authenticated/my-agent'
     | '/_authenticated/my-projects'
     | '/_authenticated/onboarding'
     | '/_authenticated/os-data'
@@ -1186,6 +1198,13 @@ declare module '@tanstack/react-router' {
       path: '/home'
       fullPath: '/home'
       preLoaderRoute: typeof AuthenticatedHomeRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/my-agent': {
+      id: '/_authenticated/my-agent'
+      path: '/my-agent'
+      fullPath: '/my-agent'
+      preLoaderRoute: typeof AuthenticatedMyAgentRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/my-projects': {
@@ -1559,6 +1578,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDeliveriesRoute: typeof AuthenticatedDeliveriesRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
+  AuthenticatedMyAgentRoute: typeof AuthenticatedMyAgentRoute
   AuthenticatedMyProjectsRoute: typeof AuthenticatedMyProjectsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOsDataRoute: typeof AuthenticatedOsDataRoute
@@ -1602,6 +1622,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDeliveriesRoute: AuthenticatedDeliveriesRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
+  AuthenticatedMyAgentRoute: AuthenticatedMyAgentRoute,
   AuthenticatedMyProjectsRoute: AuthenticatedMyProjectsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOsDataRoute: AuthenticatedOsDataRoute,
