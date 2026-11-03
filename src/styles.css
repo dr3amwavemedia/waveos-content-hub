@@ -239,6 +239,52 @@ html {
   }
 }
 
+.ocean-dashboard {
+  background:
+    radial-gradient(circle at 42% -8%, rgba(30, 232, 220, 0.11), transparent 31rem),
+    radial-gradient(circle at 100% 18%, rgba(103, 82, 255, 0.1), transparent 27rem),
+    linear-gradient(145deg, #020b1b 0%, #04182e 52%, #031125 100%);
+}
+
+.ocean-panel {
+  border: 1px solid rgba(129, 222, 239, 0.12);
+  border-radius: 1rem;
+  background: linear-gradient(145deg, rgba(8, 33, 58, 0.86), rgba(5, 22, 43, 0.74));
+  box-shadow:
+    inset 0 1px 0 rgba(208, 249, 255, 0.035),
+    0 16px 34px rgba(0, 5, 18, 0.18);
+  backdrop-filter: blur(18px);
+}
+
+.ocean-chip {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  border: 1px solid rgba(147, 225, 241, 0.13);
+  border-radius: 9999px;
+  padding: 0.35rem 0.65rem;
+  color: rgba(217, 245, 251, 0.8);
+  transition:
+    border-color 150ms ease,
+    background-color 150ms ease;
+}
+
+.ocean-chip:hover {
+  border-color: rgba(147, 225, 241, 0.34);
+  background: rgba(89, 223, 231, 0.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ocean-dashboard *,
+  .ocean-dashboard *::before,
+  .ocean-dashboard *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
 body {
   min-height: 100dvh;
   overscroll-behavior-y: none;

@@ -27,7 +27,7 @@ test.describe("tier-based landing on /home", () => {
     await page.waitForLoadState("networkidle").catch(() => {});
 
     const clientLocator = page.getByRole("heading", { name: /invoices|deliveries|your account/i });
-    const staffLocator = page.getByText(/growth overview|home dashboard/i);
+    const staffLocator = page.getByText(/growth overview|performance current|today/i);
     const emptyLocator = page.getByRole("heading", {
       name: /haven't been invited to a workspace yet/i,
     });
