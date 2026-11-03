@@ -30,6 +30,7 @@ const campaignIdeaSchema = z.object({
     likelyPurpose: z.string().trim().min(1).max(240).default("General campaign content"),
     hookPotential: z.enum(["low","medium","high"]).default("medium"),
     suggestedPlatforms: z.array(z.string().trim().min(1).max(40)).max(6).default([]),
+    placement: z.enum(["feed", "story", "both"]).default("feed"),
     confidence: z.enum(["low","medium","high"]).default("medium"),
     inspectionMode: z.enum(["photo","video_frames","metadata_only"]).default("metadata_only"),
   })).max(24).default([]),
@@ -42,6 +43,7 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
     name: z.string().trim().max(120),
     goal: z.enum(["awareness", "engagement", "leads", "launch", "retention"]),
     platforms: z.array(z.string().trim().min(1).max(40)).min(1).max(12),
+    contentFormats: z.array(z.enum(["feed", "story"])).min(1).max(2).default(["feed", "story"]),
     brief: z.string().trim().max(2000).optional(),
     mediaIds: z.array(z.string().uuid()).max(24).default([]),
     videoFrames: z.array(z.object({
@@ -198,7 +200,7 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "You are WaveOS Campaign Director. Build an organic social campaign direction that feels like a smart creative strategist, not a template generator. When selected media is provided, act as a content planner: rank the supplied pieces, identify which are strongest for the requested platforms, recommend a sensible day or sequence for each, and write a usable caption and hashtag set for each selected recommendation. For each recommended asset also return contentType, visualSummary, likelyPurpose, hookPotential (low/medium/high), suggestedPlatforms, confidence (low/medium/high), and inspectionMode (photo/video_frames/metadata_only). Never invent visual details you cannot actually infer. Treat video_frames as true visual inspection, photo as image inspection, and metadata_only as uninspected media.  Use the saved brand profile as personality/audience context and use supplied historical performance evidence to learn from what has actually attracted attention. When historical evidence exists, favor patterns supported by the strongest observed days/posts while still introducing fresh creative angles; never imply causation from correlation and never invent missing metrics. If evidence is sparse, say so internally through conservative recommendations rather than fabricating performance conclusions. Favor specific human angles, recognizable situations, behind-the-scenes, storytelling, useful education, proof/process, personality, culture, transformation, and audience-relevant moments. Avoid generic marketing filler, fake urgency, invented offers, invented results, made-up statistics, and repetitive sales CTAs. Suggested days may use historical evidence and campaign sequencing, but never call them guaranteed optimal posting times. Return JSON only with keys: angle, audienceInsight, pillars (name,purpose,examples), hooks, notes, mediaRecommendations (mediaId,reason,platforms,suggestedDay,caption,hashtags,contentType,visualSummary,likelyPurpose,hookPotential,suggestedPlatforms,confidence,inspectionMode).",
+              "You are WaveOS Campaign Director. Build an organic social campaign direction that feels like a smart creative strategist, not a template generator. Plan both durable feed posts and timely Stories when requested; Stories should use concise, conversational frames, polls/questions, behind-the-scenes moments, or a clear next action rather than recycling a feed caption. When selected media is provided, rank only the supplied pieces, identify which are strongest for the requested platforms, recommend a sensible sequence, placement (feed/story/both), and write a usable organic caption and hashtag set. For each recommendation return contentType, visualSummary, likelyPurpose, hookPotential (low/medium/high), suggestedPlatforms, placement, confidence, and inspectionMode. Never invent visual details or performance. Use saved brand context and only the supplied historical evidence. Say when evidence is sparse, separate observation from recommendation, never imply causation, never guarantee performance, and never shame low results. Favor specific human angles, recognizable situations, behind-the-scenes, storytelling, useful education, proof/process, personality, culture, transformation, and audience-relevant moments. Avoid generic marketing filler, fake urgency, invented offers, results, statistics, and repetitive sales CTAs. Return JSON only with keys: angle, audienceInsight, pillars (name,purpose,examples), hooks, notes, mediaRecommendations (mediaId,reason,platforms,suggestedDay,caption,hashtags,contentType,visualSummary,likelyPurpose,hookPotential,suggestedPlatforms,placement,confidence,inspectionMode).",
           },
           {
             role: "user",
@@ -209,6 +211,7 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
 Campaign name/idea: ${data.name || "Untitled campaign"}
 Goal: ${data.goal}
 Platforms: ${data.platforms.join(", ")}
+Content formats: ${data.contentFormats.join(", ")}
 Optional brief: ${data.brief ?? "None supplied"}
 Historical performance evidence: ${JSON.stringify(performanceContext)}
 Selected media: ${JSON.stringify(mediaContext.map(({previewUrl,videoFrames,...rest})=>rest))}
@@ -325,6 +328,7 @@ const campaignDraftInput = z.object({
     contentType: z.string().trim().max(120).optional(),
     visualSummary: z.string().trim().min(1).max(500),
     likelyPurpose: z.string().trim().min(1).max(240),
+    placement: z.enum(["feed", "story", "both"]).default("feed"),
   })).min(1).max(24),
 });
 
@@ -387,7 +391,7 @@ export const createCampaignPostDrafts = createServerFn({ method: "POST" })
     const rows = data.recommendations.map((rec, index) => ({
       workspace_id: data.workspaceId,
       created_by: context.userId,
-      title: `${data.campaignName?.trim() || "Campaign"} · Post ${index + 1}`,
+      title: `${data.campaignName?.trim() || "Campaign"} · ${rec.placement === "story" ? "Story" : rec.placement === "both" ? "Feed + Story" : "Feed"} ${index + 1}`,
       primary_caption: rec.caption,
       hashtags: rec.hashtags.map((tag) => tag.replace(/^#/, "")),
       media_asset_ids: [rec.mediaId],
@@ -398,6 +402,7 @@ export const createCampaignPostDrafts = createServerFn({ method: "POST" })
         platforms: rec.platforms,
         suggestedDay: rec.suggestedDay,
         contentType: rec.contentType ?? null,
+        placement: rec.placement,
       },
     }));
     const { data: created, error } = await supabaseAdmin

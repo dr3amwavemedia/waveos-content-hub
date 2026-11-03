@@ -27,7 +27,7 @@ type ZernioProfileRow = {
 
 const workspaceAnalyticsInput = z.object({
   workspaceId: z.string().uuid(),
-  days: z.union([z.literal(7), z.literal(30), z.literal(90)]).default(30),
+  days: z.union([z.literal(7), z.literal(30), z.literal(90), z.literal(180), z.literal(365)]).default(30),
   refresh: z.boolean().default(false),
 });
 
@@ -247,6 +247,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
         const previousBackfill = existingMetadata.historicalBackfill as
           | {
               completedAt?: string;
+              attemptedAt?: string;
               availableRangeStart?: string;
               availableRangeEnd?: string;
               dailyRecords?: number;
@@ -258,7 +259,12 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
 
         // Initial onboarding backfill: request two provider-supported windows so
         // a newly connected workspace can analyze up to ~2 years immediately.
-        if (!previousBackfill?.completedAt) {
+        const previousAttempt = previousBackfill?.attemptedAt
+          ? Date.parse(previousBackfill.attemptedAt)
+          : Number.NaN;
+        const backfillRetryDue =
+          !Number.isFinite(previousAttempt) || Date.now() - previousAttempt >= 24 * 60 * 60 * 1000;
+        if (!previousBackfill?.completedAt && backfillRetryDue) {
           type DashboardDaily = {
             date?: string;
             impressions?: number;
@@ -321,7 +327,10 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
             .filter((row) => typeof row.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(row.date))
             .sort((a, b) => String(a.date).localeCompare(String(b.date)));
 
-          if (allDaily.length) {
+          // A single daily record cannot produce a trend and would be inserted
+          // again on the next retry. Persist history only once the provider has
+          // returned at least two comparable observations.
+          if (allDaily.length >= 2) {
             const capturedAt = now;
             const backfillRows = allDaily.flatMap((row) => {
               const values: Array<[string, number | undefined]> = [
@@ -379,6 +388,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
             const metadata = {
               ...existingMetadata,
               historicalBackfill: {
+                attemptedAt: now,
                 completedAt: now,
                 requestedRangeStart: olderStart,
                 requestedRangeEnd: newestEnd,
@@ -391,6 +401,25 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
                     .map((result) => result.dataAsOf)
                     .filter(Boolean)
                     .at(-1) ?? null,
+              },
+            };
+            const metadataUpdate = await supabaseAdmin
+              .from("social_intelligence_profiles" as never)
+              .update({ metadata } as never)
+              .eq("workspace_id", data.workspaceId);
+            if (metadataUpdate.error) throw metadataUpdate.error;
+            intelligenceProfile.metadata = metadata;
+          } else {
+            const metadata = {
+              ...existingMetadata,
+              historicalBackfill: {
+                ...previousBackfill,
+                attemptedAt: now,
+                requestedRangeStart: olderStart,
+                requestedRangeEnd: newestEnd,
+                availableRangeStart: previousBackfill?.availableRangeStart ?? null,
+                availableRangeEnd: previousBackfill?.availableRangeEnd ?? null,
+                dailyRecords: Math.max(previousBackfill?.dailyRecords ?? 0, allDaily.length),
               },
             };
             const metadataUpdate = await supabaseAdmin

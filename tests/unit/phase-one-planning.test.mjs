@@ -15,6 +15,8 @@ const campaign = {
   postingHours: ["09:00", "15:00"],
   excludedDays: ["saturday", "sunday"],
   approvalRequired: true,
+  optimizationMode: "approval_required",
+  contentFormats: ["feed", "story"],
 };
 
 assert.deepEqual(validateCampaignPlanningInput(campaign), []);
@@ -30,6 +32,11 @@ assert.deepEqual(
   plan.map((item) => item.platform),
   ["instagram", "linkedin", "instagram", "linkedin"],
 );
+assert.deepEqual(
+  plan.map((item) => item.contentFormat),
+  ["feed", "story", "feed", "story"],
+);
+assert.match(plan[1].copyBrief, /organic linkedin story concept/);
 
 const noAvailableDays = buildCampaignPlan({
   ...campaign,

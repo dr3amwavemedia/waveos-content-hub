@@ -95,6 +95,7 @@ const DEFAULT_INPUT: CampaignPlanningInput = {
   excludedDays: ["saturday", "sunday"],
   approvalRequired: true,
   optimizationMode: "approval_required",
+  contentFormats: ["feed", "story"],
 };
 
 interface CampaignPlanRow {
@@ -139,6 +140,7 @@ function CampaignManagerPage() {
       likelyPurpose:string;
       hookPotential:"low"|"medium"|"high";
       suggestedPlatforms:string[];
+      placement:"feed"|"story"|"both";
       confidence:"low"|"medium"|"high";
       inspectionMode:"photo"|"video_frames"|"metadata_only";
     }>;
@@ -154,7 +156,7 @@ function CampaignManagerPage() {
   const [directionBusy, setDirectionBusy] = useState(false);
   const [draftsBusy,setDraftsBusy]=useState(false);
   const [draftsCreated,setDraftsCreated]=useState(false);
-  const mobileSteps = ["Campaign name", "Your goal", "Platforms", "Posting frequency", "Planning schedule", "Review campaign"];
+  const mobileSteps = ["Campaign name", "Your goal", "Platforms & formats", "Posting frequency", "Planning schedule", "Review campaign"];
   const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
     workspaceId,
     workflowKey: "campaign-manager",
@@ -211,6 +213,7 @@ function CampaignManagerPage() {
           start_date: input.startDate,
           end_date: input.endDate,
           platforms: input.platforms,
+          contentFormats: input.contentFormats,
           max_posts: input.maxPosts,
           posting_hours: input.postingHours,
           excluded_days: input.excludedDays,
@@ -261,11 +264,11 @@ function CampaignManagerPage() {
     setDirty(true);
   }
 
-  function toggleList(key: "platforms" | "excludedDays", value: string) {
-    const values = input[key];
+  function toggleList(key: "platforms" | "excludedDays" | "contentFormats", value: string) {
+    const values = input[key] as readonly string[];
     update(
       key,
-      values.includes(value) ? values.filter((item) => item !== value) : [...values, value],
+      (values.includes(value) ? values.filter((item) => item !== value) : [...values, value]) as CampaignPlanningInput[typeof key],
     );
   }
 
@@ -389,6 +392,7 @@ function CampaignManagerPage() {
             contentType:rec.contentType,
             visualSummary:rec.visualSummary,
             likelyPurpose:rec.likelyPurpose,
+            placement:rec.placement,
           })),
         },
       });
@@ -543,8 +547,9 @@ function CampaignManagerPage() {
               <div className="mt-2 space-y-3">
                 {campaignDirection.mediaRecommendations.map((rec,index)=><div key={rec.mediaId+index} className="rounded-xl border border-border bg-background/60 p-3">
                   <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-semibold">{(mediaAssets.data??[]).find(a=>a.id===rec.mediaId)?.name ?? `Selected media ${index+1}`}</p><p className="mt-1 text-xs text-muted-foreground">{rec.reason}</p></div><span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary">{rec.suggestedDay}</span></div>
-                  <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                  <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
                     <label className="rounded-lg bg-surface/70 p-2"><span className="text-muted-foreground">What WaveOS thinks this is</span><input className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 font-medium" value={rec.contentType} onChange={(event)=>updateMediaRecommendation(index,{contentType:event.target.value})}/></label>
+                    <label className="rounded-lg bg-surface/70 p-2"><span className="text-muted-foreground">Placement</span><select className="mt-1 w-full rounded-md border border-border bg-background px-2 py-1.5 font-medium capitalize" value={rec.placement} onChange={(event)=>updateMediaRecommendation(index,{placement:event.target.value as "feed"|"story"|"both"})}><option value="feed">Feed post</option><option value="story">Story</option><option value="both">Feed + Story</option></select></label>
                     <div className="rounded-lg bg-surface/70 p-2"><span className="text-muted-foreground">Hook potential</span><div className="mt-1 font-medium capitalize">{rec.hookPotential}</div></div>
                   </div>
                   <label className="mt-3 block text-xs"><span className="font-medium">What it shows</span><textarea className="mt-1 min-h-16 w-full rounded-md border border-border bg-background px-2 py-1.5 text-muted-foreground" value={rec.visualSummary} onChange={(event)=>updateMediaRecommendation(index,{visualSummary:event.target.value})}/></label>
@@ -561,7 +566,7 @@ function CampaignManagerPage() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button onClick={()=>void createPostDrafts()} disabled={draftsBusy||draftsCreated||confirmedMediaIds.length!==campaignDirection.mediaRecommendations.length}>
                   {draftsBusy?<Loader2 className="h-4 w-4 animate-spin"/>:<CheckCircle2 className="h-4 w-4"/>}
-                  {draftsCreated?"Post drafts created":"Create post drafts"}
+                  {draftsCreated?"Campaign drafts created":"Create feed & story drafts"}
                 </Button>
                 <Button asChild variant="outline">
                   <a href="/create">Open Create Post</a>
@@ -695,6 +700,17 @@ function CampaignManagerPage() {
             selected={input.platforms}
             onToggle={(value) => toggleList("platforms", value)}
           />
+          <div className="mt-4">
+            <ChoiceGroup
+              label="Campaign content"
+              values={["feed", "story"]}
+              selected={input.contentFormats}
+              onToggle={(value) => toggleList("contentFormats", value)}
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Use both to balance lasting feed content with timely, conversational Stories.
+            </p>
+          </div>
           </MobileWorkflowSection>
           <MobileWorkflowSection active={mobileStep === 4}>
           <ChoiceGroup
@@ -710,6 +726,7 @@ function CampaignManagerPage() {
             <dt className="text-muted-foreground">Campaign</dt><dd className="break-words">{input.name || "Not named"}</dd>
             <dt className="text-muted-foreground">Goal</dt><dd className="capitalize">{input.goal}</dd>
             <dt className="text-muted-foreground">Platforms</dt><dd className="break-words capitalize">{input.platforms.join(", ") || "None"}</dd>
+            <dt className="text-muted-foreground">Formats</dt><dd className="break-words capitalize">{input.contentFormats.join(", ") || "None"}</dd>
             <dt className="text-muted-foreground">Maximum posts</dt><dd>{input.maxPosts}</dd>
             <dt className="text-muted-foreground">Dates</dt><dd>{input.startDate} – {input.endDate}</dd>
           </dl>
@@ -745,7 +762,7 @@ function CampaignManagerPage() {
               ))}
             </ul>
           )}
-          <MobileWorkflowFooter step={mobileStep} total={mobileSteps.length} onChange={setMobileStep} canNext={mobileStep === 0 ? Boolean(input.name.trim()) : mobileStep === 2 ? input.platforms.length > 0 : mobileStep === 3 ? input.maxPosts > 0 && input.maxPosts <= 60 : true} final={<Button className="min-h-12" onClick={generatePlan} disabled={errors.length > 0}><Sparkles /> Build plan</Button>} />
+          <MobileWorkflowFooter step={mobileStep} total={mobileSteps.length} onChange={setMobileStep} canNext={mobileStep === 0 ? Boolean(input.name.trim()) : mobileStep === 2 ? input.platforms.length > 0 && input.contentFormats.length > 0 : mobileStep === 3 ? input.maxPosts > 0 && input.maxPosts <= 60 : true} final={<Button className="min-h-12" onClick={generatePlan} disabled={errors.length > 0}><Sparkles /> Build plan</Button>} />
         </section>
 
         <aside className="space-y-5">
@@ -815,9 +832,10 @@ function CampaignManagerPage() {
                   </div>
                 </div>
                 <div>
-                  <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase text-primary">
-                    {item.platform}
-                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-semibold uppercase text-primary">{item.platform}</span>
+                    <span className="rounded-full border border-border bg-elevated px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">{item.contentFormat}</span>
+                  </div>
                 </div>
                 <div>
                   <div className="text-sm font-semibold">{item.workingTitle}</div>

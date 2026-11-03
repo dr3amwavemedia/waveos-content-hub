@@ -2,6 +2,7 @@ export const CAMPAIGN_GOALS = ["awareness", "engagement", "leads", "launch", "re
 
 export type CampaignGoal = (typeof CAMPAIGN_GOALS)[number];
 export type CampaignOptimizationMode = "automatic" | "approval_required";
+export type CampaignContentFormat = "feed" | "story";
 
 export interface CampaignPlanningInput {
   name: string;
@@ -14,6 +15,7 @@ export interface CampaignPlanningInput {
   excludedDays: string[];
   approvalRequired: boolean;
   optimizationMode: CampaignOptimizationMode;
+  contentFormats: CampaignContentFormat[];
 }
 
 export interface CampaignPlanningItem {
@@ -25,6 +27,7 @@ export interface CampaignPlanningItem {
   workingTitle: string;
   copyBrief: string;
   approvalRequired: boolean;
+  contentFormat: CampaignContentFormat;
 }
 
 const DAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -55,6 +58,7 @@ export function validateCampaignPlanningInput(input: CampaignPlanningInput): str
   if (!start || !end) errors.push("Choose a valid start and end date.");
   else if (end.getTime() < start.getTime()) errors.push("End date must be on or after start date.");
   if (input.platforms.length === 0) errors.push("Choose at least one platform.");
+  if (input.contentFormats.length === 0) errors.push("Choose feed posts, stories, or both.");
   if (!Number.isInteger(input.maxPosts) || input.maxPosts < 1 || input.maxPosts > 60) {
     errors.push("Max posts must be between 1 and 60.");
   }
@@ -96,14 +100,16 @@ export function buildCampaignPlan(input: CampaignPlanningInput): CampaignPlannin
   return selectedSlots.map((slot, index) => {
     const pillar = pillars[index % pillars.length];
     const platform = input.platforms[index % input.platforms.length];
+    const contentFormat = input.contentFormats[index % input.contentFormats.length];
     return {
       sequence: index + 1,
       plannedDate: slot.plannedDate,
       localTime: slot.localTime,
       platform,
+      contentFormat,
       pillar,
-      workingTitle: `${pillar}: ${input.name}`,
-      copyBrief: `Draft a ${platform} concept that supports the ${input.goal} goal through ${pillar.toLowerCase()}.`,
+      workingTitle: `${contentFormat === "story" ? "Story" : "Feed"} · ${pillar}: ${input.name}`,
+      copyBrief: `Draft an organic ${platform} ${contentFormat} concept that supports the ${input.goal} goal through ${pillar.toLowerCase()}. Keep the language natural, platform-appropriate, and reviewable before publishing.`,
       approvalRequired: input.approvalRequired,
     };
   });
