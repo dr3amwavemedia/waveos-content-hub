@@ -134,7 +134,7 @@ export const waveAssist = createServerFn({ method: "POST" })
         },
         body: JSON.stringify({
           model: MODEL,
-          max_tokens: data.mode === "advisor" ? 1_200 : 1_500,
+          max_tokens: data.mode === "advisor" ? 1_200 : data.mode === "caption_suite" ? 3_000 : 1_500,
           messages: [
             {
               role: "system",
@@ -180,10 +180,16 @@ export const waveAssist = createServerFn({ method: "POST" })
       throw new Error(`AI request failed: ${res.status}`);
     }
 
-    const json = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>;
+    let json: {
+      choices?: Array<{ message?: { content?: string }; finish_reason?: string }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
+    try {
+      json = await res.json();
+    } catch {
+      await recordAiUsage({ workspaceId: data.workspaceId, userId: context.userId, feature: `wave_assist.${data.mode}`, model: MODEL, durationMs: Date.now() - startedAt, status: "invalid_response", safeErrorCode: "malformed_gateway_json" });
+      throw new Error("Wave Assist received an incomplete response. Please retry.");
+    }
     const out = (json.choices?.[0]?.message?.content ?? "").trim();
     if (!out || out.length > 20_000) {
       await recordAiUsage({
@@ -199,10 +205,16 @@ export const waveAssist = createServerFn({ method: "POST" })
       throw new Error("The caption assistant returned an invalid draft. Please try again.");
     }
     if (data.mode === "caption_suite") {
-      const parsed = JSON.parse(cleanJson(out)) as {
+      let parsed: {
         primaryCaption?: string;
         variants?: Array<{ platform?: string; caption?: string }>;
       };
+      try {
+        parsed = JSON.parse(cleanJson(out));
+      } catch {
+        await recordAiUsage({ workspaceId: data.workspaceId, userId: context.userId, feature: `wave_assist.${data.mode}`, model: MODEL, durationMs: Date.now() - startedAt, status: "invalid_response", usage: json.usage, safeErrorCode: json.choices?.[0]?.finish_reason === "length" ? "truncated_caption_suite" : "malformed_caption_suite" });
+        throw new Error("Wave Assist could not finish the captions. Please retry.");
+      }
       const requested = new Set(data.platforms);
       const variants = (parsed.variants ?? [])
         .filter((variant) => variant.platform && variant.caption && requested.has(variant.platform))
