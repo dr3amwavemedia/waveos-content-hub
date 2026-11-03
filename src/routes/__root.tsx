@@ -141,10 +141,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+// If the app's startup script fails to load (e.g. the dev server was mid-restart
+// and answered module requests with 500s), the page stays as inert SSR markup.
+// Reload once after a short pause instead of leaving disabled buttons on screen.
+const MODULE_LOAD_RECOVERY_SCRIPT = `(function(){var K="waveos:module-reload",P=/Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i;function h(m){if(!m||!P.test(String(m)))return;try{var l=Number(sessionStorage.getItem(K)||0);if(Date.now()-l<30000)return;sessionStorage.setItem(K,String(Date.now()))}catch(e){return}setTimeout(function(){location.reload()},1500)}window.addEventListener("unhandledrejection",function(e){h(e.reason&&(e.reason.message||e.reason))});window.addEventListener("error",function(e){h(e.message)})})();`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="dark">
       <head>
+        <script dangerouslySetInnerHTML={{ __html: MODULE_LOAD_RECOVERY_SCRIPT }} />
         <HeadContent />
       </head>
       <body>
