@@ -21,6 +21,7 @@ import { useMemo, useState } from "react";
 import {
   combineAnalyticsMetric,
   deriveEngagements,
+  formatAnalyticsPlatform,
   type AnalyticsAvailability,
   type AnalyticsMetricKey,
   type AnalyticsSource,
@@ -176,9 +177,7 @@ export function AnalyticsCheckup({
   const leadSignalsByPlatform = useMemo(() => {
     const groups = new Map<string, typeof leadSignals>();
     for (const signal of leadSignals) {
-      const label = signal.platform
-        .replaceAll("_", " ")
-        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+      const label = formatAnalyticsPlatform(signal.platform);
       groups.set(label, [...(groups.get(label) ?? []), signal]);
     }
     return [...groups.entries()].sort(([left], [right]) => left.localeCompare(right));
@@ -506,13 +505,13 @@ export function AnalyticsCheckup({
                             <MousePointerClick className="size-3.5 text-analytics" />
                             {signal.clicks === null
                               ? "Clicks unavailable"
-                              : `${signal.clicks} clicks`}
+                              : `${signal.clicks} ${signal.clicks === 1 ? "click" : "clicks"}`}
                           </span>
                           <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-intelligence/25 bg-intelligence/10 px-2.5 text-xs text-foreground">
                             <MessageCircle className="size-3.5 text-intelligence" />
                             {signal.messages === null
                               ? "Messages unavailable"
-                              : `${signal.messages} messages`}
+                              : `${signal.messages} ${signal.messages === 1 ? "message" : "messages"}`}
                           </span>
                         </div>
                       </article>

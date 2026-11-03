@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   extractContentLeadSignals,
+  formatAnalyticsPlatform,
   mergeContentLeadSignals,
   parseAnalyticsPayload,
 } from "../../src/lib/analytics-transparency.ts";
@@ -81,4 +82,23 @@ test("provider content and nested platform metadata identify attributed posts", 
   );
   assert.equal(signal.title, "Behind the scenes at today’s brand shoot");
   assert.equal(signal.platform, "youtube");
+});
+
+test("source-only posts get truthful dated titles and branded platform casing", () => {
+  const [signal] = extractContentLeadSignals(
+    {
+      posts: [
+        {
+          postId: "post-3",
+          platform: "facebook",
+          publishedAt: "2026-11-02T12:00:00Z",
+          analytics: { linkClicks: 1 },
+        },
+      ],
+    },
+    "organic",
+  );
+  assert.equal(signal.title, "Facebook post from 2026-11-02");
+  assert.equal(formatAnalyticsPlatform("linkedin"), "LinkedIn");
+  assert.equal(formatAnalyticsPlatform("youtube"), "YouTube");
 });
