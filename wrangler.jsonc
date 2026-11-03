@@ -10,11 +10,6 @@
   "observability": {
     "enabled": true
   },
-  "routes": [
-    {
-      "pattern": "waveos.dreamwavemedia.co",
-      "custom_domain": true
-    }
-  ],
+  "workers_dev": true,
   "keep_vars": true
 }

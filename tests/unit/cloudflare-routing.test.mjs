@@ -4,11 +4,8 @@ import test from "node:test";
 
 const wrangler = JSON.parse(readFileSync("wrangler.jsonc", "utf8"));
 
-test("Cloudflare deploy owns only the WaveOS production hostname", () => {
-  assert.deepEqual(wrangler.routes, [
-    {
-      pattern: "waveos.dreamwavemedia.co",
-      custom_domain: true,
-    },
-  ]);
+test("Cloudflare deploy keeps staging enabled without an unmanaged zone route", () => {
+  assert.equal(wrangler.workers_dev, true);
+  assert.equal("route" in wrangler, false);
+  assert.equal("routes" in wrangler, false);
 });
