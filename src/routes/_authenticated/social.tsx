@@ -916,8 +916,8 @@ function AnalyticsAndComments({
             Comments and Brand Voice replies
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Facebook, Instagram, YouTube, LinkedIn organization pages, Threads, X and Bluesky. Every
-            AI draft requires review before posting.
+            Facebook, Instagram, YouTube, LinkedIn organization pages, Threads, X and Bluesky. Wave
+            Assist drafts in your Brand Voice. Every reply requires review before posting.
           </p>
         </div>
         <div className="mt-4 space-y-3">
@@ -943,7 +943,7 @@ function AnalyticsAndComments({
                   onClick={() => void draftReply(comment)}
                   className="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs font-semibold text-primary"
                 >
-                  Draft with Brand Voice
+                  Wave Assist · Draft Reply
                 </button>
                 {drafts[comment.id] && (
                   <button

@@ -480,7 +480,7 @@ function CampaignManagerPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="flex items-center gap-2 font-semibold"><Images className="h-4 w-4 text-primary" /> Choose campaign media</div>
-            <p className="mt-1 text-xs text-muted-foreground">Select multiple photos/videos from a folder or upload new pieces. AI Direction will evaluate the selected content.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Select multiple photos/videos from a folder or upload new pieces. Wave Assist will evaluate the selected content and keep every recommendation review-only.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button type="button" variant="outline" className="min-h-11" onClick={()=>setShowSharedMediaPicker(true)}>
@@ -522,7 +522,7 @@ function CampaignManagerPage() {
           <summary className="cursor-pointer list-none">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              <span className="font-semibold">AI campaign direction</span>
+              <span className="font-semibold">Wave Assist · Campaign Direction</span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{campaignDirection.angle}</p>
           </summary>

@@ -447,7 +447,7 @@ function CreatePost() {
           });
       }
       await qc.invalidateQueries({ queryKey: ["content-item", id] });
-      toast.success("Brand Voice caption and platform adaptations are ready to review.");
+      toast.success("Wave Assist prepared a Brand Voice draft and platform adaptations for review.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Caption assistant failed.");
     } finally {
@@ -807,7 +807,7 @@ function CreatePost() {
                 ) : (
                   <Sparkles className="h-3 w-3" />
                 )}
-                Draft with Brand Voice
+                Wave Assist · Brand Voice Draft
               </button>
             </div>
           </div>

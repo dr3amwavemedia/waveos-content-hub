@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { recordAiUsage } from "@/lib/ai-usage.server";
 
-const CAMPAIGN_MODEL = "google/gemini-3.1-flash-lite";
+const CAMPAIGN_MODEL = "google/gemini-3.8-flash";
 
 const campaignIdeaSchema = z.object({
   angle: z.string().trim().min(1).max(500),
