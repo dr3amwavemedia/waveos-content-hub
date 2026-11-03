@@ -45,6 +45,7 @@ import { nextInvoicePaymentCents, nextInvoicePaymentLabel } from "@/lib/invoice-
 import { serviceFeePercentLabel } from "@/lib/invoice-service-fee";
 import { AuthorizeAutopayButton } from "@/components/app/authorize-autopay-button";
 import { canViewClientFinancials } from "@/lib/client-account-access";
+import { OceanHeader, OceanPage, OceanStatus } from "@/components/app/ocean-ui";
 
 export type Invoice = Database["public"]["Tables"]["client_invoices"]["Row"];
 /** One recorded transaction against an invoice (card payment, automatic charge, import or refund). */
@@ -364,34 +365,25 @@ export function Layer1Overview() {
   );
 
   return (
-    <div className="space-y-8">
+    <OceanPage>
       {/* Welcome */}
-      <header className="flex items-start gap-4 sm:items-center sm:gap-5">
-        <WorkspaceBrandmark
-          logoUrl={branding.data?.logoUrl}
-          name={projectName}
-          className="h-16 w-16 sm:h-20 sm:w-20"
-        />
-        <div className="min-w-0 space-y-2">
-          <p className="truncate text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-            {projectName}
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            {firstName ? `Welcome back, ${firstName}.` : "Welcome back."}
-          </h1>
-          <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-            Everything related to your Dream Wave Media project is organized below.
-          </p>
-        </div>
-      </header>
-      <div>
-        {statusLabel && (
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-elevated/60 px-3 py-1 text-xs text-muted-foreground">
-            <span className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px] shadow-primary" />
-            Project status: <span className="font-medium text-foreground">{statusLabel}</span>
+      <OceanHeader
+        eyebrow={projectName}
+        title={firstName ? `Welcome back, ${firstName}.` : "Welcome back."}
+        description="Everything related to your Dream Wave Media project is organized here, from the next action to final delivery."
+        action={
+          <div className="flex items-center gap-3">
+            <WorkspaceBrandmark
+              logoUrl={branding.data?.logoUrl}
+              name={projectName}
+              className="h-14 w-14 sm:h-16 sm:w-16"
+            />
+            {statusLabel && (
+              <OceanStatus tone="positive">Project status: {statusLabel}</OceanStatus>
+            )}
           </div>
-        )}
-      </div>
+        }
+      />
 
       <nav aria-label="Your workspace tools" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {(canViewFinancials
@@ -408,7 +400,7 @@ export function Layer1Overview() {
               const section = document.getElementById(item.id);
               if (section instanceof HTMLDetailsElement) section.open = true;
             }}
-            className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary"
+            className="ocean-panel p-4 text-sm font-semibold transition-colors hover:border-primary"
           >
             <FileText className="mb-2 h-5 w-5 text-primary" />
             {item.label}
@@ -417,14 +409,14 @@ export function Layer1Overview() {
         ))}
         <Link
           to="/deliveries"
-          className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary"
+          className="ocean-panel p-4 text-sm font-semibold transition-colors hover:border-primary"
         >
           <ImageIcon className="mb-2 h-5 w-5 text-primary" />
           Deliverables
         </Link>
         <Link
           to="/my-projects"
-          className="rounded-xl border border-border bg-surface p-4 text-sm font-semibold hover:border-primary"
+          className="ocean-panel p-4 text-sm font-semibold transition-colors hover:border-primary"
         >
           <Film className="mb-2 h-5 w-5 text-primary" />
           Projects
@@ -517,7 +509,7 @@ export function Layer1Overview() {
         <ExpandableSection
           title="Contracts"
           id="contracts"
-          className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4"
+          className="ocean-panel scroll-mt-24 space-y-3 p-4"
         >
           <div className="flex flex-wrap items-end justify-between gap-2">
             <h2 className="text-lg font-semibold text-foreground">Contracts & Agreements</h2>
@@ -553,7 +545,7 @@ export function Layer1Overview() {
         <ExpandableSection
           title="Invoices & Payments"
           id="invoices"
-          className="scroll-mt-24 space-y-3 rounded-xl border border-border p-4"
+          className="ocean-panel scroll-mt-24 space-y-3 p-4"
         >
           <div className="flex flex-wrap items-end justify-between gap-2">
             {activeInvoices.length > 1 && (
@@ -625,7 +617,7 @@ export function Layer1Overview() {
         <h2 className="text-lg font-semibold text-foreground">Contact Dream Wave</h2>
         <ContactCard />
       </section>
-    </div>
+    </OceanPage>
   );
 }
 

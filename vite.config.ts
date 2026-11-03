@@ -9,12 +9,13 @@ import { mcpPlugin } from "@lovable.dev/mcp-js/stacks/tanstack/vite";
 
 export default defineConfig({
   tanstackStart: {
+    // Keep the browser entry inside the app. Lovable's embedded dev preview can
+    // intermittently fail to transform TanStack's default entry from
+    // node_modules, which leaves SSR markup visible but never hydrated.
+    client: { entry: "client" },
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
     server: { entry: "server" },
-    // Use a project-local client entry so the preview never has to fetch the
-    // package's default client entry from node_modules.
-    client: { entry: "client" },
   },
   vite: {
     define: {

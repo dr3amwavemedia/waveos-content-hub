@@ -18,6 +18,8 @@ import {
   clearAuthenticatedBrowserState,
 } from "@/lib/auth-session-state";
 
+const GOOGLE_OAUTH_FALLBACK_SCRIPT = `(function(){function state(){try{var b=new Uint8Array(16);crypto.getRandomValues(b);return Array.from(b,function(v){return v.toString(16).padStart(2,"0")}).join("")}catch(e){return Math.random().toString(36).slice(2)+Date.now().toString(36)}}function apply(){document.querySelectorAll("[data-google-oauth-fallback]").forEach(function(link){var params=new URLSearchParams({provider:"google",redirect_uri:location.origin+"/auth-callback",prompt:"select_account",state:state()});link.setAttribute("href","/~oauth/initiate?"+params.toString())})}if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",apply,{once:true});else apply()})();`;
+
 function NotFoundComponent() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -141,20 +143,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
-// If the app's startup script fails to load (e.g. the dev server was mid-restart
-// and answered module requests with 500s), the page stays as inert SSR markup.
-// Reload once after a short pause instead of leaving disabled buttons on screen.
-const MODULE_LOAD_RECOVERY_SCRIPT = `(function(){var K="waveos:module-reload",P=/Failed to fetch dynamically imported module|Importing a module script failed|error loading dynamically imported module/i;function h(m){if(!m||!P.test(String(m)))return;try{var l=Number(sessionStorage.getItem(K)||0);if(Date.now()-l<30000)return;sessionStorage.setItem(K,String(Date.now()))}catch(e){return}setTimeout(function(){location.reload()},1500)}window.addEventListener("unhandledrejection",function(e){h(e.reason&&(e.reason.message||e.reason))});window.addEventListener("error",function(e){h(e.message)})})();`;
-
-// No-hydration fallback: give the server-rendered Google link a complete broker URL
-// so it still works when React never starts. Hydrated clicks use the SDK flow instead.
-const GOOGLE_OAUTH_FALLBACK_SCRIPT = `document.addEventListener("DOMContentLoaded",function(){var b=new Uint8Array(16);crypto.getRandomValues(b);var s=Array.prototype.map.call(b,function(x){return x.toString(16).padStart(2,"0")}).join("");var q=new URLSearchParams({provider:"google",redirect_uri:location.origin+"/auth-callback",prompt:"select_account",state:s});document.querySelectorAll("a[data-google-oauth-fallback]").forEach(function(a){a.setAttribute("href","/~oauth/initiate?"+q.toString())})});`;
-
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className="dark">
       <head>
-        <script dangerouslySetInnerHTML={{ __html: MODULE_LOAD_RECOVERY_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: GOOGLE_OAUTH_FALLBACK_SCRIPT }} />
         <HeadContent />
       </head>

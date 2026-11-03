@@ -1,4 +1,5 @@
 <!-- LOVABLE:BEGIN -->
+
 > [!IMPORTANT]
 > This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
 > published git history — force pushing, or rebasing/amending/squashing commits
@@ -7,6 +8,7 @@
 >
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
+
 <!-- LOVABLE:END -->
 
 Mobile guided workflows wrap existing fields and actions with shared step controls; desktop keeps all fields visible, so presentation changes do not fork business logic.
@@ -33,6 +35,3 @@ Published-post removal goes through one manager-authorized server function that 
 The Social Media published-post library reads live provider data per connected account (sync-external, Zernio post records, account-scoped analytics), merges by platform + account + platform post id, and removes only after re-reading the Zernio post to confirm the exact account copy; removals are recorded in activity_logs, not a new table.
 Published cards come only from provider targets explicitly live (shared `providerTargetState`), any provider's cancelled/non-live record for the same target vetoes them, and WaveOS publish_attempts only enrich cards; local attempt status can lag the provider, so it never creates, keeps or hides a card.
 Every Zernio create-post request passes a pure single-target invariant (one platforms[] entry matching the variant and its selected connection, no other network's settings) before sending, stores the target summary in request_snapshot.waveosTarget, and treats any unrequested target in the response as an attention failure that is never auto-resent or auto-deleted.
-TanStack Start uses project-local entries (src/server.ts and src/client.tsx via vite.config.ts), because the embedded preview cannot reliably fetch the package's default client entry from node_modules.
-The root shell carries an inline once-per-30s reload on failed dynamic module imports, because dev-server restarts answer in-flight module requests with 500s and otherwise leave inert SSR markup; do not override TanStack's optimizeDeps exclusion of @tanstack/react-router to "fix" this.
-The /auth Google control is a real anchor to the managed OAuth broker whose href the root head script completes before hydration, because the embedded preview can fail to hydrate; hydrated clicks must still preventDefault and use the SDK flow.
