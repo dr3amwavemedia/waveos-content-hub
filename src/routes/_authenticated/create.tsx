@@ -149,17 +149,32 @@ function CreatePost() {
   const restoredStudio=useRef<string|null>(null);
 
   useEffect(() => {
-    if (search.studio || !search.media || editingId || pickedMedia.length) return;
+    if (
+      search.studio ||
+      !search.media ||
+      editingId ||
+      pickedMedia.length ||
+      composerAssets.isPending
+    ) return;
     setPickedMedia([search.media]);
+    const handedOffAsset = composerAssets.data?.find((asset) => asset.id === search.media);
+    const mediaLabel = handedOffAsset?.mime_type.startsWith("video/") ? "Video" : "Media";
     if (search.destination === "story") {
       setPlatforms(["instagram"]);
       setActivePlatform("instagram");
       setDraftPlatformOptions({ instagram: { contentType: "story" } });
-      toast.success("Creative Studio image added to an Instagram Story draft.");
+      toast.success(`${mediaLabel} added to an Instagram Story draft.`);
     } else {
-      toast.success("Creative Studio image added to this feed post draft.");
+      toast.success(`${mediaLabel} added to this feed post draft.`);
     }
-  }, [editingId, pickedMedia.length, search.destination, search.media]);
+  }, [
+    composerAssets.data,
+    composerAssets.isPending,
+    editingId,
+    pickedMedia.length,
+    search.destination,
+    search.media,
+  ]);
 
   const draftStorageKey = workspaceId ? `waveos-create-draft-${workspaceId}` : null;
 
@@ -1538,12 +1553,28 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
           onError={() => setFailed(true)}
         />
       ) : kind === "video" ? (
-        <video
-          src={preview!.url!}
-          className="h-full w-full object-cover"
-          muted
-          onError={() => setFailed(true)}
-        />
+        <>
+          <video
+            src={preview!.url!}
+            poster={asset.thumbnail_url ?? undefined}
+            className="h-full w-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(event) => {
+              if (
+                Number.isFinite(event.currentTarget.duration) &&
+                event.currentTarget.duration > 0.01
+              )
+                event.currentTarget.currentTime = 0.01;
+            }}
+            onError={() => setFailed(true)}
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 text-left text-xs text-white">
+            <FileVideo className="h-4 w-4 shrink-0" />
+            <span className="truncate">{asset.name}</span>
+          </div>
+        </>
       ) : (
         <div className="flex h-full w-full items-center justify-center p-2 text-center text-xs text-muted-foreground">
           {asset.name}

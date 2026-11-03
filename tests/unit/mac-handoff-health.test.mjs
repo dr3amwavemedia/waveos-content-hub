@@ -39,6 +39,7 @@ test("admin health is owner-gated and reports AI plus analytics without secrets"
   assert.match(health, /LOVABLE_API_KEY/);
   assert.match(health, /social_intelligence_profiles/);
   assert.doesNotMatch(health, /access_token_encrypted|refresh_token_encrypted|api_key|secret_key/);
+  assert.doesNotMatch(health, /expired connections/);
 });
 
 test("Creative Studio mobile landing has only the three requested primary choices", () => {

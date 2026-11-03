@@ -874,7 +874,7 @@ function AdminPage() {
                 }
                 detail={
                   operationalHealth.data.externalMedia.available
-                    ? `${operationalHealth.data.externalMedia.unhealthy} expired connections`
+                    ? `${operationalHealth.data.externalMedia.unhealthy} connection${operationalHealth.data.externalMedia.unhealthy === 1 ? "" : "s"} requiring reconnection`
                     : "Connection health query failed"
                 }
                 attention={operationalHealth.data.externalMedia.unhealthy > 0}

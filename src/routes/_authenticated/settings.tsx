@@ -1070,7 +1070,7 @@ function StorageConnectionCard({
             {status.isLoading
               ? "Checking connection…"
               : reconnectRequired
-                ? "Reconnect required — Drive permission is missing"
+                ? `Reconnect required — ${label} authorization can no longer refresh`
                 : connected
                   ? status.data?.account?.email || "Connected"
                   : configured
