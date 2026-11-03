@@ -776,20 +776,117 @@ function AdminPage() {
       <div className="surface-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-sm font-semibold text-foreground">AI, analytics, and storage health</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Operational totals only. Prompts, generated content, provider payloads, and credentials are never shown.</p>
+            <h2 className="text-sm font-semibold text-foreground">
+              AI, analytics, and storage health
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Operational totals only. Prompts, generated content, provider payloads, and
+              credentials are never shown.
+            </p>
           </div>
-          <button type="button" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold" onClick={()=>void operationalHealth.refetch()} disabled={operationalHealth.isFetching}>
-            <RefreshCw className={`h-4 w-4 ${operationalHealth.isFetching?"animate-spin":""}`} /> Refresh health
+          <button
+            type="button"
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold"
+            onClick={() => void operationalHealth.refetch()}
+            disabled={operationalHealth.isFetching}
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${operationalHealth.isFetching ? "animate-spin" : ""}`}
+            />{" "}
+            Refresh health
           </button>
         </div>
-        {operationalHealth.isLoading ? <div className="mt-4 flex items-center text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking health…</div> : operationalHealth.isError ? <p className="mt-4 text-sm text-destructive">Operational health is unavailable. Integration readiness below remains independent.</p> : operationalHealth.data && <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <HealthCard label="Storage" value={operationalHealth.data.storage.available?`${formatBytes(operationalHealth.data.storage.usedBytes)} used`:"Unavailable"} detail={operationalHealth.data.storage.available?`${Math.round((operationalHealth.data.storage.usedBytes/operationalHealth.data.storage.safetyLimitBytes)*100)}% of safety limit · ${operationalHealth.data.storage.workspaceCount} workspaces`:"Storage query failed"} attention={operationalHealth.data.storage.available&&operationalHealth.data.storage.usedBytes/operationalHealth.data.storage.safetyLimitBytes>=0.8}/>
-          <HealthCard label="AI · 30 days" value={operationalHealth.data.ai.available?`${operationalHealth.data.ai.requests30d} requests`:"Unavailable"} detail={operationalHealth.data.ai.available?`${operationalHealth.data.ai.failures30d} failures · ${(operationalHealth.data.ai.inputTokens30d+operationalHealth.data.ai.outputTokens30d).toLocaleString()} tokens${operationalHealth.data.ai.estimatedCostMicros30d===null?" · cost unavailable":` · $${(operationalHealth.data.ai.estimatedCostMicros30d/1_000_000).toFixed(2)}`}`:"Metering table not available"} attention={operationalHealth.data.ai.failures30d>0}/>
-          <HealthCard label="Analytics" value={operationalHealth.data.analytics.available?`${operationalHealth.data.analytics.profiles} profiles`:"Unavailable"} detail={operationalHealth.data.analytics.available?`${operationalHealth.data.analytics.unhealthy} unhealthy · ${operationalHealth.data.analytics.stale} stale over 7 days`:"Analytics health query failed"} attention={operationalHealth.data.analytics.unhealthy>0||operationalHealth.data.analytics.stale>0}/>
-          <HealthCard label="External sources" value={operationalHealth.data.externalMedia.available?`${operationalHealth.data.externalMedia.connections} connected`:"Unavailable"} detail={operationalHealth.data.externalMedia.available?`${operationalHealth.data.externalMedia.unhealthy} expired connections`:"Connection health query failed"} attention={operationalHealth.data.externalMedia.unhealthy>0}/>
-        </div>}
-        {operationalHealth.data?.observedAt && <p className="mt-3 text-[11px] text-muted-foreground">Observed {new Date(operationalHealth.data.observedAt).toLocaleString()}</p>}
+        {operationalHealth.isLoading ? (
+          <div className="mt-4 flex items-center text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Checking health…
+          </div>
+        ) : operationalHealth.isError ? (
+          <p className="mt-4 text-sm text-destructive">
+            Operational health is unavailable. Integration readiness below remains independent.
+          </p>
+        ) : (
+          operationalHealth.data && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <HealthCard
+                label="Storage"
+                value={
+                  operationalHealth.data.storage.available
+                    ? `${formatBytes(operationalHealth.data.storage.usedBytes)} used`
+                    : "Unavailable"
+                }
+                detail={
+                  operationalHealth.data.storage.available
+                    ? `${Math.round((operationalHealth.data.storage.usedBytes / operationalHealth.data.storage.safetyLimitBytes) * 100)}% of safety limit · ${operationalHealth.data.storage.workspaceCount} workspaces`
+                    : "Storage query failed"
+                }
+                attention={
+                  operationalHealth.data.storage.available &&
+                  operationalHealth.data.storage.usedBytes /
+                    operationalHealth.data.storage.safetyLimitBytes >=
+                    0.8
+                }
+              />
+              <HealthCard
+                label="AI · 30 days"
+                value={
+                  operationalHealth.data.ai.available
+                    ? operationalHealth.data.ai.telemetryAvailable
+                      ? `${operationalHealth.data.ai.requests30d} requests`
+                      : "Ready"
+                    : "Unavailable"
+                }
+                detail={
+                  !operationalHealth.data.ai.available
+                    ? "AI service configuration is unavailable"
+                    : operationalHealth.data.ai.telemetryAvailable
+                      ? `${operationalHealth.data.ai.failures30d} failures · ${(operationalHealth.data.ai.inputTokens30d + operationalHealth.data.ai.outputTokens30d).toLocaleString()} tokens${operationalHealth.data.ai.estimatedCostMicros30d === null ? " · cost unavailable" : ` · $${(operationalHealth.data.ai.estimatedCostMicros30d / 1_000_000).toFixed(2)}`}`
+                      : "Usage metering table is not available; assistant readiness is reported separately"
+                }
+                attention={
+                  !operationalHealth.data.ai.available ||
+                  !operationalHealth.data.ai.telemetryAvailable ||
+                  operationalHealth.data.ai.failures30d > 0
+                }
+              />
+              <HealthCard
+                label="Analytics"
+                value={
+                  operationalHealth.data.analytics.available
+                    ? `${operationalHealth.data.analytics.profiles} profiles`
+                    : "Unavailable"
+                }
+                detail={
+                  operationalHealth.data.analytics.available
+                    ? `${operationalHealth.data.analytics.unhealthy} unhealthy · ${operationalHealth.data.analytics.stale} stale over 7 days`
+                    : "Analytics health query failed"
+                }
+                attention={
+                  operationalHealth.data.analytics.unhealthy > 0 ||
+                  operationalHealth.data.analytics.stale > 0
+                }
+              />
+              <HealthCard
+                label="External sources"
+                value={
+                  operationalHealth.data.externalMedia.available
+                    ? `${operationalHealth.data.externalMedia.connections} connected`
+                    : "Unavailable"
+                }
+                detail={
+                  operationalHealth.data.externalMedia.available
+                    ? `${operationalHealth.data.externalMedia.unhealthy} connection${operationalHealth.data.externalMedia.unhealthy === 1 ? "" : "s"} requiring reconnection`
+                    : "Connection health query failed"
+                }
+                attention={operationalHealth.data.externalMedia.unhealthy > 0}
+              />
+            </div>
+          )
+        )}
+        {operationalHealth.data?.observedAt && (
+          <p className="mt-3 text-[11px] text-muted-foreground">
+            Observed {new Date(operationalHealth.data.observedAt).toLocaleString()}
+          </p>
+        )}
       </div>
 
       <div className="surface-card p-5">
@@ -889,10 +986,26 @@ function formatBytes(bytes: number) {
   return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
 }
 
-function HealthCard({label,value,detail,attention}:{label:string;value:string;detail:string;attention:boolean}) {
-  return <div className={`rounded-xl border p-3 ${attention?"border-warning/40 bg-warning/5":"border-border bg-elevated/40"}`}>
-    <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
-    <p className="mt-1 text-lg font-semibold text-foreground">{value}</p>
-    <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
-  </div>;
+function HealthCard({
+  label,
+  value,
+  detail,
+  attention,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  attention: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border p-3 ${attention ? "border-warning/40 bg-warning/5" : "border-border bg-elevated/40"}`}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-semibold text-foreground">{value}</p>
+      <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+    </div>
+  );
 }

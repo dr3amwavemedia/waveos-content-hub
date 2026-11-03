@@ -57,8 +57,9 @@ export function NotificationsBell() {
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
-        className="relative flex h-11 w-11 items-center justify-center rounded-xl text-muted-foreground hover:bg-elevated hover:text-foreground"
+        className="relative z-10 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl text-muted-foreground hover:bg-elevated hover:text-foreground"
         aria-label="Notifications"
         aria-expanded={open}
         aria-controls="waveos-notifications-panel"
@@ -77,7 +78,7 @@ export function NotificationsBell() {
             id="waveos-notifications-panel"
             role="dialog"
             aria-label="Notifications"
-            className="absolute right-0 top-full z-40 mt-2 w-[min(20rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl"
+            className="absolute -right-[3.25rem] top-full z-40 mt-2 w-[min(20rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-border bg-popover shadow-2xl sm:right-0"
           >
             <div className="flex min-h-12 items-center justify-between gap-3 border-b border-border px-3 py-2">
               <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">

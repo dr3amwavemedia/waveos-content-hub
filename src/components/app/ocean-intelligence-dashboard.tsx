@@ -12,14 +12,13 @@ import {
   FolderKanban,
   HeartPulse,
   Loader2,
-  MessageSquareText,
   PenSquare,
   Play,
   Send,
   Sparkles,
   WandSparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Area,
   AreaChart,
@@ -49,7 +48,6 @@ import {
   type OceanTimelineKind,
 } from "@/lib/ocean-dashboard";
 import { getAdminOperationalHealth } from "@/lib/operational-health.functions";
-import { waveAssist } from "@/lib/wave-assist.functions";
 import { getSocialIntelligenceProfile, getZernioAnalytics } from "@/lib/zernio.functions";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +73,7 @@ type HealthPayload = {
     outputTokens30d: number;
     estimatedCostMicros30d: number | null;
     available: boolean;
+    telemetryAvailable: boolean;
   };
   analytics: { profiles: number; unhealthy: number; stale: number; available: boolean };
   externalMedia: { connections: number; unhealthy: number; available: boolean };
@@ -116,19 +115,12 @@ export function OceanIntelligenceDashboard() {
   const { data: user } = useCurrentUser();
   const { can } = usePermissions();
   const navigate = useNavigate();
-  const [assistBrief, setAssistBrief] = useState("");
-  const [assistBusy, setAssistBusy] = useState(false);
-  const [assistError, setAssistError] = useState<string | null>(null);
-  const [assistMessages, setAssistMessages] = useState<
-    Array<{ role: "user" | "assistant"; content: string }>
-  >([]);
   const workspaceId = activeWorkspace?.id ?? null;
   const content = useContentItems(workspaceId);
   const shoots = useProductionCalendar(workspaceId);
   const analyticsFn = useServerFn(getZernioAnalytics);
   const intelligenceFn = useServerFn(getSocialIntelligenceProfile);
   const healthFn = useServerFn(getAdminOperationalHealth);
-  const assistFn = useServerFn(waveAssist);
   const canSeeAnalytics = can("can_view_analytics_checkup");
   const isOwner = user?.isDreamWaveOwner === true;
 
@@ -173,66 +165,6 @@ export function OceanIntelligenceDashboard() {
     { label: "Followers", metric: combineAnalyticsMetric(sources, "followers") },
   ];
   const workloadUnavailable = content.isError;
-
-  useEffect(() => {
-    if (!workspaceId) return;
-    try {
-      const stored = sessionStorage.getItem(`waveos.assist.${workspaceId}`);
-      if (stored) setAssistMessages(JSON.parse(stored).slice(-8));
-      else setAssistMessages([]);
-    } catch {
-      setAssistMessages([]);
-    }
-  }, [workspaceId]);
-
-  useEffect(() => {
-    if (!workspaceId) return;
-    sessionStorage.setItem(
-      `waveos.assist.${workspaceId}`,
-      JSON.stringify(assistMessages.slice(-8)),
-    );
-  }, [assistMessages, workspaceId]);
-
-  const submitAssist = async () => {
-    const brief = assistBrief.trim();
-    if (!brief || !workspaceId) return;
-    const prior = assistMessages.slice(-6);
-    setAssistMessages((current) =>
-      [...current, { role: "user" as const, content: brief }].slice(-8),
-    );
-    setAssistBrief("");
-    setAssistBusy(true);
-    setAssistError(null);
-    try {
-      const result = await assistFn({
-        data: {
-          mode: "advisor",
-          input: brief,
-          workspaceId,
-          conversation: prior,
-          context: JSON.stringify({
-            workspace: activeWorkspace?.name ?? "WaveOS",
-            workload: workloadUnavailable ? "unavailable" : workload,
-            performance: Object.fromEntries(
-              metrics.map(({ label, metric }) => [label.toLowerCase(), metric.value]),
-            ),
-            analyticsCoverage: analytics.isError
-              ? "unavailable"
-              : analytics.isPending
-                ? "loading"
-                : "provider sourced",
-          }),
-        },
-      });
-      setAssistMessages((current) =>
-        [...current, { role: "assistant" as const, content: result.suggestion }].slice(-8),
-      );
-    } catch (error) {
-      setAssistError(error instanceof Error ? error.message : "Wave Assist is unavailable.");
-    } finally {
-      setAssistBusy(false);
-    }
-  };
 
   return (
     <div className="ocean-dashboard relative isolate min-h-[calc(100vh-8rem)] overflow-hidden rounded-[1.75rem] border border-cyan-300/10 p-3 text-slate-50 shadow-[0_30px_100px_rgba(0,0,0,.4)] sm:p-5 xl:p-6">
@@ -492,7 +424,7 @@ export function OceanIntelligenceDashboard() {
         <aside className="min-w-0 space-y-4">
           <section
             className="ocean-panel overflow-hidden border-cyan-300/25 bg-[linear-gradient(145deg,rgba(7,34,62,.96),rgba(16,22,54,.94))] p-4 shadow-[0_18px_55px_rgba(17,217,225,.08)]"
-            aria-labelledby="wave-assist-title"
+            aria-labelledby="my-agent-title"
           >
             <div className="-mx-4 -mt-4 mb-4 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
             <div className="flex items-start gap-3">
@@ -501,109 +433,32 @@ export function OceanIntelligenceDashboard() {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <h2 id="wave-assist-title" className="text-lg font-semibold">
-                    Wave Assist
+                  <h2 id="my-agent-title" className="text-lg font-semibold">
+                    My Agent
                   </h2>
                   <span className="rounded-full border border-violet-300/20 bg-violet-300/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[.16em] text-violet-200">
-                    Premium AI
+                    Premium
                   </span>
                 </div>
                 <p className="text-xs text-slate-400">
-                  Brand-aware guidance grounded in your live WaveOS workspace.
+                  One private conversation for text or voice, grounded in your WaveOS workspace.
                 </p>
               </div>
             </div>
-            {assistMessages.length > 0 && (
-              <div aria-live="polite" className="mt-4 max-h-72 space-y-3 overflow-y-auto pr-1">
-                {assistMessages.map((message, index) => (
-                  <div
-                    key={`${message.role}-${index}`}
-                    className={cn(
-                      "rounded-xl px-3 py-2.5 text-sm leading-6",
-                      message.role === "assistant"
-                        ? "border border-cyan-200/10 bg-cyan-200/[.06] text-slate-200"
-                        : "ml-8 bg-violet-300/10 text-violet-50",
-                    )}
-                  >
-                    {message.role === "assistant" && (
-                      <span className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.15em] text-cyan-200/70">
-                        <MessageSquareText className="h-3 w-3" /> Wave Assist
-                      </span>
-                    )}
-                    <p className="whitespace-pre-wrap">{message.content}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-            {assistBusy && (
-              <div
-                className="mt-3 flex items-center gap-2 rounded-xl border border-cyan-200/10 bg-cyan-200/[.04] p-3 text-xs text-cyan-100"
-                role="status"
+            {can("can_use_ai_tools") ? (
+              <Link
+                to="/my-agent"
+                className="mt-4 flex min-h-14 items-center justify-between gap-3 rounded-xl border border-cyan-300/35 bg-[#06182d]/70 px-4 text-sm font-semibold text-cyan-50 transition-colors hover:bg-cyan-300/10"
               >
-                <Loader2 className="h-4 w-4 animate-spin" /> Reading your workspace and shaping a
-                useful answer…
-              </div>
-            )}
-            {assistError && (
-              <p className="mt-3 rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-xs text-amber-100">
-                {assistError}
-              </p>
-            )}
-            {can("can_create_content") ? (
-              <form
-                className="mt-4"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void submitAssist();
-                }}
-              >
-                <label className="sr-only" htmlFor="ocean-assist-brief">
-                  Ask Wave Assist
-                </label>
-                <div className="flex min-h-11 items-center rounded-xl border border-cyan-300/35 bg-[#06182d]/70 px-3 focus-within:ring-2 focus-within:ring-cyan-300/45">
-                  <Sparkles className="mr-2 h-4 w-4 text-cyan-300" />
-                  <input
-                    id="ocean-assist-brief"
-                    value={assistBrief}
-                    onChange={(event) => setAssistBrief(event.target.value)}
-                    placeholder="Ask for a decision, idea, or next step…"
-                    className="min-w-0 flex-1 bg-transparent text-sm text-slate-100 outline-none placeholder:text-slate-500"
-                  />
-                  <button
-                    type="submit"
-                    disabled={!assistBrief.trim() || assistBusy}
-                    className="ml-2 flex h-9 w-9 items-center justify-center rounded-lg text-cyan-200 hover:bg-cyan-300/10 disabled:opacity-35"
-                    aria-label="Ask Wave Assist"
-                  >
-                    <Send className="h-4 w-4" />
-                  </button>
-                </div>
-              </form>
+                <span>Open your conversation</span>
+                <ChevronRight className="h-4 w-4" />
+              </Link>
             ) : (
               <p className="mt-4 rounded-xl border border-white/10 p-3 text-xs text-slate-400">
-                Wave Assist opens through the existing Create Post workflow when content creation is
-                available.
+                My Agent is available when workspace intelligence is included in your plan.
               </p>
             )}
             <div className="mt-3 flex flex-wrap gap-2 text-[11px]">
-              {assistMessages.some((message) => message.role === "assistant") && (
-                <button
-                  type="button"
-                  className="ocean-chip"
-                  onClick={() => {
-                    const lastAnswer = [...assistMessages]
-                      .reverse()
-                      .find((message) => message.role === "assistant")?.content;
-                    if (lastAnswer && workspaceId)
-                      void navigate({
-                        to: "/create",
-                        search: { brief: lastAnswer.slice(0, 3000), briefWorkspace: workspaceId },
-                      });
-                  }}
-                >
-                  Turn answer into a draft
-                </button>
-              )}
               {can("can_use_campaign_manager") && (
                 <Link to="/campaigns" className="ocean-chip">
                   Plan a campaign
@@ -619,7 +474,7 @@ export function OceanIntelligenceDashboard() {
               </Link>
             </div>
             <p className="mt-3 text-[10px] leading-4 text-slate-500">
-              Suggestions only · Brand Voice aware · never publishes or changes records for you
+              One conversation · text and voice together · never publishes or changes records for you
             </p>
           </section>
 
@@ -813,9 +668,11 @@ function SystemHealthPanel({
           label: "AI",
           icon: Sparkles,
           healthy: data.ai.available && data.ai.failures30d === 0,
-          detail: data.ai.available
-            ? `${data.ai.requests30d} requests · ${data.ai.failures30d} failures`
-            : "Unavailable",
+          detail: !data.ai.available
+            ? "Service unavailable"
+            : data.ai.telemetryAvailable
+              ? `${data.ai.requests30d} requests · ${data.ai.failures30d} failures`
+              : "Ready · usage metering unavailable",
         },
         {
           label: "Analytics",

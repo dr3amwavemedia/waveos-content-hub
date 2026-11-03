@@ -83,6 +83,7 @@ const CLIENT_NAV: NavItem[] = [
     feature: "can_use_competitive_intelligence",
   },
   { to: "/home", label: "Overview", icon: Home },
+  { to: "/my-agent", label: "My Agent", icon: Sparkles, feature: "can_use_ai_tools" },
   { to: "/deliveries", label: "Deliveries", icon: Images },
   { to: "/home", hash: "invoices", label: "Invoices & Payments", icon: FileText },
   { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
@@ -131,6 +132,7 @@ const PUBLIC_OS_NAV: NavItem[] = [
     feature: "can_use_competitive_intelligence",
   },
   { to: "/home", label: "Overview", icon: Home },
+  { to: "/my-agent", label: "My Agent", icon: Sparkles, feature: "can_use_ai_tools" },
   { to: "/create", label: "Create Post", icon: PenSquare, feature: "can_create_content" },
   { to: "/social", label: "Social Media", icon: Share2, feature: "can_connect_socials" },
   {
@@ -457,6 +459,7 @@ function Shell({ children }: { children: ReactNode }) {
 
     const priority = [
       "Overview",
+      "My Agent",
       "Create Post",
       "Social Media",
       "Analytics",
@@ -490,7 +493,7 @@ function Shell({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="ocean-dashboard min-h-screen bg-background text-foreground"
+      className="ocean-dashboard waveos-app-shell min-h-screen overflow-x-clip bg-background text-foreground"
       style={workspaceThemeStyle(branding.data?.accentColor)}
     >
       {/* Sidebar — desktop */}
@@ -524,15 +527,16 @@ function Shell({ children }: { children: ReactNode }) {
       {/* Mobile top bar */}
       <header
         data-global-mobile-header
-        className="sticky top-0 z-20 border-b border-cyan-200/10 bg-[#04172b]/90 backdrop-blur-xl lg:hidden"
+        className="mobile-classic-header sticky top-0 z-30 w-full max-w-[100dvw] border-b border-cyan-200/10 bg-[#04172b]/90 backdrop-blur-xl lg:hidden"
       >
-        <div className="flex min-h-14 items-center justify-between px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
-          <WaveLogo compact />
-          <div className="flex items-center gap-2">
+        <div className="flex h-[calc(4rem+env(safe-area-inset-top))] min-w-0 items-center justify-between gap-2 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.5rem)]">
+          <WaveLogo compact className="min-w-0" />
+          <div className="flex shrink-0 items-center gap-1">
             <NotificationsBell />
             <button
+              type="button"
               onClick={() => setMobileOpen(true)}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-elevated text-foreground"
+              className="relative z-10 flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-xl border border-border bg-elevated text-foreground"
               aria-label="Open menu"
             >
               <Menu className="h-5 w-5" />
@@ -543,12 +547,12 @@ function Shell({ children }: { children: ReactNode }) {
 
       {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden" role="dialog">
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog">
           <div
             className="absolute inset-0 bg-background/70 backdrop-blur"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 flex w-[min(18rem,82vw)] flex-col border-r border-cyan-200/10 bg-[#031326]/98 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] shadow-2xl">
+          <div className="mobile-classic-drawer absolute inset-y-0 left-0 flex w-[min(18rem,82vw)] flex-col border-r border-cyan-200/10 bg-[#031326]/98 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] shadow-2xl">
             <div className="flex items-center justify-between">
               <WaveLogo />
               <button
@@ -634,7 +638,7 @@ function Shell({ children }: { children: ReactNode }) {
       </main>
 
       {createSheetOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-label="Create">
+        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-label="Create">
           <div
             className="absolute inset-0 bg-background/70 backdrop-blur"
             onClick={() => setCreateSheetOpen(false)}
@@ -691,7 +695,7 @@ function Shell({ children }: { children: ReactNode }) {
       )}
 
       {/* Mobile bottom nav */}
-      <nav className="fixed inset-x-0 bottom-0 z-20 flex items-end justify-around rounded-t-3xl border-t border-cyan-200/10 bg-[#04172b]/92 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[var(--shadow-elevated)] backdrop-blur-xl lg:hidden">
+      <nav className="mobile-classic-nav fixed inset-x-0 bottom-0 z-30 flex max-w-[100dvw] items-end justify-around rounded-t-3xl border-t border-cyan-200/10 bg-[#04172b]/92 px-1 pb-[max(.35rem,env(safe-area-inset-bottom))] pt-1.5 shadow-[var(--shadow-elevated)] backdrop-blur-xl lg:hidden">
         {(showCreateFab ? barNav.slice(0, 2) : barNav).map((item) => (
           <MobileNavLink key={`${item.to}#${item.hash ?? ""}`} item={item} />
         ))}
@@ -816,9 +820,11 @@ function NavGroup({ items, className }: { items: NavItem[]; className?: string }
 // Routes and permissions stay unchanged; this only controls mobile organization.
 const MOBILE_PERSONAL_PATHS = new Set([
   "/home",
+  "/my-agent",
   "/create",
   "/social",
   "/creative-studio",
+  "/video-maker",
   "/campaigns",
   "/analytics",
   "/competitive-intelligence",

@@ -12,7 +12,7 @@ interface WaveLogoProps {
 export function WaveLogo({ compact, className }: WaveLogoProps) {
   return (
     <div className={cn("flex items-center gap-2.5", className)}>
-      <span className="relative flex h-8 w-8 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary to-primary-glow shadow-[0_0_24px_-4px_var(--color-primary)]">
+      <span className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-primary to-primary-glow shadow-[0_0_24px_-4px_var(--color-primary)]">
         <svg
           viewBox="0 0 32 32"
           className="h-5 w-5 text-primary-foreground"
@@ -27,10 +27,8 @@ export function WaveLogo({ compact, className }: WaveLogoProps) {
           <path d="M3 12c3-4 6-4 9 0s6 4 9 0 6-4 8 0" opacity="0.6" />
         </svg>
       </span>
-      <div className="flex flex-col leading-none">
-        <span className="text-sm font-bold tracking-tight text-foreground">
-          WaveOS
-        </span>
+      <div className="flex min-w-0 flex-col leading-none">
+        <span className="truncate text-sm font-bold tracking-tight text-foreground">WaveOS</span>
         {!compact && (
           <span className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
             by Dream Wave Media

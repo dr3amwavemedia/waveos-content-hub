@@ -37,6 +37,7 @@ import { Route as AuthenticatedCrmRouteImport } from './routes/_authenticated/cr
 import { Route as AuthenticatedDeliveriesRouteImport } from './routes/_authenticated/deliveries'
 import { Route as AuthenticatedFeedbackRouteImport } from './routes/_authenticated/feedback'
 import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
+import { Route as AuthenticatedMyAgentRouteImport } from './routes/_authenticated/my-agent'
 import { Route as AuthenticatedMyProjectsRouteImport } from './routes/_authenticated/my-projects'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedOsDataRouteImport } from './routes/_authenticated/os-data'
@@ -54,6 +55,7 @@ import { Route as AuthenticatedTemplatesRouteImport } from './routes/_authentica
 import { Route as AuthenticatedToolsRouteImport } from './routes/_authenticated/tools'
 import { Route as AuthenticatedTrendingNowRouteImport } from './routes/_authenticated/trending-now'
 import { Route as AuthenticatedUpdatesRouteImport } from './routes/_authenticated/updates'
+import { Route as AuthenticatedVideoMakerRouteImport } from './routes/_authenticated/video-maker'
 import { Route as AuthenticatedVideographerRouteImport } from './routes/_authenticated/videographer'
 import { Route as AuthenticatedVisionBoardRouteImport } from './routes/_authenticated/vision-board'
 import { Route as AuthenticatedVisionStudioRouteImport } from './routes/_authenticated/vision-studio'
@@ -228,6 +230,11 @@ const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
   path: '/home',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedMyAgentRoute = AuthenticatedMyAgentRouteImport.update({
+  id: '/my-agent',
+  path: '/my-agent',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedMyProjectsRoute = AuthenticatedMyProjectsRouteImport.update({
   id: '/my-projects',
   path: '/my-projects',
@@ -315,6 +322,11 @@ const AuthenticatedTrendingNowRoute =
 const AuthenticatedUpdatesRoute = AuthenticatedUpdatesRouteImport.update({
   id: '/updates',
   path: '/updates',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedVideoMakerRoute = AuthenticatedVideoMakerRouteImport.update({
+  id: '/video-maker',
+  path: '/video-maker',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedVideographerRoute =
@@ -509,6 +521,7 @@ export interface FileRoutesByFullPath {
   '/deliveries': typeof AuthenticatedDeliveriesRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/my-agent': typeof AuthenticatedMyAgentRoute
   '/my-projects': typeof AuthenticatedMyProjectsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/os-data': typeof AuthenticatedOsDataRoute
@@ -526,6 +539,7 @@ export interface FileRoutesByFullPath {
   '/tools': typeof AuthenticatedToolsRoute
   '/trending-now': typeof AuthenticatedTrendingNowRoute
   '/updates': typeof AuthenticatedUpdatesRoute
+  '/video-maker': typeof AuthenticatedVideoMakerRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -585,6 +599,7 @@ export interface FileRoutesByTo {
   '/deliveries': typeof AuthenticatedDeliveriesRoute
   '/feedback': typeof AuthenticatedFeedbackRoute
   '/home': typeof AuthenticatedHomeRoute
+  '/my-agent': typeof AuthenticatedMyAgentRoute
   '/my-projects': typeof AuthenticatedMyProjectsRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/os-data': typeof AuthenticatedOsDataRoute
@@ -602,6 +617,7 @@ export interface FileRoutesByTo {
   '/tools': typeof AuthenticatedToolsRoute
   '/trending-now': typeof AuthenticatedTrendingNowRoute
   '/updates': typeof AuthenticatedUpdatesRoute
+  '/video-maker': typeof AuthenticatedVideoMakerRoute
   '/videographer': typeof AuthenticatedVideographerRoute
   '/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -663,6 +679,7 @@ export interface FileRoutesById {
   '/_authenticated/deliveries': typeof AuthenticatedDeliveriesRoute
   '/_authenticated/feedback': typeof AuthenticatedFeedbackRoute
   '/_authenticated/home': typeof AuthenticatedHomeRoute
+  '/_authenticated/my-agent': typeof AuthenticatedMyAgentRoute
   '/_authenticated/my-projects': typeof AuthenticatedMyProjectsRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/os-data': typeof AuthenticatedOsDataRoute
@@ -680,6 +697,7 @@ export interface FileRoutesById {
   '/_authenticated/tools': typeof AuthenticatedToolsRoute
   '/_authenticated/trending-now': typeof AuthenticatedTrendingNowRoute
   '/_authenticated/updates': typeof AuthenticatedUpdatesRoute
+  '/_authenticated/video-maker': typeof AuthenticatedVideoMakerRoute
   '/_authenticated/videographer': typeof AuthenticatedVideographerRoute
   '/_authenticated/vision-board': typeof AuthenticatedVisionBoardRouteWithChildren
   '/_authenticated/vision-studio': typeof AuthenticatedVisionStudioRoute
@@ -741,6 +759,7 @@ export interface FileRouteTypes {
     | '/deliveries'
     | '/feedback'
     | '/home'
+    | '/my-agent'
     | '/my-projects'
     | '/onboarding'
     | '/os-data'
@@ -758,6 +777,7 @@ export interface FileRouteTypes {
     | '/tools'
     | '/trending-now'
     | '/updates'
+    | '/video-maker'
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
@@ -817,6 +837,7 @@ export interface FileRouteTypes {
     | '/deliveries'
     | '/feedback'
     | '/home'
+    | '/my-agent'
     | '/my-projects'
     | '/onboarding'
     | '/os-data'
@@ -834,6 +855,7 @@ export interface FileRouteTypes {
     | '/tools'
     | '/trending-now'
     | '/updates'
+    | '/video-maker'
     | '/videographer'
     | '/vision-board'
     | '/vision-studio'
@@ -894,6 +916,7 @@ export interface FileRouteTypes {
     | '/_authenticated/deliveries'
     | '/_authenticated/feedback'
     | '/_authenticated/home'
+    | '/_authenticated/my-agent'
     | '/_authenticated/my-projects'
     | '/_authenticated/onboarding'
     | '/_authenticated/os-data'
@@ -911,6 +934,7 @@ export interface FileRouteTypes {
     | '/_authenticated/tools'
     | '/_authenticated/trending-now'
     | '/_authenticated/updates'
+    | '/_authenticated/video-maker'
     | '/_authenticated/videographer'
     | '/_authenticated/vision-board'
     | '/_authenticated/vision-studio'
@@ -1176,6 +1200,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedHomeRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/my-agent': {
+      id: '/_authenticated/my-agent'
+      path: '/my-agent'
+      fullPath: '/my-agent'
+      preLoaderRoute: typeof AuthenticatedMyAgentRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/my-projects': {
       id: '/_authenticated/my-projects'
       path: '/my-projects'
@@ -1293,6 +1324,13 @@ declare module '@tanstack/react-router' {
       path: '/updates'
       fullPath: '/updates'
       preLoaderRoute: typeof AuthenticatedUpdatesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/video-maker': {
+      id: '/_authenticated/video-maker'
+      path: '/video-maker'
+      fullPath: '/video-maker'
+      preLoaderRoute: typeof AuthenticatedVideoMakerRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/videographer': {
@@ -1540,6 +1578,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDeliveriesRoute: typeof AuthenticatedDeliveriesRoute
   AuthenticatedFeedbackRoute: typeof AuthenticatedFeedbackRoute
   AuthenticatedHomeRoute: typeof AuthenticatedHomeRoute
+  AuthenticatedMyAgentRoute: typeof AuthenticatedMyAgentRoute
   AuthenticatedMyProjectsRoute: typeof AuthenticatedMyProjectsRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOsDataRoute: typeof AuthenticatedOsDataRoute
@@ -1557,6 +1596,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedToolsRoute: typeof AuthenticatedToolsRoute
   AuthenticatedTrendingNowRoute: typeof AuthenticatedTrendingNowRoute
   AuthenticatedUpdatesRoute: typeof AuthenticatedUpdatesRoute
+  AuthenticatedVideoMakerRoute: typeof AuthenticatedVideoMakerRoute
   AuthenticatedVideographerRoute: typeof AuthenticatedVideographerRoute
   AuthenticatedVisionBoardRoute: typeof AuthenticatedVisionBoardRouteWithChildren
   AuthenticatedVisionStudioRoute: typeof AuthenticatedVisionStudioRoute
@@ -1582,6 +1622,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDeliveriesRoute: AuthenticatedDeliveriesRoute,
   AuthenticatedFeedbackRoute: AuthenticatedFeedbackRoute,
   AuthenticatedHomeRoute: AuthenticatedHomeRoute,
+  AuthenticatedMyAgentRoute: AuthenticatedMyAgentRoute,
   AuthenticatedMyProjectsRoute: AuthenticatedMyProjectsRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOsDataRoute: AuthenticatedOsDataRoute,
@@ -1599,6 +1640,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedToolsRoute: AuthenticatedToolsRoute,
   AuthenticatedTrendingNowRoute: AuthenticatedTrendingNowRoute,
   AuthenticatedUpdatesRoute: AuthenticatedUpdatesRoute,
+  AuthenticatedVideoMakerRoute: AuthenticatedVideoMakerRoute,
   AuthenticatedVideographerRoute: AuthenticatedVideographerRoute,
   AuthenticatedVisionBoardRoute: AuthenticatedVisionBoardRouteWithChildren,
   AuthenticatedVisionStudioRoute: AuthenticatedVisionStudioRoute,

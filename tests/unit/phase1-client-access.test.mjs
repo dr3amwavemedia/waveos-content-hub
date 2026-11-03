@@ -7,7 +7,7 @@ const permissions = read("src/hooks/use-permissions.ts");
 assert.match(permissions, /PUBLIC_OS_CURRENT_FEATURES/);
 assert.match(
   permissions,
-  /subscription\?\.plan === "full" \|\| subscription\?\.plan === "expanded"/,
+  /subscription\?\.status === "trialing" \|\|\s*subscription\?\.plan === "full" \|\|\s*subscription\?\.plan === "expanded"/,
 );
 assert.match(permissions, /can_view_analytics_checkup/);
 
@@ -41,6 +41,9 @@ assert.doesNotMatch(creative, /video\/|FileVideo/);
 
 const createPost = read("src/routes/_authenticated/create.tsx");
 assert.match(createPost, /search\.media/);
-assert.match(createPost, /Creative Studio image added/);
+assert.match(createPost, /const mediaLabel = handedOffAsset\?\.mime_type\.startsWith\("video\/"\)/);
+assert.match(createPost, /\? "Video" : "Media"/);
+assert.match(createPost, /`\$\{mediaLabel\} added to this feed post draft\.`/);
+assert.match(createPost, /poster=\{asset\.thumbnail_url \?\? undefined\}/);
 
 console.log("Phase 1 client access and safety boundaries passed");

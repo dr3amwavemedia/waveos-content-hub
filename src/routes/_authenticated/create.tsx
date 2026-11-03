@@ -138,7 +138,7 @@ function CreatePost() {
   const briefApplied = useRef<string | null>(null);
   const [pendingBrief,setPendingBrief] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
-  const [platforms, setPlatforms] = useState<SocialPlatform[]>(["instagram"]);
+  const [platforms, setPlatforms] = useState<SocialPlatform[]>([]);
   const [pickedMedia, setPickedMedia] = useState<string[]>([]);
   const [scheduledAt, setScheduledAt] = useState<string>("");
   const [activePlatform, setActivePlatform] = useState<SocialPlatform>("instagram");
@@ -149,17 +149,32 @@ function CreatePost() {
   const restoredStudio=useRef<string|null>(null);
 
   useEffect(() => {
-    if (search.studio || !search.media || editingId || pickedMedia.length) return;
+    if (
+      search.studio ||
+      !search.media ||
+      editingId ||
+      pickedMedia.length ||
+      composerAssets.isPending
+    ) return;
     setPickedMedia([search.media]);
+    const handedOffAsset = composerAssets.data?.find((asset) => asset.id === search.media);
+    const mediaLabel = handedOffAsset?.mime_type.startsWith("video/") ? "Video" : "Media";
     if (search.destination === "story") {
       setPlatforms(["instagram"]);
       setActivePlatform("instagram");
       setDraftPlatformOptions({ instagram: { contentType: "story" } });
-      toast.success("Creative Studio image added to an Instagram Story draft.");
+      toast.success(`${mediaLabel} added to an Instagram Story draft.`);
     } else {
-      toast.success("Creative Studio image added to this feed post draft.");
+      toast.success(`${mediaLabel} added to this feed post draft.`);
     }
-  }, [editingId, pickedMedia.length, search.destination, search.media]);
+  }, [
+    composerAssets.data,
+    composerAssets.isPending,
+    editingId,
+    pickedMedia.length,
+    search.destination,
+    search.media,
+  ]);
 
   const draftStorageKey = workspaceId ? `waveos-create-draft-${workspaceId}` : null;
 
@@ -284,16 +299,34 @@ function CreatePost() {
     }
     setSavedId(it.id);
   }, [existing.data?.item?.id]);
-  useEffect(()=>{
-    if(!search.studio || !workspaceId || restoredStudio.current===search.studio)return;
-    try{const raw=sessionStorage.getItem(studioPostKey(workspaceId,search.studio));if(!raw)return;
-      const snapshot=JSON.parse(raw) as StudioPostSnapshot;
-      if(snapshot.workspaceId!==workspaceId || snapshot.id!==search.id)return;
-      setTitle(snapshot.title);setCaption(snapshot.caption);setPlatforms(snapshot.platforms.filter((p):p is SocialPlatform=>ALL_PLATFORMS.includes(p as SocialPlatform)));
-      setPickedMedia(studioReturnedMedia(snapshot,search.media));setScheduledAt(snapshot.scheduledAt);setDraftPlatformOptions(snapshot.platformOptions);setSavedId(snapshot.id??null);
-      restoredStudio.current=search.studio;
-    }catch{toast.error("The originating post could not be restored. Your saved posts are unchanged.");}
-  },[search.studio,search.media,workspaceId,search.id]);
+  useEffect(() => {
+    if (!search.studio || !workspaceId || restoredStudio.current === search.studio) return;
+
+    try {
+      const raw = sessionStorage.getItem(studioPostKey(workspaceId, search.studio));
+      if (!raw) return;
+
+      const snapshot = JSON.parse(raw) as StudioPostSnapshot;
+      if (snapshot.workspaceId !== workspaceId || snapshot.id !== search.id) return;
+
+      const restoredPlatforms = snapshot.platforms.filter(
+        (platform): platform is SocialPlatform =>
+          ALL_PLATFORMS.includes(platform as SocialPlatform),
+      );
+
+      setTitle(snapshot.title);
+      setCaption(snapshot.caption);
+      setPlatforms(restoredPlatforms);
+      if (restoredPlatforms[0]) setActivePlatform(restoredPlatforms[0]);
+      setPickedMedia(studioReturnedMedia(snapshot, search.media));
+      setScheduledAt(snapshot.scheduledAt);
+      setDraftPlatformOptions(snapshot.platformOptions);
+      setSavedId(snapshot.id ?? null);
+      restoredStudio.current = search.studio;
+    } catch {
+      toast.error("The originating post could not be restored. Your saved posts are unchanged.");
+    }
+  }, [search.studio, search.media, workspaceId, search.id]);
 
   const publishFn = useServerFn(publishContentItem);
   const assist = useServerFn(waveAssist);
@@ -652,7 +685,7 @@ function CreatePost() {
     setSavedId(null);
     setTitle("");
     setCaption("");
-    setPlatforms(["instagram"]);
+    setPlatforms([]);
     setPickedMedia([]);
     setScheduledAt("");
     setActivePlatform("instagram");
@@ -816,7 +849,7 @@ function CreatePost() {
           </div>
 
           <details className="order-3 border-b border-border pb-5" open={undefined}>
-            <summary className="cursor-pointer py-2 text-sm font-semibold">Platform settings · {platforms.join(", ")}</summary>
+            <summary className="cursor-pointer py-2 text-sm font-semibold">Platform settings{platforms.length ? ` · ${platforms.join(", ")}` : ""}</summary>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-foreground">Per-platform captions</div>
@@ -833,17 +866,12 @@ function CreatePost() {
                 setPlatforms((current) => {
                   const isEnabled = current.includes(p);
 
-                  if (isEnabled && current.length === 1) {
-                    toast.error("At least one platform must remain selected.");
-                    return current;
-                  }
-
                   const nextPlatforms = isEnabled
                     ? current.filter((platform) => platform !== p)
                     : [...current, p];
 
                   if (activePlatform === p && isEnabled) {
-                    setActivePlatform(nextPlatforms[0]);
+                    setActivePlatform(nextPlatforms[0] ?? p);
                   }
 
                   if (!isEnabled) {
@@ -855,34 +883,40 @@ function CreatePost() {
               }}
               locked={locked}
             />
-            <div className="mt-4">
-              <VariantEditor
-                contentId={savedId}
-                variants={existing.data?.variants ?? []}
-                platform={activePlatform}
-                connections={(socialConnections.data ?? []).filter(
-                  (connection) =>
-                    connection.connected && connection.connection_state === "connected",
+            {platforms.length > 0 ? (
+              <div className="mt-4">
+                <VariantEditor
+                  contentId={savedId}
+                  variants={existing.data?.variants ?? []}
+                  platform={activePlatform}
+                  connections={(socialConnections.data ?? []).filter(
+                    (connection) =>
+                      connection.connected && connection.connection_state === "connected",
+                  )}
+                  primaryCaption={caption}
+                  locked={locked}
+                  draftOptions={draftPlatformOptions[activePlatform] ?? {}}
+                  onDraftOptionsChange={(options) =>
+                    setDraftPlatformOptions((current) => ({
+                      ...current,
+                      [activePlatform]: options,
+                    }))
+                  }
+                  onUpdate={async (id, patch) => {
+                    await updateVariant.mutateAsync({ id, patch });
+                  }}
+                />
+                {!savedId && (
+                  <p className="mt-3 rounded-lg border border-dashed border-border bg-elevated/40 p-3 text-xs text-muted-foreground">
+                    Per-platform captions become editable after you save the draft.
+                  </p>
                 )}
-                primaryCaption={caption}
-                locked={locked}
-                draftOptions={draftPlatformOptions[activePlatform] ?? {}}
-                onDraftOptionsChange={(options) =>
-                  setDraftPlatformOptions((current) => ({
-                    ...current,
-                    [activePlatform]: options,
-                  }))
-                }
-                onUpdate={async (id, patch) => {
-                  await updateVariant.mutateAsync({ id, patch });
-                }}
-              />
-              {!savedId && (
-                <p className="mt-3 rounded-lg border border-dashed border-border bg-elevated/40 p-3 text-xs text-muted-foreground">
-                  Per-platform captions become editable after you save the draft.
-                </p>
-              )}
-            </div>
+              </div>
+            ) : (
+              <p className="mt-4 rounded-lg border border-dashed border-border bg-elevated/40 p-3 text-sm text-muted-foreground">
+                {"Select the exact connected platform you want this post to use. WaveOS will not add a linked Meta account automatically."}
+              </p>
+            )}
           </details>
         </div>
 
@@ -1538,12 +1572,28 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
           onError={() => setFailed(true)}
         />
       ) : kind === "video" ? (
-        <video
-          src={preview!.url!}
-          className="h-full w-full object-cover"
-          muted
-          onError={() => setFailed(true)}
-        />
+        <>
+          <video
+            src={preview!.url!}
+            poster={asset.thumbnail_url ?? undefined}
+            className="h-full w-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(event) => {
+              if (
+                Number.isFinite(event.currentTarget.duration) &&
+                event.currentTarget.duration > 0.01
+              )
+                event.currentTarget.currentTime = 0.01;
+            }}
+            onError={() => setFailed(true)}
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 bg-gradient-to-t from-black/80 to-transparent px-3 pb-3 pt-8 text-left text-xs text-white">
+            <FileVideo className="h-4 w-4 shrink-0" />
+            <span className="truncate">{asset.name}</span>
+          </div>
+        </>
       ) : (
         <div className="flex h-full w-full items-center justify-center p-2 text-center text-xs text-muted-foreground">
           {asset.name}

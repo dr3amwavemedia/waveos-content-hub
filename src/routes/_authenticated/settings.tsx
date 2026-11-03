@@ -131,6 +131,17 @@ function SettingsPage() {
   );
   const canViewFinancials = canViewClientFinancials(activeWorkspace?.role);
   const automaticApproval = activeWorkspace?.approval_required === false;
+  const activeWorkspaceAccess = !activeWorkspace
+    ? "—"
+    : user?.isDreamWaveOwner
+      ? "Dream Wave Owner"
+      : user?.isStaff || activeWorkspace.role === "staff"
+        ? "Dream Wave Team"
+        : activeWorkspace.data_source === "os_data"
+          ? activeWorkspace.role === "owner"
+            ? "Workspace Owner"
+            : "Workspace Member"
+          : clientAccountAccessLabel(clientAccountAccess(activeWorkspace.role));
   const updateApproval = useMutation({
     mutationFn: async (enabled: boolean) => {
       if (!activeWorkspace) throw new Error("No workspace selected.");
@@ -199,7 +210,9 @@ function SettingsPage() {
           <dl className="mt-4 space-y-3 text-sm">
             <Row
               label="Name"
-              value={[user?.firstName, user?.lastName].filter(Boolean).join(" ") || "—"}
+              value={
+                [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "—"
+              }
             />
             <Row label="Email" value={user?.email ?? "—"} />
             <Row
@@ -227,11 +240,7 @@ function SettingsPage() {
             <Row label="Timezone" value={activeWorkspace?.timezone ?? "—"} />
             <Row
               label="Your access"
-              value={
-                activeWorkspace
-                  ? clientAccountAccessLabel(clientAccountAccess(activeWorkspace.role))
-                  : "—"
-              }
+              value={activeWorkspaceAccess}
             />
           </dl>
         </div>
@@ -1070,7 +1079,7 @@ function StorageConnectionCard({
             {status.isLoading
               ? "Checking connection…"
               : reconnectRequired
-                ? "Reconnect required — Drive permission is missing"
+                ? `Reconnect required — ${label} authorization can no longer refresh`
                 : connected
                   ? status.data?.account?.email || "Connected"
                   : configured

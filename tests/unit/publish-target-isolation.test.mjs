@@ -5,11 +5,9 @@ import {
   assertSingleTargetRequest,
   destinationHeadline,
   destinationLines,
-  META_SHARING_WARNING,
   providerPlatformFor,
   readTargetSummary,
   sameDestinations,
-  showMetaSharingWarning,
   unexpectedResponseTargets,
   unexpectedTargetMessage,
 } from "../../src/lib/publish-targets.ts";
@@ -185,23 +183,11 @@ const connections = [
 
 test("destination line names the only target, or lists each one", () => {
   const one = destinationLines(["instagram"], connections);
-  assert.equal(destinationHeadline(one), "Publishing only to Instagram · @organicskin");
+  assert.equal(destinationHeadline(one), "Publishing to Instagram · @organicskin");
   const two = destinationLines(["instagram", "tiktok"], connections);
   assert.equal(destinationHeadline(two), "Publishing to 2 destinations");
   assert.deepEqual(two.map((line) => line.text), ["Instagram · @organicskin", "TikTok · @organictt"]);
   assert.equal(destinationLines(["youtube"], connections)[0].connected, false);
-});
-
-test("Meta warning shows only for Instagram without Facebook when Facebook is connected", () => {
-  assert.equal(showMetaSharingWarning(["instagram"], connections), true);
-  assert.equal(showMetaSharingWarning(["instagram", "facebook"], connections), false);
-  assert.equal(showMetaSharingWarning(["facebook"], connections), false);
-  assert.equal(showMetaSharingWarning(["tiktok"], connections), false);
-  assert.equal(showMetaSharingWarning(["instagram"], connections.filter((row) => row.platform !== "facebook")), false);
-  assert.equal(
-    META_SHARING_WARNING,
-    "WaveOS will send only to Instagram. If Meta automatic sharing is enabled in Accounts Center, Meta may still copy it to Facebook.",
-  );
 });
 
 test("publisher runs the invariant before claim and immediately before create, keeps the idempotency key", () => {
@@ -229,6 +215,8 @@ test("editor publishes the saved selection it showed and shows the destination a
   assert.ok(desktop > 0 && desktop < editor.indexOf("Post now", desktop));
   const mobile = editor.indexOf("<PublishDestinations\n          compact");
   assert.ok(mobile > 0 && mobile < editor.indexOf("onClick={handlePublishNow}><Send", mobile));
-  assert.match(editor, /metaWarning=\{metaSharingWarning\}/);
+  assert.doesNotMatch(editor, /metaWarning=\{metaSharingWarning\}/);
+  assert.match(editor, /useState<SocialPlatform\[]>\(\[\]\)/);
+  assert.match(editor, /WaveOS will not add a linked Meta account automatically/);
   assert.match(editor, /if \(draftStorageKey\) window\.localStorage\.removeItem\(draftStorageKey\);\s*return item\.id;/);
 });

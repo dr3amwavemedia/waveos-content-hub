@@ -9,6 +9,7 @@ const migration = fs.readFileSync(
 const health = fs.readFileSync("src/lib/operational-health.functions.ts", "utf8");
 const campaign = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
 const studio = fs.readFileSync("src/routes/_authenticated/creative-studio.tsx", "utf8");
+const videoMaker = fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8");
 const aiUsage = fs.readFileSync("src/lib/ai-usage.server.ts", "utf8");
 
 test("AI telemetry is server-only and contains no prompt or generated-content columns", () => {
@@ -34,8 +35,11 @@ test("campaign behavior stays approval-first while exposing explicit optimizatio
 test("admin health is owner-gated and reports AI plus analytics without secrets", () => {
   assert.match(health, /eq\("role", "dream_wave_owner"\)/);
   assert.match(health, /ai_usage_events/);
+  assert.match(health, /telemetryAvailable/);
+  assert.match(health, /LOVABLE_API_KEY/);
   assert.match(health, /social_intelligence_profiles/);
   assert.doesNotMatch(health, /access_token_encrypted|refresh_token_encrypted|api_key|secret_key/);
+  assert.doesNotMatch(health, /expired connections/);
 });
 
 test("Creative Studio mobile landing has only the three requested primary choices", () => {
@@ -46,5 +50,9 @@ test("Creative Studio mobile landing has only the three requested primary choice
   assert.match(landing, /Graphic Design/);
   assert.match(landing, /Photo Editor/);
   assert.match(landing, /Video Editor/);
+  assert.match(landing, /navigate\(\{ to: "\/video-maker" \}\)/);
   assert.doesNotMatch(landing, /Resize Content|Brand Template/);
+  assert.match(videoMaker, /Choose or upload a video/);
+  assert.match(videoMaker, /getMediaPreviewUrl/);
+  assert.match(videoMaker, /to: "\/create"/);
 });

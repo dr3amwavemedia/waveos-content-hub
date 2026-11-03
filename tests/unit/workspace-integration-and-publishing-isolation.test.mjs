@@ -49,10 +49,15 @@ test("Google Drive rejects partial consent and resets remembered authorization o
   assert.match(externalServer, /oauth2\.googleapis\.com\/revoke/);
   assert.match(externalRoute, /include_granted_scopes: "false"/);
   assert.match(externalRoute, /revokeExternalConnection/);
+  assert.match(externalRoute, /tokenExpired && !connection\?\.refresh_token_encrypted/);
+  assert.match(externalRoute, /connected: Boolean\(connection\) && !reconnectRequired/);
   assert.match(externalCallback, /google_scope_required/);
   assert.match(externalCallback, /hasGoogleDriveScope/);
   assert.match(externalFilesRoute, /drive\/v3\/about\?fields=user/);
-  assert.match(settingsRoute, /Reconnect required — Drive permission is missing/);
+  assert.match(
+    settingsRoute,
+    /Reconnect required — \$\{label\} authorization can no longer refresh/,
+  );
   assert.match(settingsRoute, /waveos:external-media-oauth/);
   assert.match(settingsRoute, /max-width: 767px/);
   assert.match(settingsRoute, /reconnectRequired[\s\S]*disconnectExternalMedia/);
