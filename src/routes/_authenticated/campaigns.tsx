@@ -118,6 +118,8 @@ interface CampaignPlanRow {
   optimization_mode: "automatic" | "approval_required";
   status: string;
   created_at: string;
+  primary_caption?: string | null;
+  internal_notes?: string | null;
 }
 
 interface CampaignLinkedContentRow {
@@ -235,7 +237,7 @@ function CampaignManagerPage() {
     queryFn: async () => {
       const { data, error } = await db
         .from("content_items")
-        .select("id,title,status,scheduled_at,media_asset_ids,metadata,created_at")
+        .select("id,title,status,scheduled_at,media_asset_ids,metadata,created_at,primary_caption,internal_notes")
         .eq("workspace_id", workspaceId!)
         .order("created_at", { ascending: false })
         .limit(300);
@@ -349,7 +351,8 @@ function CampaignManagerPage() {
           workspace_id: workspaceId,
           created_by: auth.user.id,
           title: `${input.name} · ${asset.name}`.slice(0, 180),
-          primary_caption: plannedItem?.copyBrief ?? "",
+          internal_notes: plannedItem?.copyBrief ?? null,
+          primary_caption: null,
           hashtags: [],
           media_asset_ids: [asset.id],
           status: "draft",
@@ -363,16 +366,45 @@ function CampaignManagerPage() {
             platform: plannedItem?.platform ?? null,
             contentFormat: plannedItem?.contentFormat ?? null,
             contentPillar: plannedItem?.pillar ?? null,
+            captionState: "needs_generation",
           },
         };
       });
-      const { error: contentError } = await db.from("content_items").insert(linkedRows);
+      const { data: createdContent, error: contentError } = await db
+        .from("content_items")
+        .insert(linkedRows)
+        .select("id,metadata");
       if (contentError) {
         console.error("Campaign saved but linked content could not be created", {
           campaignPlanId: plan.id,
           message: contentError.message,
         });
         return { planId: plan.id as string, contentLinked: false };
+      }
+
+      const variantRows = (createdContent ?? []).flatMap((content: any) => {
+        const metadata =
+          content.metadata && typeof content.metadata === "object" ? content.metadata : {};
+        const platform = typeof metadata.platform === "string" ? metadata.platform : null;
+        if (!platform || !PLATFORM_OPTIONS.includes(platform)) return [];
+        return [{
+          content_item_id: content.id,
+          workspace_id: workspaceId,
+          platform,
+          enabled: true,
+          caption: "",
+          platform_options:
+            metadata.contentFormat === "story" ? { contentType: "story" } : {},
+        }];
+      });
+      if (variantRows.length) {
+        const { error: variantError } = await db.from("post_variants").insert(variantRows);
+        if (variantError) {
+          console.error("Campaign content saved but platform variants could not be created", {
+            campaignPlanId: plan.id,
+            message: variantError.message,
+          });
+        }
       }
       return { planId: plan.id as string, contentLinked: true };
     },
@@ -770,8 +802,13 @@ function CampaignManagerPage() {
                           <p className="truncate text-sm font-semibold">{item.title || `Campaign post ${index + 1}`}</p>
                           <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
                             {item.status.replaceAll("_", " ")}
-                            {item.scheduled_at ? ` · ${new Date(item.scheduled_at).toLocaleString()}` : ""}
+                            {typeof item.metadata?.platform === "string" ? ` · ${item.metadata.platform}` : ""}
+                            {typeof item.metadata?.plannedDate === "string" ? ` · ${item.metadata.plannedDate}` : ""}
+                            {typeof item.metadata?.plannedTime === "string" ? ` ${item.metadata.plannedTime}` : ""}
                           </p>
+                          {!item.primary_caption && (
+                            <p className="mt-1 text-[10px] font-medium text-amber-300">Caption still needs Brand Voice generation</p>
+                          )}
                         </div>
                         <Button asChild size="sm" variant="outline">
                           <Link
