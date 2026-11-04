@@ -1538,7 +1538,7 @@ function MyAgentPage() {
       {showAgentMediaPicker && workspaceId && (
         <MediaPicker
           workspaceId={workspaceId}
-          picked={agentPickedMedia}
+          picked={activeTool === "campaign" && campaignStep === 5 ? campaignMediaIds : agentPickedMedia}
           onClose={() => setShowAgentMediaPicker(false)}
           onConfirm={(ids) => {
             if (activeTool === "campaign" && campaignStep === 5) {
