@@ -57,6 +57,9 @@
   --color-analytics: var(--analytics);
   --color-intelligence: var(--intelligence);
   --color-campaign: var(--campaign);
+  --color-neon-cyan: var(--neon-cyan);
+  --color-neon-violet: var(--neon-violet);
+  --color-stage: var(--stage);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -68,6 +71,13 @@
 }
 :root {
   --radius: 0.75rem;
+
+  /* WaveOS studio neon accents (Campaign Manager, Video Maker) */
+  --neon-cyan: oklch(0.86 0.14 195);
+  --neon-violet: oklch(0.66 0.22 295);
+  --stage: oklch(0.09 0.012 260);
+  --gradient-neon: linear-gradient(90deg, var(--neon-cyan), var(--neon-violet));
+  --shadow-neon: 0 0 22px -6px color-mix(in oklab, var(--neon-cyan) 60%, transparent);
 
   /* Backgrounds — deep, near-black navy */
   --background: oklch(0.14 0.02 260); /* ~#05080F */
