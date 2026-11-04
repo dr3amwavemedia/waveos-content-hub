@@ -877,6 +877,13 @@ function CreatePost() {
               workspaceId={workspaceId}
               picked={pickedMedia}
               onRemove={(id) => setPickedMedia((cur) => cur.filter((x) => x !== id))}
+              onReorder={(from, to) => setPickedMedia((current) => {
+                if (from === to || from < 0 || to < 0 || from >= current.length || to >= current.length) return current;
+                const reordered = [...current];
+                const [moved] = reordered.splice(from, 1);
+                reordered.splice(to, 0, moved);
+                return reordered;
+              })}
             />
             {pickedMedia.length>0 && <div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0],true)}><PenSquare/>Edit</Button><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0])}><Sparkles/>Design</Button><Button variant="ghost" disabled={locked} onClick={()=>setShowLibrary(true)}><ImagePlus/>Replace</Button></div>}
             <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Media format & export guidance</summary><PlatformMediaGuide platforms={platforms} /></details>
@@ -1536,11 +1543,14 @@ function MediaPreviewRow({
   workspaceId,
   picked,
   onRemove,
+  onReorder,
 }: {
   workspaceId: string | null;
   picked: string[];
   onRemove: (id: string) => void;
+  onReorder: (from: number, to: number) => void;
 }) {
+  const dragIndex = useRef<number | null>(null);
   const assets = useMediaAssets(workspaceId, {});
   const map = useMemo(() => {
     const m = new Map<string, MediaAsset>();
@@ -1557,11 +1567,71 @@ function MediaPreviewRow({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      {picked.map((id) => {
-        const a = map.get(id);
-        return <MediaThumb key={id} asset={a} onRemove={() => onRemove(id)} />;
-      })}
+    <div>
+      <p className="mb-2 text-xs text-muted-foreground">
+        {picked.length > 1
+          ? `One post · ${picked.length} slides. Hold and drag a photo to change the carousel order.`
+          : "One post · 1 photo or video."}
+      </p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {picked.map((id, index) => {
+          const a = map.get(id);
+          return (
+            <div
+              key={id}
+              data-carousel-index={index}
+              className="relative min-w-0"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (dragIndex.current !== null) onReorder(dragIndex.current, index);
+                dragIndex.current = null;
+              }}
+            >
+              <MediaThumb asset={a} onRemove={() => onRemove(id)} />
+              <div className="absolute bottom-2 left-2 z-10 rounded-md bg-black/75 px-2 py-1 text-xs font-semibold text-white">
+                {index + 1} / {picked.length}
+              </div>
+              {picked.length > 1 && (
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Move carousel slide ${index + 1}. Drag or use arrow keys.`}
+                  draggable
+                  onDragStart={(event) => {
+                    dragIndex.current = index;
+                    event.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragEnd={() => { dragIndex.current = null; }}
+                  onTouchStart={() => { dragIndex.current = index; }}
+                  onTouchEnd={(event) => {
+                    const touch = event.changedTouches[0];
+                    const target = touch && document.elementFromPoint(touch.clientX, touch.clientY)?.closest("[data-carousel-index]");
+                    const destination = target?.getAttribute("data-carousel-index");
+                    if (dragIndex.current !== null && destination !== null && destination !== undefined) {
+                      onReorder(dragIndex.current, Number(destination));
+                    }
+                    dragIndex.current = null;
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+                      event.preventDefault();
+                      onReorder(index, Math.max(0, index - 1));
+                    } else if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+                      event.preventDefault();
+                      onReorder(index, Math.min(picked.length - 1, index + 1));
+                    }
+                  }}
+                  className="absolute left-1/2 top-2 z-10 -translate-x-1/2 cursor-grab select-none rounded-lg bg-black/80 px-3 py-2 text-xs font-semibold text-white active:cursor-grabbing"
+                  style={{ touchAction: "none" }}
+                >
+                  Hold & drag
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
