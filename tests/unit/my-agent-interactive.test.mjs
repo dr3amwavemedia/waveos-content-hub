@@ -151,3 +151,14 @@ test("Video Maker has an automatic local playback fallback", () => {
   assert.match(videoMaker, /Prepare local preview/);
   assert.match(videoMaker, /temporary on-device preview/);
 });
+
+
+test("Campaign Manager keeps media compact and saved campaigns tappable", () => {
+  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  assert.match(campaigns, /Campaign content/);
+  assert.match(campaigns, /mediaSectionOpen/);
+  assert.match(campaigns, /ChevronDown/);
+  assert.match(campaigns, /Tap to open/);
+  assert.match(campaigns, /campaign-command-detail/);
+  assert.match(campaigns, /max-h-\[28rem\]/);
+});
