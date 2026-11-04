@@ -1361,7 +1361,7 @@ function WorkspaceDrawer({
 }) {
   const [tab, setTab] = useState<DrawerTab>("info");
   const impersonate = useImpersonateClient();
-  const mobileTabs: DrawerTab[] = ["info", "contracts", "invoices", "invites"];
+  const mobileTabs: DrawerTab[] = ["info", "contracts", "invoices", "deliveries", "invites"];
 
   function exportSummary() {
     const rows = [
