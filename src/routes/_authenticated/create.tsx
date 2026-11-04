@@ -304,9 +304,8 @@ function CreatePost() {
 
     setTitle(it.title ?? "");
     setCampaignBrief(
-      typeof (it as { internal_notes?: unknown }).internal_notes === "string" &&
-        ((it as { internal_notes?: string }).internal_notes ?? "").trim()
-        ? ((it as { internal_notes?: string }).internal_notes ?? "")
+      typeof metadata.campaignBrief === "string" && metadata.campaignBrief.trim()
+        ? metadata.campaignBrief
         : legacyPlanningCaption
           ? it.primary_caption ?? ""
           : "",
