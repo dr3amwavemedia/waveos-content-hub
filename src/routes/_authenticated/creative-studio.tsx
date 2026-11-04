@@ -573,6 +573,17 @@ function CreativeStudioPage() {
       setMobileTool(null);
       return;
     }
+    const selectedBackground = mediaSlots.find(
+      (item) => item.layer.id === selectedId && item.role === "background",
+    );
+    if (!photoMode && selectedBackground) {
+      changeDocument((current) =>
+        replaceStudioMedia(current, selectedBackground.layer.id, { assetId }),
+      );
+      setSelectedId(selectedBackground.layer.id);
+      setMobileTool(null);
+      return;
+    }
     const sourceWidth = asset?.width ?? loadedImage.naturalWidth ?? 800;
     const sourceHeight = asset?.height ?? loadedImage.naturalHeight ?? 800;
     const useNativePhotoCanvas =
@@ -1454,7 +1465,7 @@ function CreativeStudioPage() {
         </section>
       )}
 
-      {workflowDraft.data?.payload && (
+      {workflowDraft.data?.payload && !mobileStarted && (
         <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="font-semibold">A private server draft is available</div>
@@ -1718,7 +1729,9 @@ function CreativeStudioPage() {
                     commit(next);
                     setName(template.name);
                     setDesignId(null);
-                    setSelectedId(null);
+                    const background = studioMediaSlots(next).find((item) => item.role === "background");
+                    setSelectedId(background?.layer.id ?? null);
+                    setReplaceId(null);
                   }}
                 >
                   <DesignThumbnail
@@ -2307,8 +2320,21 @@ function CreativeStudioPage() {
               variant="ghost"
               className="h-auto min-h-16 min-w-[4.5rem] flex-col gap-1 px-1 text-[10px]"
               onClick={() => {
-                if (selected?.type === "image") {
-                  setReplaceId(selected.id);
+                const selectedSlot =
+                  selected?.type === "image"
+                    ? mediaSlots.find((item) => item.layer.id === selected.id)
+                    : null;
+                const backgroundSlot =
+                  selectedSlot?.role === "background"
+                    ? selectedSlot
+                    : mediaSlots.find((item) => item.role === "background");
+                if (selectedSlot) {
+                  setReplaceId(selectedSlot.layer.id);
+                } else if (!photoMode && backgroundSlot) {
+                  setSelectedId(backgroundSlot.layer.id);
+                  setReplaceId(backgroundSlot.layer.id);
+                } else {
+                  setReplaceId(null);
                 }
                 setMobileTool("Media");
               }}
