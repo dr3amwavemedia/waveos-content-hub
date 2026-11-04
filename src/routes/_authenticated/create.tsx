@@ -138,6 +138,7 @@ function CreatePost() {
   const briefApplied = useRef<string | null>(null);
   const [pendingBrief,setPendingBrief] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
+  const [campaignBrief, setCampaignBrief] = useState("");
   const [platforms, setPlatforms] = useState<SocialPlatform[]>([]);
   const [pickedMedia, setPickedMedia] = useState<string[]>([]);
   const [scheduledAt, setScheduledAt] = useState<string>("");
@@ -288,14 +289,46 @@ function CreatePost() {
     if(search.studio)return;
     if (!existing.data?.item) return;
     const it = existing.data.item;
+    const metadata =
+      it.metadata && typeof it.metadata === "object"
+        ? (it.metadata as Record<string, unknown>)
+        : {};
+    const isCampaignDraft =
+      metadata.source === "campaign_manager" || metadata.source === "my_agent_campaign";
+    const legacyPlanningCaption =
+      typeof it.primary_caption === "string" &&
+      /^Draft an organic\b/i.test(it.primary_caption.trim());
+    const needsCampaignCaption =
+      isCampaignDraft &&
+      (metadata.captionState === "needs_generation" || legacyPlanningCaption || !it.primary_caption?.trim());
+
     setTitle(it.title ?? "");
-    setCaption(it.primary_caption ?? "");
+    setCampaignBrief(
+      typeof it.internal_notes === "string" && it.internal_notes.trim()
+        ? it.internal_notes
+        : legacyPlanningCaption
+          ? it.primary_caption ?? ""
+          : "",
+    );
+    setCaption(needsCampaignCaption ? "" : it.primary_caption ?? "");
     setPickedMedia(it.media_asset_ids ?? []);
     setScheduledAt(it.scheduled_at ? isoToDateTimeLocal(it.scheduled_at, workspaceTimeZone) : "");
+
     const vp = existing.data.variants.filter((v) => v.enabled).map((v) => v.platform);
     if (vp.length) {
       setPlatforms(vp);
       setActivePlatform(vp[0]);
+    } else if (
+      isCampaignDraft &&
+      typeof metadata.platform === "string" &&
+      ALL_PLATFORMS.includes(metadata.platform as SocialPlatform)
+    ) {
+      const plannedPlatform = metadata.platform as SocialPlatform;
+      setPlatforms([plannedPlatform]);
+      setActivePlatform(plannedPlatform);
+      if (metadata.contentFormat === "story") {
+        setDraftPlatformOptions({ [plannedPlatform]: { contentType: "story" } });
+      }
     }
     setSavedId(it.id);
   }, [existing.data?.item?.id]);
@@ -448,7 +481,7 @@ function CreatePost() {
   async function handleCaptionAssist() {
     if (!workspaceId) return;
     if (!canUseAiAssist) return toast.info("AI Assist is included with Current and Tidal. Your Ripple draft is still ready to edit manually.");
-    const brief = caption.trim() || title.trim();
+    const brief = caption.trim() || campaignBrief.trim() || title.trim();
     if (!brief) return toast.error("Add a short post idea or post title first.");
     setAssisting(true);
     try {
