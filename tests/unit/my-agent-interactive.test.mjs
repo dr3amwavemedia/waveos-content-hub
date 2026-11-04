@@ -222,3 +222,17 @@ test("Video Maker uses mobile-friendly controls instead of raw timing fields", (
   assert.match(videoMaker, /selected/);
   assert.doesNotMatch(videoMaker, /type="number" min=\{0\} max=\{recipe\.trimEnd/);
 });
+
+
+test("My Agent and Campaign Manager share reusable media intelligence", () => {
+  const assist = fs.readFileSync("src/lib/wave-assist.functions.ts", "utf8");
+  const campaignIdeas = fs.readFileSync("src/lib/campaign-ideas.functions.ts", "utf8");
+  assert.match(assist, /mediaLibraryUnderstanding/);
+  assert.match(assist, /waveos_campaign_intelligence/);
+  assert.match(assist, /waveos_campaign_correction/);
+  assert.match(assist, /Treat user-corrected media understanding as authoritative/);
+  assert.match(assist, /metadata-only understanding is an inference/);
+  assert.match(campaignIdeas, /filename\/title, tags, media type, duration\/dimensions/);
+  assert.match(campaignIdeas, /photo previews, and sampled video frames/);
+  assert.match(campaignIdeas, /Treat a user correction as authoritative/);
+});
