@@ -244,9 +244,9 @@ function VideoMakerPage() {
       if (error) throw error;
       setSelected(data as MediaAsset);
       setRecipeDirty(false);
-      toast.success("Video edit setup saved with this clip.");
+      toast.success("Video changes saved with this clip.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Video edit setup could not be saved.");
+      toast.error(error instanceof Error ? error.message : "Video changes could not be saved.");
     } finally {
       setSavingRecipe(false);
     }
@@ -285,8 +285,8 @@ function VideoMakerPage() {
     Boolean(recipe.text.trim());
 
   return (
-    <div className="ocean-page space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-3">
+    <div className="ocean-page flex flex-col gap-5">
+      <header className="order-1 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
             Creative Studio
@@ -314,14 +314,35 @@ function VideoMakerPage() {
         />
       </header>
 
-      <section className="surface-card p-4 sm:p-5" aria-label="Video Maker tools">
+      <section className="order-2 rounded-2xl border border-border bg-surface/70 p-3 lg:hidden">
+        <div className="flex items-center gap-2">
+          <Video className="h-4 w-4 text-primary" />
+          <label htmlFor="mobile-video-picker" className="text-sm font-semibold">Clip</label>
+        </div>
+        <select
+          id="mobile-video-picker"
+          value={selected?.id ?? ""}
+          onChange={(event) => {
+            const asset = (videos.data ?? []).find((item) => item.id === event.target.value);
+            if (asset) selectVideo(asset);
+          }}
+          className="mt-2 min-h-12 w-full rounded-xl border border-border bg-background px-3 text-sm"
+        >
+          <option value="">Choose a video…</option>
+          {(videos.data ?? []).map((asset) => (
+            <option key={asset.id} value={asset.id}>{asset.name}</option>
+          ))}
+        </select>
+      </section>
+
+      <section className="order-4 surface-card p-4 sm:p-5 lg:order-2" aria-label="Video Maker tools">
         <div className="flex gap-2 overflow-x-auto pb-1">
           {[
             ["trim", "Trim", SlidersHorizontal],
-            ["canvas", "Canvas", ImageIcon],
-            ["adjust", "Adjust", Gauge],
+            ["canvas", "Size", ImageIcon],
+            ["adjust", "Look", Gauge],
             ["text", "Text", Type],
-            ["audio", "Audio", Volume2],
+            ["audio", "Sound", Volume2],
           ].map(([key, label, Icon]) => (
             <button
               key={key as string}
@@ -346,61 +367,118 @@ function VideoMakerPage() {
         ) : (
           <div className="mt-4 rounded-2xl border border-border bg-background/30 p-4">
             {editorTab === "trim" && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="font-semibold">Trim & speed</p>
-                    <p className="text-xs text-muted-foreground">Set the section you want to work with and preview its playback speed.</p>
+                    <p className="font-semibold">Trim</p>
+                    <p className="text-xs text-muted-foreground">Choose where the clip starts and ends.</p>
                   </div>
-                  <Button size="sm" variant="outline" onClick={resetRecipe}><RotateCcw /> Reset</Button>
+                  <Button size="sm" variant="ghost" onClick={resetRecipe}><RotateCcw /> Reset</Button>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <label className="text-xs font-medium">Start
-                    <input type="number" min={0} max={recipe.trimEnd ?? selected.duration_seconds ?? 0} step="0.1" value={recipe.trimStart}
-                      onChange={(e)=>updateRecipe({trimStart:Math.max(0,Number(e.target.value)||0)})}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm"/>
+                <div className="rounded-2xl border border-border bg-black/15 p-4">
+                  <div className="flex items-center justify-between text-sm font-semibold">
+                    <span>{formatDuration(recipe.trimStart)}</span>
+                    <span className="text-muted-foreground">
+                      {formatDuration(Math.max(0, (recipe.trimEnd ?? selected.duration_seconds ?? 0) - recipe.trimStart))} selected
+                    </span>
+                    <span>{formatDuration(recipe.trimEnd ?? selected.duration_seconds ?? 0)}</span>
+                  </div>
+                  <label className="mt-4 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    Start
+                    <input
+                      className="mt-2 w-full accent-primary"
+                      type="range"
+                      min={0}
+                      max={Math.max(0.1, (recipe.trimEnd ?? selected.duration_seconds ?? 0) - 0.1)}
+                      step={0.1}
+                      value={recipe.trimStart}
+                      onChange={(e) => {
+                        const value = Number(e.target.value);
+                        updateRecipe({ trimStart: value });
+                        if (videoRef.current) videoRef.current.currentTime = value;
+                      }}
+                    />
                   </label>
-                  <label className="text-xs font-medium">End
-                    <input type="number" min={recipe.trimStart} max={selected.duration_seconds ?? undefined} step="0.1"
+                  <label className="mt-4 block text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                    End
+                    <input
+                      className="mt-2 w-full accent-primary"
+                      type="range"
+                      min={Math.min((selected.duration_seconds ?? 0), recipe.trimStart + 0.1)}
+                      max={selected.duration_seconds ?? recipe.trimEnd ?? 0}
+                      step={0.1}
                       value={recipe.trimEnd ?? selected.duration_seconds ?? 0}
-                      onChange={(e)=>updateRecipe({trimEnd:Math.max(recipe.trimStart,Number(e.target.value)||0)})}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm"/>
+                      onChange={(e) => updateRecipe({ trimEnd: Number(e.target.value) })}
+                    />
                   </label>
-                  <label className="text-xs font-medium">Speed
-                    <select value={recipe.speed} onChange={(e)=>updateRecipe({speed:Number(e.target.value)})}
-                      className="mt-1 min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm">
-                      {[0.5,0.75,1,1.25,1.5,2].map(v=><option key={v} value={v}>{v}×</option>)}
-                    </select>
-                  </label>
+                </div>
+                <div>
+                  <p className="text-xs font-medium">Speed</p>
+                  <div className="mt-2 grid grid-cols-4 gap-2">
+                    {[0.5, 1, 1.5, 2].map((speed) => (
+                      <Button
+                        key={speed}
+                        size="sm"
+                        variant={recipe.speed === speed ? "secondary" : "outline"}
+                        onClick={() => updateRecipe({ speed })}
+                      >
+                        {speed}×
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
             {editorTab === "canvas" && (
               <div className="space-y-4">
                 <div>
-                  <p className="font-semibold">Canvas & framing</p>
-                  <p className="text-xs text-muted-foreground">Preview the clip for vertical, square, portrait, or landscape social layouts.</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(["original","9:16","1:1","4:5","16:9"] as const).map(aspect=>(
-                    <Button key={aspect} size="sm" variant={recipe.aspect===aspect?"secondary":"outline"} onClick={()=>updateRecipe({aspect})}>{aspect}</Button>
-                  ))}
+                  <p className="font-semibold">Size & framing</p>
+                  <p className="text-xs text-muted-foreground">Pick where this video is going. WaveOS handles the ratio.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <Button variant={recipe.fit==="contain"?"secondary":"outline"} onClick={()=>updateRecipe({fit:"contain"})}>Fit</Button>
-                  <Button variant={recipe.fit==="cover"?"secondary":"outline"} onClick={()=>updateRecipe({fit:"cover"})}>Fill</Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {([0,90,180,270] as const).map(rotation=>(
-                    <Button key={rotation} size="sm" variant={recipe.rotation===rotation?"secondary":"outline"} onClick={()=>updateRecipe({rotation})}>
-                      {rotation===0 ? "No rotation" : `${rotation}°`}
+                  {([
+                    ["original", "Original"],
+                    ["9:16", "Reel / Story"],
+                    ["1:1", "Square"],
+                    ["4:5", "Portrait"],
+                    ["16:9", "Landscape"],
+                  ] as const).map(([aspect, label]) => (
+                    <Button
+                      key={aspect}
+                      className="h-auto min-h-14 whitespace-normal"
+                      variant={recipe.aspect === aspect ? "secondary" : "outline"}
+                      onClick={() => updateRecipe({ aspect })}
+                    >
+                      {label}
                     </Button>
                   ))}
+                </div>
+                <div>
+                  <p className="text-xs font-medium">How should it fit?</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <Button variant={recipe.fit==="contain"?"secondary":"outline"} onClick={()=>updateRecipe({fit:"contain"})}>Show full video</Button>
+                    <Button variant={recipe.fit==="cover"?"secondary":"outline"} onClick={()=>updateRecipe({fit:"cover"})}>Fill screen</Button>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium">Rotate</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    <Button variant="outline" onClick={() => updateRecipe({ rotation: ((recipe.rotation + 270) % 360) as VideoEditRecipe["rotation"] })}>
+                      <RotateCcw /> Left
+                    </Button>
+                    <Button variant="outline" onClick={() => updateRecipe({ rotation: ((recipe.rotation + 90) % 360) as VideoEditRecipe["rotation"] })}>
+                      <RotateCw /> Right
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
             {editorTab === "adjust" && (
               <div className="space-y-4">
+                <div>
+                  <p className="font-semibold">Look</p>
+                  <p className="text-xs text-muted-foreground">Make quick visual adjustments while watching the preview.</p>
+                </div>
                 {[
                   ["Brightness","brightness",recipe.brightness],
                   ["Contrast","contrast",recipe.contrast],
@@ -416,9 +494,9 @@ function VideoMakerPage() {
             )}
             {editorTab === "text" && (
               <div className="space-y-3">
-                <label className="text-xs font-medium">Overlay text
+                <label className="text-xs font-medium">On-screen text
                   <textarea value={recipe.text} onChange={(e)=>updateRecipe({text:e.target.value})} maxLength={120} rows={3}
-                    placeholder="Add optional on-screen text"
+                    placeholder="Type text to show on the video"
                     className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"/>
                 </label>
                 <div className="grid grid-cols-3 gap-2">
@@ -430,6 +508,7 @@ function VideoMakerPage() {
             )}
             {editorTab === "audio" && (
               <div className="space-y-4">
+                <p className="font-semibold">Sound</p>
                 <Button variant={recipe.muted?"secondary":"outline"} onClick={()=>updateRecipe({muted:!recipe.muted})}>
                   {recipe.muted ? <VolumeX /> : <Volume2 />} {recipe.muted ? "Muted" : "Mute clip"}
                 </Button>
@@ -445,14 +524,14 @@ function VideoMakerPage() {
                 {editorChanged ? "Edit setup changed." : "No edits applied yet."}
               </p>
               <Button onClick={() => void saveRecipe()} disabled={!recipeDirty || savingRecipe}>
-                {savingRecipe ? <Loader2 className="animate-spin" /> : <Save />} Save edit setup
+                {savingRecipe ? <Loader2 className="animate-spin" /> : <Save />} Save changes
               </Button>
             </div>
           </div>
         )}
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)]">
+      <div className="order-3 grid gap-5 lg:order-3 lg:grid-cols-[minmax(0,1.35fr)_minmax(280px,.65fr)]">
         <section
           ref={previewRef}
           className="surface-card scroll-mt-24 overflow-hidden p-4 sm:p-5"
@@ -563,9 +642,8 @@ function VideoMakerPage() {
                 </div>
               </div>
               <p className="mt-3 rounded-xl border border-border bg-surface/40 p-3 text-xs text-muted-foreground">
-                Video Maker now saves non-destructive edit settings with the clip. Create Post still
-                uses the original media file until WaveOS has a rendered-output pipeline, so nothing is
-                silently altered or published.
+                Your changes are saved with this clip in WaveOS. Continue to Create Post when you're
+                ready to write the caption, choose the account, and review publishing.
               </p>
             </>
           ) : (
@@ -583,7 +661,7 @@ function VideoMakerPage() {
           )}
         </section>
 
-        <section className="surface-card p-4 sm:p-5" aria-label="Video library">
+        <section className="surface-card hidden p-4 sm:p-5 lg:block" aria-label="Video library">
           <div className="flex items-center gap-2">
             <Video className="h-5 w-5 text-primary" />
             <h2 className="font-semibold">Video library</h2>
