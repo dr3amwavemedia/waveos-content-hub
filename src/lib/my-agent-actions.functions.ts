@@ -299,7 +299,8 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
         workspace_id: data.workspaceId,
         created_by: context.userId,
         title: `${input.name} · ${media?.name ?? `Content ${index + 1}`}`.slice(0, 180),
-        primary_caption: plannedItem?.copyBrief ?? "",
+        internal_notes: plannedItem?.copyBrief ?? null,
+        primary_caption: null,
         hashtags: [],
         media_asset_ids: [mediaId],
         status: "draft",
@@ -313,13 +314,15 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
           platform: plannedItem?.platform ?? null,
           contentFormat: plannedItem?.contentFormat ?? null,
           contentPillar: plannedItem?.pillar ?? null,
+          captionState: "needs_generation",
         },
       };
     });
 
-    const { error: linkedDraftError } = await (supabaseAdmin as any)
+    const { data: createdDrafts, error: linkedDraftError } = await (supabaseAdmin as any)
       .from("content_items")
-      .insert(linkedDraftRows);
+      .insert(linkedDraftRows)
+      .select("id,metadata");
     const contentLinked = !linkedDraftError;
     if (linkedDraftError) {
       console.error("My Agent campaign saved but linked content insert failed", {
@@ -327,6 +330,33 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
         message: linkedDraftError.message ?? "linked campaign content insert failed",
         campaignPlanId: plan.id,
       });
+    } else if ((createdDrafts ?? []).length) {
+      const variantRows = (createdDrafts ?? []).flatMap((draft: any) => {
+        const metadata =
+          draft.metadata && typeof draft.metadata === "object" ? draft.metadata : {};
+        const platform = typeof metadata.platform === "string" ? metadata.platform : null;
+        if (!platform) return [];
+        return [{
+          content_item_id: draft.id,
+          workspace_id: data.workspaceId,
+          platform,
+          enabled: true,
+          caption: "",
+          platform_options:
+            metadata.contentFormat === "story" ? { contentType: "story" } : {},
+        }];
+      });
+      if (variantRows.length) {
+        const { error: variantError } = await (supabaseAdmin as any)
+          .from("post_variants")
+          .insert(variantRows);
+        if (variantError) {
+          console.error("My Agent campaign variants could not be created", {
+            campaignPlanId: plan.id,
+            message: variantError.message ?? "variant insert failed",
+          });
+        }
+      }
     }
 
     return {
