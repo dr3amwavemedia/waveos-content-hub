@@ -648,7 +648,7 @@ function MyAgentPage() {
     const normalized = input.toLowerCase();
     if (
       /(campaign)/.test(normalized) &&
-      /(create|build|start|make|new|plan)/.test(normalized)
+      /(create|build|start|make|new)/.test(normalized)
     ) {
       startCampaignBuilder(input);
       return;
