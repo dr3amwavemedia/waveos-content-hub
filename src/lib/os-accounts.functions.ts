@@ -128,9 +128,9 @@ export const createOsPromoCode = createServerFn({ method: "POST" })
     if (
       !Number.isInteger(data.bonusTrialDays) ||
       data.bonusTrialDays < 1 ||
-      data.bonusTrialDays > 30
+      data.bonusTrialDays > 90
     )
-      throw new Error("Promo trial duration must be between 1 and 30 days.");
+      throw new Error("Promo trial duration must be between 1 and 90 days.");
     if (
       !Number.isInteger(data.maxRedemptions) ||
       data.maxRedemptions < 1 ||
@@ -165,6 +165,56 @@ export const createOsPromoCode = createServerFn({ method: "POST" })
       safe_metadata: { code, trial_duration_days: data.bonusTrialDays, account_limit: 3 },
     });
     return { created: true };
+  });
+
+export const updateOsPromoCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: {
+    promoId: string;
+    name: string;
+    bonusTrialDays: number;
+    maxRedemptions: number;
+    startsAt: string;
+    expiresAt?: string | null;
+    colorTheme: OsPromoColor;
+  }) => data)
+  .handler(async ({ data, context }) => {
+    const admin = await requireOwner(context.userId);
+    const name = data.name.trim();
+    if (!name || name.length > 80) throw new Error("Add a promo name up to 80 characters.");
+    if (!Number.isInteger(data.bonusTrialDays) || data.bonusTrialDays < 1 || data.bonusTrialDays > 90)
+      throw new Error("Promo trial duration must be between 1 and 90 days.");
+    if (!Number.isInteger(data.maxRedemptions) || data.maxRedemptions < 1 || data.maxRedemptions > 100000)
+      throw new Error("Redemption limit must be between 1 and 100,000.");
+    const startsAt = new Date(data.startsAt);
+    const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+    if (Number.isNaN(startsAt.getTime()) || (expiresAt && Number.isNaN(expiresAt.getTime())))
+      throw new Error("Enter valid promo dates.");
+    if (expiresAt && expiresAt <= startsAt) throw new Error("Expiration must be after the start date.");
+    const { data: existing, error: lookupError } = await admin.from("os_promo_codes" as never)
+      .select("redemption_count").eq("id", data.promoId).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!existing) throw new Error("Promo code not found.");
+    const used = (existing as { redemption_count: number }).redemption_count;
+    if (data.maxRedemptions < used) throw new Error(`Redemption limit cannot be below ${used} already used.`);
+    const { error } = await admin.from("os_promo_codes" as never)
+      .update({
+        name,
+        bonus_trial_days: data.bonusTrialDays,
+        max_redemptions: data.maxRedemptions,
+        starts_at: startsAt.toISOString(),
+        expires_at: expiresAt?.toISOString() ?? null,
+        color_theme: data.colorTheme,
+      } as never).eq("id", data.promoId);
+    if (error) throw error;
+    await admin.from("activity_logs").insert({
+      actor_user_id: context.userId,
+      action: "os_promo_code_updated",
+      entity_type: "os_promo_code",
+      entity_id: data.promoId,
+      safe_metadata: { trial_duration_days: data.bonusTrialDays, max_redemptions: data.maxRedemptions },
+    });
+    return { updated: true };
   });
 
 export const setOsPromoCodeActive = createServerFn({ method: "POST" })
