@@ -193,11 +193,11 @@ test("Campaign drafts keep briefs internal, restore platforms, and appear on Cal
 
 test("Video Maker exposes real non-destructive editing controls", () => {
   const videoMaker = fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8");
-  assert.match(videoMaker, /Trim & speed/);
-  assert.match(videoMaker, /Canvas & framing/);
+  assert.match(videoMaker, /"Trim"/);
+  assert.match(videoMaker, /Size & framing/);
   assert.match(videoMaker, /Brightness/);
-  assert.match(videoMaker, /Overlay text/);
-  assert.match(videoMaker, /Save edit setup/);
+  assert.match(videoMaker, /"Text"/);
+  assert.match(videoMaker, /Save changes/);
   assert.match(videoMaker, /video_maker_edit/);
   assert.match(videoMaker, /Continue to Story/);
   assert.match(videoMaker, /Continue to Feed/);
