@@ -659,10 +659,16 @@ function MyAgentPage() {
       void openPerformanceSnapshot(input);
       return;
     }
-    if (
-      /(post|caption|reel|story)/.test(normalized) &&
-      /(create|make|write|draft|start|new)/.test(normalized)
-    ) {
+    // Only an explicit request to begin a *new* post opens the builder.
+    // Refinements such as "make the captions shorter", "rewrite that reel",
+    // or "let's draft shorter captions" belong in the ongoing conversation.
+    const explicitNewPostRequest =
+      /\\b(?:create|make|start|build|draft|write)\\s+(?:(?:me|us)\\s+)?(?:(?:a|an|another|new|some|one|two|three)\\s+)?(?:social\\s+media\\s+)?(?:post|reel|story|caption)(?:s)?\\b/.test(normalized) ||
+      /\\b(?:new|another)\\s+(?:post|reel|story|caption)\\b/.test(normalized);
+    const isRevision =
+      /\\b(?:shorter|longer|short|brief|concise|rewrite|revise|adjust|change|edit|improve|tweak|less|more|instead|those|these|them|that|existing|already)\\b/.test(normalized) ||
+      /\\b(?:let'?s|we should|can you)\\s+(?:make|keep|have)\\b/.test(normalized);
+    if (explicitNewPostRequest && !isRevision) {
       startPostBuilder(input);
       return;
     }
