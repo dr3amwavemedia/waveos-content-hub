@@ -330,7 +330,7 @@ function ClientsPage() {
       if (first.error) {
         // A failed broad query does not necessarily mean wedding columns are absent.
         // Only flag a missing migration when PostgREST explicitly reports a missing column.
-        const missingColumn = first.error.code === "42703" || first.error.code === "PGRST204" || first.error.code === "PGRST200" || (first.error.code === "PGRST116" && /column/i.test(first.error.message));
+        const missingColumn = /(?:column|field).*wedding_|wedding_[a-z_]+.*(?:column|field)/i.test(`${first.error.message} ${first.error.details ?? ""} ${first.error.hint ?? ""}`);
         const fallback = await supabase
           .from("workspaces")
           .select(BASE_COLS)
