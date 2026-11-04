@@ -95,6 +95,6 @@ test("Shared media picker separates Files from Camera Roll and keeps cloud provi
   assert.match(createPost, /Google Drive/);
   assert.match(createPost, /Dropbox/);
   assert.match(createPost, /Camera roll \/ Photos/);
-  assert.match(createPost, />Files</);
+  assert.match(createPost, /"Files"/);
   assert.match(createPost, /startExternalMediaConnection/);
 });
