@@ -5,7 +5,10 @@ import {
   ArrowUp,
   BarChart3,
   CheckCircle2,
+  CalendarClock,
   FileText,
+  FolderOpen,
+  Globe2,
   ImageIcon,
   Loader2,
   Megaphone,
@@ -13,8 +16,10 @@ import {
   Mic,
   MicOff,
   Plus,
+  Search,
   Sparkles,
   Volume2,
+  TrendingUp,
   Video,
   VolumeX,
   WandSparkles,
@@ -30,6 +35,9 @@ import {
   createAgentPostDraft,
   getAgentPerformanceSnapshot,
 } from "@/lib/my-agent-actions.functions";
+import { discoverTrends } from "@/lib/trending-now.functions";
+import { researchCompetitor } from "@/lib/competitive-research.functions";
+import { analyzeSeoGrowth } from "@/lib/seo-growth.functions";
 import { cn } from "@/lib/utils";
 
 type AgentMessage = { role: "user" | "assistant"; content: string };
@@ -62,6 +70,35 @@ type AgentPostDraft = {
   platform: "instagram" | "facebook" | "linkedin" | "tiktok" | "youtube" | "x";
   placement: "feed" | "story";
   caption: string;
+};
+
+type AgentTrend = {
+  id: string;
+  title: string;
+  url: string;
+  source: string;
+  excerpt: string;
+  platform?: "TikTok" | "Instagram" | "YouTube" | "Facebook";
+  thumbnail?: string;
+  creator?: string;
+  engagementEvidence?: string;
+};
+
+type AgentCompetitiveReport = {
+  company: string | null;
+  website: string | null;
+  sections: Array<{ title: string; findings: Array<{ text: string; sources: string[] }> }>;
+  ideas: Array<{ text: string; sources: string[] }>;
+  limitations: string[];
+};
+
+type AgentSeoReport = {
+  business: string | null;
+  website: string | null;
+  summary: string;
+  quickWins: string[];
+  actions: Array<{ title: string; why: string; priority: "high" | "medium" | "low" }>;
+  limitations: string[];
 };
 
 function localDateKey() {
@@ -161,6 +198,9 @@ function MyAgentPage() {
   const getPerformance = useServerFn(getAgentPerformanceSnapshot);
   const saveAgentCampaign = useServerFn(createAgentCampaign);
   const saveAgentPost = useServerFn(createAgentPostDraft);
+  const findTrends = useServerFn(discoverTrends);
+  const researchBusiness = useServerFn(researchCompetitor);
+  const runSeoAudit = useServerFn(analyzeSeoGrowth);
   const workspaceId = activeWorkspace?.id ?? null;
   const storageKey = workspaceId ? `waveos.assist.${workspaceId}` : null;
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -169,7 +209,9 @@ function MyAgentPage() {
   const [error, setError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceReplies, setVoiceReplies] = useState(false);
-  const [activeTool, setActiveTool] = useState<"campaign" | "performance" | "post" | "studio" | null>(null);
+  const [activeTool, setActiveTool] = useState<
+    "campaign" | "performance" | "post" | "studio" | "trends" | "competitive" | "seo" | "media" | "publish" | null
+  >(null);
   const [toolBusy, setToolBusy] = useState(false);
   const [toolError, setToolError] = useState<string | null>(null);
   const [performance, setPerformance] = useState<AgentPerformanceSnapshot | null>(null);
@@ -196,6 +238,13 @@ function MyAgentPage() {
     caption: "",
   });
   const [postSaved, setPostSaved] = useState<null | { id: string; title: string }>(null);
+  const [trendQuery, setTrendQuery] = useState("");
+  const [trendType, setTrendType] = useState<"topic" | "hook" | "format" | "audio">("topic");
+  const [trendResults, setTrendResults] = useState<AgentTrend[]>([]);
+  const [competitiveUrl, setCompetitiveUrl] = useState("");
+  const [competitiveReport, setCompetitiveReport] = useState<AgentCompetitiveReport | null>(null);
+  const [seoWebsite, setSeoWebsite] = useState("");
+  const [seoReport, setSeoReport] = useState<AgentSeoReport | null>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -327,6 +376,98 @@ function MyAgentPage() {
     }
   }
 
+  function openAgentTool(
+    tool: "trends" | "competitive" | "seo" | "media" | "publish",
+    prompt?: string,
+  ) {
+    if (prompt) addUserMessage(prompt);
+    setDraft("");
+    setToolError(null);
+    setActiveTool(tool);
+  }
+
+  async function runTrendDiscovery() {
+    if (!workspaceId || toolBusy) return;
+    setToolBusy(true);
+    setToolError(null);
+    setTrendResults([]);
+    try {
+      const result = await findTrends({
+        data: {
+          workspaceId,
+          type: trendType,
+          query: trendQuery,
+          filters: {
+            platform: "All videos",
+            style: "",
+            language: "English",
+            market: "",
+            niche: "",
+            businessType: "",
+            audience: "",
+            days: 7,
+            kind: "",
+          },
+        },
+      });
+      setTrendResults((result.trends ?? []).slice(0, 6) as AgentTrend[]);
+      if (!(result.trends ?? []).length) {
+        setToolError(result.message ?? "No strong trend matches were found.");
+      }
+    } catch (caught) {
+      setToolError(caught instanceof Error ? caught.message : "Trend research could not be completed.");
+    } finally {
+      setToolBusy(false);
+    }
+  }
+
+  function startPostFromIdea(idea: string) {
+    setPostSaved(null);
+    setPostDraft({
+      idea: idea.slice(0, 500),
+      platform: "instagram",
+      placement: "feed",
+      caption: "",
+    });
+    setPostStep(1);
+    setToolError(null);
+    setActiveTool("post");
+  }
+
+  async function runCompetitiveResearch() {
+    if (!workspaceId || !competitiveUrl.trim() || toolBusy) return;
+    setToolBusy(true);
+    setToolError(null);
+    setCompetitiveReport(null);
+    try {
+      const result = await researchBusiness({
+        data: { workspaceId, url: competitiveUrl.trim() },
+      });
+      setCompetitiveReport(result.report as AgentCompetitiveReport);
+    } catch (caught) {
+      setToolError(caught instanceof Error ? caught.message : "Competitive research could not be completed.");
+    } finally {
+      setToolBusy(false);
+    }
+  }
+
+  async function runSeoResearch() {
+    if (!workspaceId || !seoWebsite.trim() || toolBusy) return;
+    setToolBusy(true);
+    setToolError(null);
+    setSeoReport(null);
+    try {
+      const result = await runSeoAudit({
+        data: { workspaceId, website: seoWebsite.trim() },
+      });
+      setSeoReport(result as AgentSeoReport);
+    } catch (caught) {
+      setToolError(caught instanceof Error ? caught.message : "SEO review could not be completed.");
+    } finally {
+      setToolBusy(false);
+    }
+  }
+
   async function openPerformanceSnapshot(prompt?: string) {
     if (!workspaceId || toolBusy) return;
     if (prompt) addUserMessage(prompt);
@@ -423,6 +564,26 @@ function MyAgentPage() {
       /(creative studio|graphic|design|photo editor|edit photo|video maker|edit video)/.test(normalized)
     ) {
       openStudioLauncher(input);
+      return;
+    }
+    if (/(trend|trending|viral|what.*hot|hot right now)/.test(normalized)) {
+      openAgentTool("trends", input);
+      return;
+    }
+    if (/(competitor|competitive|compare.*business|research.*business)/.test(normalized)) {
+      openAgentTool("competitive", input);
+      return;
+    }
+    if (/(seo|google growth|search growth|website audit)/.test(normalized)) {
+      openAgentTool("seo", input);
+      return;
+    }
+    if (/(media|library|files|footage|photos|videos)/.test(normalized) && /(find|pick|choose|open|select|browse)/.test(normalized)) {
+      openAgentTool("media", input);
+      return;
+    }
+    if (/(schedule|publish|posting calendar|review.*post|scheduled posts)/.test(normalized)) {
+      openAgentTool("publish", input);
       return;
     }
 
@@ -546,6 +707,9 @@ function MyAgentPage() {
               setCampaignSaved(null);
               setPostSaved(null);
               setPostStep(0);
+              setTrendResults([]);
+              setCompetitiveReport(null);
+              setSeoReport(null);
               if (storageKey) sessionStorage.removeItem(storageKey);
             }}
           >
@@ -932,6 +1096,160 @@ function MyAgentPage() {
                 <p className="mt-3 text-[11px] text-slate-400">
                   My Agent stays the central assistant. These open the existing editing tools rather than creating a second chat.
                 </p>
+              </section>
+            )}
+            {activeTool === "trends" && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-orange-300/20 bg-orange-300/[.05] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-orange-100">
+                  <TrendingUp className="h-4 w-4" /> Trending Now
+                </div>
+                <p className="mt-2 text-sm text-slate-300">What kind of trend should I look for?</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(["topic", "hook", "format", "audio"] as const).map((type) => (
+                    <Button key={type} size="sm" variant={trendType === type ? "secondary" : "outline"} className="capitalize" onClick={() => setTrendType(type)}>
+                      {type}
+                    </Button>
+                  ))}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    value={trendQuery}
+                    onChange={(event) => setTrendQuery(event.target.value)}
+                    placeholder="e.g. luxury real estate, skincare, restaurants"
+                    className="min-h-11 min-w-0 flex-1 rounded-xl border border-orange-200/20 bg-[#06182d] px-3 text-sm outline-none"
+                  />
+                  <Button disabled={toolBusy} onClick={() => void runTrendDiscovery()}>
+                    {toolBusy ? <Loader2 className="animate-spin" /> : <Search />} Search
+                  </Button>
+                </div>
+                {trendResults.length > 0 && (
+                  <div className="mt-4 space-y-2">
+                    {trendResults.map((trend) => (
+                      <div key={trend.id} className="rounded-xl border border-orange-200/10 bg-black/10 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-slate-100">{trend.title}</p>
+                            <p className="mt-1 text-[11px] text-slate-400">
+                              {[trend.platform, trend.creator, trend.engagementEvidence].filter(Boolean).join(" · ")}
+                            </p>
+                          </div>
+                          <Button size="sm" variant="outline" onClick={() => startPostFromIdea(`Create an original post inspired by this trend: ${trend.title}. ${trend.excerpt}`)}>
+                            Adapt
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {toolError && <p className="mt-3 text-xs text-amber-200">{toolError}</p>}
+                <Button className="mt-3 w-full" variant="outline" onClick={() => void navigate({ to: "/trending-now" })}>Open full Trending Now</Button>
+              </section>
+            )}
+            {activeTool === "competitive" && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-indigo-300/20 bg-indigo-300/[.05] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-indigo-100">
+                  <Globe2 className="h-4 w-4" /> Competitive Intelligence
+                </div>
+                <p className="mt-2 text-sm text-slate-300">Paste a competitor website or public profile.</p>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    value={competitiveUrl}
+                    onChange={(event) => setCompetitiveUrl(event.target.value)}
+                    placeholder="https://competitor.com"
+                    className="min-h-11 min-w-0 flex-1 rounded-xl border border-indigo-200/20 bg-[#06182d] px-3 text-sm outline-none"
+                  />
+                  <Button disabled={!competitiveUrl.trim() || toolBusy} onClick={() => void runCompetitiveResearch()}>
+                    {toolBusy ? <Loader2 className="animate-spin" /> : <Search />} Research
+                  </Button>
+                </div>
+                {competitiveReport && (
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-xl border border-indigo-200/10 bg-black/10 p-3">
+                      <p className="font-semibold">{competitiveReport.company ?? "Competitor research"}</p>
+                      <div className="mt-2 space-y-2 text-xs text-slate-300">
+                        {competitiveReport.sections
+                          .flatMap((section) => section.findings.slice(0, 1).map((finding) => ({ section: section.title, text: finding.text })))
+                          .slice(0, 3)
+                          .map((finding, index) => (
+                            <p key={index}><strong>{finding.section}:</strong> {finding.text}</p>
+                          ))}
+                      </div>
+                    </div>
+                    {competitiveReport.ideas[0] && (
+                      <Button className="w-full" onClick={() => startPostFromIdea(competitiveReport.ideas[0].text)}>
+                        Turn opportunity into a post
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {toolError && <p className="mt-3 text-xs text-amber-200">{toolError}</p>}
+                <Button className="mt-3 w-full" variant="outline" onClick={() => void navigate({ to: "/competitive-intelligence" })}>Open full report tool</Button>
+              </section>
+            )}
+            {activeTool === "seo" && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-emerald-300/20 bg-emerald-300/[.05] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-100">
+                  <Search className="h-4 w-4" /> SEO Growth
+                </div>
+                <p className="mt-2 text-sm text-slate-300">What website should I audit?</p>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    value={seoWebsite}
+                    onChange={(event) => setSeoWebsite(event.target.value)}
+                    placeholder="yourbusiness.com"
+                    className="min-h-11 min-w-0 flex-1 rounded-xl border border-emerald-200/20 bg-[#06182d] px-3 text-sm outline-none"
+                  />
+                  <Button disabled={!seoWebsite.trim() || toolBusy} onClick={() => void runSeoResearch()}>
+                    {toolBusy ? <Loader2 className="animate-spin" /> : <Search />} Audit
+                  </Button>
+                </div>
+                {seoReport && (
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-xl border border-emerald-200/10 bg-black/10 p-3">
+                      <p className="text-sm font-semibold">{seoReport.business ?? "SEO snapshot"}</p>
+                      <p className="mt-2 text-xs leading-5 text-slate-300">{seoReport.summary}</p>
+                    </div>
+                    <div className="grid gap-2">
+                      {seoReport.quickWins.slice(0, 3).map((win, index) => (
+                        <div key={index} className="rounded-xl border border-emerald-200/10 bg-black/10 px-3 py-2 text-xs text-slate-300">
+                          <span className="mr-2 font-semibold text-emerald-200">{index + 1}.</span>{win}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {toolError && <p className="mt-3 text-xs text-amber-200">{toolError}</p>}
+                <Button className="mt-3 w-full" variant="outline" onClick={() => void navigate({ to: "/analytics" })}>Open SEO Growth</Button>
+              </section>
+            )}
+            {activeTool === "media" && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-cyan-300/20 bg-cyan-300/[.05] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
+                  <FolderOpen className="h-4 w-4" /> Media
+                </div>
+                <p className="mt-2 text-sm text-slate-300">Choose where you want to use your media.</p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={() => void navigate({ to: "/content" })}><FolderOpen /> Browse library</Button>
+                  <Button onClick={() => startPostBuilder()}><FileText /> Use in a post</Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/creative-studio", search: { post: undefined, workspace: undefined, media: undefined, photo: false } })}><ImageIcon /> Graphic</Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/video-maker" })}><Video /> Video</Button>
+                </div>
+              </section>
+            )}
+            {activeTool === "publish" && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-violet-300/20 bg-violet-300/[.05] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-violet-100">
+                  <CalendarClock className="h-4 w-4" /> Schedule & Publish Review
+                </div>
+                <p className="mt-2 text-sm text-slate-300">
+                  My Agent can prepare the next step, but publishing stays review-first so nothing goes live accidentally.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <Button variant="outline" onClick={() => void navigate({ to: "/content" })}>Review drafts</Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/calendar" })}>Open calendar</Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/approvals" })}>Approvals</Button>
+                  <Button onClick={() => startPostBuilder()}>Create next post</Button>
+                </div>
               </section>
             )}
             {busy && (
