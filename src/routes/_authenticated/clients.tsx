@@ -328,6 +328,9 @@ function ClientsPage() {
         .order("created_at", { ascending: false });
       let dataSourceMissing = false;
       if (first.error) {
+        // A failed broad query does not necessarily mean wedding columns are absent.
+        // Only flag a missing migration when PostgREST explicitly reports a missing column.
+        const missingColumn = first.error.code === "42703" || first.error.code === "PGRST204" || first.error.code === "PGRST200" || (first.error.code === "PGRST116" && /column/i.test(first.error.message));
         const fallback = await supabase
           .from("workspaces")
           .select(BASE_COLS)
@@ -345,7 +348,7 @@ function ClientsPage() {
         } else {
           ws = (fallback.data ?? []) as unknown as Record<string, unknown>[];
         }
-        missing = true;
+        missing = missingColumn;
       } else {
         ws = (first.data ?? []) as unknown as Record<string, unknown>[];
       }
