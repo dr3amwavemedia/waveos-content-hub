@@ -202,14 +202,30 @@ function CampaignManagerPage() {
     queryKey: ["campaign-plans", workspaceId],
     enabled: Boolean(workspaceId),
     queryFn: async () => {
-      const { data, error } = await db
+      const base = db
         .from("campaign_plans")
         .select("id,name,goal,start_date,end_date,platforms,max_posts,posting_hours,excluded_days,approval_required,optimization_mode,status,created_at")
         .eq("workspace_id", workspaceId!)
         .order("created_at", { ascending: false })
         .limit(12);
-      if (error) throw error;
-      return (data ?? []) as CampaignPlanRow[];
+      const primary = await base;
+      if (!primary.error) return (primary.data ?? []) as CampaignPlanRow[];
+
+      const message = String(primary.error?.message ?? "");
+      if (/optimization_mode|schema cache|column/i.test(message)) {
+        const fallback = await db
+          .from("campaign_plans")
+          .select("id,name,goal,start_date,end_date,platforms,max_posts,posting_hours,excluded_days,approval_required,status,created_at")
+          .eq("workspace_id", workspaceId!)
+          .order("created_at", { ascending: false })
+          .limit(12);
+        if (fallback.error) throw fallback.error;
+        return (fallback.data ?? []).map((row: any) => ({
+          ...row,
+          optimization_mode: "approval_required",
+        })) as CampaignPlanRow[];
+      }
+      throw primary.error;
     },
   });
 
@@ -352,22 +368,29 @@ function CampaignManagerPage() {
       });
       const { error: contentError } = await db.from("content_items").insert(linkedRows);
       if (contentError) {
-        await db.from("campaign_plans").delete().eq("id", plan.id).eq("workspace_id", workspaceId);
-        throw contentError;
+        console.error("Campaign saved but linked content could not be created", {
+          campaignPlanId: plan.id,
+          message: contentError.message,
+        });
+        return { planId: plan.id as string, contentLinked: false };
       }
-      return plan.id as string;
+      return { planId: plan.id as string, contentLinked: true };
     },
-    onSuccess: async (planId) => {
+    onSuccess: async (result) => {
       await workflowDraft.discard.mutateAsync();
       setDirty(false);
       setPreview([]);
       setInput(DEFAULT_INPUT);
-      setSelectedCampaignId(planId);
+      setSelectedCampaignId(result.planId);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campaign-plans", workspaceId] }),
         queryClient.invalidateQueries({ queryKey: ["campaign-linked-content", workspaceId] }),
       ]);
-      toast.success("Campaign saved. Continue below in the campaign workspace.");
+      if (result.contentLinked) {
+        toast.success("Campaign saved. Continue below in the campaign workspace.");
+      } else {
+        toast.warning("Campaign saved, but its content could not be linked yet. Reopen the campaign and reconnect the media.");
+      }
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Campaign plan could not be saved."),
@@ -799,10 +822,15 @@ function CampaignManagerPage() {
               </div>
             )}
           </>
+        ) : campaigns.isError ? (
+          <div className="mt-4 rounded-xl border border-amber-300/25 bg-amber-300/5 p-5 text-sm text-amber-100">
+            WaveOS could not load your saved campaigns. Your campaigns were not deleted. Refresh this
+            page or try again in a moment.
+          </div>
         ) : (
           <div className="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
-            No campaigns yet. Build your first campaign below and it will become a working campaign
-            workspace here.
+            No saved campaigns were returned for this workspace. Build a campaign below, or refresh if
+            you expected an existing campaign to appear.
           </div>
         )}
       </section>
