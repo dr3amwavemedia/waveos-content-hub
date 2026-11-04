@@ -107,3 +107,19 @@ test("My Agent campaign save uses an authorized server write and schema fallback
   assert.match(actions, /legacyPayload/);
   assert.match(actions, /campaign_plan_items/);
 });
+
+
+test("campaign builders require content selection and persist linked drafts", () => {
+  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  assert.match(agent, /Choose campaign content/);
+  assert.match(agent, /Use this entire folder/);
+  assert.match(agent, /Pick individual media/);
+  assert.match(agent, /mediaAssetIds: campaignMediaIds/);
+  assert.match(actions, /linkedDraftRows/);
+  assert.match(actions, /campaignPlanId/);
+  assert.match(actions, /mediaFolderId/);
+  assert.match(campaigns, /Choose campaign content before saving/);
+  assert.match(campaigns, /Use this entire folder/);
+  assert.match(campaigns, /campaignPlanId/);
+  assert.match(campaigns, /media_asset_ids: \[asset\.id\]/);
+});
