@@ -56,6 +56,18 @@ export const Route = createFileRoute("/api/external-media/$provider")({
                 : Boolean(process.env.DROPBOX_APP_KEY && process.env.DROPBOX_APP_SECRET),
             connected: Boolean(connection) && !reconnectRequired,
             reconnectRequired,
+            // Safe, read-only diagnosis for My Agent and the connection picker.
+            // Never return OAuth tokens, granted scope strings, or account secrets.
+            diagnosis: !connection
+              ? "not_connected"
+              : !hasRequiredDriveScope
+                ? "missing_permission"
+                : tokenExpired && !connection.refresh_token_encrypted
+                  ? "expired_authorization"
+                  : "connection_record_present",
+            suggestedAction: !connection || reconnectRequired
+              ? "reconnect_with_provider_consent"
+              : "check_picker_or_provider_api",
             account: connection
               ? {
                   email: connection.account_email,
