@@ -5,6 +5,8 @@ import {
   ArrowUp,
   BarChart3,
   CheckCircle2,
+  FileText,
+  ImageIcon,
   Loader2,
   Megaphone,
   MessageSquareText,
@@ -13,6 +15,7 @@ import {
   Plus,
   Sparkles,
   Volume2,
+  Video,
   VolumeX,
   WandSparkles,
 } from "lucide-react";
@@ -24,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { waveAssist } from "@/lib/wave-assist.functions";
 import {
   createAgentCampaign,
+  createAgentPostDraft,
   getAgentPerformanceSnapshot,
 } from "@/lib/my-agent-actions.functions";
 import { cn } from "@/lib/utils";
@@ -51,6 +55,13 @@ type AgentCampaignDraft = {
   durationDays: number;
   maxPosts: number;
   platforms: string[];
+};
+
+type AgentPostDraft = {
+  idea: string;
+  platform: "instagram" | "facebook" | "linkedin" | "tiktok" | "youtube" | "x";
+  placement: "feed" | "story";
+  caption: string;
 };
 
 function localDateKey() {
@@ -149,6 +160,7 @@ function MyAgentPage() {
   const assist = useServerFn(waveAssist);
   const getPerformance = useServerFn(getAgentPerformanceSnapshot);
   const saveAgentCampaign = useServerFn(createAgentCampaign);
+  const saveAgentPost = useServerFn(createAgentPostDraft);
   const workspaceId = activeWorkspace?.id ?? null;
   const storageKey = workspaceId ? `waveos.assist.${workspaceId}` : null;
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -157,7 +169,7 @@ function MyAgentPage() {
   const [error, setError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceReplies, setVoiceReplies] = useState(false);
-  const [activeTool, setActiveTool] = useState<"campaign" | "performance" | null>(null);
+  const [activeTool, setActiveTool] = useState<"campaign" | "performance" | "post" | "studio" | null>(null);
   const [toolBusy, setToolBusy] = useState(false);
   const [toolError, setToolError] = useState<string | null>(null);
   const [performance, setPerformance] = useState<AgentPerformanceSnapshot | null>(null);
@@ -176,6 +188,14 @@ function MyAgentPage() {
     maxPosts: 8,
     platforms: ["instagram"],
   });
+  const [postStep, setPostStep] = useState(0);
+  const [postDraft, setPostDraft] = useState<AgentPostDraft>({
+    idea: "",
+    platform: "instagram",
+    placement: "feed",
+    caption: "",
+  });
+  const [postSaved, setPostSaved] = useState<null | { id: string; title: string }>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -231,6 +251,80 @@ function MyAgentPage() {
       platforms: ["instagram"],
     });
     setActiveTool("campaign");
+  }
+
+  function startPostBuilder(prompt?: string) {
+    if (prompt) addUserMessage(prompt);
+    setDraft("");
+    setToolError(null);
+    setPostSaved(null);
+    setPostStep(0);
+    setPostDraft({
+      idea: "",
+      platform: "instagram",
+      placement: "feed",
+      caption: "",
+    });
+    setActiveTool("post");
+  }
+
+  function openStudioLauncher(prompt?: string) {
+    if (prompt) addUserMessage(prompt);
+    setDraft("");
+    setToolError(null);
+    setActiveTool("studio");
+  }
+
+  async function generatePostCaption() {
+    if (!workspaceId || !postDraft.idea.trim() || toolBusy) return;
+    setToolBusy(true);
+    setToolError(null);
+    try {
+      const result = await assist({
+        data: {
+          mode: "caption",
+          input: postDraft.idea,
+          workspaceId,
+          platform: postDraft.platform,
+          conversation: [],
+          context: JSON.stringify({
+            workspace: activeWorkspace?.name ?? "WaveOS",
+            surface: "My Agent Post Builder",
+            localDate: localDateKey(),
+          }),
+        },
+      });
+      setPostDraft((current) => ({ ...current, caption: result.suggestion }));
+      setPostStep(3);
+    } catch (caught) {
+      setToolError(caught instanceof Error ? caught.message : "Caption could not be generated.");
+    } finally {
+      setToolBusy(false);
+    }
+  }
+
+  async function finishPostDraft() {
+    if (!workspaceId || !postDraft.idea.trim() || !postDraft.caption.trim() || toolBusy) return;
+    setToolBusy(true);
+    setToolError(null);
+    try {
+      const result = await saveAgentPost({
+        data: {
+          workspaceId,
+          localDate: localDateKey(),
+          idea: postDraft.idea,
+          caption: postDraft.caption,
+          platform: postDraft.platform,
+          placement: postDraft.placement,
+        },
+      });
+      setPostSaved({ id: result.id, title: result.title });
+      setPostStep(4);
+    } catch (caught) {
+      setToolError(caught instanceof Error ? caught.message : "Post draft could not be saved.");
+    } finally {
+      setToolBusy(false);
+    }
   }
 
   async function openPerformanceSnapshot(prompt?: string) {
@@ -296,6 +390,13 @@ function MyAgentPage() {
       setDraft("");
       return;
     }
+    if (activeTool === "post" && postStep === 0 && !postDraft.idea.trim()) {
+      addUserMessage(input);
+      setPostDraft((current) => ({ ...current, idea: input.slice(0, 500) }));
+      setPostStep(1);
+      setDraft("");
+      return;
+    }
 
     const normalized = input.toLowerCase();
     if (
@@ -309,6 +410,19 @@ function MyAgentPage() {
       /(performance|analytics|growth|results|how (am|are) .*doing|how .*performing)/.test(normalized)
     ) {
       void openPerformanceSnapshot(input);
+      return;
+    }
+    if (
+      /(post|caption|reel|story)/.test(normalized) &&
+      /(create|make|write|draft|start|new)/.test(normalized)
+    ) {
+      startPostBuilder(input);
+      return;
+    }
+    if (
+      /(creative studio|graphic|design|photo editor|edit photo|video maker|edit video)/.test(normalized)
+    ) {
+      openStudioLauncher(input);
       return;
     }
 
@@ -430,6 +544,8 @@ function MyAgentPage() {
               setPerformance(null);
               setToolError(null);
               setCampaignSaved(null);
+              setPostSaved(null);
+              setPostStep(0);
               if (storageKey) sessionStorage.removeItem(storageKey);
             }}
           >
@@ -468,14 +584,14 @@ function MyAgentPage() {
               </button>
               <button
                 type="button"
-                onClick={() => void navigate({ to: "/create" })}
+                onClick={() => startPostBuilder("Let's create a new post")}
                 className="rounded-2xl border border-cyan-200/15 bg-cyan-200/[.04] px-3 py-3 text-xs font-semibold text-cyan-50 hover:bg-cyan-200/10"
               >
                 Create a post
               </button>
               <button
                 type="button"
-                onClick={() => void navigate({ to: "/creative-studio", search: { post: undefined, workspace: undefined, media: undefined, photo: false } })}
+                onClick={() => openStudioLauncher("Open Creative Studio")}
                 className="rounded-2xl border border-cyan-200/15 bg-cyan-200/[.04] px-3 py-3 text-xs font-semibold text-cyan-50 hover:bg-cyan-200/10"
               >
                 Open Creative Studio
@@ -671,6 +787,151 @@ function MyAgentPage() {
                 ) : (
                   <p className="mt-4 text-sm text-slate-400">{performance?.message ?? toolError ?? "No performance data is available yet."}</p>
                 )}
+              </section>
+            )}
+            {activeTool === "post" && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-fuchsia-300/20 bg-fuchsia-300/[.05] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-fuchsia-100">
+                  <FileText className="h-4 w-4" /> Create Post
+                </div>
+                {postStep === 0 && (
+                  <div className="mt-4 space-y-3">
+                    <p className="text-sm text-slate-300">What do you want this post to be about?</p>
+                    <div className="flex gap-2">
+                      <input
+                        value={postDraft.idea}
+                        onChange={(event) => setPostDraft((current) => ({ ...current, idea: event.target.value }))}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && postDraft.idea.trim()) setPostStep(1);
+                        }}
+                        placeholder="Describe the post"
+                        maxLength={500}
+                        className="min-h-11 min-w-0 flex-1 rounded-xl border border-fuchsia-200/20 bg-[#06182d] px-3 text-sm outline-none focus:border-fuchsia-300/60"
+                      />
+                      <Button size="sm" disabled={!postDraft.idea.trim()} onClick={() => setPostStep(1)}>
+                        Continue <ArrowRight />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {postStep === 1 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-slate-300">Which platform?</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(["instagram", "facebook", "tiktok", "linkedin", "youtube", "x"] as const).map((platform) => (
+                        <Button
+                          key={platform}
+                          size="sm"
+                          variant={postDraft.platform === platform ? "secondary" : "outline"}
+                          className="capitalize"
+                          onClick={() => {
+                            setPostDraft((current) => ({ ...current, platform }));
+                            setPostStep(2);
+                          }}
+                        >
+                          {platform}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {postStep === 2 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-slate-300">Feed post or story?</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {(["feed", "story"] as const).map((placement) => (
+                        <Button
+                          key={placement}
+                          variant={postDraft.placement === placement ? "secondary" : "outline"}
+                          className="capitalize"
+                          onClick={() => {
+                            setPostDraft((current) => ({ ...current, placement }));
+                            void generatePostCaption();
+                          }}
+                        >
+                          {placement}
+                        </Button>
+                      ))}
+                    </div>
+                    {toolBusy && (
+                      <div className="mt-3 flex items-center gap-2 text-xs text-slate-400">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Writing in your Brand Voice…
+                      </div>
+                    )}
+                  </div>
+                )}
+                {postStep === 3 && (
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-xl border border-fuchsia-200/10 bg-black/10 p-3">
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">Caption preview</p>
+                      <textarea
+                        value={postDraft.caption}
+                        onChange={(event) => setPostDraft((current) => ({ ...current, caption: event.target.value }))}
+                        rows={6}
+                        className="mt-2 w-full resize-y bg-transparent text-sm leading-6 text-slate-200 outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" disabled={toolBusy} onClick={() => void generatePostCaption()}>
+                        <Sparkles /> Rewrite
+                      </Button>
+                      <Button disabled={!postDraft.caption.trim() || toolBusy} onClick={() => void finishPostDraft()}>
+                        {toolBusy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Save draft
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {postStep === 4 && postSaved && (
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3">
+                      <div className="flex items-center gap-2 font-semibold text-emerald-100">
+                        <CheckCircle2 className="h-4 w-4" /> Post draft created
+                      </div>
+                      <p className="mt-1 text-xs text-slate-300">{postSaved.title}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" onClick={() => void navigate({ to: "/create", search: { id: postSaved.id } })}>
+                        Open draft
+                      </Button>
+                      <Button onClick={() => openStudioLauncher()}>Add creative</Button>
+                    </div>
+                  </div>
+                )}
+                {toolError && <p className="mt-3 text-xs text-amber-200">{toolError}</p>}
+              </section>
+            )}
+            {activeTool === "studio" && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-cyan-300/20 bg-cyan-300/[.05] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
+                  <WandSparkles className="h-4 w-4" /> Creative Studio
+                </div>
+                <p className="mt-2 text-sm text-slate-300">What do you want to work on?</p>
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void navigate({ to: "/creative-studio", search: { post: undefined, workspace: undefined, media: undefined, photo: false } })}
+                    className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-cyan-200/15 bg-black/10 px-2 text-xs font-semibold hover:bg-cyan-200/10"
+                  >
+                    <WandSparkles className="h-5 w-5 text-cyan-200" /> Graphic
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void navigate({ to: "/creative-studio", search: { post: undefined, workspace: undefined, media: undefined, photo: true } })}
+                    className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-cyan-200/15 bg-black/10 px-2 text-xs font-semibold hover:bg-cyan-200/10"
+                  >
+                    <ImageIcon className="h-5 w-5 text-cyan-200" /> Photo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void navigate({ to: "/video-maker" })}
+                    className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-cyan-200/15 bg-black/10 px-2 text-xs font-semibold hover:bg-cyan-200/10"
+                  >
+                    <Video className="h-5 w-5 text-cyan-200" /> Video
+                  </button>
+                </div>
+                <p className="mt-3 text-[11px] text-slate-400">
+                  My Agent stays the central assistant. These open the existing editing tools rather than creating a second chat.
+                </p>
               </section>
             )}
             {busy && (
