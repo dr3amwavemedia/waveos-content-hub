@@ -118,6 +118,8 @@ export type MediaRecommendation = {
   placement: "feed" | "story" | "both";
   confidence: "low" | "medium" | "high";
   inspectionMode: "photo" | "video_frames" | "metadata_only";
+  /** Set by the server from stored transcripts, never by the model. */
+  transcriptEvidence?: "user_corrected_transcript" | "speech_to_text_transcript" | "none";
 };
 
 export type CampaignDirection = {

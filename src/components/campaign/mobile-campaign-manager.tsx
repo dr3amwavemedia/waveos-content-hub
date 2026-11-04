@@ -21,6 +21,7 @@ import {
   Video,
   CheckCircle2,
   ListChecks,
+  AudioLines,
   X,
 } from "lucide-react";
 import { MediaPicker } from "@/routes/_authenticated/create";
@@ -31,6 +32,14 @@ import { CAMPAIGN_GOALS } from "@/lib/phase-one-planning";
 import { CAMPAIGN_BUILDER_STEPS, campaignGoalReady } from "@/lib/campaign-builder-steps";
 import { cn } from "@/lib/utils";
 import { getMediaPreviewUrl, type MediaAsset } from "@/hooks/use-media";
+import { TranscriptPanel, transcriptStatusLabel } from "@/components/media/transcript-panel";
+import {
+  isTranscriptStale,
+  transcribableMedia,
+  useMediaTranscripts,
+  useSaveTranscriptEdits,
+  useTranscriptRunner,
+} from "@/hooks/use-media-transcripts";
 import {
   DAY_OPTIONS,
   GOAL_LABELS,
@@ -129,6 +138,36 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
     setDraftsCreated,
     createPostDrafts,
   } = controller;
+
+  const transcribableAssets = selectedMediaIds
+    .map((id) => assetLookup.get(id))
+    .filter((asset): asset is MediaAsset => Boolean(asset && transcribableMedia(asset)));
+  const transcripts = useMediaTranscripts(workspaceId, transcribableAssets.map((asset) => asset.id));
+  const transcriptRunner = useTranscriptRunner(workspaceId);
+  const saveTranscriptEdits = useSaveTranscriptEdits(workspaceId);
+  const [transcriptBatch, setTranscriptBatch] = useState<{ done: number; total: number } | null>(null);
+  const [openTranscriptId, setOpenTranscriptId] = useState<string | null>(null);
+  const transcriptDone = transcribableAssets.filter((asset) => {
+    const status = transcripts.data?.[asset.id]?.status;
+    return status === "completed" || status === "no_speech";
+  }).length;
+  const transcriptPending = transcribableAssets.filter((asset) => {
+    const row = transcripts.data?.[asset.id];
+    if (row?.status === "completed" || row?.status === "no_speech") return false;
+    if (row?.status === "processing" && !isTranscriptStale(row)) return false;
+    return !transcriptRunner.isRunning(asset.id);
+  });
+
+  async function transcribeAllSelected() {
+    if (transcriptBatch || !transcriptPending.length) return;
+    const queue = [...transcriptPending];
+    setTranscriptBatch({ done: 0, total: queue.length });
+    for (const asset of queue) {
+      await transcriptRunner.start(asset);
+      setTranscriptBatch((current) => (current ? { ...current, done: current.done + 1 } : current));
+    }
+    setTranscriptBatch(null);
+  }
 
   if (!activeWorkspace) return null;
 
@@ -381,8 +420,62 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
               <li className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> File names, tags, type, length and size</li>
               <li className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> Photo previews and up to 3 frames from each of the first {MAX_SAMPLED_VIDEOS} videos</li>
               <li className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> Your earlier corrections in this workspace</li>
-              <li className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Speech transcripts aren't available yet — WaveOS doesn't transcribe audio, so spoken words are not part of the analysis.</li>
+              <li className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> Finished transcripts of what's said in each video (your corrections first)</li>
             </ul>
+
+            {transcribableAssets.length > 0 && (
+              <div className="mt-4 rounded-xl border border-border bg-background/30 p-3">
+                <div className="flex items-center gap-2">
+                  <AudioLines className="h-4 w-4 text-neon-cyan" />
+                  <p className="text-sm font-semibold">Transcripts</p>
+                  <span className="ml-auto text-xs text-muted-foreground">{transcriptDone} of {transcribableAssets.length} done</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Optional. Speech-to-text reads what's said so analysis can quote real words instead of guessing.
+                </p>
+                {transcriptBatch ? (
+                  <p className="mt-2 flex items-center gap-2 text-xs" role="status">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-neon-cyan" /> Transcribing {Math.min(transcriptBatch.done + 1, transcriptBatch.total)} of {transcriptBatch.total}…
+                  </p>
+                ) : transcriptPending.length > 0 ? (
+                  <Button size="sm" variant="secondary" className="mt-2" onClick={() => void transcribeAllSelected()}>
+                    <AudioLines /> Transcribe {transcriptPending.length === 1 ? "1 video" : `${transcriptPending.length} videos`}
+                  </Button>
+                ) : null}
+                <ul className="mt-3 space-y-2">
+                  {transcribableAssets.map((asset) => {
+                    const row = transcripts.data?.[asset.id];
+                    const run = transcriptRunner.runs[asset.id];
+                    const open = openTranscriptId === asset.id;
+                    return (
+                      <li key={asset.id} className="rounded-xl border border-border bg-background/40">
+                        <button
+                          type="button"
+                          className="flex w-full items-center gap-3 p-2 text-left"
+                          aria-expanded={open}
+                          onClick={() => setOpenTranscriptId(open ? null : asset.id)}
+                        >
+                          <MediaThumb asset={asset} className="h-10 w-10 shrink-0 rounded-lg" />
+                          <span className="min-w-0 flex-1 truncate text-sm">{asset.name}</span>
+                          <span className="shrink-0 text-[10px] font-semibold uppercase text-muted-foreground">{transcriptStatusLabel(row, run)}</span>
+                          {open ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+                        </button>
+                        {open && (
+                          <TranscriptPanel
+                            className="m-2 mt-0"
+                            transcript={row}
+                            run={run}
+                            canStart={!transcriptBatch && !transcriptRunner.isRunning(asset.id)}
+                            onStart={() => void transcriptRunner.start(asset)}
+                            onSave={(input) => saveTranscriptEdits({ mediaAssetId: asset.id, ...input })}
+                          />
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
             <Button
               className="mt-4 min-h-12 w-full sm:w-auto"
               onClick={() => void generateDirection()}
@@ -440,8 +533,14 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                       </div>
                       <label className="mt-2 block text-xs"><span className="text-muted-foreground">What it shows</span><textarea className="mt-1 min-h-16 w-full rounded-md border border-border bg-background px-2 py-1.5" value={rec.visualSummary} onChange={(event)=>updateMediaRecommendation(index,{visualSummary:event.target.value})}/></label>
                       <p className="mt-2 text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">Transcript:</span> not available
-                        {asset?.mime_type.startsWith("video/") ? " — audio isn't transcribed yet." : " — photos have no audio."}
+                        <span className="font-medium text-foreground">Speech evidence:</span>{" "}
+                        {rec.transcriptEvidence === "user_corrected_transcript"
+                          ? "your corrected transcript was used"
+                          : rec.transcriptEvidence === "speech_to_text_transcript"
+                            ? "the speech-to-text transcript was used"
+                            : asset?.mime_type.startsWith("video/")
+                              ? "no transcript — spoken words were not analyzed"
+                              : "none (photo)"}
                       </p>
                       <Button type="button" size="sm" className="mt-3" variant={confirmed?"secondary":"outline"} onClick={()=>setConfirmedMediaIds((current)=>current.includes(rec.mediaId)?current.filter((id)=>id!==rec.mediaId):[...current,rec.mediaId])}>
                         <Check className="h-4 w-4" /> {confirmed?"Confirmed · edit again":"Confirm understanding"}
