@@ -202,3 +202,23 @@ test("Video Maker exposes real non-destructive editing controls", () => {
   assert.match(videoMaker, /Continue to Story/);
   assert.match(videoMaker, /Continue to Feed/);
 });
+
+
+test("Campaign Manager exposes captions as part of the campaign workspace", () => {
+  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  assert.match(campaigns, /Campaign captions/);
+  assert.match(campaigns, /Generate caption/);
+  assert.match(campaigns, /Rewrite/);
+  assert.match(campaigns, /Save caption/);
+  assert.match(campaigns, /Open full post/);
+});
+
+test("Video Maker uses mobile-friendly controls instead of raw timing fields", () => {
+  const videoMaker = fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8");
+  assert.match(videoMaker, /Reel \/ Story/);
+  assert.match(videoMaker, /Show full video/);
+  assert.match(videoMaker, /Fill screen/);
+  assert.match(videoMaker, /Save changes/);
+  assert.match(videoMaker, /selected/);
+  assert.doesNotMatch(videoMaker, /type="number" min=\{0\} max=\{recipe\.trimEnd/);
+});
