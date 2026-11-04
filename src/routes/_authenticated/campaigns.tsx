@@ -1504,7 +1504,7 @@ function CampaignManagerPage() {
                           <div className="flex items-center gap-1"><CalendarDays className="h-3 w-3" /> {item.plannedDate.slice(5)}</div>
                           <div className="mt-1 flex items-center gap-1"><Clock3 className="h-3 w-3" /> {item.localTime}</div>
                         </div>
-                        {asset ? <MediaThumb asset={asset} className="h-12 w-12 shrink-0 rounded-lg" /> : <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-dashed border-border text-[10px] text-muted-foreground">Open</span>}
+                        {asset ? <MediaThumb asset={asset} className="h-12 w-12 shrink-0 rounded-lg" /> : <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-dashed border-border text-[10px] text-muted-foreground">No media</span>}
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap gap-1">
                             <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{item.platform}</span>
