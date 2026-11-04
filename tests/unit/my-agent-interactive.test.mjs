@@ -55,3 +55,18 @@ test("My Agent post action saves a real WaveOS content draft", () => {
   assert.match(actions, /can_create_content/);
   assert.match(actions, /status: "draft"/);
 });
+
+
+test("My Agent connects the remaining intelligence and workflow tools", () => {
+  assert.match(agent, /Trending Now/);
+  assert.match(agent, /Competitive Intelligence/);
+  assert.match(agent, /SEO Growth/);
+  assert.match(agent, /Schedule & Publish Review/);
+  assert.match(agent, /Browse library/);
+  assert.match(agent, /discoverTrends/);
+  assert.match(agent, /researchCompetitor/);
+  assert.match(agent, /analyzeSeoGrowth/);
+  assert.match(agent, /Turn opportunity into a post/);
+  assert.match(agent, /Adapt/);
+  assert.match(agent, /publishing stays review-first/);
+});
