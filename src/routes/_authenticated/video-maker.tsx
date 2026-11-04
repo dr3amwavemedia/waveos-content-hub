@@ -621,7 +621,7 @@ function VideoMakerPage() {
                   disabled={!selected}
                   onClick={() => setEditorTab(key)}
                   className={cn(
-                    "flex min-h-14 min-w-[3.6rem] flex-1 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 text-[11px] font-semibold",
+                    "flex min-h-14 min-w-[2.75rem] flex-1 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border px-0.5 text-[10px] font-semibold sm:text-[11px]",
                     editorTab === key
                       ? "border-neon-cyan/50 bg-neon-cyan/10 text-foreground neon-glow"
                       : "border-transparent text-muted-foreground",
