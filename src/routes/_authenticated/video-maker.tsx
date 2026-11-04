@@ -250,7 +250,7 @@ function VideoMakerPage() {
                         "This browser still cannot decode this clip after the local preview fallback. The original remains selected and can still be added to a post.",
                       );
                     }
-                  }
+                  }}
                   className="aspect-video w-full rounded-2xl bg-black object-contain"
                 />
               ) : (
