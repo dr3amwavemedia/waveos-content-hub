@@ -86,6 +86,7 @@ import {
   deleteOsAccount,
   deleteOsPromoCode,
   createOsPromoCode,
+  updateOsPromoCode,
   listOsPromoCodes,
   listOsAccounts,
   sendOsAccountPasswordReset,
@@ -1010,6 +1011,8 @@ function generatePromoCode() {
 function OsPromoCodesPanel() {
   const list = useServerFn(listOsPromoCodes);
   const createPromo = useServerFn(createOsPromoCode);
+  const updatePromo = useServerFn(updateOsPromoCode);
+  const [editingPromoId, setEditingPromoId] = useState<string | null>(null);
   const deletePromo = useServerFn(deleteOsPromoCode);
   const setActive = useServerFn(setOsPromoCodeActive);
   const [code, setCode] = useState("");
@@ -1020,6 +1023,12 @@ function OsPromoCodesPanel() {
   const [expiresAt, setExpiresAt] = useState("");
   const [colorTheme, setColorTheme] = useState<OsPromoColor>("violet");
   const [saving, setSaving] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editDays, setEditDays] = useState(30);
+  const [editLimit, setEditLimit] = useState(100);
+  const [editStart, setEditStart] = useState("");
+  const [editExpiry, setEditExpiry] = useState("");
+  const [editColor, setEditColor] = useState<OsPromoColor>("violet");
   const promos = useQuery({
     queryKey: ["os-promo-codes"],
     queryFn: () => list({ data: {} }),
@@ -1075,7 +1084,7 @@ function OsPromoCodesPanel() {
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
               Promo codes belong only to the public WaveOS app. Choose a trial duration and
               redemption limit. Promotional access supports up to three social accounts and never
-              lasts longer than 30 days without payment.
+              lasts longer than 90 days without payment.
             </p>
           </div>
           <span className="rounded-full border border-violet-400/30 bg-violet-500/15 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-violet-200">
@@ -1255,6 +1264,30 @@ function OsPromoCodesPanel() {
                     {status}
                   </span>
                 </div>
+                {editingPromoId === promo.id && (
+                  <div className="mt-4 grid gap-3 rounded-xl border border-current/20 bg-black/10 p-3 sm:grid-cols-2">
+                    <label className="text-xs">Campaign name<input className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" value={editName} onChange={e => setEditName(e.target.value)} /></label>
+                    <label className="text-xs">Trial days (1–90)<input type="number" min={1} max={90} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" value={editDays} onChange={e => setEditDays(Number(e.target.value))} /></label>
+                    <label className="text-xs">Redemption limit<input type="number" min={promo.redemption_count || 1} max={100000} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" value={editLimit} onChange={e => setEditLimit(Number(e.target.value))} /></label>
+                    <label className="text-xs">Starts<input type="datetime-local" className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" value={editStart} onChange={e => setEditStart(e.target.value)} /></label>
+                    <label className="text-xs">Expires (optional)<input type="datetime-local" className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" value={editExpiry} onChange={e => setEditExpiry(e.target.value)} /></label>
+                    <label className="text-xs">Color<select className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm" value={editColor} onChange={e => setEditColor(e.target.value as OsPromoColor)}><option value="ocean">Ocean blue</option><option value="violet">Wave violet</option><option value="emerald">Growth green</option><option value="sunset">Launch orange</option></select></label>
+                    <p className="text-xs opacity-75 sm:col-span-2">Changes affect future redemptions only. Existing trial grants stay unchanged.</p>
+                    <div className="flex gap-2 sm:col-span-2">
+                      <button type="button" disabled={saving} className="rounded-lg bg-violet-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50" onClick={async () => {
+                        setSaving(true);
+                        try {
+                          await updatePromo({ data: { promoId: promo.id, name: editName, bonusTrialDays: editDays, maxRedemptions: editLimit, startsAt: editStart, expiresAt: editExpiry || null, colorTheme: editColor } });
+                          await promos.refetch();
+                          setEditingPromoId(null);
+                          toast.success("Promo code updated.");
+                        } catch (error) { toast.error(error instanceof Error ? error.message : "Could not update promo code."); }
+                        finally { setSaving(false); }
+                      }}>Save changes</button>
+                      <button type="button" className="rounded-lg border border-current/25 px-4 py-2 text-sm" onClick={() => setEditingPromoId(null)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
                 <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                   <div className="rounded-xl bg-black/10 p-3">
                     <p className="text-lg font-bold">{promo.bonus_trial_days}</p>
@@ -1278,6 +1311,18 @@ function OsPromoCodesPanel() {
                       : "No expiration"}
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
+                    <button type="button"
+                      onClick={() => {
+                        setEditingPromoId(promo.id);
+                        setEditName(promo.name);
+                        setEditDays(promo.bonus_trial_days);
+                        setEditLimit(promo.max_redemptions);
+                        setEditStart(new Date(promo.starts_at).toISOString().slice(0, 16));
+                        setEditExpiry(promo.expires_at ? new Date(promo.expires_at).toISOString().slice(0, 16) : "");
+                        setEditColor(promo.color_theme);
+                      }}
+                      className="rounded-lg border border-current/25 bg-black/10 px-3 py-2 font-semibold"
+                    >Edit</button>
                     <button
                       type="button"
                       onClick={async () => {
