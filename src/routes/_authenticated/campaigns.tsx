@@ -131,6 +131,8 @@ interface CampaignLinkedContentRow {
   media_asset_ids: string[];
   metadata: Record<string, unknown>;
   created_at: string;
+  primary_caption?: string | null;
+  internal_notes?: string | null;
 }
 
 function CampaignManagerPage() {
