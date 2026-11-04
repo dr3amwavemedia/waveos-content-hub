@@ -1114,8 +1114,8 @@ function MyAgentPage() {
                         <div key={metric.key} className="rounded-xl border border-cyan-200/10 bg-black/10 p-3">
                           <p className="text-[10px] uppercase tracking-wide text-slate-400">{metric.label}</p>
                           <p className="mt-1 text-xl font-semibold">{Intl.NumberFormat().format(metric.value)}</p>
-                          <p className={cn("mt-1 text-[11px]", metric.changePercent === null ? "text-slate-500" : metric.changePercent >= 0 ? "text-emerald-300" : "text-rose-300")}>
-                            {metric.changePercent === null ? "No equal prior period" : `${metric.changePercent >= 0 ? "+" : ""}${metric.changePercent.toFixed(1)}% vs prior period`}
+                          <p className={cn("mt-1 text-[11px]", metric.changePercent === null ? "text-slate-500" : metric.changePercent >= 0 ? "text-slate-300" : "text-rose-300")}>
+                            {metric.changePercent === null ? "No equal prior period" : `${metric.changePercent >= 0 ? "+" : ""}${metric.changePercent.toFixed(1)}% vs prior period (${Intl.NumberFormat().format(metric.previousValue ?? 0)} → ${Intl.NumberFormat().format(metric.value)})`}
                           </p>
                         </div>
                       ))}
@@ -1464,7 +1464,7 @@ function MyAgentPage() {
             )}
             {busy && (
               <div className="mr-auto flex w-fit items-center gap-2 rounded-2xl border border-cyan-200/10 bg-cyan-200/[.04] px-4 py-3 text-xs text-cyan-100">
-                <Loader2 className="h-4 w-4 animate-spin" /> Thinking with your workspace…
+                <span aria-hidden="true" className="inline-block text-lg motion-safe:animate-bounce">🏄</span><span>Catching the right wave…</span>
               </div>
             )}
             {error && (
