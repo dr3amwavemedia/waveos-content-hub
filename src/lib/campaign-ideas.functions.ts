@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { recordAiUsage } from "@/lib/ai-usage.server";
+import { transcriptExcerptForAi, type StoredTranscriptRow } from "@/lib/transcript-audio";
 
 const CAMPAIGN_MODEL = "google/gemini-3.8-flash";
 
@@ -140,6 +141,20 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
       : { data: [], error: null };
     if (selectedMedia.error) throw selectedMedia.error;
 
+    // Real transcript evidence only: finished transcripts, user corrections first.
+    const { data: transcriptRows } = data.mediaIds.length
+      ? await context.supabase
+          .from("media_transcripts")
+          .select("media_asset_id,status,transcript_text,segments,has_timestamps,key_moments,edited_text,edited_segments,edited_at")
+          .eq("workspace_id", data.workspaceId)
+          .in("media_asset_id", data.mediaIds)
+      : { data: [] };
+    const transcriptMap = new Map(
+      ((transcriptRows ?? []) as Array<StoredTranscriptRow & { media_asset_id: string }>).map((row) => [
+        row.media_asset_id,
+        transcriptExcerptForAi(row, 1500),
+      ]),
+    );
     const frameMap = new Map(data.videoFrames.map((entry) => [entry.mediaId, entry.frames]));
     const mediaContext = await Promise.all(
       (selectedMedia.data ?? []).map(async (asset) => {
@@ -171,6 +186,7 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
             ? (frameMap.has(asset.id) ? "video_frames" : "metadata_only")
             : (previewUrl ? "photo" : "metadata_only"),
           videoFrames: frameMap.get(asset.id) ?? [],
+          transcript: transcriptMap.get(asset.id) ?? null,
         };
       }),
     );
@@ -200,7 +216,7 @@ export const generateCampaignDirection = createServerFn({ method: "POST" })
           {
             role: "system",
             content:
-              "You are WaveOS Campaign Director. Build an organic social campaign direction that feels like a smart creative strategist, not a template generator. Plan both durable feed posts and timely Stories when requested; Stories should use concise, conversational frames, polls/questions, behind-the-scenes moments, or a clear next action rather than recycling a feed caption. When selected media is provided, rank only the supplied pieces, identify which are strongest for the requested platforms, recommend a sensible sequence, placement (feed/story/both), and write a usable organic caption and hashtag set. Build media understanding from every reliable signal available: filename/title, tags, media type, duration/dimensions, stored prior intelligence, user corrections, photo previews, and sampled video frames. Treat a user correction as authoritative. If actual pixels/frames are available, use them to verify or override weak filename inference. If only metadata is available, infer cautiously from the filename/tags and label confidence accordingly; never invent visual details. For each recommendation return contentType, visualSummary, likelyPurpose, hookPotential (low/medium/high), suggestedPlatforms, placement, confidence, and inspectionMode. Never invent visual details or performance. Use saved brand context and only the supplied historical evidence. Say when evidence is sparse, separate observation from recommendation, never imply causation, never guarantee performance, and never shame low results. Favor specific human angles, recognizable situations, behind-the-scenes, storytelling, useful education, proof/process, personality, culture, transformation, and audience-relevant moments. Avoid generic marketing filler, fake urgency, invented offers, results, statistics, and repetitive sales CTAs. Return JSON only with keys: angle, audienceInsight, pillars (name,purpose,examples), hooks, notes, mediaRecommendations (mediaId,reason,platforms,suggestedDay,caption,hashtags,contentType,visualSummary,likelyPurpose,hookPotential,suggestedPlatforms,placement,confidence,inspectionMode).",
+              "You are WaveOS Campaign Director. Build an organic social campaign direction that feels like a smart creative strategist, not a template generator. Plan both durable feed posts and timely Stories when requested; Stories should use concise, conversational frames, polls/questions, behind-the-scenes moments, or a clear next action rather than recycling a feed caption. When selected media is provided, rank only the supplied pieces, identify which are strongest for the requested platforms, recommend a sensible sequence, placement (feed/story/both), and write a usable organic caption and hashtag set. Build media understanding from every reliable signal available: filename/title, tags, media type, duration/dimensions, stored prior intelligence, user corrections, photo previews, and sampled video frames. Treat a user correction as authoritative. When an item has a transcript, it is actual speech-to-text evidence of what is said (a user_corrected_transcript is authoritative over speech_to_text_transcript); use it for hooks, quotes and captions, quote only words that appear in it, and never claim what is said in a video that has no transcript — visual-only or filename conclusions remain inference. If actual pixels/frames are available, use them to verify or override weak filename inference. If only metadata is available, infer cautiously from the filename/tags and label confidence accordingly; never invent visual details. For each recommendation return contentType, visualSummary, likelyPurpose, hookPotential (low/medium/high), suggestedPlatforms, placement, confidence, and inspectionMode. Never invent visual details or performance. Use saved brand context and only the supplied historical evidence. Say when evidence is sparse, separate observation from recommendation, never imply causation, never guarantee performance, and never shame low results. Favor specific human angles, recognizable situations, behind-the-scenes, storytelling, useful education, proof/process, personality, culture, transformation, and audience-relevant moments. Avoid generic marketing filler, fake urgency, invented offers, results, statistics, and repetitive sales CTAs. Return JSON only with keys: angle, audienceInsight, pillars (name,purpose,examples), hooks, notes, mediaRecommendations (mediaId,reason,platforms,suggestedDay,caption,hashtags,contentType,visualSummary,likelyPurpose,hookPotential,suggestedPlatforms,placement,confidence,inspectionMode).",
           },
           {
             role: "user",
@@ -312,7 +328,13 @@ Available photo previews and extracted video frames are supplied below when poss
       if (updateError) console.warn("Could not persist campaign media intelligence", asset.id);
     }
 
-    return parsed;
+    return {
+      ...parsed,
+      mediaRecommendations: parsed.mediaRecommendations.map((recommendation) => ({
+        ...recommendation,
+        transcriptEvidence: transcriptMap.get(recommendation.mediaId)?.evidence ?? ("none" as const),
+      })),
+    };
   });
 
 
