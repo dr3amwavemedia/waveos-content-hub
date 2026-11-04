@@ -475,7 +475,7 @@ function MyAgentPage() {
               </button>
               <button
                 type="button"
-                onClick={() => void navigate({ to: "/creative-studio" })}
+                onClick={() => void navigate({ to: "/creative-studio", search: { post: undefined, workspace: undefined, media: undefined, photo: false } })}
                 className="rounded-2xl border border-cyan-200/15 bg-cyan-200/[.04] px-3 py-3 text-xs font-semibold text-cyan-50 hover:bg-cyan-200/10"
               >
                 Open Creative Studio
