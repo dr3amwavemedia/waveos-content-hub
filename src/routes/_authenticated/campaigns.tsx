@@ -110,6 +110,10 @@ interface CampaignPlanRow {
   end_date: string;
   platforms: string[];
   max_posts: number;
+  posting_hours: string[];
+  excluded_days: string[];
+  approval_required: boolean;
+  optimization_mode: "automatic" | "approval_required";
   status: string;
   created_at: string;
 }
@@ -197,7 +201,7 @@ function CampaignManagerPage() {
     queryFn: async () => {
       const { data, error } = await db
         .from("campaign_plans")
-        .select("id,name,goal,start_date,end_date,platforms,max_posts,status,created_at")
+        .select("id,name,goal,start_date,end_date,platforms,max_posts,posting_hours,excluded_days,approval_required,optimization_mode,status,created_at")
         .eq("workspace_id", workspaceId!)
         .order("created_at", { ascending: false })
         .limit(12);
@@ -446,6 +450,38 @@ function CampaignManagerPage() {
     });
   }
 
+  function continueSavedCampaign(campaign: CampaignPlanRow) {
+    const linked = campaignContentByPlan.get(campaign.id) ?? [];
+    const mediaIds = Array.from(
+      new Set(linked.flatMap((item) => item.media_asset_ids ?? [])),
+    ).slice(0, campaign.max_posts);
+    setInput({
+      name: campaign.name,
+      goal: campaign.goal,
+      startDate: campaign.start_date,
+      endDate: campaign.end_date,
+      platforms: campaign.platforms,
+      maxPosts: campaign.max_posts,
+      postingHours: campaign.posting_hours?.length ? campaign.posting_hours : ["09:00", "15:00"],
+      excludedDays: campaign.excluded_days ?? [],
+      approvalRequired: campaign.approval_required,
+      optimizationMode: campaign.optimization_mode ?? "approval_required",
+      contentFormats: ["feed", "story"],
+    });
+    setSelectedMediaIds(mediaIds);
+    setCampaignDirection(null);
+    setConfirmedMediaIds([]);
+    setDraftsCreated(false);
+    setPreview([]);
+    setMobileStep(5);
+    window.requestAnimationFrame(() => {
+      document.getElementById("campaign-builder-workflow")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
   async function generateDirection() {
     if (!workspaceId || !input.platforms.length || directionBusy) return;
     setDirectionBusy(true);
@@ -658,6 +694,9 @@ function CampaignManagerPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <Button size="sm" onClick={() => continueSavedCampaign(selectedCampaign)}>
+                      <ArrowRight /> Continue building
+                    </Button>
                     <Button asChild size="sm" variant="outline">
                       <Link to="/content"><Images /> Content library</Link>
                     </Button>
@@ -899,7 +938,7 @@ function CampaignManagerPage() {
       )}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(20rem,.72fr)]">
-        <section className="space-y-5 sm:surface-card sm:p-6">
+        <section id="campaign-builder-workflow" className="scroll-mt-24 space-y-5 sm:surface-card sm:p-6">
           <MobileWorkflowSteps steps={mobileSteps} step={mobileStep} onChange={setMobileStep} />
           <div className="grid gap-4 sm:grid-cols-2">
             <MobileWorkflowSection active={mobileStep === 0}>
