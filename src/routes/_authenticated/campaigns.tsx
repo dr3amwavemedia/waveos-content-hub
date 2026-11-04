@@ -38,6 +38,7 @@ import {
   type CampaignPlanningInput,
   type CampaignPlanningItem,
 } from "@/lib/phase-one-planning";
+import { waveAssist } from "@/lib/wave-assist.functions";
 import { cn } from "@/lib/utils";
 import { createCampaignPostDrafts, generateCampaignDirection } from "@/lib/campaign-ideas.functions";
 import { MobileWorkflowSteps, MobileWorkflowSection, MobileWorkflowFooter } from "@/components/app/mobile-workflow";
@@ -144,6 +145,7 @@ function CampaignManagerPage() {
   const [mobileStep, setMobileStep] = useState(0);
   const campaignDirectionFn = useServerFn(generateCampaignDirection);
   const createDraftsFn = useServerFn(createCampaignPostDrafts);
+  const captionAssistFn = useServerFn(waveAssist);
   const [campaignDirection, setCampaignDirection] = useState<{
     angle:string;
     audienceInsight:string;
@@ -180,6 +182,7 @@ function CampaignManagerPage() {
   const [draftsCreated,setDraftsCreated]=useState(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [mediaSectionOpen, setMediaSectionOpen] = useState(false);
+  const [bulkCaptionBusy, setBulkCaptionBusy] = useState(false);
   const mobileSteps = ["Campaign name", "Your goal", "Platforms & formats", "Posting frequency", "Planning schedule", "Review campaign"];
   const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
     workspaceId,
@@ -508,6 +511,99 @@ function CampaignManagerPage() {
     });
   }
 
+  async function generateMissingCampaignCaptions() {
+    if (!workspaceId || !selectedCampaignId || bulkCaptionBusy) return;
+    const missing = selectedCampaignContent.filter((item) => !item.primary_caption?.trim());
+    if (!missing.length) {
+      toast.info("Every linked campaign post already has a caption.");
+      return;
+    }
+    setBulkCaptionBusy(true);
+    let completed = 0;
+    try {
+      for (const item of missing) {
+        const metadata =
+          item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+        const plannedPlatform =
+          typeof metadata.platform === "string" && PLATFORM_OPTIONS.includes(metadata.platform)
+            ? metadata.platform
+            : "instagram";
+        const brief =
+          item.internal_notes?.trim() ||
+          (typeof metadata.contentPillar === "string" ? metadata.contentPillar : "") ||
+          item.title ||
+          "Create an organic social caption for this campaign post.";
+
+        const generated = await captionAssistFn({
+          data: {
+            mode: "caption_suite",
+            input: brief,
+            workspaceId,
+            platforms: [plannedPlatform],
+          },
+        });
+        const primaryCaption = generated.primaryCaption ?? generated.suggestion;
+        const { error: contentError } = await db
+          .from("content_items")
+          .update({
+            primary_caption: primaryCaption,
+            metadata: { ...metadata, captionState: "generated_for_review" },
+          })
+          .eq("id", item.id)
+          .eq("workspace_id", workspaceId);
+        if (contentError) throw contentError;
+
+        const { data: existingVariants, error: variantReadError } = await db
+          .from("post_variants")
+          .select("id,platform")
+          .eq("content_item_id", item.id)
+          .eq("workspace_id", workspaceId);
+        if (variantReadError) throw variantReadError;
+        const variant = (existingVariants ?? []).find(
+          (row: any) => row.platform === plannedPlatform,
+        );
+        const platformCaption =
+          generated.variants?.find((row) => row.platform === plannedPlatform)?.caption ??
+          primaryCaption;
+        if (variant?.id) {
+          const { error } = await db
+            .from("post_variants")
+            .update({ caption: platformCaption, enabled: true })
+            .eq("id", variant.id);
+          if (error) throw error;
+        } else {
+          const { error } = await db.from("post_variants").insert({
+            content_item_id: item.id,
+            workspace_id: workspaceId,
+            platform: plannedPlatform,
+            enabled: true,
+            caption: platformCaption,
+            platform_options:
+              metadata.contentFormat === "story" ? { contentType: "story" } : {},
+          });
+          if (error) throw error;
+        }
+        completed += 1;
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campaign-linked-content", workspaceId] }),
+        queryClient.invalidateQueries({ queryKey: ["content-items", workspaceId] }),
+      ]);
+      toast.success(
+        `Generated ${completed} campaign caption${completed === 1 ? "" : "s"} for review.`,
+      );
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : `Generated ${completed} captions before the campaign caption pass stopped.`,
+      );
+    } finally {
+      setBulkCaptionBusy(false);
+    }
+  }
+
   function continueSavedCampaign(campaign: CampaignPlanRow) {
     const linked = campaignContentByPlan.get(campaign.id) ?? [];
     const mediaIds = Array.from(
@@ -765,6 +861,15 @@ function CampaignManagerPage() {
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" onClick={() => continueSavedCampaign(selectedCampaign)}>
                       <ArrowRight /> Continue building
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={bulkCaptionBusy || !selectedCampaignContent.some((item) => !item.primary_caption?.trim())}
+                      onClick={() => void generateMissingCampaignCaptions()}
+                    >
+                      {bulkCaptionBusy ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                      Generate missing captions
                     </Button>
                     <Button asChild size="sm" variant="outline">
                       <Link to="/content"><Images /> Content library</Link>
