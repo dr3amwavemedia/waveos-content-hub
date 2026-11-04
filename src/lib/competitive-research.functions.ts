@@ -86,7 +86,7 @@ export const compareBusinessesIndependent = createServerFn({ method: "POST" })
     });
     if (!response.ok) {
       console.error("Independent comparison provider failed", { status: response.status });
-      throw new Error(RESEARCH_FAILURE_MESSAGE);
+      throw new Error(`The comparison research provider is unavailable (HTTP ${response.status}). Please retry shortly.`);
     }
     const payload = await response.json() as { output?: Array<{ content?: Array<{ type?: string; text?: string; annotations?: Array<{ type?: string; url?: string }> }>; action?: { url?: string; sources?: Array<{url?:string}> } }> };
     const raw = payload.output?.flatMap(item => item.content ?? []).find(item => item.type === "output_text")?.text;
@@ -108,6 +108,6 @@ export const compareBusinessesIndependent = createServerFn({ method: "POST" })
       };
     } catch (error) {
       console.error("Independent comparison rejected", error instanceof z.ZodError ? error.issues.map(issue=>({path:issue.path,code:issue.code})) : {kind:error instanceof SyntaxError ? "invalid_json" : "unsupported_report"});
-      throw new Error(RESEARCH_FAILURE_MESSAGE);
+      throw new Error("The comparison provider returned information WaveOS could not verify. Please retry with two official public websites.");
     }
   });
