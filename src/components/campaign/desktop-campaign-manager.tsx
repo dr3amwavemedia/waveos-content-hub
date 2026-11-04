@@ -438,7 +438,7 @@ export function DesktopCampaignManager({ controller }: { controller: CampaignMan
                 </Button>
                 <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">
                   {uploadMedia.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload media
-                  <input ref={mediaInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={async(e)=>{const files=Array.from(e.target.files??[]); const folderId=mediaFolder==="all"||mediaFolder==="root"?null:mediaFolder; for(const file of files){try{const asset=await uploadMedia.mutateAsync({file,folderId,tags:["campaign"]}); setSelectedMediaIds(ids=>Array.from(new Set([...ids,asset.id])));}catch(error){toast.error(error instanceof Error?error.message:"Upload failed.");}} e.currentTarget.value="";}} />
+                  <input ref={mediaInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={async(e)=>{const inputEl=e.currentTarget; const files=Array.from(e.target.files??[]); const folderId=mediaFolder==="all"||mediaFolder==="root"?null:mediaFolder; for(const file of files){try{const asset=await uploadMedia.mutateAsync({file,folderId,tags:["campaign"]}); setSelectedMediaIds(ids=>Array.from(new Set([...ids,asset.id])));}catch(error){toast.error(error instanceof Error?error.message:"Upload failed.");}} inputEl.value="";}} />
                 </label>
               </div>
             </div>
