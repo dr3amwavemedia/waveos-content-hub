@@ -198,28 +198,54 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
     const plannedItems = buildCampaignPlan(input);
     if (!plannedItems.length) throw new Error("No campaign planning slots are available.");
 
-    const { data: plan, error: planError } = await (context.supabase as any)
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const planPayload = {
+      workspace_id: data.workspaceId,
+      created_by: context.userId,
+      name: input.name,
+      goal: input.goal,
+      start_date: input.startDate,
+      end_date: input.endDate,
+      platforms: input.platforms,
+      max_posts: input.maxPosts,
+      posting_hours: input.postingHours,
+      excluded_days: input.excludedDays,
+      approval_required: true,
+      optimization_mode: "approval_required",
+      status: "draft",
+    };
+
+    let { data: plan, error: planError } = await (supabaseAdmin as any)
       .from("campaign_plans")
-      .insert({
-        workspace_id: data.workspaceId,
-        created_by: context.userId,
-        name: input.name,
-        goal: input.goal,
-        start_date: input.startDate,
-        end_date: input.endDate,
-        platforms: input.platforms,
-        max_posts: input.maxPosts,
-        posting_hours: input.postingHours,
-        excluded_days: input.excludedDays,
-        approval_required: true,
-        optimization_mode: "approval_required",
-        status: "draft",
-      })
+      .insert(planPayload)
       .select("id")
       .single();
-    if (planError || !plan?.id) throw new Error("Campaign plan could not be saved.");
 
-    const { error: itemsError } = await (context.supabase as any)
+    if (
+      planError &&
+      /optimization_mode/i.test(String(planError.message ?? "")) &&
+      /column|schema cache|does not exist/i.test(String(planError.message ?? ""))
+    ) {
+      const { optimization_mode: _ignored, ...legacyPayload } = planPayload;
+      const retry = await (supabaseAdmin as any)
+        .from("campaign_plans")
+        .insert(legacyPayload)
+        .select("id")
+        .single();
+      plan = retry.data;
+      planError = retry.error;
+    }
+
+    if (planError || !plan?.id) {
+      console.error("My Agent campaign plan insert failed", {
+        code: planError?.code ?? "unknown",
+        message: planError?.message ?? "missing plan id",
+      });
+      throw new Error("Campaign plan could not be saved.");
+    }
+
+    const { error: itemsError } = await (supabaseAdmin as any)
       .from("campaign_plan_items")
       .insert(
         plannedItems.map((item) => ({
@@ -237,7 +263,11 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
         })),
       );
     if (itemsError) {
-      await (context.supabase as any)
+      console.error("My Agent campaign item insert failed", {
+        code: itemsError.code ?? "unknown",
+        message: itemsError.message ?? "campaign items insert failed",
+      });
+      await (supabaseAdmin as any)
         .from("campaign_plans")
         .delete()
         .eq("id", plan.id)
