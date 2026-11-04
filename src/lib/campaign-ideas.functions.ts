@@ -336,58 +336,10 @@ export const createCampaignPostDrafts = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) => campaignDraftInput.parse(input))
   .handler(async ({ data, context }) => {
-    const [{ data: member }, { data: manageable }] = await Promise.all([
-      context.supabase
-        .from("workspace_members")
-        .select("role")
-        .eq("workspace_id", data.workspaceId)
-        .eq("user_id", context.userId)
-        .maybeSingle(),
-      context.supabase.rpc(
-        "can_staff_manage_workspace" as never,
-        { _user_id: context.userId, _workspace_id: data.workspaceId } as never,
-      ),
-    ]);
-    const canManage =
-      (manageable as unknown as boolean | null) === true ||
-      ["owner","admin","editor"].includes(member?.role ?? "");
-    if (!canManage) throw new Error("You do not have permission to create campaign drafts.");
+    await assertCampaignManager(context, data.workspaceId, "You do not have permission to create campaign drafts.");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const mediaIds = data.recommendations.map((recommendation) => recommendation.mediaId);
-    const { data: assets, error: assetsError } = await supabaseAdmin
-      .from("media_assets")
-      .select("id,source_metadata")
-      .eq("workspace_id", data.workspaceId)
-      .in("id", mediaIds);
-    if (assetsError) throw assetsError;
-    if ((assets ?? []).length !== new Set(mediaIds).size) {
-      throw new Error("One or more campaign assets are no longer available in this workspace.");
-    }
-    for (const recommendation of data.recommendations) {
-      const asset = (assets ?? []).find((row) => row.id === recommendation.mediaId);
-      const existing =
-        asset?.source_metadata && typeof asset.source_metadata === "object"
-          ? (asset.source_metadata as Record<string, unknown>)
-          : {};
-      const { error: correctionError } = await supabaseAdmin
-        .from("media_assets")
-        .update({
-          source_metadata: {
-            ...existing,
-            waveos_campaign_correction: {
-              correctedAt: new Date().toISOString(),
-              correctedBy: context.userId,
-              contentType: recommendation.contentType ?? "unknown",
-              visualSummary: recommendation.visualSummary,
-              likelyPurpose: recommendation.likelyPurpose,
-            },
-          },
-        })
-        .eq("id", recommendation.mediaId)
-        .eq("workspace_id", data.workspaceId);
-      if (correctionError) throw correctionError;
-    }
+    await writeCampaignCorrections(supabaseAdmin, data.workspaceId, context.userId, data.recommendations);
     const rows = data.recommendations.map((rec, index) => ({
       workspace_id: data.workspaceId,
       created_by: context.userId,
@@ -412,3 +364,94 @@ export const createCampaignPostDrafts = createServerFn({ method: "POST" })
     if (error) throw error;
     return { createdIds: (created ?? []).map((row) => row.id), count: created?.length ?? 0 };
   });
+
+/**
+ * Persists the user's confirmed media understanding without creating content.
+ * Campaign Manager saves linked drafts itself, so this only records corrections
+ * that guide future campaign analysis.
+ */
+export const saveCampaignMediaCorrections = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input) => z.object({
+    workspaceId: z.string().uuid(),
+    corrections: z.array(z.object({
+      mediaId: z.string().uuid(),
+      contentType: z.string().trim().max(120).optional(),
+      visualSummary: z.string().trim().min(1).max(500),
+      likelyPurpose: z.string().trim().min(1).max(240),
+    })).min(1).max(24),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    await assertCampaignManager(context, data.workspaceId, "You do not have permission to update campaign media.");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    await writeCampaignCorrections(supabaseAdmin, data.workspaceId, context.userId, data.corrections);
+    return { count: data.corrections.length };
+  });
+
+type CampaignAuthContext = {
+  userId: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any;
+};
+
+async function assertCampaignManager(context: CampaignAuthContext, workspaceId: string, message: string) {
+  const [{ data: member }, { data: manageable }] = await Promise.all([
+    context.supabase
+      .from("workspace_members")
+      .select("role")
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", context.userId)
+      .maybeSingle(),
+    context.supabase.rpc(
+      "can_staff_manage_workspace" as never,
+      { _user_id: context.userId, _workspace_id: workspaceId } as never,
+    ),
+  ]);
+  const canManage =
+    (manageable as unknown as boolean | null) === true ||
+    ["owner","admin","editor"].includes(member?.role ?? "");
+  if (!canManage) throw new Error(message);
+}
+
+async function writeCampaignCorrections(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabaseAdmin: any,
+  workspaceId: string,
+  userId: string,
+  corrections: Array<{ mediaId: string; contentType?: string; visualSummary: string; likelyPurpose: string }>,
+) {
+  const mediaIds = corrections.map((correction) => correction.mediaId);
+  const { data: assets, error: assetsError } = await supabaseAdmin
+    .from("media_assets")
+    .select("id,source_metadata")
+    .eq("workspace_id", workspaceId)
+    .in("id", mediaIds);
+  if (assetsError) throw assetsError;
+  if ((assets ?? []).length !== new Set(mediaIds).size) {
+    throw new Error("One or more campaign assets are no longer available in this workspace.");
+  }
+  for (const correction of corrections) {
+    const asset = (assets ?? []).find((row: { id: string }) => row.id === correction.mediaId);
+    const existing =
+      asset?.source_metadata && typeof asset.source_metadata === "object"
+        ? (asset.source_metadata as Record<string, unknown>)
+        : {};
+    const { error: correctionError } = await supabaseAdmin
+      .from("media_assets")
+      .update({
+        source_metadata: {
+          ...existing,
+          waveos_campaign_correction: {
+            correctedAt: new Date().toISOString(),
+            correctedBy: userId,
+            contentType: correction.contentType ?? "unknown",
+            visualSummary: correction.visualSummary,
+            likelyPurpose: correction.likelyPurpose,
+          },
+        },
+      })
+      .eq("id", correction.mediaId)
+      .eq("workspace_id", workspaceId);
+    if (correctionError) throw correctionError;
+  }
+}
