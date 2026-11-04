@@ -6,6 +6,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   CalendarDays,
+  ChevronDown,
+  ChevronUp,
   Check,
   Clock3,
   Loader2,
@@ -175,6 +177,7 @@ function CampaignManagerPage() {
   const [draftsBusy,setDraftsBusy]=useState(false);
   const [draftsCreated,setDraftsCreated]=useState(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
+  const [mediaSectionOpen, setMediaSectionOpen] = useState(false);
   const mobileSteps = ["Campaign name", "Your goal", "Platforms & formats", "Posting frequency", "Planning schedule", "Review campaign"];
   const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
     workspaceId,
@@ -659,7 +662,15 @@ function CampaignManagerPage() {
                   <button
                     key={campaign.id}
                     type="button"
-                    onClick={() => setSelectedCampaignId(campaign.id)}
+                    onClick={() => {
+                      setSelectedCampaignId(campaign.id);
+                      window.requestAnimationFrame(() => {
+                        document.getElementById("campaign-command-detail")?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "start",
+                        });
+                      });
+                    }}
                     className={cn(
                       "min-w-[15rem] rounded-xl border p-3 text-left transition-colors",
                       active
@@ -679,13 +690,16 @@ function CampaignManagerPage() {
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       {campaign.start_date} → {campaign.end_date}
                     </p>
+                    <p className="mt-2 flex items-center gap-1 text-[11px] font-medium text-primary">
+                      Tap to open <ArrowRight className="h-3 w-3" />
+                    </p>
                   </button>
                 );
               })}
             </div>
 
             {selectedCampaign && (
-              <div className="mt-3 rounded-2xl border border-primary/15 bg-background/35 p-4">
+              <div id="campaign-command-detail" className="scroll-mt-24 mt-3 rounded-2xl border border-primary/15 bg-background/35 p-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-lg font-semibold">{selectedCampaign.name}</p>
@@ -794,22 +808,43 @@ function CampaignManagerPage() {
       </section>
 
       <section className="rounded-2xl border border-border bg-surface/70 p-4 sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <button
+          type="button"
+          onClick={() => setMediaSectionOpen((open) => !open)}
+          className="flex w-full items-center justify-between gap-3 text-left"
+          aria-expanded={mediaSectionOpen}
+        >
           <div>
-            <div className="flex items-center gap-2 font-semibold"><Images className="h-4 w-4 text-primary" /> Choose campaign media</div>
-            <p className="mt-1 text-xs text-muted-foreground">Select multiple photos/videos from a folder or upload new pieces. Wave Assist will evaluate the selected content and keep every recommendation review-only.</p>
+            <div className="flex items-center gap-2 font-semibold"><Images className="h-4 w-4 text-primary" /> Campaign content</div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {selectedMediaIds.length
+                ? `${selectedMediaIds.length} piece${selectedMediaIds.length === 1 ? "" : "s"} selected · tap to change`
+                : "Choose a folder or select individual photos/videos when you're ready."}
+            </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" className="min-h-11" onClick={()=>setShowSharedMediaPicker(true)}>
-              <Images className="h-4 w-4" /> Drive / Dropbox / Frame.io
-            </Button>
-            <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">
-              {uploadMedia.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload media
-              <input ref={mediaInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={async(e)=>{const files=Array.from(e.target.files??[]); const folderId=mediaFolder==="all"||mediaFolder==="root"?null:mediaFolder; for(const file of files){try{const asset=await uploadMedia.mutateAsync({file,folderId,tags:["campaign"]}); setSelectedMediaIds(ids=>Array.from(new Set([...ids,asset.id])));}catch(error){toast.error(error instanceof Error?error.message:"Upload failed.");}} e.currentTarget.value="";}} />
-            </label>
-          </div>
-        </div>
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-background/50">
+            {mediaSectionOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          </span>
+        </button>
+
+        {mediaSectionOpen && (
+          <div className="mt-4 border-t border-border pt-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium">Choose campaign media</p>
+                <p className="mt-1 text-xs text-muted-foreground">Select multiple photos/videos from a folder or upload new pieces.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="min-h-11" onClick={()=>setShowSharedMediaPicker(true)}>
+                  <Images className="h-4 w-4" /> Drive / Dropbox / Frame.io
+                </Button>
+                <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">
+                  {uploadMedia.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload media
+                  <input ref={mediaInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={async(e)=>{const files=Array.from(e.target.files??[]); const folderId=mediaFolder==="all"||mediaFolder==="root"?null:mediaFolder; for(const file of files){try{const asset=await uploadMedia.mutateAsync({file,folderId,tags:["campaign"]}); setSelectedMediaIds(ids=>Array.from(new Set([...ids,asset.id])));}catch(error){toast.error(error instanceof Error?error.message:"Upload failed.");}} e.currentTarget.value="";}} />
+                </label>
+              </div>
+            </div>
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
           <Button type="button" variant={mediaFolder==="all"?"default":"outline"} size="sm" onClick={()=>setMediaFolder("all")}>All media</Button>
           <Button type="button" variant={mediaFolder==="root"?"default":"outline"} size="sm" onClick={()=>setMediaFolder("root")}>Uncategorized</Button>
           {(mediaFolders.data??[]).map(folder=><Button key={folder.id} type="button" variant={mediaFolder===folder.id?"default":"outline"} size="sm" onClick={()=>setMediaFolder(folder.id)}>{folder.name}</Button>)}
@@ -820,11 +855,12 @@ function CampaignManagerPage() {
             size="sm"
             variant="outline"
             disabled={mediaAssets.isLoading || !(mediaAssets.data ?? []).length}
-            onClick={() =>
+            onClick={() => {
               setSelectedMediaIds(
                 (mediaAssets.data ?? []).map((asset) => asset.id).slice(0, input.maxPosts),
-              )
-            }
+              );
+              setMediaSectionOpen(false);
+            }}
           >
             <FolderOpen className="h-4 w-4" /> Use this entire folder
           </Button>
@@ -832,11 +868,15 @@ function CampaignManagerPage() {
             Up to {input.maxPosts} pieces will be connected to this campaign.
           </span>
         </div>
-        <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
+        <div className="mt-4 max-h-[28rem] overflow-y-auto rounded-xl pr-1">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
           {(mediaAssets.data??[]).slice(0,36).map(asset=><CampaignMediaTile key={asset.id} asset={asset} selected={selectedMediaIds.includes(asset.id)} onToggle={()=>setSelectedMediaIds(ids=>ids.includes(asset.id)?ids.filter(id=>id!==asset.id):[...ids,asset.id])} />)}
+          </div>
         </div>
         {!mediaAssets.isLoading && !(mediaAssets.data??[]).length && <p className="mt-4 text-sm text-muted-foreground">No media in this folder yet. Upload files or choose another folder.</p>}
         <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground"><span>{selectedMediaIds.length} selected{selectedMediaIds.length===0 ? " · choose at least one piece of content" : ""}</span>{selectedMediaIds.length>0&&<button type="button" className="text-primary" onClick={()=>setSelectedMediaIds([])}>Clear selection</button>}</div>
+          </div>
+        )}
       </section>
 
       {showSharedMediaPicker && workspaceId && (
@@ -847,6 +887,7 @@ function CampaignManagerPage() {
           onConfirm={(ids)=>{
             setSelectedMediaIds(ids.slice(0,24));
             setShowSharedMediaPicker(false);
+            setMediaSectionOpen(false);
             void mediaAssets.refetch();
           }}
         />
