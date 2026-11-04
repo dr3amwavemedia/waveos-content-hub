@@ -120,7 +120,6 @@ interface CampaignPlanRow {
   status: string;
   created_at: string;
   primary_caption?: string | null;
-  internal_notes?: string | null;
 }
 
 interface CampaignLinkedContentRow {
@@ -242,7 +241,7 @@ function CampaignManagerPage() {
     queryFn: async () => {
       const { data, error } = await db
         .from("content_items")
-        .select("id,title,status,scheduled_at,media_asset_ids,metadata,created_at,primary_caption,internal_notes")
+        .select("id,title,status,scheduled_at,media_asset_ids,metadata,created_at,primary_caption")
         .eq("workspace_id", workspaceId!)
         .order("created_at", { ascending: false })
         .limit(300);
@@ -356,7 +355,6 @@ function CampaignManagerPage() {
           workspace_id: workspaceId,
           created_by: auth.user.id,
           title: `${input.name} · ${asset.name}`.slice(0, 180),
-          internal_notes: plannedItem?.copyBrief ?? null,
           primary_caption: null,
           hashtags: [],
           media_asset_ids: [asset.id],
@@ -372,6 +370,7 @@ function CampaignManagerPage() {
             contentFormat: plannedItem?.contentFormat ?? null,
             contentPillar: plannedItem?.pillar ?? null,
             captionState: "needs_generation",
+            campaignBrief: plannedItem?.copyBrief ?? null,
           },
         };
       });
@@ -531,7 +530,7 @@ function CampaignManagerPage() {
             ? metadata.platform
             : "instagram";
         const brief =
-          item.internal_notes?.trim() ||
+          (typeof metadata.campaignBrief === "string" ? metadata.campaignBrief.trim() : "") ||
           (typeof metadata.contentPillar === "string" ? metadata.contentPillar : "") ||
           item.title ||
           "Create an organic social caption for this campaign post.";
