@@ -70,3 +70,12 @@ test("My Agent connects the remaining intelligence and workflow tools", () => {
   assert.match(agent, /Adapt/);
   assert.match(agent, /publishing stays review-first/);
 });
+
+
+test("Campaign Builder keeps typed corrections inside the active tool", () => {
+  assert.match(agent, /applyCampaignConversationInput/);
+  assert.match(agent, /\(\\d\{1,2\}\)\\s\*\(\?:post\|posts\)/);
+  assert.match(agent, /durationMatch/);
+  assert.match(agent, /mentionedPlatforms/);
+  assert.match(agent, /activeTool === "campaign" && applyCampaignConversationInput\(input\)/);
+});
