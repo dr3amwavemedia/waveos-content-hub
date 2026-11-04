@@ -142,3 +142,12 @@ test("Campaign Manager continues after save with a working command center", () =
   assert.match(campaigns, /Continue below in the campaign workspace/);
   assert.doesNotMatch(campaigns, /contentFormats: input\.contentFormats/);
 });
+
+
+test("Video Maker has an automatic local playback fallback", () => {
+  const videoMaker = fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8");
+  assert.match(videoMaker, /prepareLocalPreview/);
+  assert.match(videoMaker, /URL\.createObjectURL/);
+  assert.match(videoMaker, /Prepare local preview/);
+  assert.match(videoMaker, /temporary on-device preview/);
+});
