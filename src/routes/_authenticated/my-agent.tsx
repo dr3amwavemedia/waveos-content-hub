@@ -52,6 +52,58 @@ export const Route = createFileRoute("/_authenticated/my-agent")({
   head: () => ({ meta: [{ title: "My Agent — WaveOS" }] }),
 });
 
+function AgentMessageContent({ content }: { content: string }) {
+  const inline = (text: string) =>
+    text.split(/(\*\*[^*]+\*\*)/g).map((part, index) =>
+      part.startsWith("**") && part.endsWith("**") ? (
+        <strong key={index} className="font-semibold text-slate-100">
+          {part.slice(2, -2)}
+        </strong>
+      ) : (
+        <span key={index}>{part}</span>
+      ),
+    );
+
+  return (
+    <div className="space-y-2 whitespace-normal">
+      {content.split("\n").map((raw, index) => {
+        const line = raw.trimEnd();
+        if (!line.trim()) return <div key={index} className="h-1" aria-hidden="true" />;
+        if (/^---+$/.test(line.trim())) {
+          return <div key={index} className="my-2 border-t border-cyan-200/10" />;
+        }
+        const heading = line.match(/^#{1,4}\s+(.+)$/);
+        if (heading) {
+          return (
+            <p key={index} className="pt-1 font-semibold text-slate-100">
+              {inline(heading[1])}
+            </p>
+          );
+        }
+        const bullet = line.match(/^[-*]\s+(.+)$/);
+        if (bullet) {
+          return (
+            <div key={index} className="flex gap-2">
+              <span className="mt-[.55rem] h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300/70" />
+              <p className="min-w-0">{inline(bullet[1])}</p>
+            </div>
+          );
+        }
+        const numbered = line.match(/^(\d+)\.\s+(.+)$/);
+        if (numbered) {
+          return (
+            <div key={index} className="flex gap-2">
+              <span className="shrink-0 font-semibold text-cyan-200/80">{numbered[1]}.</span>
+              <p className="min-w-0">{inline(numbered[2])}</p>
+            </div>
+          );
+        }
+        return <p key={index}>{inline(line)}</p>;
+      })}
+    </div>
+  );
+}
+
 function MyAgentPage() {
   const { activeWorkspace } = useWorkspace();
   const navigate = useNavigate();
@@ -268,7 +320,7 @@ function MyAgentPage() {
                     <Sparkles className="h-3 w-3" /> My Agent
                   </span>
                 )}
-                <p className="whitespace-pre-wrap">{message.content}</p>
+                <AgentMessageContent content={message.content} />
               </article>
             ))}
             {busy && (
