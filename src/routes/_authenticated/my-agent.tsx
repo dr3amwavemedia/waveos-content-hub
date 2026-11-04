@@ -1,8 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  ArrowRight,
   ArrowUp,
+  BarChart3,
+  CheckCircle2,
   Loader2,
+  Megaphone,
   MessageSquareText,
   Mic,
   MicOff,
@@ -18,9 +22,44 @@ import { RequireFeature } from "@/components/app/require-feature";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { waveAssist } from "@/lib/wave-assist.functions";
+import {
+  createAgentCampaign,
+  getAgentPerformanceSnapshot,
+} from "@/lib/my-agent-actions.functions";
 import { cn } from "@/lib/utils";
 
 type AgentMessage = { role: "user" | "assistant"; content: string };
+
+type AgentPerformanceSnapshot = {
+  asOf: string;
+  rangeStart: string | null;
+  rangeEnd: string | null;
+  metrics: Array<{
+    key: string;
+    label: string;
+    value: number;
+    unit: string;
+    previousValue: number | null;
+    changePercent: number | null;
+  }>;
+  message: string | null;
+};
+
+type AgentCampaignDraft = {
+  name: string;
+  goal: "awareness" | "engagement" | "leads" | "launch" | "retention";
+  durationDays: number;
+  maxPosts: number;
+  platforms: string[];
+};
+
+function localDateKey() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
 type SpeechResultEvent = {
   results: ArrayLike<{ 0?: { transcript?: string } }>;
@@ -108,6 +147,8 @@ function MyAgentPage() {
   const { activeWorkspace } = useWorkspace();
   const navigate = useNavigate();
   const assist = useServerFn(waveAssist);
+  const getPerformance = useServerFn(getAgentPerformanceSnapshot);
+  const saveAgentCampaign = useServerFn(createAgentCampaign);
   const workspaceId = activeWorkspace?.id ?? null;
   const storageKey = workspaceId ? `waveos.assist.${workspaceId}` : null;
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -116,6 +157,25 @@ function MyAgentPage() {
   const [error, setError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
   const [voiceReplies, setVoiceReplies] = useState(false);
+  const [activeTool, setActiveTool] = useState<"campaign" | "performance" | null>(null);
+  const [toolBusy, setToolBusy] = useState(false);
+  const [toolError, setToolError] = useState<string | null>(null);
+  const [performance, setPerformance] = useState<AgentPerformanceSnapshot | null>(null);
+  const [campaignStep, setCampaignStep] = useState(0);
+  const [campaignSaved, setCampaignSaved] = useState<null | {
+    id: string;
+    name: string;
+    plannedItems: number;
+    startDate: string;
+    endDate: string;
+  }>(null);
+  const [campaignDraft, setCampaignDraft] = useState<AgentCampaignDraft>({
+    name: "",
+    goal: "awareness",
+    durationDays: 30,
+    maxPosts: 8,
+    platforms: ["instagram"],
+  });
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -153,9 +213,105 @@ function MyAgentPage() {
     [],
   );
 
+  function addUserMessage(content: string) {
+    setMessages((current) => [...current, { role: "user" as const, content }].slice(-8));
+  }
+
+  function startCampaignBuilder(prompt?: string) {
+    if (prompt) addUserMessage(prompt);
+    setDraft("");
+    setToolError(null);
+    setCampaignSaved(null);
+    setCampaignStep(0);
+    setCampaignDraft({
+      name: "",
+      goal: "awareness",
+      durationDays: 30,
+      maxPosts: 8,
+      platforms: ["instagram"],
+    });
+    setActiveTool("campaign");
+  }
+
+  async function openPerformanceSnapshot(prompt?: string) {
+    if (!workspaceId || toolBusy) return;
+    if (prompt) addUserMessage(prompt);
+    setDraft("");
+    setToolError(null);
+    setActiveTool("performance");
+    setToolBusy(true);
+    try {
+      const result = await getPerformance({
+        data: { workspaceId, localDate: localDateKey() },
+      });
+      setPerformance(result as AgentPerformanceSnapshot);
+    } catch (caught) {
+      setToolError(caught instanceof Error ? caught.message : "Performance could not be loaded.");
+    } finally {
+      setToolBusy(false);
+    }
+  }
+
+  async function finishCampaign() {
+    if (!workspaceId || toolBusy || !campaignDraft.name.trim() || !campaignDraft.platforms.length) return;
+    setToolBusy(true);
+    setToolError(null);
+    try {
+      const result = await saveAgentCampaign({
+        data: {
+          workspaceId,
+          localDate: localDateKey(),
+          name: campaignDraft.name,
+          goal: campaignDraft.goal,
+          durationDays: campaignDraft.durationDays,
+          maxPosts: campaignDraft.maxPosts,
+          platforms: campaignDraft.platforms as Array<
+            "instagram" | "facebook" | "linkedin" | "tiktok" | "youtube" | "x"
+          >,
+        },
+      });
+      setCampaignSaved({
+        id: result.id,
+        name: result.name,
+        plannedItems: result.plannedItems,
+        startDate: result.startDate,
+        endDate: result.endDate,
+      });
+      setCampaignStep(5);
+    } catch (caught) {
+      setToolError(caught instanceof Error ? caught.message : "Campaign could not be saved.");
+    } finally {
+      setToolBusy(false);
+    }
+  }
+
   async function sendMessage(raw: string, speakReply = false) {
     const input = raw.trim();
-    if (!input || !workspaceId || busy) return;
+    if (!input || !workspaceId || busy || toolBusy) return;
+
+    if (activeTool === "campaign" && campaignStep === 0 && !campaignDraft.name.trim()) {
+      addUserMessage(input);
+      setCampaignDraft((current) => ({ ...current, name: input.slice(0, 120) }));
+      setCampaignStep(1);
+      setDraft("");
+      return;
+    }
+
+    const normalized = input.toLowerCase();
+    if (
+      /(campaign)/.test(normalized) &&
+      /(create|build|start|make|new|plan)/.test(normalized)
+    ) {
+      startCampaignBuilder(input);
+      return;
+    }
+    if (
+      /(performance|analytics|growth|results|how (am|are) .*doing|how .*performing)/.test(normalized)
+    ) {
+      void openPerformanceSnapshot(input);
+      return;
+    }
+
     const prior = messages.slice(-6);
     setMessages((current) =>
       [...current, { role: "user" as const, content: input }].slice(-8),
@@ -174,6 +330,7 @@ function MyAgentPage() {
             workspace: activeWorkspace?.name ?? "WaveOS",
             surface: "My Agent",
             inputMode: speakReply ? "voice" : "text",
+            localDate: localDateKey(),
           }),
         },
       });
@@ -232,7 +389,7 @@ function MyAgentPage() {
     .find((message) => message.role === "assistant")?.content;
 
   return (
-    <div className="ocean-page mx-auto flex min-h-[calc(100vh-10rem)] max-w-5xl flex-col overflow-hidden rounded-3xl border border-cyan-300/15 bg-[linear-gradient(145deg,rgba(4,24,45,.98),rgba(15,20,52,.96))] text-slate-50 shadow-2xl">
+    <div className="ocean-page mx-auto mb-24 flex h-[calc(100dvh-13rem)] min-h-[34rem] max-w-5xl flex-col overflow-hidden rounded-3xl border border-cyan-300/15 bg-[linear-gradient(145deg,rgba(4,24,45,.98),rgba(15,20,52,.96))] text-slate-50 shadow-2xl lg:mb-0 lg:h-auto lg:min-h-[calc(100vh-10rem)]">
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-cyan-300/15 px-4 py-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-200/20 bg-gradient-to-br from-cyan-300/25 to-violet-400/25 text-cyan-100">
@@ -269,6 +426,10 @@ function MyAgentPage() {
             onClick={() => {
               setMessages([]);
               setError(null);
+              setActiveTool(null);
+              setPerformance(null);
+              setToolError(null);
+              setCampaignSaved(null);
               if (storageKey) sessionStorage.removeItem(storageKey);
             }}
           >
@@ -288,19 +449,37 @@ function MyAgentPage() {
               Ask for a decision, content idea, performance recommendation, campaign plan, or next
               step. Speak or type—both continue this same conversation.
             </p>
-            <div className="mt-5 flex flex-wrap justify-center gap-2">
-              {["What should I focus on next?", "Plan my next content week", "Help me improve performance"].map(
-                (prompt) => (
-                  <button
-                    key={prompt}
-                    type="button"
-                    onClick={() => void sendMessage(prompt)}
-                    className="rounded-full border border-cyan-200/15 bg-cyan-200/[.06] px-3 py-2 text-xs text-cyan-50 hover:bg-cyan-200/10"
-                  >
-                    {prompt}
-                  </button>
-                ),
-              )}
+            <div className="mt-5 grid w-full max-w-lg grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => startCampaignBuilder("Let's create a new campaign")}
+                className="flex min-h-20 items-center gap-3 rounded-2xl border border-cyan-200/15 bg-cyan-200/[.06] p-3 text-left hover:bg-cyan-200/10"
+              >
+                <Megaphone className="h-5 w-5 shrink-0 text-cyan-200" />
+                <span><span className="block text-sm font-semibold">Create campaign</span><span className="text-[11px] text-slate-400">Build it step by step</span></span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void openPerformanceSnapshot("Show me my performance")}
+                className="flex min-h-20 items-center gap-3 rounded-2xl border border-cyan-200/15 bg-cyan-200/[.06] p-3 text-left hover:bg-cyan-200/10"
+              >
+                <BarChart3 className="h-5 w-5 shrink-0 text-cyan-200" />
+                <span><span className="block text-sm font-semibold">Performance</span><span className="text-[11px] text-slate-400">See a live snapshot</span></span>
+              </button>
+              <button
+                type="button"
+                onClick={() => void navigate({ to: "/create" })}
+                className="rounded-2xl border border-cyan-200/15 bg-cyan-200/[.04] px-3 py-3 text-xs font-semibold text-cyan-50 hover:bg-cyan-200/10"
+              >
+                Create a post
+              </button>
+              <button
+                type="button"
+                onClick={() => void navigate({ to: "/creative-studio" })}
+                className="rounded-2xl border border-cyan-200/15 bg-cyan-200/[.04] px-3 py-3 text-xs font-semibold text-cyan-50 hover:bg-cyan-200/10"
+              >
+                Open Creative Studio
+              </button>
             </div>
           </div>
         ) : (
@@ -323,6 +502,177 @@ function MyAgentPage() {
                 <AgentMessageContent content={message.content} />
               </article>
             ))}
+            {activeTool === "campaign" && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-violet-300/20 bg-violet-300/[.06] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-violet-100">
+                  <Megaphone className="h-4 w-4" /> Campaign Builder
+                </div>
+                {campaignStep === 0 && (
+                  <div className="mt-4 space-y-3">
+                    <p className="text-sm text-slate-300">What should we call this campaign?</p>
+                    <div className="flex gap-2">
+                      <input
+                        value={campaignDraft.name}
+                        onChange={(event) => setCampaignDraft((current) => ({ ...current, name: event.target.value }))}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && campaignDraft.name.trim()) setCampaignStep(1);
+                        }}
+                        placeholder="Campaign name"
+                        maxLength={120}
+                        className="min-h-11 min-w-0 flex-1 rounded-xl border border-violet-200/20 bg-[#06182d] px-3 text-sm outline-none focus:border-violet-300/60"
+                      />
+                      <Button size="sm" disabled={!campaignDraft.name.trim()} onClick={() => setCampaignStep(1)}>
+                        Continue <ArrowRight />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {campaignStep === 1 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-slate-300">What is the main goal?</p>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {(["awareness", "engagement", "leads", "launch", "retention"] as const).map((goal) => (
+                        <Button
+                          key={goal}
+                          variant={campaignDraft.goal === goal ? "secondary" : "outline"}
+                          className="justify-start capitalize"
+                          onClick={() => {
+                            setCampaignDraft((current) => ({ ...current, goal }));
+                            setCampaignStep(2);
+                          }}
+                        >
+                          {goal}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {campaignStep === 2 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-slate-300">How many posts should WaveOS plan?</p>
+                    <div className="mt-3 grid grid-cols-4 gap-2">
+                      {[4, 8, 12, 16].map((count) => (
+                        <Button
+                          key={count}
+                          variant={campaignDraft.maxPosts === count ? "secondary" : "outline"}
+                          onClick={() => {
+                            setCampaignDraft((current) => ({ ...current, maxPosts: count }));
+                            setCampaignStep(3);
+                          }}
+                        >
+                          {count}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {campaignStep === 3 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-slate-300">How long should the campaign run?</p>
+                    <div className="mt-3 grid grid-cols-4 gap-2">
+                      {[14, 30, 45, 60].map((days) => (
+                        <Button
+                          key={days}
+                          variant={campaignDraft.durationDays === days ? "secondary" : "outline"}
+                          onClick={() => {
+                            setCampaignDraft((current) => ({ ...current, durationDays: days }));
+                            setCampaignStep(4);
+                          }}
+                        >
+                          {days}d
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {campaignStep === 4 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-slate-300">Where should it run?</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {["instagram", "facebook", "tiktok", "linkedin", "youtube", "x"].map((platform) => {
+                        const selected = campaignDraft.platforms.includes(platform);
+                        return (
+                          <Button
+                            key={platform}
+                            size="sm"
+                            variant={selected ? "secondary" : "outline"}
+                            className="capitalize"
+                            onClick={() =>
+                              setCampaignDraft((current) => ({
+                                ...current,
+                                platforms: selected
+                                  ? current.platforms.filter((item) => item !== platform)
+                                  : [...current.platforms, platform],
+                              }))
+                            }
+                          >
+                            {platform}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-4 rounded-xl border border-violet-200/10 bg-black/10 p-3 text-xs text-slate-300">
+                      <strong>{campaignDraft.name}</strong> · {campaignDraft.maxPosts} posts · {campaignDraft.durationDays} days · {campaignDraft.goal}
+                    </div>
+                    <Button className="mt-3 w-full" disabled={!campaignDraft.platforms.length || toolBusy} onClick={() => void finishCampaign()}>
+                      {toolBusy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Create campaign
+                    </Button>
+                  </div>
+                )}
+                {campaignStep === 5 && campaignSaved && (
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3">
+                      <div className="flex items-center gap-2 font-semibold text-emerald-100">
+                        <CheckCircle2 className="h-4 w-4" /> Campaign created
+                      </div>
+                      <p className="mt-1 text-xs text-slate-300">
+                        {campaignSaved.name} · {campaignSaved.plannedItems} planned slots · {campaignSaved.startDate} to {campaignSaved.endDate}
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button variant="outline" onClick={() => void navigate({ to: "/campaigns" })}>Open Campaign Manager</Button>
+                      <Button variant="outline" onClick={() => startCampaignBuilder()}>Build another</Button>
+                    </div>
+                  </div>
+                )}
+                {toolError && <p className="mt-3 text-xs text-amber-200">{toolError}</p>}
+              </section>
+            )}
+            {activeTool === "performance" && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-cyan-300/20 bg-cyan-300/[.05] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
+                  <BarChart3 className="h-4 w-4" /> Performance Snapshot
+                </div>
+                {toolBusy ? (
+                  <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Loading connected analytics…
+                  </div>
+                ) : performance?.metrics.length ? (
+                  <>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      {performance.rangeStart} to {performance.rangeEnd} · as of {performance.asOf}
+                    </p>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {performance.metrics.map((metric) => (
+                        <div key={metric.key} className="rounded-xl border border-cyan-200/10 bg-black/10 p-3">
+                          <p className="text-[10px] uppercase tracking-wide text-slate-400">{metric.label}</p>
+                          <p className="mt-1 text-xl font-semibold">{Intl.NumberFormat().format(metric.value)}</p>
+                          <p className={cn("mt-1 text-[11px]", metric.changePercent === null ? "text-slate-500" : metric.changePercent >= 0 ? "text-emerald-300" : "text-rose-300")}>
+                            {metric.changePercent === null ? "No equal prior period" : `${metric.changePercent >= 0 ? "+" : ""}${metric.changePercent.toFixed(1)}% vs prior period`}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button variant="outline" onClick={() => void navigate({ to: "/analytics" })}>Open Analytics</Button>
+                      <Button onClick={() => startCampaignBuilder()}>Build a campaign</Button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-4 text-sm text-slate-400">{performance?.message ?? toolError ?? "No performance data is available yet."}</p>
+                )}
+              </section>
+            )}
             {busy && (
               <div className="mr-auto flex w-fit items-center gap-2 rounded-2xl border border-cyan-200/10 bg-cyan-200/[.04] px-4 py-3 text-xs text-cyan-100">
                 <Loader2 className="h-4 w-4 animate-spin" /> Thinking with your workspace…
@@ -338,7 +688,7 @@ function MyAgentPage() {
         )}
       </main>
 
-      <footer className="border-t border-cyan-300/15 bg-[#04172b]/92 p-3 sm:p-4">
+      <footer className="shrink-0 border-t border-cyan-300/15 bg-[#04172b]/92 p-3 sm:p-4">
         <form
           className="mx-auto max-w-3xl"
           onSubmit={(event) => {
