@@ -162,3 +162,13 @@ test("Campaign Manager keeps media compact and saved campaigns tappable", () => 
   assert.match(campaigns, /campaign-command-detail/);
   assert.match(campaigns, /max-h-\[28rem\]/);
 });
+
+
+test("Campaign persistence never deletes a saved plan just because content linking fails", () => {
+  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  assert.match(campaigns, /Campaign saved, but its content could not be linked yet/);
+  assert.match(campaigns, /Your campaigns were not deleted/);
+  assert.match(campaigns, /optimization_mode\|schema cache\|column/);
+  assert.match(actions, /contentLinked/);
+  assert.doesNotMatch(actions, /linked campaign content insert failed[\s\S]{0,400}\.delete\(\)/);
+});
