@@ -202,7 +202,7 @@ export function MobileVideoMaker({ controller }: { controller: VideoMakerControl
     seek(next);
   }
 
-  function useTranscriptAsCaptions() {
+  function applyTranscriptCaptions() {
     if (!transcript) return;
     const view = effectiveTranscript(transcript);
     const cues = captionCuesFromSegments(view.segments, recipe.trimStart, trimEnd);
@@ -563,7 +563,7 @@ export function MobileVideoMaker({ controller }: { controller: VideoMakerControl
                       onSeek={seek}
                       actions={
                         transcript?.status === "completed" && effectiveTranscript(transcript).hasTimestamps ? (
-                          <Button size="sm" variant="secondary" onClick={useTranscriptAsCaptions}>
+                          <Button size="sm" variant="secondary" onClick={applyTranscriptCaptions}>
                             <Captions /> Use as captions
                           </Button>
                         ) : null
