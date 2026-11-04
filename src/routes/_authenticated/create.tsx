@@ -1627,7 +1627,8 @@ export function MediaPicker({
   const [urls, setUrls] = useState<Record<string, MediaPreview>>({});
   const [brokenPreviews, setBrokenPreviews] = useState<string[]>([]);
   const [source, setSource] = useState<"waveos" | ExternalMediaProvider | "frameio">("waveos");
-  const deviceInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraRollInputRef = useRef<HTMLInputElement>(null);
   const upload = useUploadAsset(workspaceId);
   const storageUsage = useMediaStorageUsage(workspaceId);
   const [deviceUploading, setDeviceUploading] = useState(false);
@@ -1660,7 +1661,8 @@ export function MediaPicker({
       toast.error(error instanceof Error ? error.message : "Media could not be added.");
     } finally {
       setDeviceUploading(false);
-      if (deviceInputRef.current) deviceInputRef.current.value = "";
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (cameraRollInputRef.current) cameraRollInputRef.current.value = "";
     }
   }
 
@@ -1720,9 +1722,17 @@ export function MediaPicker({
               </button>
             ))}
             <input
-              ref={deviceInputRef}
+              ref={fileInputRef}
               type="file"
               accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime"
+              multiple
+              className="sr-only"
+              onChange={(event) => void handleDeviceFiles(event.target.files)}
+            />
+            <input
+              ref={cameraRollInputRef}
+              type="file"
+              accept="image/*,video/*"
               multiple
               className="sr-only"
               onChange={(event) => void handleDeviceFiles(event.target.files)}
@@ -1730,7 +1740,16 @@ export function MediaPicker({
             <button
               type="button"
               disabled={deviceUploading}
-              onClick={() => deviceInputRef.current?.click()}
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/40 hover:text-primary disabled:opacity-50"
+            >
+              {deviceUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+              {deviceUploading ? "Adding…" : "Files"}
+            </button>
+            <button
+              type="button"
+              disabled={deviceUploading}
+              onClick={() => cameraRollInputRef.current?.click()}
               className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
             >
               {deviceUploading ? (
@@ -1738,7 +1757,7 @@ export function MediaPicker({
               ) : (
                 <Camera className="h-3.5 w-3.5" />
               )}
-              {deviceUploading ? "Adding…" : "Camera roll"}
+              {deviceUploading ? "Adding…" : "Camera roll / Photos"}
             </button>
           </div>
           <div className="mb-3 rounded-lg border border-border bg-elevated/50 px-3 py-2 text-[11px] text-muted-foreground">
@@ -1781,7 +1800,7 @@ export function MediaPicker({
             </div>
           ) : (assets.data ?? []).length === 0 ? (
             <div className="py-16 text-center text-sm text-muted-foreground">
-              No media yet. Choose Camera roll to add a photo or video from this device.
+              No media yet. Choose Files or Camera roll / Photos to add media from this device.
             </div>
           ) : (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
