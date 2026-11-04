@@ -27,6 +27,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { RequireFeature } from "@/components/app/require-feature";
+import { MediaPicker } from "@/routes/_authenticated/create";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
 import { waveAssist } from "@/lib/wave-assist.functions";
@@ -245,6 +246,8 @@ function MyAgentPage() {
   const [competitiveReport, setCompetitiveReport] = useState<AgentCompetitiveReport | null>(null);
   const [seoWebsite, setSeoWebsite] = useState("");
   const [seoReport, setSeoReport] = useState<AgentSeoReport | null>(null);
+  const [showAgentMediaPicker, setShowAgentMediaPicker] = useState(false);
+  const [agentPickedMedia, setAgentPickedMedia] = useState<string[]>([]);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
 
@@ -801,6 +804,8 @@ function MyAgentPage() {
               setTrendResults([]);
               setCompetitiveReport(null);
               setSeoReport(null);
+              setAgentPickedMedia([]);
+              setShowAgentMediaPicker(false);
               if (storageKey) sessionStorage.removeItem(storageKey);
             }}
           >
@@ -1318,13 +1323,46 @@ function MyAgentPage() {
                 <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
                   <FolderOpen className="h-4 w-4" /> Media
                 </div>
-                <p className="mt-2 text-sm text-slate-300">Choose where you want to use your media.</p>
+                <p className="mt-2 text-sm text-slate-300">
+                  Pick from WaveOS, Google Drive, Dropbox, Files, Camera Roll / Photos, or Frame.io.
+                </p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Button variant="outline" onClick={() => void navigate({ to: "/content" })}><FolderOpen /> Browse library</Button>
-                  <Button onClick={() => startPostBuilder()}><FileText /> Use in a post</Button>
-                  <Button variant="outline" onClick={() => void navigate({ to: "/creative-studio", search: { post: undefined, workspace: undefined, media: undefined, photo: false } })}><ImageIcon /> Graphic</Button>
-                  <Button variant="outline" onClick={() => void navigate({ to: "/video-maker" })}><Video /> Video</Button>
+                  <Button className="col-span-2" onClick={() => setShowAgentMediaPicker(true)}>
+                    <FolderOpen /> Pick media
+                  </Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/content" })}>
+                    <FolderOpen /> Browse library
+                  </Button>
+                  <Button
+                    disabled={!agentPickedMedia.length}
+                    onClick={() =>
+                      void navigate({
+                        to: "/create",
+                        search: {
+                          media: agentPickedMedia[0],
+                          destination: undefined,
+                          brief: undefined,
+                          briefWorkspace: undefined,
+                          studio: undefined,
+                          id: undefined,
+                        },
+                      })
+                    }
+                  >
+                    <FileText /> Use in a post
+                  </Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/creative-studio", search: { post: undefined, workspace: undefined, media: agentPickedMedia[0], photo: false } })}>
+                    <ImageIcon /> Graphic
+                  </Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/video-maker" })}>
+                    <Video /> Video
+                  </Button>
                 </div>
+                {agentPickedMedia.length > 0 && (
+                  <p className="mt-3 text-xs text-cyan-100">
+                    {agentPickedMedia.length} media item{agentPickedMedia.length === 1 ? "" : "s"} selected.
+                  </p>
+                )}
               </section>
             )}
             {activeTool === "publish" && (
@@ -1422,6 +1460,17 @@ function MyAgentPage() {
           </div>
         </form>
       </footer>
+      {showAgentMediaPicker && workspaceId && (
+        <MediaPicker
+          workspaceId={workspaceId}
+          picked={agentPickedMedia}
+          onClose={() => setShowAgentMediaPicker(false)}
+          onConfirm={(ids) => {
+            setAgentPickedMedia(ids);
+            setShowAgentMediaPicker(false);
+          }}
+        />
+      )}
     </div>
   );
 }
