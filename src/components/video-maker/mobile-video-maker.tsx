@@ -50,6 +50,14 @@ import {
   type VideoEditRecipe,
 } from "@/lib/video-edit-recipe";
 import type { VideoMakerController } from "@/components/video-maker/use-video-maker";
+import { TranscriptPanel } from "@/components/media/transcript-panel";
+import {
+  transcribableMedia,
+  useMediaTranscripts,
+  useSaveTranscriptEdits,
+  useTranscriptRunner,
+} from "@/hooks/use-media-transcripts";
+import { captionCuesFromSegments, effectiveTranscript } from "@/lib/transcript-audio";
 
 type EditorTab = "trim" | "speed" | "captions" | "text" | "look" | "aspect" | "audio";
 
@@ -104,6 +112,10 @@ export function MobileVideoMaker({ controller }: { controller: VideoMakerControl
     saveRecipe,
   } = controller;
   const [editorTab, setEditorTab] = useState<EditorTab>("trim");
+  const transcriptQuery = useMediaTranscripts(workspaceId, selected && transcribableMedia(selected) ? [selected.id] : []);
+  const transcriptRunner = useTranscriptRunner(workspaceId);
+  const saveTranscriptEdits = useSaveTranscriptEdits(workspaceId);
+  const transcript = selected ? transcriptQuery.data?.[selected.id] : undefined;
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [mediaDuration, setMediaDuration] = useState<number | null>(null);
@@ -188,6 +200,18 @@ export function MobileVideoMaker({ controller }: { controller: VideoMakerControl
     const next = Math.min(duration || value, Math.max(value, recipe.trimStart + 0.1));
     updateRecipe({ trimEnd: Number(next.toFixed(2)) });
     seek(next);
+  }
+
+  function useTranscriptAsCaptions() {
+    if (!transcript) return;
+    const view = effectiveTranscript(transcript);
+    const cues = captionCuesFromSegments(view.segments, recipe.trimStart, trimEnd);
+    if (!cues.length) {
+      toast.error("No transcript text falls inside the trimmed part of the clip.");
+      return;
+    }
+    updateRecipe({ captions: cues });
+    toast.success(`Added ${cues.length} caption${cues.length === 1 ? "" : "s"} from the transcript. Timing within each section is estimated.`);
   }
 
   function addCaption() {
@@ -530,10 +554,21 @@ export function MobileVideoMaker({ controller }: { controller: VideoMakerControl
                     <PanelHeading title="Captions" detail="Add timed captions by hand. Each caption starts at the playhead.">
                       <Button size="sm" onClick={addCaption}><Plus /> Add</Button>
                     </PanelHeading>
-                    <p className="flex gap-2 rounded-xl border border-border bg-surface/40 p-3 text-xs text-muted-foreground">
-                      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                      Automatic captions need speech transcription, which WaveOS doesn't offer yet.
-                    </p>
+                    <TranscriptPanel
+                      transcript={transcript}
+                      run={transcriptRunner.runs[selected.id]}
+                      canStart={!transcriptRunner.isRunning(selected.id)}
+                      onStart={() => void transcriptRunner.start(selected)}
+                      onSave={(input) => saveTranscriptEdits({ mediaAssetId: selected.id, ...input })}
+                      onSeek={seek}
+                      actions={
+                        transcript?.status === "completed" && effectiveTranscript(transcript).hasTimestamps ? (
+                          <Button size="sm" variant="secondary" onClick={useTranscriptAsCaptions}>
+                            <Captions /> Use as captions
+                          </Button>
+                        ) : null
+                      }
+                    />
                     {recipe.captions.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No captions yet.</p>
                     ) : (
