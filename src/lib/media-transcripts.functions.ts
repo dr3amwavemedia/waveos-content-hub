@@ -6,7 +6,8 @@ const uuid = z.string().uuid();
 const MAX_AUDIO_UPLOAD_BYTES = 600 * 16000 * 2 + 4096;
 
 function safeMessage(error: unknown) {
-  return error instanceof Error && error.name !== "Error" ? "Speech-to-text could not finish this clip. Try again." : error instanceof Error ? error.message : "Speech-to-text could not finish this clip. Try again.";
+  console.error("Transcript request failed", error instanceof Error ? error.name : "unknown");
+  return "Speech-to-text could not finish this clip. Try again.";
 }
 
 /** Timestamped transcript from 16 kHz mono WAV audio read on the user's device. */
