@@ -439,11 +439,8 @@ function CreatePost() {
   async function handleSaveDraft() {
     if (!workspaceId) return;
 
-    if (!platforms.length) {
-      setSaveStatus("error");
-      toast.error("Select at least one platform before saving.");
-      return;
-    }
+    // A draft belongs to the workspace and may be saved before choosing any destination.
+    // Publishing and scheduling still require an explicit platform selection.
     setSaveStatus("saving");
 
     try {
@@ -463,16 +460,17 @@ function CreatePost() {
         });
       }
 
-      await qc.invalidateQueries({
-        queryKey: ["content-item", id],
-      });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["content-item", id] }),
+        qc.invalidateQueries({ queryKey: ["content-items", workspaceId] }),
+      ]);
 
       if (draftStorageKey) {
         window.localStorage.removeItem(draftStorageKey);
       }
 
       setSaveStatus("saved");
-      toast.success("Draft saved. You can now edit each platform caption.");
+      toast.success("Saved to this workspace. Open Social Media → Posts → Drafts on any device or authorized staff account.");
     } catch (e) {
       setSaveStatus("error");
       toast.error((e as Error).message);
