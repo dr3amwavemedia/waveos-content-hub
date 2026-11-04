@@ -1,9 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { MediaPicker } from "@/routes/_authenticated/create";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  ArrowRight,
   CalendarDays,
   Check,
   Clock3,
@@ -17,6 +18,8 @@ import {
   FolderOpen,
   Video,
   CheckCircle2,
+  FileText,
+  ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequireFeature } from "@/components/app/require-feature";
@@ -111,6 +114,16 @@ interface CampaignPlanRow {
   created_at: string;
 }
 
+interface CampaignLinkedContentRow {
+  id: string;
+  title: string | null;
+  status: string;
+  scheduled_at: string | null;
+  media_asset_ids: string[];
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
 function CampaignManagerPage() {
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id ?? null;
@@ -157,6 +170,7 @@ function CampaignManagerPage() {
   const [directionBusy, setDirectionBusy] = useState(false);
   const [draftsBusy,setDraftsBusy]=useState(false);
   const [draftsCreated,setDraftsCreated]=useState(false);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const mobileSteps = ["Campaign name", "Your goal", "Platforms & formats", "Posting frequency", "Planning schedule", "Review campaign"];
   const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
     workspaceId,
@@ -192,6 +206,59 @@ function CampaignManagerPage() {
     },
   });
 
+  const linkedCampaignContent = useQuery({
+    queryKey: ["campaign-linked-content", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("content_items")
+        .select("id,title,status,scheduled_at,media_asset_ids,metadata,created_at")
+        .eq("workspace_id", workspaceId!)
+        .order("created_at", { ascending: false })
+        .limit(300);
+      if (error) throw error;
+      return (data ?? []) as CampaignLinkedContentRow[];
+    },
+  });
+
+  useEffect(() => {
+    if (!selectedCampaignId && campaigns.data?.[0]?.id) {
+      setSelectedCampaignId(campaigns.data[0].id);
+    }
+  }, [campaigns.data, selectedCampaignId]);
+
+  const campaignContentByPlan = useMemo(() => {
+    const grouped = new Map<string, CampaignLinkedContentRow[]>();
+    for (const item of linkedCampaignContent.data ?? []) {
+      const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+      const campaignPlanId =
+        typeof metadata.campaignPlanId === "string" ? metadata.campaignPlanId : null;
+      if (!campaignPlanId) continue;
+      const current = grouped.get(campaignPlanId) ?? [];
+      current.push(item);
+      grouped.set(campaignPlanId, current);
+    }
+    return grouped;
+  }, [linkedCampaignContent.data]);
+
+  const selectedCampaign =
+    (campaigns.data ?? []).find((campaign) => campaign.id === selectedCampaignId) ?? null;
+  const selectedCampaignContent = selectedCampaignId
+    ? campaignContentByPlan.get(selectedCampaignId) ?? []
+    : [];
+  const selectedCampaignCounts = selectedCampaignContent.reduce(
+    (counts, item) => {
+      counts.total += 1;
+      if (item.status === "draft" || item.status === "changes_requested") counts.drafts += 1;
+      if (item.status === "in_review") counts.review += 1;
+      if (item.status === "approved") counts.approved += 1;
+      if (item.status === "scheduled") counts.scheduled += 1;
+      if (item.status === "published") counts.published += 1;
+      return counts;
+    },
+    { total: 0, drafts: 0, review: 0, approved: 0, scheduled: 0, published: 0 },
+  );
+
   const errors = useMemo(() => validateCampaignPlanningInput(input), [input]);
 
   const savePlan = useMutation({
@@ -215,7 +282,6 @@ function CampaignManagerPage() {
           start_date: input.startDate,
           end_date: input.endDate,
           platforms: input.platforms,
-          contentFormats: input.contentFormats,
           max_posts: input.maxPosts,
           posting_hours: input.postingHours,
           excluded_days: input.excludedDays,
@@ -284,13 +350,17 @@ function CampaignManagerPage() {
       }
       return plan.id as string;
     },
-    onSuccess: async () => {
+    onSuccess: async (planId) => {
       await workflowDraft.discard.mutateAsync();
       setDirty(false);
       setPreview([]);
       setInput(DEFAULT_INPUT);
-      await queryClient.invalidateQueries({ queryKey: ["campaign-plans", workspaceId] });
-      toast.success("Campaign saved with its selected content.");
+      setSelectedCampaignId(planId);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campaign-plans", workspaceId] }),
+        queryClient.invalidateQueries({ queryKey: ["campaign-linked-content", workspaceId] }),
+      ]);
+      toast.success("Campaign saved. Continue below in the campaign workspace.");
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Campaign plan could not be saved."),
@@ -518,6 +588,171 @@ function CampaignManagerPage() {
         </div>
         </div>
       </header>
+
+      <section className="rounded-2xl border border-primary/20 bg-[linear-gradient(145deg,rgba(8,35,60,.92),rgba(28,20,59,.9))] p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+              <ListChecks className="h-4 w-4" /> Campaign command center
+            </div>
+            <h2 className="mt-1 text-xl font-semibold">Keep building after the plan is saved</h2>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
+              Reopen a campaign, see its linked posts, and move each piece from draft to review,
+              approval, scheduling, and published content.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => {
+            setSelectedCampaignId(null);
+            setInput(DEFAULT_INPUT);
+            setSelectedMediaIds([]);
+            setCampaignDirection(null);
+            setPreview([]);
+            setMobileStep(0);
+          }}>
+            <Megaphone /> New campaign
+          </Button>
+        </div>
+
+        {(campaigns.data ?? []).length > 0 ? (
+          <>
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+              {(campaigns.data ?? []).map((campaign) => {
+                const contentCount = campaignContentByPlan.get(campaign.id)?.length ?? 0;
+                const active = selectedCampaignId === campaign.id;
+                return (
+                  <button
+                    key={campaign.id}
+                    type="button"
+                    onClick={() => setSelectedCampaignId(campaign.id)}
+                    className={cn(
+                      "min-w-[15rem] rounded-xl border p-3 text-left transition-colors",
+                      active
+                        ? "border-primary/50 bg-primary/15"
+                        : "border-border bg-background/35 hover:border-primary/30",
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-semibold">{campaign.name}</span>
+                      <span className="rounded-full bg-black/20 px-2 py-1 text-[9px] uppercase text-muted-foreground">
+                        {campaign.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {contentCount} linked post{contentCount === 1 ? "" : "s"} · {campaign.max_posts} max
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      {campaign.start_date} → {campaign.end_date}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+
+            {selectedCampaign && (
+              <div className="mt-3 rounded-2xl border border-primary/15 bg-background/35 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-lg font-semibold">{selectedCampaign.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground capitalize">
+                      {selectedCampaign.goal} · {selectedCampaign.platforms.join(" · ")}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link to="/content"><Images /> Content library</Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                      <Link to="/calendar"><CalendarDays /> Calendar</Link>
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  {[
+                    ["Linked", selectedCampaignCounts.total],
+                    ["Draft", selectedCampaignCounts.drafts],
+                    ["Review", selectedCampaignCounts.review],
+                    ["Approved", selectedCampaignCounts.approved],
+                    ["Scheduled", selectedCampaignCounts.scheduled],
+                    ["Published", selectedCampaignCounts.published],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="rounded-xl border border-border bg-black/10 p-2 text-center">
+                      <p className="text-lg font-semibold">{value}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {selectedCampaignContent.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {selectedCampaignContent.slice(0, 8).map((item, index) => (
+                      <div key={item.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface/50 p-3">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold">{item.title || `Campaign post ${index + 1}`}</p>
+                          <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+                            {item.status.replaceAll("_", " ")}
+                            {item.scheduled_at ? ` · ${new Date(item.scheduled_at).toLocaleString()}` : ""}
+                          </p>
+                        </div>
+                        <Button asChild size="sm" variant="outline">
+                          <Link
+                            to="/create"
+                            search={{
+                              id: item.id,
+                              media: undefined,
+                              studio: undefined,
+                              destination: undefined,
+                              brief: undefined,
+                              briefWorkspace: undefined,
+                            }}
+                          >
+                            Open <ArrowRight />
+                          </Link>
+                        </Button>
+                      </div>
+                    ))}
+                    {selectedCampaignContent.length > 8 && (
+                      <p className="px-1 text-xs text-muted-foreground">
+                        +{selectedCampaignContent.length - 8} more linked posts in the Content Library.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                    This campaign does not have linked content yet. Choose media below, then analyze
+                    the campaign or create linked drafts so the workflow can continue.
+                  </div>
+                )}
+
+                <div className="mt-4 rounded-xl border border-primary/15 bg-primary/5 p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">Next step</p>
+                  <p className="mt-1 text-sm">
+                    {selectedCampaignCounts.total === 0
+                      ? "Attach content and build the campaign direction."
+                      : selectedCampaignCounts.drafts > 0
+                        ? "Open the drafts, finish captions and media, then submit them for review."
+                        : selectedCampaignCounts.review > 0
+                          ? "Review the submitted posts and approve or request changes."
+                          : selectedCampaignCounts.approved > 0
+                            ? "Schedule the approved posts on the campaign calendar."
+                            : selectedCampaignCounts.scheduled > 0
+                              ? "The campaign is scheduled. Monitor publishing and performance."
+                              : "Review the published campaign and use the results for the next one."}
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+            No campaigns yet. Build your first campaign below and it will become a working campaign
+            workspace here.
+          </div>
+        )}
+      </section>
 
       <section className="rounded-2xl border border-border bg-surface/70 p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -836,26 +1071,15 @@ function CampaignManagerPage() {
           </section>
 
           <section className="surface-card p-5">
-            <h2 className="font-semibold">Recent plans</h2>
-            <div className="mt-3 space-y-2">
-              {campaigns.isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {(campaigns.data ?? []).map((campaign) => (
-                <div key={campaign.id} className="rounded-lg border border-border p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="truncate text-sm font-semibold">{campaign.name}</span>
-                    <span className="rounded-full bg-elevated px-2 py-1 text-[10px] uppercase">
-                      {campaign.status}
-                    </span>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {campaign.start_date} – {campaign.end_date} · {campaign.max_posts} max
-                  </div>
-                </div>
-              ))}
-              {!campaigns.isLoading && !campaigns.data?.length && (
-                <p className="text-sm text-muted-foreground">No saved plans yet.</p>
-              )}
+            <div className="flex items-center gap-2 font-semibold">
+              <FileText className="h-4 w-4 text-primary" /> What Campaign Manager does
             </div>
+            <ol className="mt-3 space-y-2 text-sm text-muted-foreground">
+              <li>1. Choose the campaign goal, platforms, cadence, and content.</li>
+              <li>2. Analyze the selected media and build creative direction.</li>
+              <li>3. Turn the plan into linked post drafts with captions and media.</li>
+              <li>4. Review, approve, schedule, and follow the campaign from the command center.</li>
+            </ol>
           </section>
         </aside>
       </div>
