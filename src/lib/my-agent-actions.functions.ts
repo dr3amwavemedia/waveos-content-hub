@@ -320,17 +320,13 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
     const { error: linkedDraftError } = await (supabaseAdmin as any)
       .from("content_items")
       .insert(linkedDraftRows);
+    const contentLinked = !linkedDraftError;
     if (linkedDraftError) {
-      console.error("My Agent linked campaign content insert failed", {
+      console.error("My Agent campaign saved but linked content insert failed", {
         code: linkedDraftError.code ?? "unknown",
         message: linkedDraftError.message ?? "linked campaign content insert failed",
+        campaignPlanId: plan.id,
       });
-      await (supabaseAdmin as any)
-        .from("campaign_plans")
-        .delete()
-        .eq("id", plan.id)
-        .eq("workspace_id", data.workspaceId);
-      throw new Error("Campaign content could not be connected.");
     }
 
     return {
@@ -342,7 +338,8 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
       platforms: input.platforms,
       maxPosts: input.maxPosts,
       plannedItems: plannedItems.length,
-      linkedContentCount: uniqueMediaIds.length,
+      linkedContentCount: contentLinked ? uniqueMediaIds.length : 0,
+      contentLinked,
     };
   });
 
