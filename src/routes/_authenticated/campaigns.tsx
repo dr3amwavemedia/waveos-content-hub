@@ -14,6 +14,7 @@ import {
   Sparkles,
   Upload,
   Images,
+  FolderOpen,
   Video,
   CheckCircle2,
 } from "lucide-react";
@@ -197,6 +198,7 @@ function CampaignManagerPage() {
     mutationFn: async () => {
       if (!workspaceId) throw new Error("Select a workspace first.");
       if (errors.length) throw new Error(errors[0]);
+      if (!selectedMediaIds.length) throw new Error("Choose campaign content before saving.");
       const plannedItems = preview.length ? preview : buildCampaignPlan(input);
       if (!plannedItems.length) {
         throw new Error("No planning slots remain after excluded days and times are applied.");
@@ -243,6 +245,43 @@ function CampaignManagerPage() {
         await db.from("campaign_plans").delete().eq("id", plan.id).eq("workspace_id", workspaceId);
         throw itemsError;
       }
+
+      const selectedAssets = (mediaAssets.data ?? [])
+        .filter((asset) => selectedMediaIds.includes(asset.id))
+        .slice(0, input.maxPosts);
+      if (!selectedAssets.length) {
+        await db.from("campaign_plans").delete().eq("id", plan.id).eq("workspace_id", workspaceId);
+        throw new Error("Selected campaign media could not be loaded.");
+      }
+
+      const linkedRows = selectedAssets.map((asset, index) => {
+        const plannedItem = plannedItems[index % plannedItems.length];
+        return {
+          workspace_id: workspaceId,
+          created_by: auth.user.id,
+          title: `${input.name} · ${asset.name}`.slice(0, 180),
+          primary_caption: plannedItem?.copyBrief ?? "",
+          hashtags: [],
+          media_asset_ids: [asset.id],
+          status: "draft",
+          metadata: {
+            source: "campaign_manager",
+            campaignPlanId: plan.id,
+            campaignName: input.name,
+            mediaFolderId: mediaFolder === "all" || mediaFolder === "root" ? null : mediaFolder,
+            plannedDate: plannedItem?.plannedDate ?? null,
+            plannedTime: plannedItem?.localTime ?? null,
+            platform: plannedItem?.platform ?? null,
+            contentFormat: plannedItem?.contentFormat ?? null,
+            contentPillar: plannedItem?.pillar ?? null,
+          },
+        };
+      });
+      const { error: contentError } = await db.from("content_items").insert(linkedRows);
+      if (contentError) {
+        await db.from("campaign_plans").delete().eq("id", plan.id).eq("workspace_id", workspaceId);
+        throw contentError;
+      }
       return plan.id as string;
     },
     onSuccess: async () => {
@@ -251,7 +290,7 @@ function CampaignManagerPage() {
       setPreview([]);
       setInput(DEFAULT_INPUT);
       await queryClient.invalidateQueries({ queryKey: ["campaign-plans", workspaceId] });
-      toast.success("Campaign plan saved for internal review.");
+      toast.success("Campaign saved with its selected content.");
     },
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Campaign plan could not be saved."),
@@ -500,6 +539,24 @@ function CampaignManagerPage() {
           <Button type="button" variant={mediaFolder==="all"?"default":"outline"} size="sm" onClick={()=>setMediaFolder("all")}>All media</Button>
           <Button type="button" variant={mediaFolder==="root"?"default":"outline"} size="sm" onClick={()=>setMediaFolder("root")}>Uncategorized</Button>
           {(mediaFolders.data??[]).map(folder=><Button key={folder.id} type="button" variant={mediaFolder===folder.id?"default":"outline"} size="sm" onClick={()=>setMediaFolder(folder.id)}>{folder.name}</Button>)}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={mediaAssets.isLoading || !(mediaAssets.data ?? []).length}
+            onClick={() =>
+              setSelectedMediaIds(
+                (mediaAssets.data ?? []).map((asset) => asset.id).slice(0, input.maxPosts),
+              )
+            }
+          >
+            <FolderOpen className="h-4 w-4" /> Use this entire folder
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Up to {input.maxPosts} pieces will be connected to this campaign.
+          </span>
         </div>
         <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-5 lg:grid-cols-6">
           {(mediaAssets.data??[]).slice(0,36).map(asset=><CampaignMediaTile key={asset.id} asset={asset} selected={selectedMediaIds.includes(asset.id)} onToggle={()=>setSelectedMediaIds(ids=>ids.includes(asset.id)?ids.filter(id=>id!==asset.id):[...ids,asset.id])} />)}
@@ -812,7 +869,7 @@ function CampaignManagerPage() {
                 Review every working title before saving.
               </p>
             </div>
-            <Button onClick={() => savePlan.mutate()} disabled={savePlan.isPending}>
+            <Button onClick={() => savePlan.mutate()} disabled={savePlan.isPending || selectedMediaIds.length === 0}>
               {savePlan.isPending ? <Loader2 className="animate-spin" /> : <Check />}
               Save for review
             </Button>
