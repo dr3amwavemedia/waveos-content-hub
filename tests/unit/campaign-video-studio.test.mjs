@@ -96,15 +96,85 @@ test("looks add to the manual adjustments and count as edits", () => {
 });
 
 test("Video Maker never presents a rendered export and says Create Post uses the original", () => {
-  const page = fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8");
+  const page = [fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"), ...fs.readdirSync("src/components/video-maker").map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8"))].join("\n");
   assert.match(page, /Export · not available yet/);
   assert.match(page, /Create Post uses the original clip/);
   assert.match(page, /Live preview · not rendered/);
   assert.doesNotMatch(page, /Download video|Export video<|Render video/);
 });
 
-test("Campaign Manager reports transcripts as unavailable instead of faking progress", () => {
-  const page = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
-  assert.match(page, /Speech transcripts aren't available yet/);
-  assert.doesNotMatch(page, /Transcribing/);
+test("Campaign Manager says when a video had no transcript instead of implying one", () => {
+  const page = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
+  assert.match(page, /no transcript — spoken words were not analyzed/);
+});
+
+import {
+  captionCuesFromSegments,
+  effectiveTranscript,
+  encodeWav,
+  groundKeyMoments,
+  parseWav,
+  planSpeechChunks,
+  transcriptExcerptForAi,
+} from "../../src/lib/transcript-audio.ts";
+
+function tone(seconds, amplitude) {
+  return Array.from({ length: Math.round(seconds * 16000) }, (_, i) => Math.round(amplitude * Math.sin(i / 8)));
+}
+
+test("speech sections keep real audio positions and silent stretches are never transcribed", () => {
+  const samples = Int16Array.from([...tone(5, 9000), ...tone(1, 0), ...tone(5, 9000), ...tone(3, 0)]);
+  const chunks = planSpeechChunks(samples, 16000);
+  assert.ok(chunks.length >= 2);
+  assert.equal(chunks[0].start, 0);
+  assert.ok(Math.abs(chunks[chunks.length - 1].end - 14) < 0.06);
+  assert.ok(chunks.slice(0, -1).every((chunk) => !chunk.silent));
+  const silence = planSpeechChunks(Int16Array.from(tone(6, 0)), 16000);
+  assert.ok(silence.every((chunk) => chunk.silent));
+});
+
+test("WAV audio round-trips and non-PCM input is rejected", () => {
+  const wav = encodeWav(Int16Array.from([1, -2, 3]), 16000);
+  const info = parseWav(wav);
+  assert.equal(info.sampleRate, 16000);
+  assert.equal(info.channels, 1);
+  assert.equal(info.dataLength, 6);
+  assert.equal(parseWav(new Uint8Array(60)), null);
+});
+
+const row = {
+  status: "completed",
+  transcript_text: "Welcome in. Book this week.",
+  segments: [{ start: 0, end: 4, text: "Welcome in." }, { start: 4, end: 8, text: "Book this week." }],
+  has_timestamps: true,
+  key_moments: [],
+  edited_text: null,
+  edited_segments: null,
+  edited_at: null,
+};
+
+test("a user's transcript correction is used ahead of the machine transcript", () => {
+  assert.equal(effectiveTranscript(row).evidence, "speech_to_text_transcript");
+  const edited = { ...row, edited_at: "2026-11-04T00:00:00Z", edited_segments: [{ start: 0, end: 4, text: "Welcome to Dream Wave." }, { start: 4, end: 8, text: "Book this week." }] };
+  const view = transcriptExcerptForAi(edited);
+  assert.equal(view.evidence, "user_corrected_transcript");
+  assert.match(view.excerpt, /\[0:00\] Welcome to Dream Wave\./);
+});
+
+test("unfinished transcripts never reach AI prompts", () => {
+  assert.equal(transcriptExcerptForAi({ ...row, status: "processing" }), null);
+  assert.equal(transcriptExcerptForAi({ ...row, status: "failed" }), null);
+});
+
+test("key moments must point at a real transcript section", () => {
+  const moments = groundKeyMoments([{ index: 1, label: "Call to action" }, { index: 7, label: "Invented" }, { index: 1, label: "Duplicate" }], row.segments);
+  assert.equal(moments.length, 1);
+  assert.equal(moments[0].quote, "Book this week.");
+  assert.equal(moments[0].start, 4);
+});
+
+test("transcript captions stay inside the trimmed part of the clip", () => {
+  const cues = captionCuesFromSegments(row.segments, 4, 8);
+  assert.ok(cues.length > 0);
+  assert.ok(cues.every((cue) => cue.start >= 4 && cue.end <= 8));
 });

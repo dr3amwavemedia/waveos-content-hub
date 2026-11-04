@@ -2526,6 +2526,105 @@ export type Database = {
           },
         ]
       }
+      media_transcripts: {
+        Row: {
+          attempt_count: number
+          audio_seconds: number | null
+          audio_source: string | null
+          completed_at: string | null
+          created_at: string
+          edited_at: string | null
+          edited_by: string | null
+          edited_segments: Json | null
+          edited_text: string | null
+          error_code: string | null
+          error_message: string | null
+          has_timestamps: boolean
+          id: string
+          key_moments: Json
+          language: string | null
+          media_asset_id: string
+          model: string | null
+          provider: string | null
+          requested_by: string | null
+          segments: Json
+          started_at: string | null
+          status: string
+          transcript_text: string | null
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          attempt_count?: number
+          audio_seconds?: number | null
+          audio_source?: string | null
+          completed_at?: string | null
+          created_at?: string
+          edited_at?: string | null
+          edited_by?: string | null
+          edited_segments?: Json | null
+          edited_text?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          has_timestamps?: boolean
+          id?: string
+          key_moments?: Json
+          language?: string | null
+          media_asset_id: string
+          model?: string | null
+          provider?: string | null
+          requested_by?: string | null
+          segments?: Json
+          started_at?: string | null
+          status?: string
+          transcript_text?: string | null
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          attempt_count?: number
+          audio_seconds?: number | null
+          audio_source?: string | null
+          completed_at?: string | null
+          created_at?: string
+          edited_at?: string | null
+          edited_by?: string | null
+          edited_segments?: Json | null
+          edited_text?: string | null
+          error_code?: string | null
+          error_message?: string | null
+          has_timestamps?: boolean
+          id?: string
+          key_moments?: Json
+          language?: string | null
+          media_asset_id?: string
+          model?: string | null
+          provider?: string | null
+          requested_by?: string | null
+          segments?: Json
+          started_at?: string | null
+          status?: string
+          transcript_text?: string | null
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_transcripts_media_asset_id_fkey"
+            columns: ["media_asset_id"]
+            isOneToOne: true
+            referencedRelation: "media_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "media_transcripts_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string | null

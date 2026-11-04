@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
@@ -20,7 +21,7 @@ assert.match(appShell, /const LAYER1_NAV[\s\S]*to: "\/analytics"/);
 assert.match(appShell, /const WEDDING_ALLOWED_PATHS[\s\S]*"\/analytics"/);
 assert.match(appShell, /const WEDDING_NAV[\s\S]*to: "\/analytics"/);
 
-const campaign = read("src/routes/_authenticated/campaigns.tsx");
+const campaign = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
 assert.match(campaign, /can_use_campaign_manager/);
 assert.match(campaign, /Nothing here schedules/);
 assert.doesNotMatch(campaign, /publishContentItem|stripe/i);
