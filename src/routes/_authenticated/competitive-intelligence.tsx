@@ -166,7 +166,7 @@ function CompetitiveIntelligencePage() {
       window.sessionStorage.setItem(`waveos-research-${result.workspaceId}`,JSON.stringify(next));
       return next;
     });
-  }, onError:()=>toast.error(RESEARCH_FAILURE_MESSAGE) });
+  } });
   const independentResearch = useMutation({
     mutationFn: async (input: {urlA:string;urlB:string;workspaceId:string}) => {
       const result = await independentFn({data:input});
@@ -178,7 +178,6 @@ function CompetitiveIntelligencePage() {
       setIndependentResult(result);
       window.sessionStorage.setItem(`waveos-independent-research-${result.workspaceId}`, JSON.stringify(result));
     },
-    onError: () => toast.error(RESEARCH_FAILURE_MESSAGE),
   });
 
   useEffect(()=>{
@@ -465,7 +464,7 @@ function CompetitiveIntelligencePage() {
         </>}
       </section>
 
-      {(research.isError || independentResearch.isError) && <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">{RESEARCH_FAILURE_MESSAGE}</p>}
+      {(research.isError || independentResearch.isError) && <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">{(researchMode === "independent" ? independentResearch.error : research.error)?.message || RESEARCH_FAILURE_MESSAGE}</p>}
       {researchMode==="independent" && independentResult && <section className="space-y-5 border-t border-border pt-5">
         <header><div className="text-xs font-semibold uppercase tracking-[0.16em] text-intelligence">Independent Comparison</div><h2 className="mt-1 text-xl font-semibold">{independentResult.comparison.businessA.company??"Business A"} <span className="text-muted-foreground">vs</span> {independentResult.comparison.businessB.company??"Business B"}</h2><p className="mt-1 text-xs text-muted-foreground">Public-source comparison · {new Date(independentResult.researchedAt).toLocaleString()} · Workspace Brand Voice excluded</p></header>
         <div className="grid gap-3 sm:grid-cols-2">
