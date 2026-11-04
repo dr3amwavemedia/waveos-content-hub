@@ -98,3 +98,12 @@ test("Shared media picker separates Files from Camera Roll and keeps cloud provi
   assert.match(createPost, /"Files"/);
   assert.match(createPost, /startExternalMediaConnection/);
 });
+
+
+test("My Agent campaign save uses an authorized server write and schema fallback", () => {
+  assert.match(actions, /supabaseAdmin/);
+  assert.match(actions, /campaign_plans/);
+  assert.match(actions, /optimization_mode/);
+  assert.match(actions, /legacyPayload/);
+  assert.match(actions, /campaign_plan_items/);
+});
