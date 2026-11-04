@@ -37,14 +37,23 @@ function VideoMakerPage() {
   const previewRef = useRef<HTMLElement | null>(null);
   const [selected, setSelected] = useState<MediaAsset | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [directPreviewUrl, setDirectPreviewUrl] = useState<string | null>(null);
   const [previewPending, setPreviewPending] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"direct" | "local_fallback" | null>(null);
+  const blobPreviewRef = useRef<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewAttempt, setPreviewAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
+    if (blobPreviewRef.current) {
+      URL.revokeObjectURL(blobPreviewRef.current);
+      blobPreviewRef.current = null;
+    }
     if (!selected) {
       setPreviewUrl(null);
+      setDirectPreviewUrl(null);
+      setPreviewMode(null);
       setPreviewPending(false);
       setPreviewError(null);
       return () => {
@@ -52,18 +61,22 @@ function VideoMakerPage() {
       };
     }
     setPreviewUrl(null);
+    setDirectPreviewUrl(null);
+    setPreviewMode(null);
     setPreviewPending(true);
     setPreviewError(null);
     void getMediaPreviewUrl(selected)
       .then((url) => {
         if (!active) return;
         if (!url) throw new Error("No preview URL was returned for this video.");
+        setDirectPreviewUrl(url);
         setPreviewUrl(url);
+        setPreviewMode("direct");
       })
       .catch(() => {
         if (active) {
           setPreviewError(
-            "WaveOS could not open a browser preview for this clip. The original is still selected and can be added to a post.",
+            "WaveOS could not open the original preview URL for this clip.",
           );
         }
       })
@@ -72,8 +85,43 @@ function VideoMakerPage() {
       });
     return () => {
       active = false;
+      if (blobPreviewRef.current) {
+        URL.revokeObjectURL(blobPreviewRef.current);
+        blobPreviewRef.current = null;
+      }
     };
   }, [previewAttempt, selected]);
+
+  async function prepareLocalPreview() {
+    if (!selected || !directPreviewUrl || previewPending) return;
+    setPreviewPending(true);
+    setPreviewError(null);
+    try {
+      const response = await fetch(directPreviewUrl, { credentials: "omit" });
+      if (!response.ok) throw new Error("The video file could not be downloaded for preview.");
+      const sourceBlob = await response.blob();
+      if (sourceBlob.type.includes("text/html")) {
+        throw new Error("The provider returned a webpage instead of the video file.");
+      }
+      const blob =
+        sourceBlob.type && sourceBlob.type !== "application/octet-stream"
+          ? sourceBlob
+          : new Blob([await sourceBlob.arrayBuffer()], { type: selected.mime_type || "video/mp4" });
+      if (blobPreviewRef.current) URL.revokeObjectURL(blobPreviewRef.current);
+      const objectUrl = URL.createObjectURL(blob);
+      blobPreviewRef.current = objectUrl;
+      setPreviewUrl(objectUrl);
+      setPreviewMode("local_fallback");
+    } catch (error) {
+      setPreviewError(
+        error instanceof Error
+          ? error.message
+          : "WaveOS could not prepare a local browser preview for this clip.",
+      );
+    } finally {
+      setPreviewPending(false);
+    }
+  }
 
   function selectVideo(asset: MediaAsset) {
     setSelected(asset);
@@ -193,10 +241,15 @@ function VideoMakerPage() {
                   playsInline
                   preload="metadata"
                   src={previewUrl}
-                  onError={() =>
-                    setPreviewError(
-                      "This browser cannot play the clip format, but the original can still be added to a post.",
-                    )
+                  onError={() => {
+                    if (previewMode === "direct" && directPreviewUrl) {
+                      setPreviewError("Direct playback failed. Preparing a local preview fallback…");
+                      void prepareLocalPreview();
+                    } else {
+                      setPreviewError(
+                        "This browser still cannot decode this clip after the local preview fallback. The original remains selected and can still be added to a post.",
+                      );
+                    }
                   }
                   className="aspect-video w-full rounded-2xl bg-black object-contain"
                 />
@@ -205,13 +258,20 @@ function VideoMakerPage() {
                   <CircleAlert className="h-9 w-9 text-amber-300" />
                   <p className="mt-3 font-semibold">Preview unavailable</p>
                   <p className="mt-2 max-w-md text-sm text-muted-foreground">{previewError}</p>
-                  <Button
-                    className="mt-4"
-                    variant="outline"
-                    onClick={() => setPreviewAttempt((attempt) => attempt + 1)}
-                  >
-                    <RotateCw /> Retry preview
-                  </Button>
+                  <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setPreviewAttempt((attempt) => attempt + 1)}
+                    >
+                      <RotateCw /> Retry original
+                    </Button>
+                    {directPreviewUrl && (
+                      <Button onClick={() => void prepareLocalPreview()} disabled={previewPending}>
+                        {previewPending ? <Loader2 className="animate-spin" /> : <Film />}
+                        Prepare local preview
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
@@ -221,6 +281,11 @@ function VideoMakerPage() {
                   </p>
                   <p className="truncate font-semibold">{selected.name}</p>
                   <p className="text-xs text-muted-foreground">{videoDetails(selected)}</p>
+                  {previewMode === "local_fallback" && (
+                    <p className="mt-1 text-[11px] font-medium text-emerald-300">
+                      Playing from a temporary on-device preview.
+                    </p>
+                  )}
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                   <Button variant="outline" onClick={() => continueToPost("story")}>
