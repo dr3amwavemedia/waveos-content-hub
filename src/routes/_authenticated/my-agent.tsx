@@ -624,7 +624,21 @@ function MyAgentPage() {
 
     if (!handled) return false;
 
-    addUserMessage(input);
+    // Confirm the actual updated fields so the user can verify the plan without
+    // having to understand the campaign builder's internal steps.
+    const updates: string[] = [];
+    if (nextDraft.name !== campaignDraft.name) updates.push(`name: ${nextDraft.name}`);
+    if (nextDraft.goal !== campaignDraft.goal) updates.push(`goal: ${nextDraft.goal}`);
+    if (nextDraft.maxPosts !== campaignDraft.maxPosts) updates.push(`${nextDraft.maxPosts} posts`);
+    if (nextDraft.durationDays !== campaignDraft.durationDays) updates.push(`${nextDraft.durationDays} days`);
+    if (nextDraft.platforms.join(",") !== campaignDraft.platforms.join(",")) updates.push(`platforms: ${nextDraft.platforms.join(", ")}`);
+    setMessages((current) => [
+      ...current,
+      { role: "user" as const, content: input },
+      { role: "assistant" as const, content: updates.length
+        ? `Updated your campaign: ${updates.join(" · ")}. Your existing media selections are unchanged. Review the plan before saving.`
+        : "Got it. I've kept the current campaign settings. You can adjust the details before saving." },
+    ].slice(-8));
     setCampaignDraft(nextDraft);
     setCampaignStep(nextStep);
     setDraft("");
