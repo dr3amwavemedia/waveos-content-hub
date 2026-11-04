@@ -110,7 +110,7 @@ test("My Agent campaign save uses an authorized server write and schema fallback
 
 
 test("campaign builders require content selection and persist linked drafts", () => {
-  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
   assert.match(agent, /Choose campaign content/);
   assert.match(agent, /Use this entire folder/);
   assert.match(agent, /Pick individual media/);
@@ -131,7 +131,7 @@ test("My Agent does not treat campaign status questions as new campaign creation
 });
 
 test("Campaign Manager continues after save with a working command center", () => {
-  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
   assert.match(campaigns, /Campaign command center/);
   assert.match(campaigns, /Continue building/);
   assert.match(campaigns, /campaign-linked-content/);
@@ -145,7 +145,7 @@ test("Campaign Manager continues after save with a working command center", () =
 
 
 test("Video Maker has an automatic local playback fallback", () => {
-  const videoMaker = fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8");
+  const videoMaker = [fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"), ...fs.readdirSync("src/components/video-maker").map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8"))].join("\n");
   assert.match(videoMaker, /prepareLocalPreview/);
   assert.match(videoMaker, /URL\.createObjectURL/);
   assert.match(videoMaker, /Prepare local preview/);
@@ -154,7 +154,7 @@ test("Video Maker has an automatic local playback fallback", () => {
 
 
 test("Campaign Manager keeps media compact and saved campaigns tappable", () => {
-  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
   assert.match(campaigns, /Campaign content/);
   assert.match(campaigns, /mediaSectionOpen/);
   assert.match(campaigns, /ChevronDown/);
@@ -165,7 +165,7 @@ test("Campaign Manager keeps media compact and saved campaigns tappable", () => 
 
 
 test("Campaign persistence never deletes a saved plan just because content linking fails", () => {
-  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
   assert.match(campaigns, /Campaign saved, but its content could not be linked yet/);
   assert.match(campaigns, /Your campaigns were not deleted/);
   assert.match(campaigns, /optimization_mode\|schema cache\|column/);
@@ -175,7 +175,7 @@ test("Campaign persistence never deletes a saved plan just because content linki
 
 
 test("Campaign drafts keep briefs internal, restore platforms, and appear on Calendar", () => {
-  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
   const createPost = fs.readFileSync("src/routes/_authenticated/create.tsx", "utf8");
   const calendar = fs.readFileSync("src/routes/_authenticated/calendar.tsx", "utf8");
   assert.match(campaigns, /campaignBrief: plannedItem\?\.copyBrief/);
@@ -192,7 +192,7 @@ test("Campaign drafts keep briefs internal, restore platforms, and appear on Cal
 
 
 test("Video Maker exposes real non-destructive editing controls", () => {
-  const videoMaker = fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8");
+  const videoMaker = [fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"), ...fs.readdirSync("src/components/video-maker").map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8"))].join("\n");
   assert.match(videoMaker, /"Trim"/);
   assert.match(videoMaker, /Size & framing/);
   assert.match(videoMaker, /Brightness/);
@@ -205,7 +205,7 @@ test("Video Maker exposes real non-destructive editing controls", () => {
 
 
 test("Campaign Manager exposes captions as part of the campaign workspace", () => {
-  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
   assert.match(campaigns, /Campaign captions/);
   assert.match(campaigns, /Generate caption/);
   assert.match(campaigns, /Rewrite/);
@@ -214,7 +214,7 @@ test("Campaign Manager exposes captions as part of the campaign workspace", () =
 });
 
 test("Video Maker uses mobile-friendly controls instead of raw timing fields", () => {
-  const videoMaker = fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8");
+  const videoMaker = [fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"), ...fs.readdirSync("src/components/video-maker").map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8"))].join("\n");
   assert.match(videoMaker, /Reel \/ Story/);
   assert.match(videoMaker, /Show full video/);
   assert.match(videoMaker, /Fill screen/);

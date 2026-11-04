@@ -7,9 +7,9 @@ const migration = fs.readFileSync(
   "utf8",
 );
 const health = fs.readFileSync("src/lib/operational-health.functions.ts", "utf8");
-const campaign = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+const campaign = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
 const studio = fs.readFileSync("src/routes/_authenticated/creative-studio.tsx", "utf8");
-const videoMaker = fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8");
+const videoMaker = [fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"), ...fs.readdirSync("src/components/video-maker").map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8"))].join("\n");
 const aiUsage = fs.readFileSync("src/lib/ai-usage.server.ts", "utf8");
 const agent = fs.readFileSync("src/lib/wave-assist.functions.ts", "utf8");
 const analytics = fs.readFileSync("src/lib/zernio.functions.ts", "utf8");
