@@ -123,3 +123,22 @@ test("campaign builders require content selection and persist linked drafts", ()
   assert.match(campaigns, /campaignPlanId/);
   assert.match(campaigns, /media_asset_ids: \[asset\.id\]/);
 });
+
+
+test("My Agent does not treat campaign status questions as new campaign creation", () => {
+  assert.match(agent, /\(create\|build\|start\|make\|new\)/);
+  assert.doesNotMatch(agent, /\(create\|build\|start\|make\|new\|plan\)/);
+});
+
+test("Campaign Manager continues after save with a working command center", () => {
+  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  assert.match(campaigns, /Campaign command center/);
+  assert.match(campaigns, /Continue building/);
+  assert.match(campaigns, /campaign-linked-content/);
+  assert.match(campaigns, /Draft/);
+  assert.match(campaigns, /Review/);
+  assert.match(campaigns, /Scheduled/);
+  assert.match(campaigns, /Published/);
+  assert.match(campaigns, /Continue below in the campaign workspace/);
+  assert.doesNotMatch(campaigns, /contentFormats: input\.contentFormats/);
+});
