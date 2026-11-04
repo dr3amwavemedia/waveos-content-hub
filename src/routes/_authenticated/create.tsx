@@ -1798,6 +1798,18 @@ export function MediaPicker({
             {formatFileSize(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available.
             Published camera-roll media is removed after every destination confirms the post.
           </div>
+          <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+            Have Google Drive or Dropbox? Choose that source to browse your existing files without first saving them to your phone.
+            Camera roll and device uploads use WaveOS's limited temporary storage (currently 500 MB per workspace).
+          </p>
+          {(assets.data ?? []).filter((asset) => selected.includes(asset.id) && asset.mime_type.startsWith("video/") && asset.size_bytes > 300 * 1024 * 1024).length > 0 && (
+            <div role="status" className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-xs leading-relaxed text-foreground">
+              <strong>Large video selected.</strong> Some social platforms and posting connections have file-size or encoding limits.
+              WaveOS has not compressed this file. Check each destination's requirements before publishing;
+              if needed, export a smaller H.264 MP4 from your editor. Your original stays unchanged.
+              An automatic quality-comparison and compression preview is planned, but is not available yet.
+            </div>
+          )}
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
