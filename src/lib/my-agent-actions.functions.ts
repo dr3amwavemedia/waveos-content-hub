@@ -30,6 +30,8 @@ const createCampaignInput = workspaceInput.extend({
     .array(z.enum(["instagram", "facebook", "linkedin", "tiktok", "youtube", "x"]))
     .min(1)
     .max(6),
+  mediaAssetIds: z.array(z.string().uuid()).min(1).max(60),
+  mediaFolderId: z.string().uuid().nullable().optional(),
 });
 
 function addDays(isoDate: string, days: number) {
@@ -275,6 +277,62 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
       throw new Error("Campaign plan could not be saved.");
     }
 
+    const uniqueMediaIds = [...new Set(data.mediaAssetIds)].slice(0, input.maxPosts);
+    const { data: mediaRows, error: mediaError } = await (supabaseAdmin as any)
+      .from("media_assets")
+      .select("id,name")
+      .eq("workspace_id", data.workspaceId)
+      .in("id", uniqueMediaIds);
+    if (mediaError || (mediaRows ?? []).length !== uniqueMediaIds.length) {
+      await (supabaseAdmin as any)
+        .from("campaign_plans")
+        .delete()
+        .eq("id", plan.id)
+        .eq("workspace_id", data.workspaceId);
+      throw new Error("One or more selected campaign media items are no longer available.");
+    }
+
+    const linkedDraftRows = uniqueMediaIds.map((mediaId, index) => {
+      const plannedItem = plannedItems[index % plannedItems.length];
+      const media = (mediaRows ?? []).find((row: any) => row.id === mediaId);
+      return {
+        workspace_id: data.workspaceId,
+        created_by: context.userId,
+        title: `${input.name} · ${media?.name ?? `Content ${index + 1}`}`.slice(0, 180),
+        primary_caption: plannedItem?.copyBrief ?? "",
+        hashtags: [],
+        media_asset_ids: [mediaId],
+        status: "draft",
+        metadata: {
+          source: "my_agent_campaign",
+          campaignPlanId: plan.id,
+          campaignName: input.name,
+          mediaFolderId: data.mediaFolderId ?? null,
+          plannedDate: plannedItem?.plannedDate ?? null,
+          plannedTime: plannedItem?.localTime ?? null,
+          platform: plannedItem?.platform ?? null,
+          contentFormat: plannedItem?.contentFormat ?? null,
+          contentPillar: plannedItem?.pillar ?? null,
+        },
+      };
+    });
+
+    const { error: linkedDraftError } = await (supabaseAdmin as any)
+      .from("content_items")
+      .insert(linkedDraftRows);
+    if (linkedDraftError) {
+      console.error("My Agent linked campaign content insert failed", {
+        code: linkedDraftError.code ?? "unknown",
+        message: linkedDraftError.message ?? "linked campaign content insert failed",
+      });
+      await (supabaseAdmin as any)
+        .from("campaign_plans")
+        .delete()
+        .eq("id", plan.id)
+        .eq("workspace_id", data.workspaceId);
+      throw new Error("Campaign content could not be connected.");
+    }
+
     return {
       id: plan.id as string,
       name: input.name,
@@ -284,6 +342,7 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
       platforms: input.platforms,
       maxPosts: input.maxPosts,
       plannedItems: plannedItems.length,
+      linkedContentCount: uniqueMediaIds.length,
     };
   });
 
