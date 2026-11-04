@@ -209,7 +209,12 @@ export async function publishContentItemWithZernio(
       .in("id", item.media_asset_ids)
       .eq("workspace_id", item.workspace_id);
     if (result.error) throw result.error;
-    assets = result.data ?? [];
+    // Postgres IN queries do not preserve the order of requested IDs.
+    // Reconstruct the editor's saved carousel order before resolving URLs.
+    const assetsById = new Map((result.data ?? []).map((asset) => [asset.id, asset]));
+    assets = item.media_asset_ids
+      .map((id) => assetsById.get(id))
+      .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset));
     if (assets.length !== new Set(item.media_asset_ids).size) {
       throw new Error("One or more selected media files do not belong to this client workspace.");
     }
@@ -561,11 +566,16 @@ function zernioPostResult(post: ZernioPost | undefined, platform: string) {
   const targetStatuses = matchingTargets.map((entry) =>
     String(entry.status ?? post?.status ?? "publishing").toLowerCase(),
   );
+  const isPublished = (value: string) =>
+    ["published", "success", "succeeded", "live", "posted"].includes(value);
+  const parentStatus = String(post?.status ?? "publishing").toLowerCase();
   const status = targetStatuses.includes("failed")
     ? "failed"
-    : targetStatuses.length > 0 && targetStatuses.every((value) => value === "published")
+    : targetStatuses.length > 0 && targetStatuses.every(isPublished)
       ? "published"
-      : String(post?.status ?? target?.status ?? "publishing").toLowerCase();
+      : targetStatuses.length === 0 && isPublished(parentStatus)
+        ? "published"
+        : String(post?.status ?? target?.status ?? "publishing").toLowerCase();
   const failedTarget = matchingTargets.find(
     (entry) => String(entry.status ?? "").toLowerCase() === "failed",
   );
