@@ -79,3 +79,22 @@ test("Campaign Builder keeps typed corrections inside the active tool", () => {
   assert.match(agent, /mentionedPlatforms/);
   assert.match(agent, /activeTool === "campaign" && applyCampaignConversationInput\(input\)/);
 });
+
+
+test("My Agent media flow exposes all connected and device media sources", () => {
+  assert.match(agent, /MediaPicker/);
+  assert.match(agent, /Google Drive/);
+  assert.match(agent, /Dropbox/);
+  assert.match(agent, /Files/);
+  assert.match(agent, /Camera Roll \/ Photos/);
+  assert.match(agent, /Pick media/);
+});
+
+test("Shared media picker separates Files from Camera Roll and keeps cloud providers", () => {
+  const createPost = fs.readFileSync("src/routes/_authenticated/create.tsx", "utf8");
+  assert.match(createPost, /Google Drive/);
+  assert.match(createPost, /Dropbox/);
+  assert.match(createPost, /Camera roll \/ Photos/);
+  assert.match(createPost, />Files</);
+  assert.match(createPost, /startExternalMediaConnection/);
+});
