@@ -31,6 +31,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { publishContentItem } from "@/lib/publish.functions";
 import { waveAssist } from "@/lib/wave-assist.functions";
 import { SOCIAL_PLATFORM_GUIDANCE } from "@/lib/social-platform-guidance";
+import { preflightMediaAsset } from "@/lib/media-preflight";
 
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/app/empty-state";
@@ -1802,7 +1803,7 @@ export function MediaPicker({
             Have Google Drive or Dropbox? Choose that source to browse your existing files without first saving them to your phone.
             Camera roll and device uploads use WaveOS's limited temporary storage (currently 500 MB per workspace).
           </p>
-          {(assets.data ?? []).filter((asset) => selected.includes(asset.id) && asset.mime_type.startsWith("video/") && asset.size_bytes > 300 * 1024 * 1024).length > 0 && (
+          {(assets.data ?? []).filter((asset) => selected.includes(asset.id) && preflightMediaAsset({ name: asset.name, mimeType: asset.mime_type, sizeBytes: asset.size_bytes, sourceProvider: asset.source_provider }).status === "warning").length > 0 && (
             <div role="status" className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-xs leading-relaxed text-foreground">
               <strong>Large video selected.</strong> Some social platforms and posting connections have file-size or encoding limits.
               WaveOS has not compressed this file. Check each destination's requirements before publishing;
