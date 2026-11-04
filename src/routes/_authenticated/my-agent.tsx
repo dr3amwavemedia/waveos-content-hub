@@ -520,15 +520,106 @@ function MyAgentPage() {
     }
   }
 
+  function applyCampaignConversationInput(input: string) {
+    const normalized = input.toLowerCase();
+    let handled = false;
+    let nextStep = campaignStep;
+    let nextDraft = { ...campaignDraft };
+
+    const nameMatch = input.match(/(?:call|name)(?:\s+the campaign)?\s+(?:it\s+)?["“]?(.+?)["”]?$/i);
+    if (nameMatch?.[1]?.trim()) {
+      nextDraft.name = nameMatch[1].trim().slice(0, 120);
+      handled = true;
+      if (campaignStep <= 0) nextStep = 1;
+    } else if (campaignStep === 0 && !campaignDraft.name.trim()) {
+      nextDraft.name = input.slice(0, 120);
+      handled = true;
+      nextStep = 1;
+    }
+
+    const goalMap: Array<[RegExp, AgentCampaignDraft["goal"]]> = [
+      [/\bawareness\b/i, "awareness"],
+      [/\bengagement\b/i, "engagement"],
+      [/\bleads?\b/i, "leads"],
+      [/\blaunch\b/i, "launch"],
+      [/\bretention\b/i, "retention"],
+    ];
+    const goalMatch = goalMap.find(([pattern]) => pattern.test(input));
+    if (goalMatch) {
+      nextDraft.goal = goalMatch[1];
+      handled = true;
+      if (campaignStep <= 1) nextStep = 2;
+    }
+
+    const postMatch = normalized.match(/\b(\d{1,2})\s*(?:post|posts)\b/);
+    if (postMatch) {
+      const count = Math.max(1, Math.min(60, Number(postMatch[1])));
+      nextDraft.maxPosts = count;
+      handled = true;
+      if (campaignStep <= 2) nextStep = 3;
+    } else if (campaignStep === 2) {
+      const countOnly = normalized.match(/^\D*(\d{1,2})\D*$/);
+      if (countOnly) {
+        nextDraft.maxPosts = Math.max(1, Math.min(60, Number(countOnly[1])));
+        handled = true;
+        nextStep = 3;
+      }
+    }
+
+    const durationMatch = normalized.match(/\b(\d{1,3})\s*(day|days|week|weeks|month|months)\b/);
+    if (durationMatch) {
+      const amount = Number(durationMatch[1]);
+      const unit = durationMatch[2];
+      const days =
+        unit.startsWith("week") ? amount * 7 : unit.startsWith("month") ? amount * 30 : amount;
+      nextDraft.durationDays = Math.max(1, Math.min(180, days));
+      handled = true;
+      if (campaignStep <= 3) nextStep = 4;
+    } else if (campaignStep === 3) {
+      const daysOnly = normalized.match(/^\D*(\d{1,3})\D*$/);
+      if (daysOnly) {
+        nextDraft.durationDays = Math.max(1, Math.min(180, Number(daysOnly[1])));
+        handled = true;
+        nextStep = 4;
+      }
+    }
+
+    const platformAliases: Array<[string, string[]]> = [
+      ["instagram", ["instagram", "ig"]],
+      ["facebook", ["facebook", "fb"]],
+      ["tiktok", ["tiktok", "tik tok"]],
+      ["linkedin", ["linkedin", "linked in"]],
+      ["youtube", ["youtube", "you tube"]],
+      ["x", [" x ", "twitter"]],
+    ];
+    const padded = ` ${normalized} `;
+    const mentionedPlatforms = platformAliases
+      .filter(([, aliases]) => aliases.some((alias) => padded.includes(` ${alias} `)))
+      .map(([platform]) => platform);
+    if (mentionedPlatforms.length) {
+      const replacePlatforms = /\b(?:only|just|instead|switch|change)\b/.test(normalized);
+      nextDraft.platforms = replacePlatforms
+        ? mentionedPlatforms
+        : [...new Set([...nextDraft.platforms, ...mentionedPlatforms])];
+      handled = true;
+      if (campaignStep <= 4) nextStep = 4;
+    }
+
+    if (!handled) return false;
+
+    addUserMessage(input);
+    setCampaignDraft(nextDraft);
+    setCampaignStep(nextStep);
+    setDraft("");
+    setToolError(null);
+    return true;
+  }
+
   async function sendMessage(raw: string, speakReply = false) {
     const input = raw.trim();
     if (!input || !workspaceId || busy || toolBusy) return;
 
-    if (activeTool === "campaign" && campaignStep === 0 && !campaignDraft.name.trim()) {
-      addUserMessage(input);
-      setCampaignDraft((current) => ({ ...current, name: input.slice(0, 120) }));
-      setCampaignStep(1);
-      setDraft("");
+    if (activeTool === "campaign" && applyCampaignConversationInput(input)) {
       return;
     }
     if (activeTool === "post" && postStep === 0 && !postDraft.idea.trim()) {
