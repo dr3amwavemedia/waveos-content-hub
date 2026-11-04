@@ -44,6 +44,22 @@ export const Route = createFileRoute("/_authenticated/calendar")({
   head: () => ({ meta: [{ title: "Calendar — WaveOS" }, { name: "robots", content: "noindex" }] }),
 });
 
+function contentMetadata(item: ContentItem) {
+  return item.metadata && typeof item.metadata === "object"
+    ? (item.metadata as Record<string, unknown>)
+    : {};
+}
+
+function plannedDate(item: ContentItem) {
+  const value = contentMetadata(item).plannedDate;
+  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+function plannedTime(item: ContentItem) {
+  const value = contentMetadata(item).plannedTime;
+  return typeof value === "string" && /^\d{2}:\d{2}$/.test(value) ? value : null;
+}
+
 function CalendarPage() {
   const { activeWorkspace } = useWorkspace();
   const { can } = usePermissions();
@@ -70,12 +86,25 @@ function CalendarPage() {
   const byDate = useMemo(() => {
     const map = new Map<string, ContentItem[]>();
     (items.data ?? []).forEach((it) => {
-      if (!it.scheduled_at) return;
-      const key = dateKeyInTimeZone(it.scheduled_at, timeZone);
+      const key = it.scheduled_at
+        ? dateKeyInTimeZone(it.scheduled_at, timeZone)
+        : plannedDate(it);
+      if (!key) return;
       const arr = map.get(key) ?? [];
       arr.push(it);
       map.set(key, arr);
     });
+    for (const rows of map.values()) {
+      rows.sort((a, b) => {
+        const aTime = a.scheduled_at
+          ? formatInTimeZone(a.scheduled_at, timeZone, { hour: "2-digit", minute: "2-digit", hour12: false })
+          : plannedTime(a) ?? "23:59";
+        const bTime = b.scheduled_at
+          ? formatInTimeZone(b.scheduled_at, timeZone, { hour: "2-digit", minute: "2-digit", hour12: false })
+          : plannedTime(b) ?? "23:59";
+        return aTime.localeCompare(bTime);
+      });
+    }
     return map;
   }, [items.data, timeZone]);
 
@@ -236,22 +265,44 @@ function CalendarPage() {
                     })}
                   </time>
                   <div className="mt-3 space-y-2">
-                    {dayItems.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => setSelected(item)}
-                        className="block min-h-11 w-full rounded-lg border-l-2 px-3 py-2 text-left text-sm font-medium text-foreground"
-                        style={eventColorStyle(category("content").effective_color)}
-                      >
-                        <span className="sr-only">{category("content").name}: </span>
-                        {formatInTimeZone(item.scheduled_at!, timeZone, {
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })}{" "}
-                        · {item.title || "Untitled"}
-                      </button>
-                    ))}
+                    {dayItems.map((item) => {
+                      const isScheduled = Boolean(item.scheduled_at);
+                      const label = isScheduled
+                        ? formatInTimeZone(item.scheduled_at!, timeZone, {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })
+                        : plannedTime(item) ?? "Planned";
+                      const className =
+                        "block min-h-11 w-full rounded-lg border-l-2 px-3 py-2 text-left text-sm font-medium text-foreground";
+                      const style = eventColorStyle(category("content").effective_color);
+                      return isScheduled ? (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => setSelected(item)}
+                          className={className}
+                          style={style}
+                        >
+                          <span className="sr-only">{category("content").name}: </span>
+                          {label} · {item.title || "Untitled"}
+                        </button>
+                      ) : (
+                        <Link
+                          key={item.id}
+                          to="/create"
+                          search={{ id: item.id }}
+                          className={className}
+                          style={style}
+                        >
+                          <span className="sr-only">{category("content").name}: </span>
+                          {label} · {item.title || "Untitled"}
+                          <span className="ml-2 text-[10px] font-semibold uppercase text-muted-foreground">
+                            Planned
+                          </span>
+                        </Link>
+                      );
+                    })}
                     {dayProductions.map((production) => (
                       <button
                         key={`mobile-production-${production.id}`}
@@ -287,7 +338,7 @@ function CalendarPage() {
               <EmptyState
                 icon={CalendarIcon}
                 title={`No plans in ${monthName}`}
-                body="Scheduled posts, production dates, and strategy ideas will appear here."
+                body="Scheduled posts, campaign-planned drafts, production dates, and strategy ideas will appear here."
               />
             )}
           </div>
@@ -328,22 +379,42 @@ function CalendarPage() {
                       </div>
                     )}
                     <div className="space-y-1">
-                      {dayItems.map((it) => (
-                        <button
-                          key={it.id}
-                          type="button"
-                          onClick={() => setSelected(it)}
-                          className="block w-full truncate rounded-md border-l-2 px-2 py-1 text-left text-[11px] font-medium text-foreground transition hover:brightness-125"
-                          style={eventColorStyle(category("content").effective_color)}
-                        >
-                          <span className="sr-only">{category("content").name}: </span>
-                          {formatInTimeZone(it.scheduled_at!, timeZone, {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}{" "}
-                          · {it.title || "Untitled"}
-                        </button>
-                      ))}
+                      {dayItems.map((it) => {
+                        const isScheduled = Boolean(it.scheduled_at);
+                        const label = isScheduled
+                          ? formatInTimeZone(it.scheduled_at!, timeZone, {
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })
+                          : plannedTime(it) ?? "Planned";
+                        const className =
+                          "block w-full truncate rounded-md border-l-2 px-2 py-1 text-left text-[11px] font-medium text-foreground transition hover:brightness-125";
+                        const style = eventColorStyle(category("content").effective_color);
+                        return isScheduled ? (
+                          <button
+                            key={it.id}
+                            type="button"
+                            onClick={() => setSelected(it)}
+                            className={className}
+                            style={style}
+                          >
+                            <span className="sr-only">{category("content").name}: </span>
+                            {label} · {it.title || "Untitled"}
+                          </button>
+                        ) : (
+                          <Link
+                            key={it.id}
+                            to="/create"
+                            search={{ id: it.id }}
+                            className={className}
+                            style={style}
+                            title="Planned campaign post · open draft"
+                          >
+                            <span className="sr-only">{category("content").name}: </span>
+                            {label} · {it.title || "Untitled"}
+                          </Link>
+                        );
+                      })}
                       {dayProductions.map((production) => (
                         <button
                           key={`production-${production.id}`}
