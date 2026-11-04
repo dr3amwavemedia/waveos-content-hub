@@ -307,17 +307,37 @@ export async function getMediaPreview(
   mode: "thumbnail" | "content" = "content",
 ): Promise<{ url: string | null; kind: MediaPreviewKind | null }> {
   if (asset.source_provider === "waveos") {
-    if (!asset.storage_path) throw new Error("Media file is missing its storage path.");
-    return { url: await getSignedMediaUrl(asset.storage_path, expiresIn), kind: null };
+    if (asset.storage_path) {
+      try {
+        return { url: await getSignedMediaUrl(asset.storage_path, expiresIn), kind: null };
+      } catch {
+        // Older/imported assets can still carry a safe browser URL even if local signing fails.
+        if (asset.source_web_url) return { url: asset.source_web_url, kind: null };
+        throw new Error("Media preview could not be opened.");
+      }
+    }
+    if (asset.source_web_url) return { url: asset.source_web_url, kind: null };
+    throw new Error("Media file is missing its storage path.");
   }
   if (asset.source_provider === "google_drive" || asset.source_provider === "dropbox") {
-    const result = await getExternalMediaPreviewUrl(
-      asset.source_provider,
-      asset.workspace_id,
-      asset.id,
-      mode,
-    );
-    return { url: result.url, kind: null };
+    try {
+      const result = await getExternalMediaPreviewUrl(
+        asset.source_provider,
+        asset.workspace_id,
+        asset.id,
+        mode,
+      );
+      if (result.url) return { url: result.url, kind: null };
+    } catch {
+      // Fall through to a provider/browser URL when the authenticated preview proxy
+      // is temporarily unavailable. This keeps Video Maker usable for linked media.
+    }
+    return {
+      url: mode === "thumbnail"
+        ? asset.thumbnail_url ?? asset.source_web_url
+        : asset.source_web_url ?? asset.thumbnail_url,
+      kind: null,
+    };
   }
   if (asset.source_provider === "frameio")
     return getFrameioMediaPreviewUrl(asset.workspace_id, asset.id);
