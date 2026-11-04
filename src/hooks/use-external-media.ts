@@ -50,6 +50,8 @@ export function getExternalMediaStatus(provider: ExternalMediaProvider, workspac
     configured: boolean;
     connected: boolean;
     reconnectRequired: boolean;
+    diagnosis?: "not_connected" | "missing_permission" | "expired_authorization" | "connection_record_present";
+    suggestedAction?: "reconnect_with_provider_consent" | "check_picker_or_provider_api";
     account: { email: string | null; updatedAt: string | null } | null;
   }>(provider, "", { action: "status", workspaceId });
 }
