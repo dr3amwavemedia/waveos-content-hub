@@ -14,6 +14,13 @@ test("My Agent launches interactive WaveOS tools from natural prompts", () => {
   assert.match(agent, /Create campaign/);
   assert.match(agent, /Open Campaign Manager/);
   assert.match(agent, /Build a campaign/);
+  assert.match(agent, /Create Post/);
+  assert.match(agent, /Caption preview/);
+  assert.match(agent, /Creative Studio/);
+  assert.match(agent, /Graphic/);
+  assert.match(agent, /Photo/);
+  assert.match(agent, /Video/);
+  assert.match(agent, /createAgentPostDraft/);
   assert.match(agent, /\(campaign\)/);
   assert.match(agent, /performance\|analytics\|growth\|results/);
 });
@@ -38,4 +45,13 @@ test("My Agent composer reserves space above mobile navigation", () => {
   assert.match(agent, /mb-24/);
   assert.match(agent, /100dvh/);
   assert.match(agent, /shrink-0 border-t/);
+});
+
+
+test("My Agent post action saves a real WaveOS content draft", () => {
+  assert.match(actions, /createAgentPostDraft/);
+  assert.match(actions, /from\("content_items"\)/);
+  assert.match(actions, /source: "my_agent"/);
+  assert.match(actions, /can_create_content/);
+  assert.match(actions, /status: "draft"/);
 });
