@@ -110,17 +110,21 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
       .at(-1) ?? currentRows[0].range_start;
     const sameWindow = currentRows.filter((row: any) => row.range_start === latestStart);
 
+    // Prioritize actionable outcomes over vanity metrics when space is limited.
+    // This is a display preference, not evidence that any metric improved.
     const priority = [
-      "followers",
-      "reach",
-      "impressions",
-      "views",
-      "likes",
-      "comments",
-      "shares",
-      "saves",
+      "leads",
+      "conversions",
       "clicks",
       "messages",
+      "views",
+      "reach",
+      "followers",
+      "saves",
+      "shares",
+      "comments",
+      "likes",
+      "impressions",
       "story_views",
     ];
     const ordered = [...sameWindow].sort((a: any, b: any) => {
