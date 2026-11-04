@@ -184,6 +184,8 @@ function CampaignManagerPage() {
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [mediaSectionOpen, setMediaSectionOpen] = useState(false);
   const [bulkCaptionBusy, setBulkCaptionBusy] = useState(false);
+  const [captionBusyId, setCaptionBusyId] = useState<string | null>(null);
+  const [campaignCaptionDrafts, setCampaignCaptionDrafts] = useState<Record<string, string>>({});
   const mobileSteps = ["Campaign name", "Your goal", "Platforms & formats", "Posting frequency", "Planning schedule", "Review campaign"];
   const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
     workspaceId,
@@ -275,6 +277,16 @@ function CampaignManagerPage() {
   const selectedCampaignContent = selectedCampaignId
     ? campaignContentByPlan.get(selectedCampaignId) ?? []
     : [];
+  useEffect(() => {
+    setCampaignCaptionDrafts((current) => {
+      const next = { ...current };
+      for (const item of selectedCampaignContent) {
+        if (!(item.id in next)) next[item.id] = item.primary_caption ?? "";
+      }
+      return next;
+    });
+  }, [selectedCampaignContent]);
+
   const selectedCampaignCounts = selectedCampaignContent.reduce(
     (counts, item) => {
       counts.total += 1;
@@ -510,6 +522,145 @@ function CampaignManagerPage() {
       };
       video.src = url;
     });
+  }
+
+  async function saveCampaignCaption(item: CampaignLinkedContentRow, caption: string) {
+    if (!workspaceId || captionBusyId) return;
+    const nextCaption = caption.trim();
+    if (!nextCaption) {
+      toast.error("Add or generate a caption first.");
+      return;
+    }
+    const metadata =
+      item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+    const plannedPlatform =
+      typeof metadata.platform === "string" && PLATFORM_OPTIONS.includes(metadata.platform)
+        ? metadata.platform
+        : "instagram";
+    setCaptionBusyId(item.id);
+    try {
+      const { error: contentError } = await db
+        .from("content_items")
+        .update({
+          primary_caption: nextCaption,
+          metadata: { ...metadata, captionState: "ready_for_review" },
+        })
+        .eq("id", item.id)
+        .eq("workspace_id", workspaceId);
+      if (contentError) throw contentError;
+
+      const { data: variants, error: readError } = await db
+        .from("post_variants")
+        .select("id,platform")
+        .eq("content_item_id", item.id)
+        .eq("workspace_id", workspaceId);
+      if (readError) throw readError;
+      const variant = (variants ?? []).find((row: any) => row.platform === plannedPlatform);
+      if (variant?.id) {
+        const { error } = await db
+          .from("post_variants")
+          .update({ caption: nextCaption, enabled: true })
+          .eq("id", variant.id);
+        if (error) throw error;
+      } else {
+        const { error } = await db.from("post_variants").insert({
+          content_item_id: item.id,
+          workspace_id: workspaceId,
+          platform: plannedPlatform,
+          enabled: true,
+          caption: nextCaption,
+          platform_options:
+            metadata.contentFormat === "story" ? { contentType: "story" } : {},
+        });
+        if (error) throw error;
+      }
+
+      setCampaignCaptionDrafts((current) => ({ ...current, [item.id]: nextCaption }));
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["campaign-linked-content", workspaceId] }),
+        queryClient.invalidateQueries({ queryKey: ["content-item", item.id] }),
+      ]);
+      toast.success("Campaign caption saved.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Caption could not be saved.");
+    } finally {
+      setCaptionBusyId(null);
+    }
+  }
+
+  async function generateCampaignCaption(item: CampaignLinkedContentRow) {
+    if (!workspaceId || captionBusyId) return;
+    const metadata =
+      item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+    const plannedPlatform =
+      typeof metadata.platform === "string" && PLATFORM_OPTIONS.includes(metadata.platform)
+        ? metadata.platform
+        : "instagram";
+    const brief =
+      (typeof metadata.campaignBrief === "string" ? metadata.campaignBrief.trim() : "") ||
+      (typeof metadata.contentPillar === "string" ? metadata.contentPillar : "") ||
+      item.title ||
+      "Create an organic social caption for this campaign post.";
+
+    setCaptionBusyId(item.id);
+    try {
+      const generated = await captionAssistFn({
+        data: {
+          mode: "caption_suite",
+          input: brief,
+          workspaceId,
+          platforms: [plannedPlatform],
+        },
+      });
+      const primaryCaption = generated.primaryCaption ?? generated.suggestion;
+      setCampaignCaptionDrafts((current) => ({ ...current, [item.id]: primaryCaption }));
+
+      const { error: contentError } = await db
+        .from("content_items")
+        .update({
+          primary_caption: primaryCaption,
+          metadata: { ...metadata, captionState: "generated_for_review" },
+        })
+        .eq("id", item.id)
+        .eq("workspace_id", workspaceId);
+      if (contentError) throw contentError;
+
+      const platformCaption =
+        generated.variants?.find((row) => row.platform === plannedPlatform)?.caption ??
+        primaryCaption;
+      const { data: variants, error: readError } = await db
+        .from("post_variants")
+        .select("id,platform")
+        .eq("content_item_id", item.id)
+        .eq("workspace_id", workspaceId);
+      if (readError) throw readError;
+      const variant = (variants ?? []).find((row: any) => row.platform === plannedPlatform);
+      if (variant?.id) {
+        const { error } = await db
+          .from("post_variants")
+          .update({ caption: platformCaption, enabled: true })
+          .eq("id", variant.id);
+        if (error) throw error;
+      } else {
+        const { error } = await db.from("post_variants").insert({
+          content_item_id: item.id,
+          workspace_id: workspaceId,
+          platform: plannedPlatform,
+          enabled: true,
+          caption: platformCaption,
+          platform_options:
+            metadata.contentFormat === "story" ? { contentType: "story" } : {},
+        });
+        if (error) throw error;
+      }
+
+      await queryClient.invalidateQueries({ queryKey: ["campaign-linked-content", workspaceId] });
+      toast.success(item.primary_caption ? "Caption rewritten." : "Caption generated.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Caption could not be generated.");
+    } finally {
+      setCaptionBusyId(null);
+    }
   }
 
   async function generateMissingCampaignCaptions() {
@@ -898,44 +1049,89 @@ function CampaignManagerPage() {
                 </div>
 
                 {selectedCampaignContent.length > 0 ? (
-                  <div className="mt-4 space-y-2">
-                    {selectedCampaignContent.slice(0, 8).map((item, index) => (
-                      <div key={item.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface/50 p-3">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">{item.title || `Campaign post ${index + 1}`}</p>
-                          <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
-                            {item.status.replaceAll("_", " ")}
-                            {typeof item.metadata?.platform === "string" ? ` · ${item.metadata.platform}` : ""}
-                            {typeof item.metadata?.plannedDate === "string" ? ` · ${item.metadata.plannedDate}` : ""}
-                            {typeof item.metadata?.plannedTime === "string" ? ` ${item.metadata.plannedTime}` : ""}
-                          </p>
-                          {!item.primary_caption && (
-                            <p className="mt-1 text-[10px] font-medium text-amber-300">Caption still needs Brand Voice generation</p>
-                          )}
-                        </div>
-                        <Button asChild size="sm" variant="outline">
-                          <Link
-                            to="/create"
-                            search={{
-                              id: item.id,
-                              media: undefined,
-                              studio: undefined,
-                              destination: undefined,
-                              brief: undefined,
-                              briefWorkspace: undefined,
-                            }}
-                          >
-                            Open <ArrowRight />
-                          </Link>
-                        </Button>
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold">Campaign captions</p>
+                        <p className="text-xs text-muted-foreground">Generate, rewrite, edit, and save each caption without leaving Campaign Manager.</p>
                       </div>
-                    ))}
-                    {selectedCampaignContent.length > 8 && (
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {selectedCampaignContent.filter((item) => item.primary_caption?.trim()).length}/{selectedCampaignContent.length} ready
+                      </span>
+                    </div>
+                    {selectedCampaignContent.slice(0, 12).map((item, index) => {
+                      const caption = campaignCaptionDrafts[item.id] ?? item.primary_caption ?? "";
+                      const savedCaption = item.primary_caption ?? "";
+                      const changed = caption.trim() !== savedCaption.trim();
+                      return (
+                        <article key={item.id} className="rounded-2xl border border-border bg-surface/50 p-3">
+                          <div className="flex items-start gap-3">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-xs font-bold text-primary">
+                              {index + 1}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold">{item.title || `Campaign post ${index + 1}`}</p>
+                              <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
+                                {typeof item.metadata?.platform === "string" ? item.metadata.platform : "Platform TBD"}
+                                {typeof item.metadata?.plannedDate === "string" ? ` · ${item.metadata.plannedDate}` : ""}
+                                {typeof item.metadata?.plannedTime === "string" ? ` ${item.metadata.plannedTime}` : ""}
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-background/50 px-2 py-1 text-[10px] uppercase text-muted-foreground">
+                              {item.status.replaceAll("_", " ")}
+                            </span>
+                          </div>
+                          <textarea
+                            value={caption}
+                            onChange={(event) =>
+                              setCampaignCaptionDrafts((current) => ({
+                                ...current,
+                                [item.id]: event.target.value,
+                              }))
+                            }
+                            rows={4}
+                            placeholder="Generate a Brand Voice caption or write one here…"
+                            className="mt-3 w-full resize-y rounded-xl border border-border bg-background/50 px-3 py-2 text-sm leading-6 outline-none focus:border-primary/50"
+                          />
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              variant={item.primary_caption ? "outline" : "secondary"}
+                              disabled={captionBusyId === item.id}
+                              onClick={() => void generateCampaignCaption(item)}
+                            >
+                              {captionBusyId === item.id ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                              {item.primary_caption ? "Rewrite" : "Generate caption"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              disabled={!caption.trim() || !changed || captionBusyId === item.id}
+                              onClick={() => void saveCampaignCaption(item, caption)}
+                            >
+                              <Save /> Save caption
+                            </Button>
+                            <Button asChild size="sm" variant="ghost">
+                              <Link
+                                to="/create"
+                                search={{
+                                  id: item.id,
+                                  media: undefined,
+                                  studio: undefined,
+                                  destination: undefined,
+                                  brief: undefined,
+                                  briefWorkspace: undefined,
+                                }}
+                              >
+                                Open full post <ArrowRight />
+                              </Link>
+                            </Button>
+                          </div>
+                        </article>
+                      );
+                    })}
+                    {selectedCampaignContent.length > 12 && (
                       <p className="px-1 text-xs text-muted-foreground">
-                        +{selectedCampaignContent.length - 8} more linked posts in the Content Library.
+                        +{selectedCampaignContent.length - 12} more linked posts in the Content Library.
                       </p>
                     )}
                   </div>
@@ -952,7 +1148,7 @@ function CampaignManagerPage() {
                     {selectedCampaignCounts.total === 0
                       ? "Attach content and build the campaign direction."
                       : selectedCampaignCounts.drafts > 0
-                        ? "Open the drafts, finish captions and media, then submit them for review."
+                        ? "Finish or approve the captions here, then open any post that needs final media/platform review."
                         : selectedCampaignCounts.review > 0
                           ? "Review the submitted posts and approve or request changes."
                           : selectedCampaignCounts.approved > 0
