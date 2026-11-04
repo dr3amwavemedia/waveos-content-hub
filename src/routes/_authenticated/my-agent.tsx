@@ -224,6 +224,7 @@ function MyAgentPage() {
   const [toolBusy, setToolBusy] = useState(false);
   const [toolError, setToolError] = useState<string | null>(null);
   const [performance, setPerformance] = useState<AgentPerformanceSnapshot | null>(null);
+  const [performanceFocus, setPerformanceFocus] = useState<string | null>(null);
   const [campaignStep, setCampaignStep] = useState(0);
   const [campaignSaved, setCampaignSaved] = useState<null | {
     id: string;
@@ -487,6 +488,7 @@ function MyAgentPage() {
     setDraft("");
     setToolError(null);
     setActiveTool("performance");
+    setPerformanceFocus(null);
     setToolBusy(true);
     try {
       const result = await getPerformance({
@@ -646,6 +648,15 @@ function MyAgentPage() {
     }
 
     const normalized = input.toLowerCase();
+    // A follow-up narrows the current report without reopening or losing it.
+    const metricFocus = normalized.match(/\b(?:just|only|specifically|focus on|show(?: me)?)\s+(?:my\s+)?(views?|impressions?|reach|clicks?|leads?|followers?|messages?|saves?|shares?)\b/);
+    if (activeTool === "performance" && metricFocus && performance) {
+      const metric = metricFocus[1].replace(/s$/, "");
+      setPerformanceFocus(metric === "view" ? "views" : metric === "click" ? "clicks" : metric === "lead" ? "leads" : metric === "impression" ? "impressions" : metric === "follower" ? "followers" : metric === "message" ? "messages" : metric === "save" ? "saves" : metric === "share" ? "shares" : metric);
+      addUserMessage(input);
+      setDraft("");
+      return;
+    }
     if (
       /(campaign)/.test(normalized) &&
       /(create|build|start|make|new)/.test(normalized)
@@ -654,6 +665,7 @@ function MyAgentPage() {
       return;
     }
     if (
+      !/\b(how|why|improve|increase|fix|better|strategy|recommend|should)\b/.test(normalized) &&
       /(performance|analytics|growth|results|how (am|are) .*doing|how .*performing)/.test(normalized)
     ) {
       void openPerformanceSnapshot(input);
@@ -1109,8 +1121,10 @@ function MyAgentPage() {
                     <p className="mt-1 text-[11px] text-slate-400">
                       {performance.rangeStart} to {performance.rangeEnd} · as of {performance.asOf}
                     </p>
+                    {performanceFocus && <button type="button" className="mt-2 text-xs text-cyan-200 underline" onClick={() => setPerformanceFocus(null)}>Show all available metrics</button>}
+                    {performanceFocus && !performance.metrics.some((metric) => metric.key === performanceFocus) && <p className="mt-2 text-sm text-slate-400">This metric is not available in the current connected snapshot. No estimate is being substituted.</p>}
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      {performance.metrics.map((metric) => (
+                      {performance.metrics.filter((metric) => !performanceFocus || metric.key === performanceFocus).map((metric) => (
                         <div key={metric.key} className="rounded-xl border border-cyan-200/10 bg-black/10 p-3">
                           <p className="text-[10px] uppercase tracking-wide text-slate-400">{metric.label}</p>
                           <p className="mt-1 text-xl font-semibold">{Intl.NumberFormat().format(metric.value)}</p>
