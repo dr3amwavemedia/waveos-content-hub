@@ -201,7 +201,6 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
         start_date: input.startDate,
         end_date: input.endDate,
         platforms: input.platforms,
-        contentFormats: input.contentFormats,
         max_posts: input.maxPosts,
         posting_hours: input.postingHours,
         excluded_days: input.excludedDays,
