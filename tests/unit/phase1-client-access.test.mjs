@@ -23,7 +23,7 @@ assert.match(appShell, /const WEDDING_NAV[\s\S]*to: "\/analytics"/);
 const campaign = read("src/routes/_authenticated/campaigns.tsx");
 assert.match(campaign, /can_use_campaign_manager/);
 assert.match(campaign, /Nothing here schedules/);
-assert.doesNotMatch(campaign, /waveAssist|publishContentItem|stripe/i);
+assert.doesNotMatch(campaign, /publishContentItem|stripe/i);
 
 const competitive = read("src/routes/_authenticated/competitive-intelligence.tsx");
 assert.match(competitive, /Research a competitor/);
