@@ -299,7 +299,6 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
         workspace_id: data.workspaceId,
         created_by: context.userId,
         title: `${input.name} · ${media?.name ?? `Content ${index + 1}`}`.slice(0, 180),
-        internal_notes: plannedItem?.copyBrief ?? null,
         primary_caption: null,
         hashtags: [],
         media_asset_ids: [mediaId],
@@ -315,6 +314,7 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
           contentFormat: plannedItem?.contentFormat ?? null,
           contentPillar: plannedItem?.pillar ?? null,
           captionState: "needs_generation",
+          campaignBrief: plannedItem?.copyBrief ?? null,
         },
       };
     });
