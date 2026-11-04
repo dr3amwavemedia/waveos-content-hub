@@ -39,6 +39,7 @@ import {
 import { discoverTrends } from "@/lib/trending-now.functions";
 import { researchCompetitor } from "@/lib/competitive-research.functions";
 import { analyzeSeoGrowth } from "@/lib/seo-growth.functions";
+import { useMediaAssets, useMediaFolders } from "@/hooks/use-media";
 import { cn } from "@/lib/utils";
 
 type AgentMessage = { role: "user" | "assistant"; content: string };
@@ -203,6 +204,13 @@ function MyAgentPage() {
   const researchBusiness = useServerFn(researchCompetitor);
   const runSeoAudit = useServerFn(analyzeSeoGrowth);
   const workspaceId = activeWorkspace?.id ?? null;
+  const [campaignMediaFolderId, setCampaignMediaFolderId] = useState<string | null>(null);
+  const [campaignMediaIds, setCampaignMediaIds] = useState<string[]>([]);
+  const campaignFolders = useMediaFolders(workspaceId);
+  const campaignFolderAssets = useMediaAssets(
+    workspaceId,
+    campaignMediaFolderId ? { folderId: campaignMediaFolderId } : {},
+  );
   const storageKey = workspaceId ? `waveos.assist.${workspaceId}` : null;
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -302,6 +310,8 @@ function MyAgentPage() {
       maxPosts: 8,
       platforms: ["instagram"],
     });
+    setCampaignMediaFolderId(null);
+    setCampaignMediaIds([]);
     setActiveTool("campaign");
   }
 
@@ -506,6 +516,8 @@ function MyAgentPage() {
           platforms: campaignDraft.platforms as Array<
             "instagram" | "facebook" | "linkedin" | "tiktok" | "youtube" | "x"
           >,
+          mediaAssetIds: campaignMediaIds,
+          mediaFolderId: campaignMediaFolderId,
         },
       });
       setCampaignSaved({
@@ -515,7 +527,7 @@ function MyAgentPage() {
         startDate: result.startDate,
         endDate: result.endDate,
       });
-      setCampaignStep(5);
+      setCampaignStep(6);
     } catch (caught) {
       setToolError(caught instanceof Error ? caught.message : "Campaign could not be saved.");
     } finally {
@@ -799,6 +811,8 @@ function MyAgentPage() {
               setPerformance(null);
               setToolError(null);
               setCampaignSaved(null);
+              setCampaignMediaFolderId(null);
+              setCampaignMediaIds([]);
               setPostSaved(null);
               setPostStep(0);
               setTrendResults([]);
@@ -987,22 +1001,83 @@ function MyAgentPage() {
                         );
                       })}
                     </div>
-                    <div className="mt-4 rounded-xl border border-violet-200/10 bg-black/10 p-3 text-xs text-slate-300">
-                      <strong>{campaignDraft.name}</strong> · {campaignDraft.maxPosts} posts · {campaignDraft.durationDays} days · {campaignDraft.goal}
-                    </div>
-                    <Button className="mt-3 w-full" disabled={!campaignDraft.platforms.length || toolBusy} onClick={() => void finishCampaign()}>
-                      {toolBusy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Create campaign
+                    <Button
+                      className="mt-4 w-full"
+                      disabled={!campaignDraft.platforms.length}
+                      onClick={() => setCampaignStep(5)}
+                    >
+                      Choose campaign content <ArrowRight />
                     </Button>
                   </div>
                 )}
-                {campaignStep === 5 && campaignSaved && (
+                {campaignStep === 5 && (
+                  <div className="mt-4 space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-slate-200">Choose the content for this campaign</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Use an entire WaveOS folder or pick individual media from WaveOS, Google Drive, Dropbox, Files, Camera Roll / Photos, or Frame.io.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {(campaignFolders.data ?? []).map((folder) => (
+                        <Button
+                          key={folder.id}
+                          size="sm"
+                          variant={campaignMediaFolderId === folder.id ? "secondary" : "outline"}
+                          onClick={() => {
+                            setCampaignMediaFolderId(folder.id);
+                            const ids = (campaignFolderAssets.data ?? []).map((asset) => asset.id);
+                            if (campaignMediaFolderId === folder.id && ids.length) {
+                              setCampaignMediaIds(ids.slice(0, campaignDraft.maxPosts));
+                            }
+                          }}
+                        >
+                          <FolderOpen className="h-4 w-4" /> {folder.name}
+                        </Button>
+                      ))}
+                    </div>
+                    {campaignMediaFolderId && (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={campaignFolderAssets.isLoading || !(campaignFolderAssets.data ?? []).length}
+                        onClick={() =>
+                          setCampaignMediaIds(
+                            (campaignFolderAssets.data ?? [])
+                              .map((asset) => asset.id)
+                              .slice(0, campaignDraft.maxPosts),
+                          )
+                        }
+                      >
+                        Use this entire folder
+                      </Button>
+                    )}
+                    <Button className="w-full" variant="outline" onClick={() => setShowAgentMediaPicker(true)}>
+                      <FolderOpen /> Pick individual media
+                    </Button>
+                    <div className="rounded-xl border border-violet-200/10 bg-black/10 p-3 text-xs text-slate-300">
+                      <strong>{campaignDraft.name}</strong> · {campaignDraft.maxPosts} posts · {campaignDraft.durationDays} days · {campaignDraft.goal}
+                      <div className="mt-1 text-violet-200">
+                        {campaignMediaIds.length} content item{campaignMediaIds.length === 1 ? "" : "s"} selected
+                      </div>
+                    </div>
+                    <Button
+                      className="w-full"
+                      disabled={!campaignMediaIds.length || toolBusy}
+                      onClick={() => void finishCampaign()}
+                    >
+                      {toolBusy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Create campaign with content
+                    </Button>
+                  </div>
+                )}
+                {campaignStep === 6 && campaignSaved && (
                   <div className="mt-4 space-y-3">
                     <div className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3">
                       <div className="flex items-center gap-2 font-semibold text-emerald-100">
                         <CheckCircle2 className="h-4 w-4" /> Campaign created
                       </div>
                       <p className="mt-1 text-xs text-slate-300">
-                        {campaignSaved.name} · {campaignSaved.plannedItems} planned slots · {campaignSaved.startDate} to {campaignSaved.endDate}
+                        {campaignSaved.name} · {campaignSaved.plannedItems} planned slots · {campaignMediaIds.length} linked content item{campaignMediaIds.length === 1 ? "" : "s"} · {campaignSaved.startDate} to {campaignSaved.endDate}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -1466,7 +1541,12 @@ function MyAgentPage() {
           picked={agentPickedMedia}
           onClose={() => setShowAgentMediaPicker(false)}
           onConfirm={(ids) => {
-            setAgentPickedMedia(ids);
+            if (activeTool === "campaign" && campaignStep === 5) {
+              setCampaignMediaFolderId(null);
+              setCampaignMediaIds(ids.slice(0, campaignDraft.maxPosts));
+            } else {
+              setAgentPickedMedia(ids);
+            }
             setShowAgentMediaPicker(false);
           }}
         />
