@@ -14,6 +14,13 @@ const workspaceInput = z.object({
   localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
+const createPostInput = workspaceInput.extend({
+  idea: z.string().trim().min(1).max(500),
+  caption: z.string().trim().min(1).max(6000),
+  platform: z.enum(["instagram", "facebook", "linkedin", "tiktok", "youtube", "x"]),
+  placement: z.enum(["feed", "story"]),
+});
+
 const createCampaignInput = workspaceInput.extend({
   name: z.string().trim().min(1).max(120),
   goal: z.enum(["awareness", "engagement", "leads", "launch", "retention"]),
@@ -247,5 +254,45 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
       platforms: input.platforms,
       maxPosts: input.maxPosts,
       plannedItems: plannedItems.length,
+    };
+  });
+
+
+export const createAgentPostDraft = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input) => createPostInput.parse(input))
+  .handler(async ({ data, context }) => {
+    await requireWorkspaceAccess(context as any, data.workspaceId, "can_create_content");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const titleBase = data.idea.replace(/\s+/g, " ").trim();
+    const title = titleBase.length > 90 ? `${titleBase.slice(0, 87)}…` : titleBase;
+    const { data: created, error } = await supabaseAdmin
+      .from("content_items")
+      .insert({
+        workspace_id: data.workspaceId,
+        created_by: context.userId,
+        title,
+        primary_caption: data.caption,
+        hashtags: [],
+        media_asset_ids: [],
+        status: "draft",
+        metadata: {
+          source: "my_agent",
+          platforms: [data.platform],
+          placement: data.placement,
+          localDate: data.localDate,
+        },
+      })
+      .select("id")
+      .single();
+
+    if (error || !created?.id) throw new Error("Post draft could not be saved.");
+    return {
+      id: created.id as string,
+      title,
+      caption: data.caption,
+      platform: data.platform,
+      placement: data.placement,
     };
   });
