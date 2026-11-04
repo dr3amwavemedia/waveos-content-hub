@@ -172,3 +172,20 @@ test("Campaign persistence never deletes a saved plan just because content linki
   assert.match(actions, /contentLinked/);
   assert.doesNotMatch(actions, /linked campaign content insert failed[\s\S]{0,400}\.delete\(\)/);
 });
+
+
+test("Campaign drafts keep briefs internal, restore platforms, and appear on Calendar", () => {
+  const campaigns = fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8");
+  const createPost = fs.readFileSync("src/routes/_authenticated/create.tsx", "utf8");
+  const calendar = fs.readFileSync("src/routes/_authenticated/calendar.tsx", "utf8");
+  assert.match(campaigns, /internal_notes: plannedItem\?\.copyBrief/);
+  assert.match(campaigns, /primary_caption: null/);
+  assert.match(campaigns, /Generate missing captions/);
+  assert.match(campaigns, /post_variants/);
+  assert.match(createPost, /needsCampaignCaption/);
+  assert.match(createPost, /campaignBrief/);
+  assert.match(createPost, /metadata\.platform/);
+  assert.match(calendar, /plannedDate\(it\)/);
+  assert.match(calendar, /Planned/);
+  assert.match(calendar, /campaign-planned drafts/);
+});
