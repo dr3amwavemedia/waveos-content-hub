@@ -91,6 +91,7 @@ import {
   sendOsAccountPasswordReset,
   setOsAccountPayments,
   setOsPromoCodeActive,
+  updateOsPromoCode,
   type OsPromoColor,
   updateOsAccount,
 } from "@/lib/os-accounts.functions";
@@ -1012,6 +1013,14 @@ function OsPromoCodesPanel() {
   const createPromo = useServerFn(createOsPromoCode);
   const deletePromo = useServerFn(deleteOsPromoCode);
   const setActive = useServerFn(setOsPromoCodeActive);
+  const updatePromo = useServerFn(updateOsPromoCode);
+  const [editingPromo, setEditingPromo] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editDays, setEditDays] = useState(30);
+  const [editLimit, setEditLimit] = useState(3);
+  const [editStarts, setEditStarts] = useState("");
+  const [editExpires, setEditExpires] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [bonusDays, setBonusDays] = useState(14);
@@ -1280,6 +1289,20 @@ function OsPromoCodesPanel() {
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
+                      onClick={() => {
+                        setEditingPromo(promo.id);
+                        setEditName(promo.name);
+                        setEditDays(promo.bonus_trial_days);
+                        setEditLimit(promo.max_redemptions);
+                        setEditStarts(new Date(promo.starts_at).toISOString().slice(0, 16));
+                        setEditExpires(promo.expires_at ? new Date(promo.expires_at).toISOString().slice(0, 16) : "");
+                      }}
+                      className="rounded-lg border border-current/25 bg-black/10 px-3 py-2 font-semibold"
+                    >
+                      Edit details
+                    </button>
+                    <button
+                      type="button"
                       onClick={async () => {
                         await setActive({ data: { promoId: promo.id, active: !promo.is_active } });
                         await promos.refetch();
@@ -1308,6 +1331,47 @@ function OsPromoCodesPanel() {
                     </button>
                   </div>
                 </div>
+                {editingPromo === promo.id && (
+                  <div className="mt-4 space-y-3 rounded-xl border border-current/20 bg-black/10 p-4">
+                    <p className="text-sm font-semibold">Edit {promo.code}</p>
+                    <p className="text-xs opacity-80">Changes apply to future redemptions only. Existing customer trials and other codes stay unchanged.</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <label className="text-xs">Campaign name
+                        <input value={editName} onChange={(e) => setEditName(e.target.value)} maxLength={80} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground" />
+                      </label>
+                      <label className="text-xs">Redemption limit (already used: {promo.redemption_count})
+                        <input type="number" min={Math.max(1, promo.redemption_count)} max={100000} value={editLimit} onChange={(e) => setEditLimit(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground" />
+                      </label>
+                      <label className="text-xs">Trial days (1–30)
+                        <input type="number" min={1} max={30} value={editDays} onChange={(e) => setEditDays(Number(e.target.value))} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground" />
+                      </label>
+                      <label className="text-xs">Starts
+                        <input type="datetime-local" value={editStarts} onChange={(e) => setEditStarts(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground" />
+                      </label>
+                      <label className="text-xs">Expires (blank means no expiration)
+                        <input type="datetime-local" value={editExpires} onChange={(e) => setEditExpires(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 text-foreground" />
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" disabled={editSaving} onClick={async () => {
+                        setEditSaving(true);
+                        try {
+                          await updatePromo({ data: {
+                            promoId: promo.id, name: editName, bonusTrialDays: editDays,
+                            maxRedemptions: editLimit, startsAt: new Date(editStarts).toISOString(),
+                            expiresAt: editExpires ? new Date(editExpires).toISOString() : null,
+                          } });
+                          setEditingPromo(null);
+                          await promos.refetch();
+                          toast.success("Promo settings saved. Existing redemptions unchanged.");
+                        } catch (error) {
+                          toast.error(error instanceof Error ? error.message : "Could not update promo.");
+                        } finally { setEditSaving(false); }
+                      }} className="rounded-lg bg-violet-500 px-4 py-2 text-xs font-semibold text-white disabled:opacity-50">{editSaving ? "Saving…" : "Save changes"}</button>
+                      <button type="button" onClick={() => setEditingPromo(null)} className="rounded-lg border border-current/25 px-4 py-2 text-xs font-semibold">Cancel</button>
+                    </div>
+                  </div>
+                )}
               </article>
             );
           })}
