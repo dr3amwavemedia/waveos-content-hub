@@ -167,6 +167,73 @@ export const createOsPromoCode = createServerFn({ method: "POST" })
     return { created: true };
   });
 
+// Updates only the selected promo's future redemption rules. Existing redemptions,
+// subscriber trial dates, and all other promo codes are intentionally untouched.
+export const updateOsPromoCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: {
+    promoId: string;
+    name: string;
+    bonusTrialDays: number;
+    maxRedemptions: number;
+    startsAt: string;
+    expiresAt: string | null;
+  }) => data)
+  .handler(async ({ data, context }) => {
+    const admin = await requireOwner(context.userId);
+    const { data: currentRaw, error: lookupError } = await admin
+      .from("os_promo_codes" as never)
+      .select("id,code,redemption_count,max_redemptions,bonus_trial_days,starts_at,expires_at,name")
+      .eq("id", data.promoId)
+      .maybeSingle();
+    if (lookupError) throw lookupError;
+    const current = currentRaw as {
+      id: string; code: string; redemption_count: number;
+      max_redemptions: number; bonus_trial_days: number;
+      starts_at: string; expires_at: string | null; name: string;
+    } | null;
+    if (!current) throw new Error("Promo code not found.");
+    const name = data.name.trim();
+    if (!name || name.length > 80) throw new Error("Enter a name up to 80 characters.");
+    if (!Number.isInteger(data.bonusTrialDays) || data.bonusTrialDays < 1 || data.bonusTrialDays > 30)
+      throw new Error("Trial duration must be between 1 and 30 days under current trial safeguards.");
+    if (!Number.isInteger(data.maxRedemptions) || data.maxRedemptions < Math.max(1, current.redemption_count) || data.maxRedemptions > 100000)
+      throw new Error("Redemption limit must be at least the number already used and at most 100,000.");
+    const startsAt = new Date(data.startsAt);
+    const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+    if (Number.isNaN(startsAt.getTime()) || (expiresAt && Number.isNaN(expiresAt.getTime())))
+      throw new Error("Enter valid promo dates.");
+    if (expiresAt && expiresAt <= startsAt) throw new Error("Expiration must be after the start date.");
+    const changes = {
+      name,
+      bonus_trial_days: data.bonusTrialDays,
+      max_redemptions: data.maxRedemptions,
+      starts_at: startsAt.toISOString(),
+      expires_at: expiresAt?.toISOString() ?? null,
+    };
+    const { data: updated, error } = await admin
+      .from("os_promo_codes" as never)
+      .update(changes as never)
+      .eq("id", data.promoId)
+      .eq("redemption_count", current.redemption_count)
+      .select("id")
+      .maybeSingle();
+    if (error) throw error;
+    if (!updated) throw new Error("Promo usage changed while editing. Refresh and try again.");
+    await admin.from("activity_logs").insert({
+      actor_user_id: context.userId,
+      action: "os_promo_code_edited",
+      entity_type: "os_promo_code",
+      entity_id: data.promoId,
+      safe_metadata: { code: current.code, before: {
+        name: current.name, bonus_trial_days: current.bonus_trial_days,
+        max_redemptions: current.max_redemptions, starts_at: current.starts_at,
+        expires_at: current.expires_at,
+      }, after: changes },
+    });
+    return { updated: true };
+  });
+
 export const setOsPromoCodeActive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((data: { promoId: string; active: boolean }) => data)
