@@ -43,10 +43,21 @@ export function publicResearchUrl(raw: string) {
   }
   return url.href;
 }
+// Match equivalent public URLs despite tracking parameters, fragments, www, and trailing slashes.
+// Never treat a different page on the same site as a consulted source.
+export function researchSourceIdentity(raw: unknown): string | null {
+  const normalized = normalizeResearchSource(raw);
+  if (!normalized) return null;
+  const url = new URL(normalized);
+  const host = url.hostname.replace(/^www\\./i, "");
+  const path = url.pathname.replace(/\\/+$/, "") || "/";
+  return host + path;
+}
+
 export function groundedReport(report: ResearchReport, consultedUrls?: string[]): ResearchReport {
-  const consulted = consultedUrls ? new Set(consultedUrls.flatMap(source=>{const url=normalizeResearchSource(source);return url?[url]:[];})) : null;
+  const consulted = consultedUrls ? new Set(consultedUrls.flatMap(source=>{const id=researchSourceIdentity(source);return id?[id]:[];})) : null;
   const clean = (claim: z.infer<typeof researchClaim>) => {
-    const sources = [...new Set(claim.sources.flatMap(source => { const url = normalizeResearchSource(source); return url && (!consulted || consulted.has(url)) ? [url] : []; }))];
+    const sources = [...new Set(claim.sources.flatMap(source => { const url = normalizeResearchSource(source); return url && (!consulted || consulted.has(researchSourceIdentity(url))) ? [url] : []; }))];
     return sources.length && claim.text.trim() ? [{ text: claim.text, sources }] : [];
   };
   const supportedUrl = (source: string) => { const url = normalizeResearchSource(source); return url && (!consulted || consulted.has(url)) ? url : null; };
@@ -87,13 +98,13 @@ export function validatedIndependentComparison(raw: unknown, consultedUrls: stri
   const businessA = groundedReport(parsed.businessA, consultedUrls);
   const businessB = groundedReport(parsed.businessB, consultedUrls);
   const consulted = new Set(consultedUrls.flatMap(source => {
-    const url = normalizeResearchSource(source);
-    return url ? [url] : [];
+    const id = researchSourceIdentity(source);
+    return id ? [id] : [];
   }));
   const cleanClaim = (claim: z.infer<typeof researchClaim>) => {
     const sources = [...new Set(claim.sources.flatMap(source => {
       const url = normalizeResearchSource(source);
-      return url && consulted.has(url) ? [url] : [];
+      return url && consulted.has(researchSourceIdentity(url)) ? [url] : [];
     }))];
     return { text: claim.text.trim(), sources };
   };
