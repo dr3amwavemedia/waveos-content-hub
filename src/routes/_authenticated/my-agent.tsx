@@ -273,7 +273,7 @@ function MyAgentPage() {
                   (message?.role === "user" || message?.role === "assistant") &&
                   typeof message.content === "string",
               )
-              .slice(-8)
+              .slice(-40)
           : [],
       );
     } catch {
@@ -282,7 +282,7 @@ function MyAgentPage() {
   }, [storageKey]);
 
   useEffect(() => {
-    if (storageKey) sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-8)));
+    if (storageKey) sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-40)));
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, storageKey]);
 
@@ -295,7 +295,7 @@ function MyAgentPage() {
   );
 
   function addUserMessage(content: string) {
-    setMessages((current) => [...current, { role: "user" as const, content }].slice(-8));
+    setMessages((current) => [...current, { role: "user" as const, content }].slice(-40));
   }
 
   function startCampaignBuilder(prompt?: string) {
@@ -638,7 +638,7 @@ function MyAgentPage() {
       { role: "assistant" as const, content: updates.length
         ? `Updated your campaign: ${updates.join(" · ")}. Your existing media selections are unchanged. Review the plan before saving.`
         : "Got it. I've kept the current campaign settings. You can adjust the details before saving." },
-    ].slice(-8));
+    ].slice(-40));
     setCampaignDraft(nextDraft);
     setCampaignStep(nextStep);
     setDraft("");
@@ -727,7 +727,7 @@ function MyAgentPage() {
 
     const prior = messages.slice(-6);
     setMessages((current) =>
-      [...current, { role: "user" as const, content: input }].slice(-8),
+      [...current, { role: "user" as const, content: input }].slice(-40),
     );
     setDraft("");
     setBusy(true);
@@ -748,7 +748,7 @@ function MyAgentPage() {
         },
       });
       setMessages((current) =>
-        [...current, { role: "assistant" as const, content: result.suggestion }].slice(-8),
+        [...current, { role: "assistant" as const, content: result.suggestion }].slice(-40),
       );
       if (speakReply && voiceReplies && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
