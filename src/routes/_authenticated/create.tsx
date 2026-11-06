@@ -2576,20 +2576,9 @@ function GoogleDrivePicker({
   }, [pickerOpen]);
 
   useEffect(() => () => pickerRef.current?.setVisible(false), []);
-  useEffect(() => {
-    if (!pickerOpen || !isStandaloneIos) return;
-    const check = () => {
-      if (document.visibilityState !== "visible") return;
-      const dialog = document.querySelector<HTMLElement>(".picker-dialog");
-      if (dialog && dialog.getBoundingClientRect().height > 0 && getComputedStyle(dialog).visibility !== "hidden") return;
-      closePicker();
-      setOpenError("Google Drive did not stay open. No files were added. Try again, or continue in Safari.");
-    };
-    const timer = window.setTimeout(check, 4000);
-    window.addEventListener("pageshow", check);
-    document.addEventListener("visibilitychange", check);
-    return () => { window.clearTimeout(timer); window.removeEventListener("pageshow", check); document.removeEventListener("visibilitychange", check); };
-  }, [pickerOpen, isStandaloneIos]);
+  // Google owns its cross-origin dialog and storage-access prompts. Private DOM
+  // classes and foreground timing cannot tell us whether authentication failed.
+  // Close only on an explicit callback, Exit, or component unmount.
 
   async function openPicker() {
     setOpening(true);
@@ -2597,7 +2586,12 @@ function GoogleDrivePicker({
     setNotice(null);
     const currentAttempt = ++attempt.current;
     try {
-      driveReturn?.checkpoint();
+      try {
+        driveReturn?.checkpoint();
+      } catch {
+        // Optional local draft recovery must never gate a valid Google token.
+        setNotice("Automatic draft recovery is unavailable in this browser. Keep this page open; save your draft before leaving it.");
+      }
       const config = await getGooglePickerToken(workspaceId);
       await loadGooglePickerScript();
       if (currentAttempt !== attempt.current) return;

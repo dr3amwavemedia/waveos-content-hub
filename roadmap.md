@@ -1,5 +1,8 @@
 # Approved mobile refinement
 
+- [x] Compare Nov 6 Google Picker against 2fc4335b30, PR #224/#225 and 867468de; restore explicit-only dismissal and best-effort checkpoints. All 389 tests pass; preview build OK. Real token issuance returned 200; baseline and current initializers both showed Google sign-in prompts under identical session/origin conditions. Nothing published.
+- [ ] Establish reported account-wide Google Picker failure cause: blocked on affected-browser Google session/cookie and deployed key-restriction evidence; successful file selection and physical-iPhone Safari continuation remain unverified. OAuth issuance/configuration source is unchanged; no blanket cookie/PWA diagnosis is established.
+
 - [x] Narrow Drive Picker repair: session checkpoint restores interrupted draft; visible cancel/error/empty states and explicit saved-draft Safari handoff; 42 focused tests and authenticated simulated callbacks passed, preview build OK. Physical iOS Safari launch and real Google selection remain device-verification limitations; no publishing.
 
 - [ ] Urgent repair: regenerate only package-lock.json, verify npm ci compatibility, preserve all other work; no deployment.
