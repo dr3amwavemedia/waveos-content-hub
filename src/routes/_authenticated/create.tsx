@@ -2849,6 +2849,9 @@ function loadGooglePickerScript() {
     return Promise.resolve();
   if (googlePickerLoader) return googlePickerLoader;
   googlePickerLoader = new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error("Google Drive took too long to load. Try again or continue in Safari.")), 15000);
+    const finish = () => { window.clearTimeout(timeout); resolve(); };
+    const fail = (message: string) => { window.clearTimeout(timeout); reject(new Error(message)); };
     const script = document.createElement("script");
     script.src = "https://apis.google.com/js/api.js";
     script.async = true;
@@ -2856,11 +2859,11 @@ function loadGooglePickerScript() {
       const gapi = (
         window as unknown as { gapi?: { load: (name: string, callback: () => void) => void } }
       ).gapi;
-      if (!gapi) return reject(new Error("Google API did not load."));
-      gapi.load("picker", resolve);
+      if (!gapi) return fail("Google API did not load.");
+      gapi.load("picker", finish);
     };
-    script.onerror = () => reject(new Error("Google Picker could not be downloaded."));
+    script.onerror = () => fail("Google Picker could not be downloaded.");
     document.head.appendChild(script);
-  });
+  }).catch((reason) => { googlePickerLoader = null; throw reason; });
   return googlePickerLoader;
 }
