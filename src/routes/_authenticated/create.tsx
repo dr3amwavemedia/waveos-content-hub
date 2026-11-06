@@ -2669,13 +2669,17 @@ function GoogleDrivePicker({
               durationSeconds: null,
             }));
             const imported = await importExternalMedia("google_drive", workspaceId, files);
+            if (!imported.imported.length) {
+              setOpenError("Google Drive returned no imported files. Try choosing files again.");
+              return;
+            }
             onImported(
               imported.imported.map((item) => item.id).filter((id) => !selected.includes(id)),
             );
             toast.success(
               `Added ${imported.imported.length} item${imported.imported.length === 1 ? "" : "s"} from Google Drive.`,
             );
-            setNotice(imported.imported.length ? "Files added to your media selection. Confirm your selection to attach them to the post." : "Google Drive returned no imported files. Try choosing files again.");
+            setNotice("Files added to your media selection. Confirm your selection to attach them to the post.");
           } catch (reason) {
             setOpenError(reason instanceof Error ? reason.message : "Could not add Google Drive media.");
             toast.error(
