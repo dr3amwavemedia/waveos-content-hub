@@ -18,3 +18,11 @@ test("My Agent does not overwrite saved chat before workspace hydration", () => 
 test("My Agent clears displayed conversation when there is no workspace", () => {
   assert.match(agent, /if \(!storageKey\) \{\s*setMessages\(\[\]\);\s*setLoadedConversationKey\(null\);/);
 });
+
+test("Conversation storage uses authenticated user and workspace isolation", () => {
+  const utility = fs.readFileSync("src/lib/agent-conversation-storage.ts", "utf8");
+  assert.match(utility, /if \(!userId \|\| !workspaceId\) return null/);
+  assert.match(utility, /waveos\.assist\.v2/);
+  assert.match(utility, /MAX_MESSAGES = 40/);
+  assert.match(utility, /MAX_MESSAGE_LENGTH = 12000/);
+});
