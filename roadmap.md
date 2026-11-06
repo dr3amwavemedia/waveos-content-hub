@@ -1,5 +1,7 @@
 # Approved mobile refinement
 
+- [x] Narrow Drive Picker repair: session checkpoint restores interrupted draft; visible cancel/error/empty states and explicit saved-draft Safari handoff; 42 focused tests and authenticated simulated callbacks passed, preview build OK. Physical iOS Safari launch and real Google selection remain device-verification limitations; no publishing.
+
 - [ ] Urgent repair: regenerate only package-lock.json, verify npm ci compatibility, preserve all other work; no deployment.
 
 # Shared campaign and video intelligence completion

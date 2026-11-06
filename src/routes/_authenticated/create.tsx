@@ -1,6 +1,7 @@
 import { RequireFeature } from "@/components/app/require-feature";
 import { Button } from "@/components/ui/button";
 import { studioPostKey,studioReturnedMedia,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
+import { driveBrowserReturnUrl, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safariOpenUrl } from "@/lib/drive-picker-return";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -149,6 +150,8 @@ function CreatePost() {
   >({});
   const [showLibrary, setShowLibrary] = useState(false);
   const restoredStudio=useRef<string|null>(null);
+  const restoredDrive = useRef<string | null>(null);
+  const [driveReturnNotice, setDriveReturnNotice] = useState(false);
 
   useEffect(() => {
     if (
@@ -334,6 +337,26 @@ function CreatePost() {
     setSavedId(it.id);
   }, [existing.data?.item?.id]);
   useEffect(() => {
+    if (!workspaceId || search.studio || (editingId && !existing.data?.item)) return;
+    const key = driveCheckpointKey(workspaceId, editingId);
+    if (restoredDrive.current === key) return;
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (!raw) return;
+      const snapshot = JSON.parse(raw) as StudioPostSnapshot;
+      if (snapshot.workspaceId !== workspaceId || snapshot.id !== editingId) return;
+      setTitle(snapshot.title);
+      setCaption(snapshot.caption);
+      setPlatforms(snapshot.platforms.filter((platform): platform is SocialPlatform => ALL_PLATFORMS.includes(platform as SocialPlatform)));
+      setPickedMedia(snapshot.pickedMedia);
+      setScheduledAt(snapshot.scheduledAt);
+      setDraftPlatformOptions(snapshot.platformOptions);
+      restoredDrive.current = key;
+      sessionStorage.removeItem(key);
+      setDriveReturnNotice(true);
+    } catch { setDriveReturnNotice(true); }
+  }, [workspaceId, editingId, existing.data?.item?.id, search.studio]);
+  useEffect(() => {
     if (!search.studio || !workspaceId || restoredStudio.current === search.studio) return;
 
     try {
@@ -401,7 +424,7 @@ function CreatePost() {
     );
   }
 
-  async function ensureSaved(primaryCaption = caption): Promise<string | null> {
+  async function ensureSaved(primaryCaption = caption, mediaIds = pickedMedia): Promise<string | null> {
     if (!workspaceId) return null;
     if (savedId) {
       await update.mutateAsync({
@@ -409,7 +432,7 @@ function CreatePost() {
         patch: {
           title: title || null,
           primary_caption: primaryCaption || null,
-          media_asset_ids: pickedMedia,
+          media_asset_ids: mediaIds,
           scheduled_at: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
         },
       });
@@ -424,7 +447,7 @@ function CreatePost() {
     const item = await create.mutateAsync({
       title,
       primary_caption: primaryCaption,
-      media_asset_ids: pickedMedia,
+      media_asset_ids: mediaIds,
       platforms,
       platform_options: draftPlatformOptions,
       scheduled_at: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
@@ -1072,6 +1095,21 @@ function CreatePost() {
         <MediaPicker
           workspaceId={workspaceId!}
           picked={pickedMedia}
+          driveReturn={{
+            checkpoint: () => {
+              if (!workspaceId) throw new Error("Choose a workspace first.");
+              sessionStorage.setItem(driveCheckpointKey(workspaceId, editingId), JSON.stringify({ workspaceId, id: editingId, title, caption, platforms, pickedMedia, scheduledAt, platformOptions: draftPlatformOptions }));
+            },
+            clear: () => { if (workspaceId) sessionStorage.removeItem(driveCheckpointKey(workspaceId, editingId)); },
+            prepareBrowser: async (ids) => {
+              if (locked) throw new Error("This post cannot be edited right now.");
+              const id = await ensureSaved(caption, ids);
+              if (!id) throw new Error("The draft could not be saved. Stay here and try again.");
+              setPickedMedia(ids);
+              await qc.invalidateQueries({ queryKey: ["content-item", id] });
+              return driveBrowserReturnUrl(window.location.origin, id);
+            },
+          }}
           onClose={() => setShowLibrary(false)}
           onConfirm={(ids) => {
             setPickedMedia(ids);
@@ -1079,6 +1117,7 @@ function CreatePost() {
           }}
         />
       )}
+      {driveReturnNotice && <div role="status" className="border border-border bg-elevated p-3 text-sm text-foreground">Your post was restored after leaving Google Drive. No files were added by that return. <Button variant="outline" onClick={() => { setDriveReturnNotice(false); setShowLibrary(true); }}>Choose media again</Button></div>}
     </div>
   );
 }
@@ -1712,16 +1751,20 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
   );
 }
 
+type DriveReturnControls = { checkpoint: () => void; clear: () => void; prepareBrowser: (ids: string[]) => Promise<string> };
+
 export function MediaPicker({
   workspaceId,
   picked,
   onClose,
   onConfirm,
+  driveReturn,
 }: {
   workspaceId: string;
   picked: string[];
   onClose: () => void;
   onConfirm: (ids: string[]) => void;
+  driveReturn?: DriveReturnControls;
 }) {
   const [selected, setSelected] = useState<string[]>(picked);
   const [search, setSearch] = useState("");
@@ -1900,6 +1943,7 @@ export function MediaPicker({
           ) : source !== "waveos" ? (
             <ExternalProviderPicker
               provider={source}
+              driveReturn={driveReturn}
               workspaceId={workspaceId}
               query={search}
               selected={selected}
@@ -2184,12 +2228,14 @@ function ExternalProviderPicker({
   query,
   selected,
   onImported,
+  driveReturn,
 }: {
   provider: ExternalMediaProvider;
   workspaceId: string;
   query: string;
   selected: string[];
   onImported: (ids: string[]) => void;
+  driveReturn?: DriveReturnControls;
 }) {
   const [files, setFiles] = useState<ExternalProviderFile[]>([]);
   const [folders, setFolders] = useState<ExternalProviderFolder[]>([]);
@@ -2315,7 +2361,7 @@ function ExternalProviderPicker({
   }
   if (provider === "google_drive") {
     return (
-      <GoogleDrivePicker workspaceId={workspaceId} selected={selected} onImported={onImported} />
+      <GoogleDrivePicker workspaceId={workspaceId} selected={selected} onImported={onImported} driveReturn={driveReturn} />
     );
   }
   return (
@@ -2489,44 +2535,72 @@ function GoogleDrivePicker({
   workspaceId,
   selected,
   onImported,
+  driveReturn,
 }: {
   workspaceId: string;
   selected: string[];
   onImported: (ids: string[]) => void;
+  driveReturn?: DriveReturnControls;
 }) {
   const [opening, setOpening] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const pickerRef = useRef<GooglePickerInstance | null>(null);
-  const isStandaloneIos =
-    typeof window !== "undefined" &&
-    /iPad|iPhone|iPod/.test(window.navigator.userAgent) &&
-    (window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
+  const [isStandaloneIos, setStandaloneIos] = useState(false);
+  const [browserUrl, setBrowserUrl] = useState<string | null>(null);
+  const [savingBrowser, setSavingBrowser] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const attempt = useRef(0);
+  useEffect(() => { setStandaloneIos(isIosHomeScreen(window.navigator, window.matchMedia("(display-mode: standalone)").matches)); }, []);
 
   function closePicker() {
+    attempt.current += 1;
     pickerRef.current?.setVisible(false);
     pickerRef.current = null;
     setPickerOpen(false);
+    driveReturn?.clear();
+  }
+
+  function cancelPicker() {
+    closePicker();
+    setNotice("Google Drive closed. No files were added.");
   }
 
   useEffect(() => {
     if (!pickerOpen) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closePicker();
+      if (event.key === "Escape") cancelPicker();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [pickerOpen]);
 
   useEffect(() => () => pickerRef.current?.setVisible(false), []);
+  useEffect(() => {
+    if (!pickerOpen || !isStandaloneIos) return;
+    const check = () => {
+      if (document.visibilityState !== "visible") return;
+      const dialog = document.querySelector<HTMLElement>(".picker-dialog");
+      if (dialog && dialog.getBoundingClientRect().height > 0 && getComputedStyle(dialog).visibility !== "hidden") return;
+      closePicker();
+      setOpenError("Google Drive did not stay open. No files were added. Try again, or continue in Safari.");
+    };
+    const timer = window.setTimeout(check, 4000);
+    window.addEventListener("pageshow", check);
+    document.addEventListener("visibilitychange", check);
+    return () => { window.clearTimeout(timer); window.removeEventListener("pageshow", check); document.removeEventListener("visibilitychange", check); };
+  }, [pickerOpen, isStandaloneIos]);
 
   async function openPicker() {
     setOpening(true);
     setOpenError(null);
+    setNotice(null);
+    const currentAttempt = ++attempt.current;
     try {
+      driveReturn?.checkpoint();
       const config = await getGooglePickerToken(workspaceId);
       await loadGooglePickerScript();
+      if (currentAttempt !== attempt.current) return;
       const googleApi = (window as unknown as { google?: GooglePickerGlobal }).google;
       if (!googleApi?.picker) throw new Error("Google Picker did not load.");
       const mediaTypes = "image/jpeg,image/png,video/mp4,video/quicktime";
@@ -2560,15 +2634,23 @@ function GoogleDrivePicker({
         .addView(sharedWithMeView)
         .addView(sharedDrivesView)
         .setCallback(async (data: GooglePickerResult) => {
-          if (data.action === googleApi.picker.Action.CANCEL) {
-            closePicker();
+          if (currentAttempt !== attempt.current) return;
+          const outcome = drivePickerOutcome(data.action, data.docs?.length ?? 0);
+          if (outcome === "cancelled") {
+            cancelPicker();
             return;
           }
-          if (data.action !== googleApi.picker.Action.PICKED || !data.docs?.length) return;
+          if (outcome === "failed" || outcome === "empty") {
+            closePicker();
+            setOpenError(outcome === "empty" ? "Google Drive returned no files. Choose files and try again." : "Google Drive reported a problem. No files were added. Try again or continue in Safari.");
+            return;
+          }
+          if (outcome !== "picked" || !data.docs?.length) return;
           closePicker();
           try {
             const supportedDocs = data.docs.filter(isGoogleDriveMedia);
             if (!supportedDocs.length) {
+              setOpenError("Choose an image or video file to add to this post.");
               toast.error("Choose an image or video file to add to this post.");
               return;
             }
@@ -2587,13 +2669,19 @@ function GoogleDrivePicker({
               durationSeconds: null,
             }));
             const imported = await importExternalMedia("google_drive", workspaceId, files);
+            if (!imported.imported.length) {
+              setOpenError("Google Drive returned no imported files. Try choosing files again.");
+              return;
+            }
             onImported(
               imported.imported.map((item) => item.id).filter((id) => !selected.includes(id)),
             );
             toast.success(
               `Added ${imported.imported.length} item${imported.imported.length === 1 ? "" : "s"} from Google Drive.`,
             );
+            setNotice("Files added to your media selection. Confirm your selection to attach them to the post.");
           } catch (reason) {
+            setOpenError(reason instanceof Error ? reason.message : "Could not add Google Drive media.");
             toast.error(
               reason instanceof Error ? reason.message : "Could not add Google Drive media.",
             );
@@ -2604,6 +2692,7 @@ function GoogleDrivePicker({
       picker.setVisible(true);
       setPickerOpen(true);
     } catch (reason) {
+      driveReturn?.clear();
       const message = reason instanceof Error ? reason.message : "Google Picker could not open.";
       setOpenError(message);
       toast.error(message);
@@ -2616,16 +2705,16 @@ function GoogleDrivePicker({
     <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
       {pickerOpen &&
         createPortal(
-          <button
+          <Button
             type="button"
-            onClick={closePicker}
+            onClick={cancelPicker}
             aria-label="Exit Google Drive"
-            className="fixed right-3 z-[2147483647] inline-flex min-h-12 touch-manipulation items-center gap-2 rounded-full border-2 border-white bg-slate-950 px-4 py-2 text-sm font-bold text-white shadow-2xl"
+            className="fixed right-3 z-[2147483647] min-h-12 touch-manipulation border-2 border-border bg-background text-foreground"
             style={{ top: "max(0.75rem, env(safe-area-inset-top))", pointerEvents: "auto" }}
           >
             <X className="h-5 w-5" />
             Exit Google Drive
-          </button>,
+          </Button>,
           document.body,
         )}
       <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
@@ -2645,32 +2734,38 @@ function GoogleDrivePicker({
           Browse My Drive, folders shared with you and Shared drives without leaving WaveOS. WaveOS
           only receives the JPG, PNG, MP4 or MOV files you select.
         </p>
-        {openError && <p className="mt-2 max-w-md text-[11px] text-destructive">{openError}</p>}
+        {openError && <p role="alert" className="mt-2 max-w-md text-xs text-destructive">{openError}</p>}
+        {notice && <p role="status" className="mt-2 max-w-md text-xs text-muted-foreground">{notice}</p>}
       </div>
       {isStandaloneIos && (
         <div className="max-w-sm space-y-2 rounded-xl border border-border bg-elevated p-3 text-left text-xs text-muted-foreground">
           <p className="font-semibold text-foreground">Using the iPhone Home Screen app?</p>
-          <p>Google may block its file picker here because iOS keeps Safari sign-in cookies separate. If Browse Google Drive shows a sign-in error, open this same WaveOS page in Safari to choose your files.</p>
-          <a
-            href={window.location.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex rounded-full border border-primary px-3 py-2 font-semibold text-primary"
-          >
-            Open WaveOS in browser
-          </a>
+          <p>If Google Drive closes or asks you to sign in, continue with the same saved post in Safari. You may need to sign in to WaveOS there. After adding files, save the draft in Safari, then reopen that saved draft in WaveOS.</p>
+          {driveReturn && !browserUrl && <Button variant="outline" disabled={savingBrowser || opening || pickerOpen} onClick={async () => {
+            setSavingBrowser(true);
+            try { setBrowserUrl(await driveReturn.prepareBrowser(selected)); }
+            catch (reason) { setOpenError(reason instanceof Error ? reason.message : "The draft could not be saved. Stay here and try again."); }
+            finally { setSavingBrowser(false); }
+          }}>{savingBrowser ? "Saving draft…" : "Save draft for Safari"}</Button>}
+          {browserUrl && <>
+            <Button variant="outline" asChild><a href={safariOpenUrl(browserUrl)} rel="noopener noreferrer">Open saved draft in Safari <ExternalLink className="size-4" /></a></Button>
+            <p>If Safari does not open, copy the saved-draft link and paste it into Safari’s address bar. This opens the same saved post, not a new post.</p>
+            <Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(browserUrl); setNotice("Saved-draft link copied. Open Safari and paste it into the address bar."); } catch { setNotice("Copy the saved-draft link below and paste it into Safari."); } }}>Copy saved-draft link</Button>
+            <input aria-label="Saved-draft Safari link" value={browserUrl} readOnly onFocus={(event) => event.target.select()} className="w-full rounded border border-border bg-background p-2 text-foreground" />
+          </>}
+          {!driveReturn && <p>Close the media window and save your post before continuing in Safari.</p>}
         </div>
       )}
       {opening ? (
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
       ) : !pickerOpen ? (
-        <button
+        <Button
           type="button"
           onClick={openPicker}
           className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
         >
           {openError ? "Try Google Drive again" : "Browse Google Drive"}
-        </button>
+        </Button>
       ) : null}
     </div>
   );
@@ -2758,6 +2853,9 @@ function loadGooglePickerScript() {
     return Promise.resolve();
   if (googlePickerLoader) return googlePickerLoader;
   googlePickerLoader = new Promise<void>((resolve, reject) => {
+    const timeout = window.setTimeout(() => reject(new Error("Google Drive took too long to load. Try again or continue in Safari.")), 15000);
+    const finish = () => { window.clearTimeout(timeout); resolve(); };
+    const fail = (message: string) => { window.clearTimeout(timeout); reject(new Error(message)); };
     const script = document.createElement("script");
     script.src = "https://apis.google.com/js/api.js";
     script.async = true;
@@ -2765,11 +2863,11 @@ function loadGooglePickerScript() {
       const gapi = (
         window as unknown as { gapi?: { load: (name: string, callback: () => void) => void } }
       ).gapi;
-      if (!gapi) return reject(new Error("Google API did not load."));
-      gapi.load("picker", resolve);
+      if (!gapi) return fail("Google API did not load.");
+      gapi.load("picker", finish);
     };
-    script.onerror = () => reject(new Error("Google Picker could not be downloaded."));
+    script.onerror = () => fail("Google Picker could not be downloaded.");
     document.head.appendChild(script);
-  });
+  }).catch((reason) => { googlePickerLoader = null; throw reason; });
   return googlePickerLoader;
 }
