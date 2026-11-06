@@ -111,6 +111,7 @@ test("Campaign Manager says when a video had no transcript instead of implying o
 import {
   captionCuesFromSegments,
   effectiveTranscript,
+  effectiveKeyMoments,
   encodeWav,
   groundKeyMoments,
   parseWav,
@@ -177,4 +178,24 @@ test("transcript captions stay inside the trimmed part of the clip", () => {
   const cues = captionCuesFromSegments(row.segments, 4, 8);
   assert.ok(cues.length > 0);
   assert.ok(cues.every((cue) => cue.start >= 4 && cue.end <= 8));
+});
+
+test("continuous audible speech is not discarded as silence", () => {
+  const chunks = planSpeechChunks(Int16Array.from(tone(10, 9000)), 16000);
+  assert.equal(chunks.length > 0, true);
+  assert.equal(chunks.every((chunk) => !chunk.silent), true);
+});
+
+test("malformed WAV format chunks fail safely instead of throwing", () => {
+  const wav = encodeWav(Int16Array.from([1, 2, 3]));
+  const truncated = wav.slice(0, 23);
+  assert.equal(parseWav(truncated), null);
+  new DataView(wav.buffer).setUint32(16, 2, true);
+  assert.equal(parseWav(wav), null);
+});
+
+test("key-moment quotes reflect saved corrections and exclude invalid indices", () => {
+  const edited = { ...row, edited_at: "2026-11-06T22:00:00Z", edited_text: "Corrected offer", edited_segments: [{ start: 0, end: 4, text: "Corrected offer" }, { start: 4, end: 8, text: "" }], key_moments: [{ segmentIndex: 0, start: 777, quote: "obsolete", label: "Offer" }, { segmentIndex: 8, label: "Invalid" }] };
+  assert.deepEqual(effectiveKeyMoments(edited), [{ segmentIndex: 0, start: 0, end: 4, quote: "Corrected offer", label: "Offer" }]);
+  assert.equal(transcriptExcerptForAi(edited).keyMoments[0].quote, "Corrected offer");
 });

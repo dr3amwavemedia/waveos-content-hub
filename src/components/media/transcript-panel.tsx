@@ -11,6 +11,7 @@ import {
 import {
   MAX_TRANSCRIPT_ATTEMPTS,
   effectiveTranscript,
+  effectiveKeyMoments,
   formatTranscriptStamp,
   sanitizeSegments,
   type TranscriptKeyMoment,
@@ -103,7 +104,7 @@ export function TranscriptPanel({
   const [draftText, setDraftText] = useState("");
   const [saving, setSaving] = useState(false);
   const view = transcript?.status === "completed" ? effectiveTranscript(transcript) : null;
-  const keyMoments = (Array.isArray(transcript?.key_moments) ? transcript?.key_moments : []) as TranscriptKeyMoment[];
+  const keyMoments = transcript ? effectiveKeyMoments(transcript) : [];
   const running = Boolean(run && run.phase !== "error");
   const stale = transcript ? isTranscriptStale(transcript) : false;
   const serverBusy = transcript?.status === "processing" && !stale;
