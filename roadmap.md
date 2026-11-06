@@ -1,5 +1,7 @@
 # Approved mobile refinement
 
+- [ ] Narrow Drive Picker repair: preserve draft on interrupted returns, expose cancel/error states, provide explicit saved-draft Safari handoff; test without publishing.
+
 - [ ] Urgent repair: regenerate only package-lock.json, verify npm ci compatibility, preserve all other work; no deployment.
 
 # Shared campaign and video intelligence completion
