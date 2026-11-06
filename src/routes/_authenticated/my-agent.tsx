@@ -41,6 +41,8 @@ import { researchCompetitor } from "@/lib/competitive-research.functions";
 import { analyzeSeoGrowth } from "@/lib/seo-growth.functions";
 import { useMediaAssets, useMediaFolders } from "@/hooks/use-media";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { agentConversationStorageKey, sanitizeAgentMessages } from "@/lib/agent-conversation-storage";
 
 type AgentMessage = { role: "user" | "assistant"; content: string };
 
@@ -211,8 +213,10 @@ function MyAgentPage() {
     workspaceId,
     campaignMediaFolderId ? { folderId: campaignMediaFolderId } : {},
   );
-  const storageKey = workspaceId ? `waveos.assist.${workspaceId}` : null;
+  const [conversationUserId, setConversationUserId] = useState<string | null>(null);
+  const storageKey = agentConversationStorageKey(conversationUserId, workspaceId);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const [loadedConversationKey, setLoadedConversationKey] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -261,30 +265,43 @@ function MyAgentPage() {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!storageKey) return;
+    let active = true;
+    void supabase.auth.getUser().then(({ data }) => {
+      if (active) setConversationUserId(data.user?.id ?? null);
+    }).catch(() => {
+      if (active) setConversationUserId(null);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (active) setConversationUserId(session?.user?.id ?? null);
+    });
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!storageKey) {
+      setMessages([]);
+      setLoadedConversationKey(null);
+      return;
+    }
+    setLoadedConversationKey(null);
     try {
       const stored = sessionStorage.getItem(storageKey);
-      const parsed = stored ? (JSON.parse(stored) as AgentMessage[]) : [];
-      setMessages(
-        Array.isArray(parsed)
-          ? parsed
-              .filter(
-                (message) =>
-                  (message?.role === "user" || message?.role === "assistant") &&
-                  typeof message.content === "string",
-              )
-              .slice(-8)
-          : [],
-      );
+      setMessages(sanitizeAgentMessages(stored ? JSON.parse(stored) : []));
     } catch {
       setMessages([]);
     }
+    setLoadedConversationKey(storageKey);
   }, [storageKey]);
 
   useEffect(() => {
-    if (storageKey) sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-8)));
+    if (storageKey && loadedConversationKey === storageKey) {
+      sessionStorage.setItem(storageKey, JSON.stringify(sanitizeAgentMessages(messages)));
+    }
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, storageKey]);
+  }, [messages, storageKey, loadedConversationKey]);
 
   useEffect(
     () => () => {
@@ -295,7 +312,7 @@ function MyAgentPage() {
   );
 
   function addUserMessage(content: string) {
-    setMessages((current) => [...current, { role: "user" as const, content }].slice(-8));
+    setMessages((current) => [...current, { role: "user" as const, content }].slice(-40));
   }
 
   function startCampaignBuilder(prompt?: string) {
@@ -638,7 +655,7 @@ function MyAgentPage() {
       { role: "assistant" as const, content: updates.length
         ? `Updated your campaign: ${updates.join(" · ")}. Your existing media selections are unchanged. Review the plan before saving.`
         : "Got it. I've kept the current campaign settings. You can adjust the details before saving." },
-    ].slice(-8));
+    ].slice(-40));
     setCampaignDraft(nextDraft);
     setCampaignStep(nextStep);
     setDraft("");
@@ -727,7 +744,7 @@ function MyAgentPage() {
 
     const prior = messages.slice(-6);
     setMessages((current) =>
-      [...current, { role: "user" as const, content: input }].slice(-8),
+      [...current, { role: "user" as const, content: input }].slice(-40),
     );
     setDraft("");
     setBusy(true);
@@ -748,7 +765,7 @@ function MyAgentPage() {
         },
       });
       setMessages((current) =>
-        [...current, { role: "assistant" as const, content: result.suggestion }].slice(-8),
+        [...current, { role: "assistant" as const, content: result.suggestion }].slice(-40),
       );
       if (speakReply && voiceReplies && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
