@@ -2201,13 +2201,9 @@ function ExternalProviderPicker({
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const providerLabel = provider === "google_drive" ? "Google Drive" : "Dropbox";
-  // iOS Home Screen PWAs isolate Google cookies from Safari. Use WaveOS's
-  // authenticated, server-side Drive browser instead of Google's iframe picker.
-  const useNativeDriveBrowser =
-    provider === "google_drive" &&
-    typeof window !== "undefined" &&
-    (window.matchMedia("(display-mode: standalone)").matches ||
-      (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
+  // The Google Picker is the only Drive flow that can grant access to user-selected
+  // files with the current drive.file OAuth scope. Do not replace it with a
+  // server-side list in iOS standalone mode: that list may be empty.
   const currentFolderId = folderStack.at(-1)?.id ?? null;
 
   useEffect(() => {
@@ -2230,7 +2226,7 @@ function ExternalProviderPicker({
           setFolders([]);
           return;
         }
-        if (provider === "google_drive" && !useNativeDriveBrowser) {
+        if (provider === "google_drive") {
           setFiles([]);
           setFolders([]);
           return;
@@ -2250,7 +2246,7 @@ function ExternalProviderPicker({
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [provider, workspaceId, query, currentFolderId, useNativeDriveBrowser]);
+  }, [provider, workspaceId, query, currentFolderId]);
 
   async function connect() {
     try {
@@ -2317,7 +2313,7 @@ function ExternalProviderPicker({
   if (error) {
     return <div className="py-16 text-center text-sm text-destructive">{error}</div>;
   }
-  if (provider === "google_drive" && !useNativeDriveBrowser) {
+  if (provider === "google_drive") {
     return (
       <GoogleDrivePicker workspaceId={workspaceId} selected={selected} onImported={onImported} />
     );
@@ -2502,6 +2498,11 @@ function GoogleDrivePicker({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const pickerRef = useRef<GooglePickerInstance | null>(null);
+  const isStandaloneIos =
+    typeof window !== "undefined" &&
+    /iPad|iPhone|iPod/.test(window.navigator.userAgent) &&
+    (window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
 
   function closePicker() {
     pickerRef.current?.setVisible(false);
@@ -2646,6 +2647,20 @@ function GoogleDrivePicker({
         </p>
         {openError && <p className="mt-2 max-w-md text-[11px] text-destructive">{openError}</p>}
       </div>
+      {isStandaloneIos && (
+        <div className="max-w-sm space-y-2 rounded-xl border border-border bg-elevated p-3 text-left text-xs text-muted-foreground">
+          <p className="font-semibold text-foreground">Using the iPhone Home Screen app?</p>
+          <p>Google may block its file picker here because iOS keeps Safari sign-in cookies separate. If Browse Google Drive shows a sign-in error, open this same WaveOS page in Safari to choose your files.</p>
+          <a
+            href={window.location.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex rounded-full border border-primary px-3 py-2 font-semibold text-primary"
+          >
+            Open WaveOS in browser
+          </a>
+        </div>
+      )}
       {opening ? (
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
       ) : !pickerOpen ? (
