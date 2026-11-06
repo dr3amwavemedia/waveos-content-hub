@@ -51,7 +51,7 @@ function RunProgress({ run }: { run: TranscriptRunState }) {
             ? run.sections
               ? `${run.sections} speech section${run.sections === 1 ? "" : "s"}`
               : "No speech sections found"
-            : "Original file, text only"
+            : "Original file on the server"
         }
         value={null}
       />
@@ -191,7 +191,7 @@ export function TranscriptPanel({
           <>
             <p className="text-[11px] text-muted-foreground">
               {view.evidence === "user_corrected_transcript" ? "Corrected by you · " : "Speech-to-text · "}
-              {view.hasTimestamps ? "timed to short speech sections" : "no timestamps (read from the original file)"}
+              {view.hasTimestamps ? "timed speech sections" : "speech-to-text returned no timestamps"}
             </p>
             {keyMoments.length > 0 && (
               <div>
