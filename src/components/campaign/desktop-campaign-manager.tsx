@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { MediaPicker } from "@/routes/_authenticated/create";
 import { UnsavedChangesGuard } from "@/components/app/unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
+import { CampaignTranscripts } from "@/components/media/campaign-transcripts";
 import { MobileWorkflowSteps, MobileWorkflowSection, MobileWorkflowFooter } from "@/components/app/mobile-workflow";
 import { CAMPAIGN_GOALS, type CampaignGoal } from "@/lib/phase-one-planning";
 import { cn } from "@/lib/utils";
@@ -122,6 +123,7 @@ export function DesktopCampaignManager({ controller }: { controller: CampaignMan
     draftsCreated,
     setDraftsCreated,
     createPostDrafts,
+    restoreServerDraft,
   } = controller;
   const [mobileStep, setMobileStep] = useState(0);
   const mobileSteps = ["Campaign name", "Your goal", "Platforms & formats", "Posting frequency", "Planning schedule", "Review campaign"];
@@ -547,6 +549,7 @@ export function DesktopCampaignManager({ controller }: { controller: CampaignMan
         </details>
       )}
 
+      <CampaignTranscripts workspaceId={workspaceId} assets={selectedMediaIds.map((id) => assetLookup.get(id)).filter((asset): asset is MediaAsset => Boolean(asset))} />
       {workflowDraft.data?.payload && (
         <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -560,11 +563,7 @@ export function DesktopCampaignManager({ controller }: { controller: CampaignMan
               size="sm"
               variant="outline"
               onClick={() => {
-                const restored = workflowDraft.data?.payload;
-                if (!restored) return;
-                setInput(restored);
-                setPreview([]);
-                setDirty(false);
+                restoreServerDraft();
               }}
             >
               Restore

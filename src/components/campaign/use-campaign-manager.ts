@@ -174,7 +174,11 @@ export function useCampaignManager() {
   const [campaignCaptionDrafts, setCampaignCaptionDrafts] = useState<Record<string, string>>({});
   const [continuedFrom, setContinuedFrom] = useState<string | null>(null);
   const [savedNotice, setSavedNotice] = useState<{ name: string; contentLinked: boolean } | null>(null);
-  const workflowDraft = useWorkflowDraft<CampaignPlanningInput>({
+  type BuilderDraft = CampaignPlanningInput & {
+    builder?: { selectedMediaIds: string[]; confirmedMediaIds: string[]; campaignDirection: CampaignDirection | null; preview: CampaignPlanningItem[]; campaignCaptionDrafts: Record<string, string>; continuedFrom: string | null };
+  };
+  const draftPayload: BuilderDraft = { ...input, builder: { selectedMediaIds, confirmedMediaIds, campaignDirection, preview, campaignCaptionDrafts, continuedFrom } };
+  const workflowDraft = useWorkflowDraft<BuilderDraft>({
     workspaceId,
     workflowKey: "campaign-manager",
   });
@@ -185,13 +189,13 @@ export function useCampaignManager() {
     const revision = editRevisionRef.current;
     setAutoSaveState("saving");
     const timer = window.setTimeout(() => {
-      void autoSaveDraft(input).then(() => {
+      void autoSaveDraft(draftPayload).then(() => {
         if (editRevisionRef.current === revision) setDirty(false);
         setAutoSaveState("saved");
       }).catch(() => setAutoSaveState("error"));
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [autoSaveDraft, dirty, input, workspaceId]);
+  }, [autoSaveDraft, dirty, input, workspaceId, selectedMediaIds, confirmedMediaIds, campaignDirection, preview, campaignCaptionDrafts, continuedFrom]);
 
   const campaigns = useQuery({
     queryKey: ["campaign-plans", workspaceId],
@@ -519,7 +523,9 @@ export function useCampaignManager() {
   }
 
   function changeSelectedMedia(next: string[] | ((current: string[]) => string[])) {
+    editRevisionRef.current += 1;
     setSelectedMediaIds(next);
+    setDirty(true);
     setSavedNotice(null);
   }
 
@@ -912,6 +918,8 @@ export function useCampaignManager() {
         },
       });
       setCampaignDirection(direction as CampaignDirection);
+      editRevisionRef.current += 1;
+      setDirty(true);
       setConfirmedMediaIds([]);
       toast.success("Organic campaign direction is ready.");
     } catch (error) {
@@ -923,6 +931,8 @@ export function useCampaignManager() {
   }
 
   function updateMediaRecommendation(index: number, patch: Partial<MediaRecommendation>) {
+    editRevisionRef.current += 1;
+    setDirty(true);
     setCampaignDirection((current) => current ? {
       ...current,
       mediaRecommendations: current.mediaRecommendations.map((recommendation, itemIndex) =>
@@ -950,12 +960,26 @@ export function useCampaignManager() {
 
   async function saveServerDraft() {
     try {
-      await workflowDraft.save.mutateAsync(input);
+      await workflowDraft.save.mutateAsync(draftPayload);
       setDirty(false);
       toast.success("Private server draft saved.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Draft could not be saved.");
     }
+  }
+
+  function restoreServerDraft() {
+    const restored = workflowDraft.data?.payload;
+    if (!restored) return;
+    const { builder, ...planning } = restored;
+    setInput(planning);
+    setSelectedMediaIds(builder?.selectedMediaIds ?? []);
+    setConfirmedMediaIds(builder?.confirmedMediaIds ?? []);
+    setCampaignDirection(builder?.campaignDirection ?? null);
+    setPreview(builder?.preview ?? []);
+    setCampaignCaptionDrafts(builder?.campaignCaptionDrafts ?? {});
+    setContinuedFrom(builder?.continuedFrom ?? null);
+    setDirty(false);
   }
 
   function generatePlan() {
@@ -1107,6 +1131,7 @@ export function useCampaignManager() {
     updateMediaRecommendation,
     moveSequenceItem,
     saveServerDraft,
+    restoreServerDraft,
     generatePlan,
     goToStep,
     startNewCampaign,
