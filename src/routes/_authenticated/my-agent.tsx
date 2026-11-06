@@ -213,6 +213,7 @@ function MyAgentPage() {
   );
   const storageKey = workspaceId ? `waveos.assist.${workspaceId}` : null;
   const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const [loadedConversationKey, setLoadedConversationKey] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -261,7 +262,12 @@ function MyAgentPage() {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (!storageKey) return;
+    if (!storageKey) {
+      setMessages([]);
+      setLoadedConversationKey(null);
+      return;
+    }
+    setLoadedConversationKey(null);
     try {
       const stored = sessionStorage.getItem(storageKey);
       const parsed = stored ? (JSON.parse(stored) as AgentMessage[]) : [];
@@ -279,12 +285,15 @@ function MyAgentPage() {
     } catch {
       setMessages([]);
     }
+    setLoadedConversationKey(storageKey);
   }, [storageKey]);
 
   useEffect(() => {
-    if (storageKey) sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-40)));
+    if (storageKey && loadedConversationKey === storageKey) {
+      sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-40)));
+    }
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, storageKey]);
+  }, [messages, storageKey, loadedConversationKey]);
 
   useEffect(
     () => () => {
