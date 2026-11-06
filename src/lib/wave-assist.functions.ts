@@ -33,6 +33,7 @@ const assistInput = z
     workspaceId: z.string().uuid(),
     platform: platformName.optional(),
     platforms: z.array(platformName).max(12).default([]),
+    mediaAssetIds: z.array(z.string().uuid()).max(24).default([]),
     targetLanguage: z.string().trim().min(1).max(80).optional(),
     toneHint: z.string().trim().min(1).max(160).optional(),
     context: z.string().trim().max(6_000).optional(),
@@ -122,6 +123,14 @@ export const waveAssist = createServerFn({ method: "POST" })
       } catch {
         // Context is optional and may be plain text in older callers.
       }
+    }
+    if (data.mediaAssetIds.length) {
+      const [{ data: relevantMedia }, { data: relevantTranscripts }] = await Promise.all([
+        context.supabase.from("media_assets").select("id,name,mime_type,tags,source_metadata,duration_seconds").eq("workspace_id", data.workspaceId).in("id", data.mediaAssetIds),
+        context.supabase.from("media_transcripts").select("media_asset_id,status,transcript_text,segments,has_timestamps,key_moments,edited_text,edited_segments,edited_at").eq("workspace_id", data.workspaceId).eq("status", "completed").in("media_asset_id", data.mediaAssetIds),
+      ]);
+      const transcriptMap = new Map((relevantTranscripts ?? []).map((row) => [row.media_asset_id, transcriptExcerptForAi(row, 1200)]));
+      observedWorkspaceContext = JSON.stringify({ suppliedContext: data.context || null, selectedMedia: (relevantMedia ?? []).map((asset) => ({ ...asset, transcript: transcriptMap.get(asset.id) ?? null })) });
     }
     if (data.mode === "advisor") {
       const [intelligence, snapshots, campaigns, content, mediaAssets] = await Promise.all([

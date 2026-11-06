@@ -489,11 +489,12 @@ export async function saveTranscriptEdits(
   if (!row || row.status !== "completed") throw new TranscriptUserError("Only finished transcripts can be edited.");
   const nowIso = new Date().toISOString();
   if (edit.reset) {
-    await client
+    const { error: resetError } = await client
       .from("media_transcripts")
       .update({ edited_text: null, edited_segments: null, edited_by: null, edited_at: null, updated_at: nowIso })
       .eq("media_asset_id", asset.id)
       .eq("workspace_id", asset.workspace_id);
+    if (resetError) throw new TranscriptUserError("The original transcript could not be restored.");
     return;
   }
   const original = sanitizeSegments(row.segments);

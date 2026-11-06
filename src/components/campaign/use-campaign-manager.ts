@@ -696,6 +696,7 @@ export function useCampaignManager() {
           input: brief,
           workspaceId,
           platforms: [plannedPlatform],
+          mediaAssetIds: item.media_asset_ids ?? [],
         },
       });
       const primaryCaption = generated.primaryCaption ?? generated.suggestion;
