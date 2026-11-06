@@ -80,6 +80,17 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
               409,
             );
           }
+          if (message === "google_drive_temporarily_unavailable") {
+            return json(
+              {
+                error:
+                  "Google Drive is temporarily unavailable. Your connection is still saved — please try again in a moment.",
+                code: "temporarily_unavailable",
+                provider,
+              },
+              503,
+            );
+          }
           throw tokenError;
         }
 
