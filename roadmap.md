@@ -1,5 +1,7 @@
 # Approved mobile refinement
 
+- [ ] Urgent repair: regenerate only package-lock.json, verify npm ci compatibility, preserve all other work; no deployment.
+
 # Shared campaign and video intelligence completion
 - [ ] Use server-first real speech-to-text with provider timestamps, persisted outcomes and safe retries.
 - [ ] Expose transcripts and equivalent video caption/look controls on desktop without mobile styling.
