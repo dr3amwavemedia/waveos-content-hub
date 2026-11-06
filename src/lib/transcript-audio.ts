@@ -55,7 +55,9 @@ export function parseWav(bytes: Uint8Array): WavInfo | null {
     const id = ascii(bytes, offset, 4);
     const size = view.getUint32(offset + 4, true);
     const body = offset + 8;
+    if (body + size > bytes.length && id !== "data") return null;
     if (id === "fmt ") {
+      if (size < 16 || body + 16 > bytes.length) return null;
       format = {
         audioFormat: view.getUint16(body, true),
         channels: view.getUint16(body + 2, true),
@@ -139,7 +141,10 @@ export function planSpeechChunks(
   }
   const sorted = Array.from(rms).sort((a, b) => a - b);
   const floor = sorted[Math.floor(sorted.length * 0.2)] ?? 0;
-  const threshold = Math.max(0.008, floor * 2.5);
+  // Never raise the speech threshold above the signal's typical loudness:
+  // continuous speech/music has no quiet floor, unlike speech with pauses.
+  const typical = sorted[Math.floor(sorted.length * 0.8)] ?? 0;
+  const threshold = Math.max(0.008, Math.min(floor * 2.5, typical * 0.7));
   const voiced = (frame: number) => (rms[frame] ?? 0) > threshold;
 
   const cuts: number[] = [0];
@@ -256,6 +261,16 @@ export function effectiveTranscript(row: StoredTranscriptRow) {
   };
 }
 
+export function effectiveKeyMoments(row: StoredTranscriptRow) {
+  const transcript = effectiveTranscript(row);
+  const candidates = Array.isArray(row.key_moments) ? row.key_moments : [];
+  return groundKeyMoments(candidates.flatMap((moment) => {
+    if (!moment || typeof moment !== "object") return [];
+    const stored = moment as Partial<TranscriptKeyMoment>;
+    return [{ index: stored.segmentIndex, label: stored.label }];
+  }), transcript.segments);
+}
+
 /** Bounded transcript excerpt for AI prompts, with [m:ss] markers when timestamps exist. */
 export function transcriptExcerptForAi(row: StoredTranscriptRow, maxChars = 1200) {
   if (row.status !== "completed") return null;
@@ -269,11 +284,9 @@ export function transcriptExcerptForAi(row: StoredTranscriptRow, maxChars = 1200
     : transcript.text;
   const truncated = excerpt.length > maxChars;
   if (truncated) excerpt = `${excerpt.slice(0, maxChars).trimEnd()}…`;
-  const keyMoments = (Array.isArray(row.key_moments) ? row.key_moments : [])
-    .slice(0, 5)
+  const keyMoments = effectiveKeyMoments(row)
     .map((moment) => {
-      const m = moment as Partial<TranscriptKeyMoment>;
-      return { at: formatTranscriptStamp(Number(m.start ?? 0)), label: String(m.label ?? ""), quote: String(m.quote ?? "").slice(0, 160) };
+      return { at: formatTranscriptStamp(moment.start), label: moment.label, quote: moment.quote.slice(0, 160) };
     });
   return { evidence: transcript.evidence, excerpt, truncated, hasTimestamps: transcript.hasTimestamps, keyMoments };
 }

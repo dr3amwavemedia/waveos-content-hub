@@ -1,5 +1,13 @@
 # Approved mobile refinement
 
+- [ ] Urgent repair: regenerate only package-lock.json, verify npm ci compatibility, preserve all other work; no deployment.
+
+# Shared campaign and video intelligence completion
+- [ ] Use server-first real speech-to-text with provider timestamps, persisted outcomes and safe retries.
+- [ ] Expose transcripts and equivalent video caption/look controls on desktop without mobile styling.
+- [ ] Persist complete campaign builder drafts across devices using existing authorized draft storage.
+- [ ] Verify authenticated desktop/mobile, real transcription, type checks, unit tests and preview build; do not deploy.
+
 # SaaS Dashboard
 - [x] Add owner-authorized read-only OS SaaS metrics and navigation without billing/data changes; exact files and sources documented in docs/saas-dashboard.md.
 - [x] Verify real owner data/all tabs, role-denial unit tests, mobile/desktop layout, 205 passing tests and preview build OK; no billing/data writes.

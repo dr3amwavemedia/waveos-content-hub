@@ -54,10 +54,11 @@ export function useMediaTranscripts(workspaceId: string | null | undefined, asse
     queryKey: ["media-transcripts", workspaceId, ids],
     enabled: Boolean(workspaceId) && ids.length > 0,
     queryFn: async () => {
+      if (!workspaceId) return {} as Record<string, MediaTranscriptRow>;
       const { data, error } = await supabase
         .from("media_transcripts")
         .select("*")
-        .eq("workspace_id", workspaceId!)
+        .eq("workspace_id", workspaceId)
         .in("media_asset_id", ids);
       if (error) throw error;
       const map: Record<string, MediaTranscriptRow> = {};
@@ -94,6 +95,19 @@ export function useTranscriptRunner(workspaceId: string | null | undefined) {
     if (!workspaceId) return;
     const current = runs[asset.id];
     if (current && current.phase !== "error") return;
+    // Prefer the shared server path on every device. Only unsupported/large
+    // originals fall back to device extraction, never ambiguous AI failures.
+    if (asset.size_bytes <= 24 * 1024 * 1024 && /\.(mp4|m4a|mp3|wav|webm|mpeg|mpga|ogg|oga|flac)$/i.test(asset.name)) {
+      setRun(asset.id, { phase: "transcribing", source: "original", sections: null });
+      try {
+        await originalFn({ data: { workspaceId, mediaAssetId: asset.id } });
+        setRun(asset.id, null);
+      } catch (error) {
+        setRun(asset.id, { phase: "error", message: error instanceof Error ? error.message : "The transcript could not be made." });
+      }
+      await refresh();
+      return;
+    }
     setRun(asset.id, { phase: "downloading", loaded: 0, total: asset.size_bytes || null });
     let deviceProblem: string | null = null;
     try {

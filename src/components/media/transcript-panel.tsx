@@ -11,6 +11,7 @@ import {
 import {
   MAX_TRANSCRIPT_ATTEMPTS,
   effectiveTranscript,
+  effectiveKeyMoments,
   formatTranscriptStamp,
   sanitizeSegments,
   type TranscriptKeyMoment,
@@ -51,7 +52,7 @@ function RunProgress({ run }: { run: TranscriptRunState }) {
             ? run.sections
               ? `${run.sections} speech section${run.sections === 1 ? "" : "s"}`
               : "No speech sections found"
-            : "Original file, text only"
+            : "Original file on the server"
         }
         value={null}
       />
@@ -103,7 +104,7 @@ export function TranscriptPanel({
   const [draftText, setDraftText] = useState("");
   const [saving, setSaving] = useState(false);
   const view = transcript?.status === "completed" ? effectiveTranscript(transcript) : null;
-  const keyMoments = (Array.isArray(transcript?.key_moments) ? transcript?.key_moments : []) as TranscriptKeyMoment[];
+  const keyMoments = transcript ? effectiveKeyMoments(transcript) : [];
   const running = Boolean(run && run.phase !== "error");
   const stale = transcript ? isTranscriptStale(transcript) : false;
   const serverBusy = transcript?.status === "processing" && !stale;
@@ -191,7 +192,7 @@ export function TranscriptPanel({
           <>
             <p className="text-[11px] text-muted-foreground">
               {view.evidence === "user_corrected_transcript" ? "Corrected by you · " : "Speech-to-text · "}
-              {view.hasTimestamps ? "timed to short speech sections" : "no timestamps (read from the original file)"}
+              {view.hasTimestamps ? "timed speech sections" : "speech-to-text returned no timestamps"}
             </p>
             {keyMoments.length > 0 && (
               <div>
