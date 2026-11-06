@@ -11,7 +11,10 @@ import {
 } from "@/hooks/use-media";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
-import { DEFAULT_VIDEO_RECIPE, type VideoEditRecipe } from "@/lib/video-edit-recipe";
+import { DEFAULT_VIDEO_RECIPE, VIDEO_LOOKS, VIDEO_SPEEDS, videoRecipeFilter, activeCaptionCue, type VideoEditRecipe } from "@/lib/video-edit-recipe";
+import { TranscriptPanel } from "@/components/media/transcript-panel";
+import { useMediaTranscripts, useTranscriptRunner, useSaveTranscriptEdits } from "@/hooks/use-media-transcripts";
+import { effectiveTranscript, captionCuesFromSegments } from "@/lib/transcript-audio";
 import type { VideoMakerController } from "@/components/video-maker/use-video-maker";
 
 const DEFAULT_RECIPE = DEFAULT_VIDEO_RECIPE;
@@ -55,7 +58,17 @@ export function DesktopVideoMaker({ controller }: { controller: VideoMakerContro
     updateRecipe,
     saveRecipe,
   } = controller;
-  const [editorTab, setEditorTab] = useState<"trim" | "canvas" | "adjust" | "text" | "audio">("trim");
+  const [editorTab, setEditorTab] = useState<"trim" | "canvas" | "adjust" | "text" | "audio" | "captions">("trim");
+  const transcripts = useMediaTranscripts(workspaceId, selected ? [selected.id] : []);
+  const runner = useTranscriptRunner(workspaceId);
+  const saveTranscript = useSaveTranscriptEdits(workspaceId);
+  const transcript = selected ? transcripts.data?.[selected.id] : undefined;
+  const [playhead, setPlayhead] = useState(0);
+  const cue = activeCaptionCue(recipe.captions, playhead);
+  function seek(seconds: number) {
+    if (videoRef.current) videoRef.current.currentTime = seconds;
+    setPlayhead(seconds);
+  }
 
   function resetRecipe() {
     setRecipe({ ...DEFAULT_RECIPE, trimEnd: selected?.duration_seconds ?? null });
@@ -161,6 +174,7 @@ export function DesktopVideoMaker({ controller }: { controller: VideoMakerContro
             ["adjust", "Look", Gauge],
             ["text", "Text", Type],
             ["audio", "Sound", Volume2],
+            ["captions", "Captions", Type],
           ].map(([key, label, Icon]) => (
             <button
               key={key as string}
@@ -233,7 +247,7 @@ export function DesktopVideoMaker({ controller }: { controller: VideoMakerContro
                 <div>
                   <p className="text-xs font-medium">Speed</p>
                   <div className="mt-2 grid grid-cols-4 gap-2">
-                    {[0.5, 1, 1.5, 2].map((speed) => (
+                    {VIDEO_SPEEDS.map((speed) => (
                       <Button
                         key={speed}
                         size="sm"
@@ -293,6 +307,9 @@ export function DesktopVideoMaker({ controller }: { controller: VideoMakerContro
             )}
             {editorTab === "adjust" && (
               <div className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {VIDEO_LOOKS.map((look) => <Button key={look.id} size="sm" variant={recipe.look === look.id ? "secondary" : "outline"} onClick={() => updateRecipe({ look: look.id })}>{look.label}</Button>)}
+                </div>
                 <div>
                   <p className="font-semibold">Look</p>
                   <p className="text-xs text-muted-foreground">Make quick visual adjustments while watching the preview.</p>
@@ -322,6 +339,25 @@ export function DesktopVideoMaker({ controller }: { controller: VideoMakerContro
                     <Button key={position} size="sm" className="capitalize" variant={recipe.textPosition===position?"secondary":"outline"} onClick={()=>updateRecipe({textPosition:position})}>{position}</Button>
                   ))}
                 </div>
+              </div>
+            )}
+            {editorTab === "captions" && (
+              <div className="space-y-3">
+                {transcripts.isError && <p role="alert" className="text-sm text-destructive">Saved transcripts could not be loaded.</p>}
+                <TranscriptPanel transcript={transcript} run={runner.runs[selected.id]} canStart={!transcripts.isPending && !transcripts.isError && !runner.isRunning(selected.id)} onStart={() => void runner.start(selected)} onSave={(input) => saveTranscript({ mediaAssetId: selected.id, ...input })} onSeek={seek} actions={transcript?.status === "completed" && effectiveTranscript(transcript).hasTimestamps ? <Button size="sm" onClick={() => {
+                  const cues = captionCuesFromSegments(effectiveTranscript(transcript).segments, recipe.trimStart, recipe.trimEnd ?? selected.duration_seconds ?? 0);
+                  updateRecipe({ captions: cues });
+                }}>Use as captions</Button> : null} />
+                <Button size="sm" variant="outline" onClick={() => {
+                  const start = Math.max(recipe.trimStart, playhead);
+                  const end = Math.min(start + 3, recipe.trimEnd ?? selected.duration_seconds ?? start + 3);
+                  if (end > start) updateRecipe({ captions: [...recipe.captions, { id: crypto.randomUUID(), start, end, text: "" }] });
+                }}>Add caption</Button>
+                {recipe.captions.map((item) => <div key={item.id} className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => seek(item.start)}>{formatDuration(item.start)} → {formatDuration(item.end)}</Button>
+                  <input aria-label={`Caption at ${formatDuration(item.start)}`} value={item.text} maxLength={160} className="min-w-0 flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm" onChange={(event) => updateRecipe({ captions: recipe.captions.map((caption) => caption.id === item.id ? { ...caption, text: event.target.value } : caption) })} />
+                  <Button size="sm" variant="ghost" onClick={() => updateRecipe({ captions: recipe.captions.filter((caption) => caption.id !== item.id) })}>Remove caption</Button>
+                </div>)}
               </div>
             )}
             {editorTab === "audio" && (
@@ -375,7 +411,7 @@ export function DesktopVideoMaker({ controller }: { controller: VideoMakerContro
                     muted={recipe.muted}
                     style={{
                       objectFit: recipe.fit,
-                      filter: `brightness(${recipe.brightness}%) contrast(${recipe.contrast}%) saturate(${recipe.saturation}%)`,
+                      filter: videoRecipeFilter(recipe),
                       transform: `rotate(${recipe.rotation}deg)`,
                     }}
                     onLoadedMetadata={(event) => {
@@ -388,6 +424,7 @@ export function DesktopVideoMaker({ controller }: { controller: VideoMakerContro
                     }}
                     onTimeUpdate={(event) => {
                       const video = event.currentTarget;
+                      setPlayhead(video.currentTime);
                       video.playbackRate = recipe.speed;
                       video.volume = recipe.volume;
                       video.muted = recipe.muted;
@@ -415,6 +452,7 @@ export function DesktopVideoMaker({ controller }: { controller: VideoMakerContro
                       </span>
                     </div>
                   )}
+                  {cue && <div className="pointer-events-none absolute inset-x-4 bottom-16 text-center"><span className="rounded-md bg-background/90 px-3 py-2 text-lg font-semibold text-foreground">{cue.text}</span></div>}
                 </div>
               ) : (
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-amber-300/25 bg-amber-300/5 p-6 text-center">
@@ -460,8 +498,8 @@ export function DesktopVideoMaker({ controller }: { controller: VideoMakerContro
                 </div>
               </div>
               <p className="mt-3 rounded-xl border border-border bg-surface/40 p-3 text-xs text-muted-foreground">
-                Your changes are saved with this clip in WaveOS. Continue to Create Post when you're
-                ready to write the caption, choose the account, and review publishing.
+                Live preview · not rendered. Save changes keeps the edit setup with this clip.
+                Create Post uses the original clip until rendered-output support is available.
               </p>
             </>
           ) : (
