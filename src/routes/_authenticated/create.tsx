@@ -2201,6 +2201,13 @@ function ExternalProviderPicker({
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const providerLabel = provider === "google_drive" ? "Google Drive" : "Dropbox";
+  // iOS Home Screen PWAs isolate Google cookies from Safari. Use WaveOS's
+  // authenticated, server-side Drive browser instead of Google's iframe picker.
+  const useNativeDriveBrowser =
+    provider === "google_drive" &&
+    typeof window !== "undefined" &&
+    (window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
   const currentFolderId = folderStack.at(-1)?.id ?? null;
 
   useEffect(() => {
@@ -2223,7 +2230,7 @@ function ExternalProviderPicker({
           setFolders([]);
           return;
         }
-        if (provider === "google_drive") {
+        if (provider === "google_drive" && !useNativeDriveBrowser) {
           setFiles([]);
           setFolders([]);
           return;
@@ -2243,7 +2250,7 @@ function ExternalProviderPicker({
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [provider, workspaceId, query, currentFolderId]);
+  }, [provider, workspaceId, query, currentFolderId, useNativeDriveBrowser]);
 
   async function connect() {
     try {
@@ -2310,7 +2317,7 @@ function ExternalProviderPicker({
   if (error) {
     return <div className="py-16 text-center text-sm text-destructive">{error}</div>;
   }
-  if (provider === "google_drive") {
+  if (provider === "google_drive" && !useNativeDriveBrowser) {
     return (
       <GoogleDrivePicker workspaceId={workspaceId} selected={selected} onImported={onImported} />
     );
@@ -2324,7 +2331,7 @@ function ExternalProviderPicker({
             onClick={() => setFolderStack([])}
             className="rounded-md px-2 py-1 font-medium text-foreground hover:bg-surface-2"
           >
-            Dropbox
+            {providerLabel}
           </button>
           {folderStack.map((folder, index) => (
             <span key={folder.id} className="flex min-w-0 items-center gap-1">
