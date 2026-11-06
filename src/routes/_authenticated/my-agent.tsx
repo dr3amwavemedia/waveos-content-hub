@@ -41,6 +41,8 @@ import { researchCompetitor } from "@/lib/competitive-research.functions";
 import { analyzeSeoGrowth } from "@/lib/seo-growth.functions";
 import { useMediaAssets, useMediaFolders } from "@/hooks/use-media";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { agentConversationStorageKey, sanitizeAgentMessages } from "@/lib/agent-conversation-storage";
 
 type AgentMessage = { role: "user" | "assistant"; content: string };
 
@@ -211,7 +213,8 @@ function MyAgentPage() {
     workspaceId,
     campaignMediaFolderId ? { folderId: campaignMediaFolderId } : {},
   );
-  const storageKey = workspaceId ? `waveos.assist.${workspaceId}` : null;
+  const [conversationUserId, setConversationUserId] = useState<string | null>(null);
+  const storageKey = agentConversationStorageKey(conversationUserId, workspaceId);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
   const [loadedConversationKey, setLoadedConversationKey] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -262,6 +265,22 @@ function MyAgentPage() {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    let active = true;
+    void supabase.auth.getUser().then(({ data }) => {
+      if (active) setConversationUserId(data.user?.id ?? null);
+    }).catch(() => {
+      if (active) setConversationUserId(null);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (active) setConversationUserId(session?.user?.id ?? null);
+    });
+    return () => {
+      active = false;
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!storageKey) {
       setMessages([]);
       setLoadedConversationKey(null);
@@ -270,18 +289,7 @@ function MyAgentPage() {
     setLoadedConversationKey(null);
     try {
       const stored = sessionStorage.getItem(storageKey);
-      const parsed = stored ? (JSON.parse(stored) as AgentMessage[]) : [];
-      setMessages(
-        Array.isArray(parsed)
-          ? parsed
-              .filter(
-                (message) =>
-                  (message?.role === "user" || message?.role === "assistant") &&
-                  typeof message.content === "string",
-              )
-              .slice(-40)
-          : [],
-      );
+      setMessages(sanitizeAgentMessages(stored ? JSON.parse(stored) : []));
     } catch {
       setMessages([]);
     }
@@ -290,7 +298,7 @@ function MyAgentPage() {
 
   useEffect(() => {
     if (storageKey && loadedConversationKey === storageKey) {
-      sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-40)));
+      sessionStorage.setItem(storageKey, JSON.stringify(sanitizeAgentMessages(messages)));
     }
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, storageKey, loadedConversationKey]);
