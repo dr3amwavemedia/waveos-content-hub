@@ -219,7 +219,19 @@ export async function externalAccessToken(connection: ExternalConnection) {
     const json = (await response.json()) as Record<string, unknown>;
     if (!response.ok || typeof json.access_token !== "string")
       throw new Error("google_drive_reconnect_required");
+    // Google returns the scopes actually attached to a refreshed token. If Drive
+    // access was later removed in the Google account, record that so status
+    // reports "Reconnect" instead of a connected account that cannot open files.
+    const refreshedScopes = typeof json.scope === "string" ? json.scope : null;
+    if (refreshedScopes !== null && !hasGoogleDriveScope(refreshedScopes)) {
+      await updateExternalConnection(connection.id, {
+        scopes: refreshedScopes,
+        updated_at: new Date().toISOString(),
+      });
+      throw new Error("google_drive_reconnect_required");
+    }
     await updateExternalConnection(connection.id, {
+      ...(refreshedScopes !== null ? { scopes: refreshedScopes } : {}),
       access_token_encrypted: await encryptExternalToken(json.access_token),
       token_expires_at: new Date(Date.now() + Number(json.expires_in ?? 3600) * 1000).toISOString(),
       updated_at: new Date().toISOString(),
