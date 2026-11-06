@@ -137,6 +137,7 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
     draftsCreated,
     setDraftsCreated,
     createPostDrafts,
+    restoreServerDraft,
   } = controller;
 
   const transcribableAssets = selectedMediaIds
@@ -233,11 +234,7 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
               size="sm"
               variant="outline"
               onClick={() => {
-                const restored = workflowDraft.data?.payload;
-                if (!restored) return;
-                setInput(restored);
-                setPreview([]);
-                setDirty(false);
+                restoreServerDraft();
               }}
             >
               Restore

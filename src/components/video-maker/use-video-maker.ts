@@ -3,6 +3,7 @@
  * by the mobile editor and the existing desktop layout.
  */
 import { useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { toast } from "sonner";
 import { useWorkspace } from "@/components/app/workspace-context";
@@ -12,6 +13,7 @@ import { DEFAULT_VIDEO_RECIPE, normalizeVideoRecipe, type VideoEditRecipe } from
 
 export function useVideoMaker() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id ?? null;
   const videos = useMediaAssets(workspaceId, { kind: "video" });
@@ -153,14 +155,22 @@ export function useVideoMaker() {
   function updateRecipe(patch: Partial<VideoEditRecipe>) {
     setRecipe((current) => ({ ...current, ...patch }));
     setRecipeDirty(true);
+    const video = videoRef.current;
+    if (video) {
+      if (patch.speed != null) video.playbackRate = patch.speed;
+      if (patch.volume != null) video.volume = patch.volume;
+      if (patch.muted != null) video.muted = patch.muted;
+    }
   }
 
   async function saveRecipe() {
     if (!selected || !workspaceId || savingRecipe) return;
     setSavingRecipe(true);
     try {
+      const { data: current, error: readError } = await supabase.from("media_assets").select("source_metadata").eq("id", selected.id).eq("workspace_id", workspaceId).single();
+      if (readError) throw readError;
       const nextMetadata = {
-        ...(selected.source_metadata ?? {}),
+        ...(current.source_metadata && typeof current.source_metadata === "object" && !Array.isArray(current.source_metadata) ? current.source_metadata : {}),
         video_maker_edit: recipe,
         video_maker_edit_updated_at: new Date().toISOString(),
       };
@@ -173,6 +183,7 @@ export function useVideoMaker() {
         .single();
       if (error) throw error;
       setSelected(data as MediaAsset);
+      await queryClient.invalidateQueries({ queryKey: ["media-assets", workspaceId] });
       setRecipeDirty(false);
       toast.success("Edit setup saved with this clip.");
     } catch (error) {

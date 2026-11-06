@@ -3,7 +3,7 @@
  * Lovable AI Gateway speech-to-text response; failures are stored as failed
  * with a safe message and can be retried within the attempt limit.
  */
-import { GatewayError, generateResponse, transcribeAudio } from "@lovable.dev/ai-gateway";
+import { GatewayError, generateResponse, transcribeAudio, transcribeAudioStream } from "@lovable.dev/ai-gateway";
 import { recordAiUsage } from "@/lib/ai-usage.server";
 import {
   MAX_ORIGINAL_FILE_BYTES,
@@ -135,6 +135,7 @@ async function claimTranscript(
     })
     .eq("media_asset_id", asset.id)
     .eq("workspace_id", asset.workspace_id)
+    .eq("updated_at", existing.updated_at)
     .or(`status.neq.processing,updated_at.lt.${staleIso}`)
     .select("id")
     .maybeSingle();
@@ -346,7 +347,7 @@ export async function transcribeDeviceAudio(
 
 const DIRECT_EXTENSIONS = new Set(["mp4", "m4a", "mp3", "wav", "webm", "mpeg", "mpga", "ogg", "oga", "flac"]);
 
-/** Text-only path: the server fetches the original file (≤ 24 MB) from WaveOS storage, Drive, Dropbox or Frame.io. */
+/** The server fetches accessible original media and persists native timed speech events, never invented timing. */
 export async function transcribeOriginalFile(context: TranscriptAuthContext, asset: TranscribableAsset) {
   const extension = asset.name.split(".").pop()?.toLowerCase() ?? "";
   const mimeExtension = asset.mime_type === "video/mp4" ? "mp4" : asset.mime_type === "video/webm" ? "webm" : extension;
@@ -379,9 +380,51 @@ export async function transcribeOriginalFile(context: TranscriptAuthContext, ass
     }
     const declared = Number(response.headers.get("content-length") ?? 0);
     if (declared > MAX_ORIGINAL_FILE_BYTES) throw new TranscriptUserError("This file is too large to transcribe directly (24 MB limit).");
-    const blob = await response.blob();
+    const reader = response.body?.getReader();
+    if (!reader) throw new TranscriptUserError("The media source returned no file.");
+    const parts: Uint8Array<ArrayBuffer>[] = [];
+    let downloaded = 0;
+    try {
+      while (true) {
+        const part = await reader.read();
+        if (part.done) break;
+        downloaded += part.value.byteLength;
+        if (downloaded > MAX_ORIGINAL_FILE_BYTES) {
+          await reader.cancel();
+          throw new TranscriptUserError("This file is too large to transcribe directly (24 MB speech-to-text processing limit).");
+        }
+        parts.push(new Uint8Array(part.value));
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const blob = new Blob(parts, { type: asset.mime_type });
     if (blob.size > MAX_ORIGINAL_FILE_BYTES) throw new TranscriptUserError("This file is too large to transcribe directly (24 MB limit).");
-    const result = await transcribeBlob(new File([blob], `clip.${mimeExtension}`, { type: asset.mime_type }));
+    const stream = await transcribeAudioStream({
+      model: TRANSCRIBE_MODEL,
+      file: new File([blob], `clip.${mimeExtension}`, { type: asset.mime_type }),
+      timestamp_granularities: ["segment"],
+      chunking_strategy: "auto",
+    });
+    const timed: TranscriptSegment[] = [];
+    let text = "";
+    let language: string | null = null;
+    let finished = false;
+    for await (const event of stream) {
+      if (event.type === "transcript.text.segment") {
+        timed.push({ start: event.start, end: event.end, text: event.text });
+      } else if (event.type === "transcript.text.delta") {
+        text += event.delta;
+      } else if (event.type === "transcript.text.done") {
+        text = event.text;
+        language = event.languages?.[0]?.code ?? null;
+        finished = true;
+      }
+    }
+    if (!finished) throw new TranscriptUserError("Speech-to-text stopped before confirming the transcript. Try again.");
+    const segments = sanitizeSegments(timed, asset.duration_seconds ?? MAX_TRANSCRIPT_AUDIO_SECONDS);
+    text = text.trim();
+    const keyMoments = await pickKeyMoments(segments);
     await recordAiUsage({
       workspaceId: asset.workspace_id,
       userId: context.userId,
@@ -390,18 +433,19 @@ export async function transcribeOriginalFile(context: TranscriptAuthContext, ass
       durationMs: Date.now() - startedAt,
       status: "succeeded",
     });
-    const status = result.text ? "completed" : "no_speech";
-    await client
+    const status = text ? "completed" : "no_speech";
+    const { error: persistError } = await client
       .from("media_transcripts")
       .update({
         status,
         provider: "lovable_ai_gateway",
         model: TRANSCRIBE_MODEL,
-        language: result.language,
-        transcript_text: result.text || null,
-        segments: [],
-        has_timestamps: false,
-        key_moments: [],
+        language,
+        transcript_text: text || null,
+        segments,
+        has_timestamps: segments.length > 0,
+        key_moments: keyMoments,
+        audio_seconds: segments.length ? segments[segments.length - 1]?.end : asset.duration_seconds,
         edited_text: null,
         edited_segments: null,
         edited_by: null,
@@ -411,6 +455,7 @@ export async function transcribeOriginalFile(context: TranscriptAuthContext, ass
       })
       .eq("media_asset_id", asset.id)
       .eq("workspace_id", asset.workspace_id);
+    if (persistError) throw new TranscriptUserError("Speech-to-text finished but the transcript could not be saved. Try again.");
     return { status };
   } catch (error) {
     const failure = safeProviderFailure(error);
@@ -444,11 +489,12 @@ export async function saveTranscriptEdits(
   if (!row || row.status !== "completed") throw new TranscriptUserError("Only finished transcripts can be edited.");
   const nowIso = new Date().toISOString();
   if (edit.reset) {
-    await client
+    const { error: resetError } = await client
       .from("media_transcripts")
       .update({ edited_text: null, edited_segments: null, edited_by: null, edited_at: null, updated_at: nowIso })
       .eq("media_asset_id", asset.id)
       .eq("workspace_id", asset.workspace_id);
+    if (resetError) throw new TranscriptUserError("The original transcript could not be restored.");
     return;
   }
   const original = sanitizeSegments(row.segments);
@@ -466,7 +512,7 @@ export async function saveTranscriptEdits(
   } else {
     editedText = String(edit.text ?? "").slice(0, 40000);
   }
-  await client
+  const { error: saveError } = await client
     .from("media_transcripts")
     .update({
       edited_text: editedText,
@@ -477,4 +523,5 @@ export async function saveTranscriptEdits(
     })
     .eq("media_asset_id", asset.id)
     .eq("workspace_id", asset.workspace_id);
+  if (saveError) throw new TranscriptUserError("Your transcript corrections could not be saved.");
 }
