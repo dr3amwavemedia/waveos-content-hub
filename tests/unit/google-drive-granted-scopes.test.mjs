@@ -29,8 +29,8 @@ test("stored scopes come from Google's granted token scope, not the request", ()
 
 test("refresh re-checks granted scopes and marks reconnect when Drive was removed", () => {
   const refresh = server.slice(server.indexOf('grant_type: "refresh_token"'));
-  assert.match(refresh, /!hasGoogleDriveScope\(refreshedScopes\)/);
-  assert.ok(refresh.indexOf("scopes: refreshedScopes") < refresh.indexOf("google_drive_reconnect_required\");\n    }"));
+  assert.match(refresh, /classifyGoogleRefresh\(response\.status, body\)/);
+  assert.match(refresh, /scopes: outcome\.scopes/);
 });
 
 test("status reports reconnect when stored scopes lack Drive access", () => {

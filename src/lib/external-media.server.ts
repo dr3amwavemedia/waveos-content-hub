@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { classifyGoogleRefresh } from "@/lib/google-refresh-outcome";
 
 import type { Database } from "@/integrations/supabase/types";
 
@@ -216,27 +217,25 @@ export async function externalAccessToken(connection: ExternalConnection) {
         refresh_token: refreshToken,
       }),
     });
-    const json = (await response.json()) as Record<string, unknown>;
-    if (!response.ok || typeof json.access_token !== "string")
-      throw new Error("google_drive_reconnect_required");
-    // Google returns the scopes actually attached to a refreshed token. If Drive
-    // access was later removed in the Google account, record that so status
-    // reports "Reconnect" instead of a connected account that cannot open files.
-    const refreshedScopes = typeof json.scope === "string" ? json.scope : null;
-    if (refreshedScopes !== null && !hasGoogleDriveScope(refreshedScopes)) {
+    const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    const outcome = classifyGoogleRefresh(response.status, body);
+    if (outcome.kind === "temporary") throw new Error("google_drive_temporarily_unavailable");
+    if (outcome.kind === "reconnect") throw new Error("google_drive_reconnect_required");
+    if (outcome.kind === "insufficient_scope") {
+      // Google explicitly reported Drive access is no longer granted.
       await updateExternalConnection(connection.id, {
-        scopes: refreshedScopes,
+        scopes: outcome.scopes,
         updated_at: new Date().toISOString(),
       });
       throw new Error("google_drive_reconnect_required");
     }
     await updateExternalConnection(connection.id, {
-      ...(refreshedScopes !== null ? { scopes: refreshedScopes } : {}),
-      access_token_encrypted: await encryptExternalToken(json.access_token),
-      token_expires_at: new Date(Date.now() + Number(json.expires_in ?? 3600) * 1000).toISOString(),
+      ...(outcome.scopes !== null ? { scopes: outcome.scopes } : {}),
+      access_token_encrypted: await encryptExternalToken(outcome.accessToken),
+      token_expires_at: new Date(Date.now() + Number(body?.expires_in ?? 3600) * 1000).toISOString(),
       updated_at: new Date().toISOString(),
     });
-    return json.access_token;
+    return outcome.accessToken;
   }
 
   const response = await fetch("https://api.dropboxapi.com/oauth2/token", {
