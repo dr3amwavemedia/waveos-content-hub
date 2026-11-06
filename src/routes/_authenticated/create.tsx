@@ -2498,6 +2498,11 @@ function GoogleDrivePicker({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [openError, setOpenError] = useState<string | null>(null);
   const pickerRef = useRef<GooglePickerInstance | null>(null);
+  const isStandaloneIos =
+    typeof window !== "undefined" &&
+    /iPad|iPhone|iPod/.test(window.navigator.userAgent) &&
+    (window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true);
 
   function closePicker() {
     pickerRef.current?.setVisible(false);
@@ -2642,6 +2647,20 @@ function GoogleDrivePicker({
         </p>
         {openError && <p className="mt-2 max-w-md text-[11px] text-destructive">{openError}</p>}
       </div>
+      {isStandaloneIos && (
+        <div className="max-w-sm space-y-2 rounded-xl border border-border bg-elevated p-3 text-left text-xs text-muted-foreground">
+          <p className="font-semibold text-foreground">Using the iPhone Home Screen app?</p>
+          <p>Google may block its file picker here because iOS keeps Safari sign-in cookies separate. If Browse Google Drive shows a sign-in error, open this same WaveOS page in Safari to choose your files.</p>
+          <a
+            href={window.location.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex rounded-full border border-primary px-3 py-2 font-semibold text-primary"
+          >
+            Open WaveOS in browser
+          </a>
+        </div>
+      )}
       {opening ? (
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
       ) : !pickerOpen ? (
