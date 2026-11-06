@@ -347,7 +347,7 @@ function CreatePost() {
       if (snapshot.workspaceId !== workspaceId || snapshot.id !== editingId) return;
       setTitle(snapshot.title);
       setCaption(snapshot.caption);
-      setPlatforms(snapshot.platforms);
+      setPlatforms(snapshot.platforms.filter((platform): platform is SocialPlatform => ALL_PLATFORMS.includes(platform as SocialPlatform)));
       setPickedMedia(snapshot.pickedMedia);
       setScheduledAt(snapshot.scheduledAt);
       setDraftPlatformOptions(snapshot.platformOptions);
@@ -2577,7 +2577,7 @@ function GoogleDrivePicker({
 
   useEffect(() => () => pickerRef.current?.setVisible(false), []);
   useEffect(() => {
-    if (!pickerOpen) return;
+    if (!pickerOpen || !isStandaloneIos) return;
     const check = () => {
       if (document.visibilityState !== "visible") return;
       const dialog = document.querySelector<HTMLElement>(".picker-dialog");
@@ -2589,7 +2589,7 @@ function GoogleDrivePicker({
     window.addEventListener("pageshow", check);
     document.addEventListener("visibilitychange", check);
     return () => { window.clearTimeout(timer); window.removeEventListener("pageshow", check); document.removeEventListener("visibilitychange", check); };
-  }, [pickerOpen]);
+  }, [pickerOpen, isStandaloneIos]);
 
   async function openPicker() {
     setOpening(true);
