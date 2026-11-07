@@ -51,6 +51,10 @@ Other sources: https://developers.google.com/workspace/drive/api/guides/api-spec
 
 ## Changed files
 
+For the approved A/B follow-up: `src/routes/_authenticated/create.tsx`, `src/lib/drive-picker-return.ts`, `tests/unit/drive-picker-return.test.mjs`, `tests/unit/google-picker-lifecycle.test.mjs`, `AGENTS.md`, `roadmap.md`, this investigation, and the archived approval plan. Final full unit suite: **405 passed, zero failures**. Automatic production-build signal: **build OK**, November 7 at 00:37:23 UTC. No manual typecheck/build was run. Physical-device launch, successful real Google selection/import and live saved-draft readback remain unverified; no publishing, configuration changes or live-record writes occurred.
+
+An unrelated pre-existing upload-limit mismatch with the owner's no-cap preference remains unchanged and outside this repair; it must not be silently altered as part of Drive browser continuation.
+
 - `src/routes/_authenticated/create.tsx`
 - `src/components/media/drive-authorized-browser.tsx`
 - `src/lib/drive-authorized-selection.ts`
