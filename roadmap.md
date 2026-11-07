@@ -1,5 +1,7 @@
 # Approved mobile refinement
 
+- [ ] Repair iPhone media/Google Picker viewport, safe-area and layering defects; preserve desktop, explicit callbacks and saved-draft Safari handoff; verify mobile/desktop and tests without publishing.
+
 - [x] Implement approved manual Safari continuation without embedded-browser detection; explicit save gates the safe link, independent save-error feedback preserves original Picker. Authenticated phone/desktop checks block writes; device launch and actual Google selection remain unverified. No publication or OAuth changes.
 
 - [x] Investigate second-iPhone Safari Picker failure; verify token/account match and eight authorized files, add explicit existing-scope browser fallback, 402 unit tests pass and preview build OK. Picker root cause remains blocked on real-iPhone traces and Google Cloud restriction access; no publication or scope/secret changes.

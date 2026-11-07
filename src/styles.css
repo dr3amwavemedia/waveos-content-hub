@@ -616,6 +616,49 @@ select {
   overflow: hidden !important;
 }
 
+/* Phone-only host geometry; Google still owns the iframe's content and auth. */
+@media (max-width: 639px) {
+  .waveos-media-overlay {
+    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .waveos-media-panel {
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+    min-height: 0;
+  }
+  .waveos-media-scroll {
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  body[data-waveos-drive-picker] .picker-dialog-bg {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100dvh !important;
+    z-index: 1000 !important;
+  }
+  body[data-waveos-drive-picker] .picker-dialog {
+    inset: calc(env(safe-area-inset-top) + 72px) max(8px, env(safe-area-inset-right)) auto max(8px, env(safe-area-inset-left)) !important;
+    width: auto !important;
+    height: min(600px, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 88px)) !important;
+    max-width: none !important;
+    max-height: none !important;
+    transform: none !important;
+    z-index: 1001 !important;
+    box-sizing: border-box;
+  }
+  .waveos-drive-exit {
+    top: calc(env(safe-area-inset-top) + 8px) !important;
+    right: max(8px, env(safe-area-inset-right)) !important;
+    max-width: calc(100% - 16px);
+  }
+}
+
 /* Focus is presentation-only; artwork and persistence remain shared. */
 @media (max-width: 639px) {
   body:has([data-studio-focused="true"]) main {
