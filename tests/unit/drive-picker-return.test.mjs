@@ -1,13 +1,30 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { driveBrowserReturnUrl, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safariOpenUrl } from "../../src/lib/drive-picker-return.ts";
+import { driveBrowserReturnUrl, prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safariOpenUrl } from "../../src/lib/drive-picker-return.ts";
 
-test("only installed iOS uses the Safari fallback, including desktop-mode iPads", () => {
+test("standalone wording recognizes installed iOS without classifying regular Safari as embedded", () => {
   assert.equal(isIosHomeScreen({ userAgent: "iPhone", standalone: true }, false), true);
   assert.equal(isIosHomeScreen({ userAgent: "iPhone" }, false), false);
   assert.equal(isIosHomeScreen({ userAgent: "Macintosh", platform: "MacIntel", maxTouchPoints: 5 }, true), true);
   assert.equal(isIosHomeScreen({ userAgent: "Macintosh", platform: "MacIntel", maxTouchPoints: 0 }, true), false);
   assert.equal(isIosHomeScreen({ userAgent: "Android" }, true), false);
+});
+
+test("Safari handoff waits for the explicit save and uses its returned saved draft only", async () => {
+  let finish;
+  let exposed = false;
+  const saving = new Promise((resolve) => { finish = resolve; });
+  const returning = prepareDriveBrowserReturn("https://waveos.dreamwavemedia.co", () => saving)
+    .then((url) => { exposed = true; return url; });
+  await Promise.resolve();
+  assert.equal(exposed, false);
+  finish("saved-post-123");
+  assert.equal(await returning, "https://waveos.dreamwavemedia.co/create?id=saved-post-123");
+});
+
+test("missing saved ID and failed save never produce a Safari continuation link", async () => {
+  await assert.rejects(prepareDriveBrowserReturn("https://waveos.dreamwavemedia.co", async () => null), /could not be saved/);
+  await assert.rejects(prepareDriveBrowserReturn("https://waveos.dreamwavemedia.co", async () => { throw new Error("Save failed"); }), /Save failed/);
 });
 
 test("Safari continuation retains only the exact saved draft and uses external Safari scheme", () => {

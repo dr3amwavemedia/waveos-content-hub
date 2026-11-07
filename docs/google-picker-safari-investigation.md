@@ -28,13 +28,15 @@ No server routes, OAuth scopes, secrets, database schema, billing, or other appl
 
 ## Top-level alternative
 
-### Proposed minimal saved-draft handoff (pending review)
+### Approved minimal saved-draft handoff (implemented, not published)
 
-Extend the existing explicit saved-draft Safari controls beyond detected iOS standalone mode. Offer a manual “Continue in Safari” option for account/cookie trouble without requiring reliable identification of Lovable's embedded browser. Preserve regular Safari's original Picker as the default; never automatically close Picker, navigate, reconnect or log out. Known iOS standalone mode can receive contextual wording, but user-agent or iframe heuristics cannot establish universal embedded-browser detection.
+The explicit saved-draft Safari controls now extend beyond detected iOS standalone mode. A manual “Continue in Safari” option is available for account/cookie trouble without requiring identification of Lovable's embedded browser. Regular Safari's original Picker remains the default; no automatic closing, navigation, reconnect or logout was added. Known iOS standalone mode receives contextual wording, but no universal embedded-browser detection is claimed.
 
 Only after an explicit user save succeeds through existing draft actions, expose the exact current-origin HTTPS saved-post link. Include no access tokens, unsaved content or session credentials. Offer an explicit Safari launch attempt using the existing `x-safari-https` link, with a copy/selectable HTTPS link as the dependable manual fallback; do not claim that every iOS host supports that scheme or that a normal new tab escapes an embedded browser. Safari may require WaveOS sign-in and workspace access. The existing Picker runs on that saved Create Post page; selected files must be imported through existing authorized actions, then explicitly saved before returning to the original app. Failed saves must not enable continuation or imply that content is preserved.
 
-Review draft-save coverage of destination options and selected media before implementation: the existing saved-post update path must not lose originating fields. Test successful/failed save handoff, safe URLs, manual availability without detection, regular Safari retaining default Picker, and picked/cancel/error/empty callbacks. Simulated callbacks do not establish successful real-device Google selection. No new OAuth redirect flow, scopes, secrets, manifest or service worker is proposed.
+Draft-save coverage review: newly created posts store `draftPlatformOptions` with their variants; saved-post destination settings already update directly through `PlatformComposer.onUpdate`. Do not overwrite those saved settings with the stale new-draft options map. Selected media are explicitly passed to `ensureSaved`; title, caption and planned date use that existing save path. No draft persistence hooks were changed. Failed Safari saves now have a separate visible error and never mislabel the original Picker as broken. No new OAuth redirect flow, scopes, secrets, manifest or service worker was added.
+
+November 7 follow-up verification: authenticated desktop and phone-width checks confirmed the manual option without detection, real Google Picker iframe opening, explicit Exit feedback, and an intercepted failed draft save with no continuation link. No writes or imports reached the server. Two new executable handoff tests cover delayed successful save and missing-ID/rejected-save outcomes. Callback regression tests execute cancel/error/empty production branches. Actual Google picked-file callback/import, successful live draft save/readback in Safari, and physical-iPhone external launch remain unverified. The owner's real-device evidence establishes folder visibility only.
 
 Google documents an OAuth-and-Picker redirect using `trigger_onepick=true`, `picked_file_ids`, and only `drive.file`: https://developers.google.com/workspace/drive/picker/guides/desktop-mobile-picker . This could authorize new files outside the app-hosted iframe. It is not a drop-in link: the existing connection flow combines identity scopes and replaces workspace credentials. A safe dedicated flow would need state/PKCE, registered redirect verification, account binding, cancellation handling, and server-side file verification without replacing the existing connection. It was not implemented speculatively.
 
@@ -48,6 +50,10 @@ Other sources: https://developers.google.com/workspace/drive/api/guides/api-spec
 - Physical-iPhone successful Google selection, Google Cloud restrictions, and a secure top-level device flow remain unverified. Nothing published or deployed.
 
 ## Changed files
+
+For the approved A/B follow-up: `src/routes/_authenticated/create.tsx`, `src/lib/drive-picker-return.ts`, `tests/unit/drive-picker-return.test.mjs`, `tests/unit/google-picker-lifecycle.test.mjs`, `AGENTS.md`, `roadmap.md`, this investigation, and the archived approval plan. Final full unit suite: **405 passed, zero failures**. Automatic production-build signal: **build OK**, November 7 at 00:37:23 UTC. No manual typecheck/build was run. Physical-device launch, successful real Google selection/import and live saved-draft readback remain unverified; no publishing, configuration changes or live-record writes occurred.
+
+An unrelated pre-existing upload-limit mismatch with the owner's no-cap preference remains unchanged and outside this repair; it must not be silently altered as part of Drive browser continuation.
 
 - `src/routes/_authenticated/create.tsx`
 - `src/components/media/drive-authorized-browser.tsx`

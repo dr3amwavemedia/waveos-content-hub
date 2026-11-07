@@ -1,9 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { drivePickerOutcome } from "../../src/lib/drive-picker-return.ts";
 
 const source = readFileSync(new URL("../../src/routes/_authenticated/create.tsx", import.meta.url), "utf8");
 const picker = source.slice(source.indexOf("function GoogleDrivePicker("), source.indexOf("function isGoogleDriveMedia("));
+
+test("Picker callbacks keep cancel, provider error and empty selection distinct without import", () => {
+  const body = picker.slice(picker.indexOf('          if (currentAttempt !== attempt.current) return;', picker.indexOf('.setCallback(')), picker.indexOf('          closePicker();\n          try {'));
+  for (const [action, expected] of [['cancel', 'cancel'], ['error', 'problem'], ['picked', 'no files']]) {
+    let result = '';
+    new Function('data', 'currentAttempt', 'attempt', 'drivePickerOutcome', 'cancelPicker', 'closePicker', 'setOpenError', body)(
+      { action, docs: [] }, 1, { current: 1 }, drivePickerOutcome,
+      () => { result = 'cancel'; }, () => {}, (message) => { result = message; },
+    );
+    assert.ok(result.includes(expected), `${action} must report its specific outcome`);
+  }
+});
 
 test("Google authentication is not dismissed by elapsed time or foreground events", () => {
   const effects = picker.slice(picker.indexOf("  useEffect(() => () => pickerRef"), picker.indexOf("  async function openPicker()"));
