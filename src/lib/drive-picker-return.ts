@@ -13,6 +13,13 @@ export function driveBrowserReturnUrl(origin: string, id: string) {
   return new URL(`/create?id=${encodeURIComponent(id)}`, url.origin).href;
 }
 
+// Saving is explicit and must finish before a continuation link can be exposed.
+export async function prepareDriveBrowserReturn(origin: string, save: () => Promise<string | null>) {
+  const id = await save();
+  if (!id) throw new Error("The draft could not be saved. Stay here and try again.");
+  return driveBrowserReturnUrl(origin, id);
+}
+
 export function safariOpenUrl(url: string) {
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" || parsed.username || parsed.password) throw new Error("A secure WaveOS link is required.");

@@ -2,7 +2,7 @@ import { RequireFeature } from "@/components/app/require-feature";
 import { Button } from "@/components/ui/button";
 import { DriveAuthorizedBrowser } from "@/components/media/drive-authorized-browser";
 import { studioPostKey,studioReturnedMedia,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
-import { driveBrowserReturnUrl, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safariOpenUrl } from "@/lib/drive-picker-return";
+import { prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safariOpenUrl } from "@/lib/drive-picker-return";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -1104,11 +1104,13 @@ function CreatePost() {
             clear: () => { if (workspaceId) sessionStorage.removeItem(driveCheckpointKey(workspaceId, editingId)); },
             prepareBrowser: async (ids) => {
               if (locked) throw new Error("This post cannot be edited right now.");
-              const id = await ensureSaved(caption, ids);
-              if (!id) throw new Error("The draft could not be saved. Stay here and try again.");
+              const url = await prepareDriveBrowserReturn(window.location.origin, async () => {
+                const id = await ensureSaved(caption, ids);
+                if (id) await qc.invalidateQueries({ queryKey: ["content-item", id] });
+                return id;
+              });
               setPickedMedia(ids);
-              await qc.invalidateQueries({ queryKey: ["content-item", id] });
-              return driveBrowserReturnUrl(window.location.origin, id);
+              return url;
             },
           }}
           onClose={() => setShowLibrary(false)}
@@ -2548,6 +2550,7 @@ function GoogleDrivePicker({
   const [openError, setOpenError] = useState<string | null>(null);
   const pickerRef = useRef<GooglePickerInstance | null>(null);
   const [isStandaloneIos, setStandaloneIos] = useState(false);
+  const [showSafariHelp, setShowSafariHelp] = useState(false);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
   const [savingBrowser, setSavingBrowser] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -2735,19 +2738,20 @@ function GoogleDrivePicker({
         {openError && <p role="alert" className="mt-2 max-w-md text-xs text-destructive">{openError}</p>}
         {notice && <p role="status" className="mt-2 max-w-md text-xs text-muted-foreground">{notice}</p>}
       </div>
-      {isStandaloneIos && (
-        <div className="max-w-sm space-y-2 rounded-xl border border-border bg-elevated p-3 text-left text-xs text-muted-foreground">
-          <p className="font-semibold text-foreground">Using the iPhone Home Screen app?</p>
-          <p>If Google Drive closes or asks you to sign in, continue with the same saved post in Safari. You may need to sign in to WaveOS there. After adding files, save the draft in Safari, then reopen that saved draft in WaveOS.</p>
+      {!pickerOpen && !opening && !isStandaloneIos && !showSafariHelp && <Button variant="outline" onClick={() => setShowSafariHelp(true)}>Continue in Safari <ExternalLink className="size-4" /></Button>}
+      {(isStandaloneIos || showSafariHelp) && !pickerOpen && !opening && (
+        <div className="max-w-sm space-y-2 border-t border-border pt-3 text-left text-xs text-muted-foreground">
+          <p className="font-semibold text-foreground">{isStandaloneIos ? "Continue from the Home Screen app in Safari" : "Continue in Safari"}</p>
+          <p>If Google shows an account or cookie error inside another app, exit Google Drive and open the same saved post in regular Safari. You may need to sign in to WaveOS there. After adding files, confirm your selection and save the draft in Safari, then reopen that saved draft in WaveOS.</p>
           {driveReturn && !browserUrl && <Button variant="outline" disabled={savingBrowser || opening || pickerOpen} onClick={async () => {
             setSavingBrowser(true);
             try { setBrowserUrl(await driveReturn.prepareBrowser(selected)); }
             catch (reason) { setOpenError(reason instanceof Error ? reason.message : "The draft could not be saved. Stay here and try again."); }
             finally { setSavingBrowser(false); }
           }}>{savingBrowser ? "Saving draft…" : "Save draft for Safari"}</Button>}
-          {browserUrl && <>
+          {browserUrl && !savingBrowser && <>
             <Button variant="outline" asChild><a href={safariOpenUrl(browserUrl)} rel="noopener noreferrer">Open saved draft in Safari <ExternalLink className="size-4" /></a></Button>
-            <p>If Safari does not open, copy the saved-draft link and paste it into Safari’s address bar. This opens the same saved post, not a new post.</p>
+            <p>Your draft is saved. If this app blocks opening Safari, open Safari yourself and paste the link below into its address bar. This opens the same saved post, not a new post.</p>
             <Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(browserUrl); setNotice("Saved-draft link copied. Open Safari and paste it into the address bar."); } catch { setNotice("Copy the saved-draft link below and paste it into Safari."); } }}>Copy saved-draft link</Button>
             <input aria-label="Saved-draft Safari link" value={browserUrl} readOnly onFocus={(event) => event.target.select()} className="w-full rounded border border-border bg-background p-2 text-foreground" />
           </>}
