@@ -1,5 +1,7 @@
 # Approved mobile refinement
 
+- [ ] Review minimal Safari handoff proposal following owner-confirmed same-iPhone embedded failure / regular Safari folder success; implementation waits on plan approval. Do not publish or change OAuth configuration.
+
 - [x] Investigate second-iPhone Safari Picker failure; verify token/account match and eight authorized files, add explicit existing-scope browser fallback, 402 unit tests pass and preview build OK. Picker root cause remains blocked on real-iPhone traces and Google Cloud restriction access; no publication or scope/secret changes.
 
 - [x] Compare Nov 6 Google Picker against 2fc4335b30, PR #224/#225 and 867468de; restore explicit-only dismissal and best-effort checkpoints. All 389 tests pass; preview build OK. Real token issuance returned 200; baseline and current initializers both showed Google sign-in prompts under identical session/origin conditions. Nothing published.
