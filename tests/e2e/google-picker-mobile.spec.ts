@@ -4,12 +4,13 @@ import { restoreSupabaseSession } from "./helpers/auth";
 for (const viewport of [{ width: 390, height: 844 }, { width: 320, height: 568 }, { width: 568, height: 320 }, { width: 1280, height: 1800 }]) {
   test(`Picker exit and media scroll remain usable at ${viewport.width}×${viewport.height}`, async ({ context, page, baseURL }) => {
     test.setTimeout(60_000);
-    await page.setViewportSize(viewport);
+    await page.setViewportSize(viewport.height < 400 ? { width: 390, height: 844 } : viewport);
     const restored = await restoreSupabaseSession(context, page, baseURL ?? "http://localhost:8080");
     test.skip(!restored, "Authenticated session required");
     await page.goto("/create");
     await page.getByRole("button", { name: "Add Media", exact: true }).click();
     await page.getByRole("button", { name: "Google Drive", exact: true }).click();
+    await page.setViewportSize(viewport);
     await page.getByRole("button", { name: "Browse Google Drive", exact: true }).click();
     const picker = page.locator(".picker-dialog");
     await expect(picker).toBeVisible();
