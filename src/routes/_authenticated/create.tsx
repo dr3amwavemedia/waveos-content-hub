@@ -1,5 +1,6 @@
 import { RequireFeature } from "@/components/app/require-feature";
 import { Button } from "@/components/ui/button";
+import { DriveAuthorizedBrowser } from "@/components/media/drive-authorized-browser";
 import { studioPostKey,studioReturnedMedia,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
 import { driveBrowserReturnUrl, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safariOpenUrl } from "@/lib/drive-picker-return";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -2550,6 +2551,7 @@ function GoogleDrivePicker({
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
   const [savingBrowser, setSavingBrowser] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [authorizedBrowser, setAuthorizedBrowser] = useState(false);
   const attempt = useRef(0);
   useEffect(() => { setStandaloneIos(isIosHomeScreen(window.navigator, window.matchMedia("(display-mode: standalone)").matches)); }, []);
 
@@ -2695,6 +2697,8 @@ function GoogleDrivePicker({
     }
   }
 
+  if (authorizedBrowser) return <DriveAuthorizedBrowser workspaceId={workspaceId} selected={selected} onImported={onImported} onBack={() => setAuthorizedBrowser(false)} />;
+
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
       {pickerOpen &&
@@ -2761,6 +2765,10 @@ function GoogleDrivePicker({
           {openError ? "Try Google Drive again" : "Browse Google Drive"}
         </Button>
       ) : null}
+      {!opening && !pickerOpen && <>
+        <Button variant="outline" onClick={() => setAuthorizedBrowser(true)}>Browse previously authorized files</Button>
+        <p className="max-w-md text-xs text-muted-foreground">If Google shows an account or cookie error, exit Google Drive and try previously authorized files. This cannot allow access to new files.</p>
+      </>}
     </div>
   );
 }
