@@ -19,7 +19,9 @@ test("Picker callbacks keep cancel, provider error and empty selection distinct 
 });
 
 test("Google authentication is not dismissed by elapsed time or foreground events", () => {
-  const effects = picker.slice(picker.indexOf("  useEffect(() => () => pickerRef"), picker.indexOf("  async function openPicker()"));
+  const start = picker.indexOf('  useEffect(() => {\n    if (pickerOpen)');
+  assert.ok(start > 0);
+  const effects = picker.slice(start, picker.indexOf("  async function openPicker()"));
   const listeners = [];
   const timers = [];
   let closes = 0;
@@ -29,14 +31,30 @@ test("Google authentication is not dismissed by elapsed time or foreground event
     setTimeout: (callback) => timers.push(callback),
     clearTimeout() {},
   };
-  const document = { visibilityState: "visible", querySelector: () => null, ...window };
+  const document = { visibilityState: "visible", querySelector: () => null, body: { setAttribute() {}, removeAttribute() {} }, ...window };
   const useEffect = (callback) => { callback(); };
-  new Function("useEffect", "pickerRef", "window", "document", "pickerOpen", "isStandaloneIos", "closePicker", "setOpenError", effects)(
+  new Function("useEffect", "pickerRef", "window", "document", "pickerOpen", "isStandaloneIos", "closePicker", "setOpenError", "attempt", effects)(
     useEffect, { current: { setVisible: () => { closes++; } } }, window, document,
-    true, true, () => { closes++; }, () => {},
+    true, true, () => { closes++; }, () => {}, { current: 1 },
   );
   for (const callback of [...timers, ...listeners]) callback();
   assert.equal(closes, 0);
+});
+
+test("unmount invalidates a pending Picker open and hides an existing instance", () => {
+  const start = picker.indexOf('  useEffect(() => () => {');
+  assert.ok(start > 0);
+  const effect = picker.slice(start, picker.indexOf('  // Google owns', start));
+  const attempt = { current: 7 };
+  let cleanup;
+  let hidden = 0;
+  new Function('useEffect', 'attempt', 'pickerRef', effect)(
+    (callback) => { cleanup = callback(); }, attempt,
+    { current: { setVisible: (visible) => { assert.equal(visible, false); hidden++; } } },
+  );
+  cleanup();
+  assert.equal(attempt.current, 8);
+  assert.equal(hidden, 1);
 });
 
 test("denied draft checkpoint storage never prevents workspace token issuance", async () => {

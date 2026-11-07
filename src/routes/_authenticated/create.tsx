@@ -1781,6 +1781,12 @@ export function MediaPicker({
   const storageUsage = useMediaStorageUsage(workspaceId);
   const [deviceUploading, setDeviceUploading] = useState(false);
 
+  useEffect(() => {
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previous; };
+  }, []);
+
   async function handleDeviceFiles(files: FileList | null) {
     if (!files?.length) return;
     setDeviceUploading(true);
@@ -1831,20 +1837,24 @@ export function MediaPicker({
   }, [assets.data]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur">
-      <div className="surface-card w-full max-w-4xl overflow-hidden">
-        <div className="flex items-center justify-between border-b border-border p-4">
+    <div className="waveos-media-overlay fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur" role="dialog" aria-modal="true" aria-label="Pick from library">
+      <div className="waveos-media-panel surface-card w-full max-w-4xl overflow-hidden">
+        <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border p-4 sm:flex sm:justify-between">
           <div>
             <div className="text-base font-semibold text-foreground">Pick from library</div>
             <div className="text-xs text-muted-foreground">{selected.length} selected</div>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Close media library"
             onClick={onClose}
-            className="rounded-lg p-2 text-muted-foreground hover:text-foreground"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
+        <div className="waveos-media-scroll sm:contents">
         <div className="border-b border-border p-4">
           <div className="mb-3 flex flex-wrap gap-2">
             {(
@@ -1932,7 +1942,7 @@ export function MediaPicker({
             className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm outline-none focus:border-primary/60"
           />
         </div>
-        <div className="max-h-[60vh] overflow-y-auto p-4">
+        <div className="p-4 sm:max-h-[60vh] sm:overflow-y-auto">
           {source === "frameio" ? (
             <FrameioProviderPicker
               workspaceId={workspaceId}
@@ -2023,16 +2033,16 @@ export function MediaPicker({
             </div>
           )}
         </div>
-        <div className="flex items-center justify-between border-t border-border p-4">
-          <button onClick={onClose} className="rounded-full border border-border px-4 py-2 text-sm">
+        </div>
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border p-4">
+          <Button variant="outline" onClick={onClose}>
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={() => onConfirm(selected)}
-            className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
           >
             Use {selected.length} item{selected.length === 1 ? "" : "s"}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -2581,7 +2591,15 @@ function GoogleDrivePicker({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [pickerOpen]);
 
-  useEffect(() => () => pickerRef.current?.setVisible(false), []);
+  useEffect(() => {
+    if (pickerOpen) document.body.setAttribute("data-waveos-drive-picker", "true");
+    return () => { document.body.removeAttribute("data-waveos-drive-picker"); };
+  }, [pickerOpen]);
+
+  useEffect(() => () => {
+    attempt.current += 1;
+    pickerRef.current?.setVisible(false);
+  }, []);
   // Google owns its cross-origin dialog and storage-access prompts. Private DOM
   // classes and foreground timing cannot tell us whether authentication failed.
   // Close only on an explicit callback, Exit, or component unmount.
@@ -2704,14 +2722,14 @@ function GoogleDrivePicker({
   if (authorizedBrowser) return <DriveAuthorizedBrowser workspaceId={workspaceId} selected={selected} onImported={onImported} onBack={() => setAuthorizedBrowser(false)} />;
 
   return (
-    <div className="flex flex-col items-center justify-center gap-3 py-14 text-center">
+    <div className="flex min-w-0 flex-col items-center justify-center gap-3 py-6 text-center sm:py-14 [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:h-auto [&_button]:min-h-10">
       {pickerOpen &&
         createPortal(
           <Button
             type="button"
             onClick={cancelPicker}
             aria-label="Exit Google Drive"
-            className="fixed right-3 z-[2147483647] min-h-12 touch-manipulation border-2 border-border bg-background text-foreground"
+            className="waveos-drive-exit fixed right-3 z-[2147483647] min-h-12 touch-manipulation border-2 border-border bg-background text-foreground"
             style={{ top: "max(0.75rem, env(safe-area-inset-top))", pointerEvents: "auto" }}
           >
             <X className="h-5 w-5" />
