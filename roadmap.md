@@ -1,6 +1,6 @@
 # Approved mobile refinement
 
-- [ ] Review minimal Safari handoff proposal following owner-confirmed same-iPhone embedded failure / regular Safari folder success; implementation waits on plan approval. Do not publish or change OAuth configuration.
+- [x] Implement approved manual Safari continuation without embedded-browser detection; explicit save gates the safe link, independent save-error feedback preserves original Picker. Authenticated phone/desktop checks block writes; device launch and actual Google selection remain unverified. No publication or OAuth changes.
 
 - [x] Investigate second-iPhone Safari Picker failure; verify token/account match and eight authorized files, add explicit existing-scope browser fallback, 402 unit tests pass and preview build OK. Picker root cause remains blocked on real-iPhone traces and Google Cloud restriction access; no publication or scope/secret changes.
 
