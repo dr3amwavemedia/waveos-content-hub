@@ -1,5 +1,7 @@
 # Approved mobile refinement
 
+- [ ] Investigate confirmed second-iPhone Safari Picker account-access failure separately from refresh/lifecycle handling; check origin evidence and existing-scope fallback, add focused tests, no publication or scope/secret changes.
+
 - [x] Compare Nov 6 Google Picker against 2fc4335b30, PR #224/#225 and 867468de; restore explicit-only dismissal and best-effort checkpoints. All 389 tests pass; preview build OK. Real token issuance returned 200; baseline and current initializers both showed Google sign-in prompts under identical session/origin conditions. Nothing published.
 - [ ] Establish reported account-wide Google Picker failure cause: blocked on affected-browser Google session/cookie and deployed key-restriction evidence; successful file selection and physical-iPhone Safari continuation remain unverified. OAuth issuance/configuration source is unchanged; no blanket cookie/PWA diagnosis is established.
 
