@@ -2552,6 +2552,7 @@ function GoogleDrivePicker({
   const [isStandaloneIos, setStandaloneIos] = useState(false);
   const [showSafariHelp, setShowSafariHelp] = useState(false);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
+  const [safariError, setSafariError] = useState<string | null>(null);
   const [savingBrowser, setSavingBrowser] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [authorizedBrowser, setAuthorizedBrowser] = useState(false);
@@ -2745,10 +2746,12 @@ function GoogleDrivePicker({
           <p>If Google shows an account or cookie error inside another app, exit Google Drive and open the same saved post in regular Safari. You may need to sign in to WaveOS there. After adding files, confirm your selection and save the draft in Safari, then reopen that saved draft in WaveOS.</p>
           {driveReturn && !browserUrl && <Button variant="outline" disabled={savingBrowser || opening || pickerOpen} onClick={async () => {
             setSavingBrowser(true);
+            setSafariError(null);
             try { setBrowserUrl(await driveReturn.prepareBrowser(selected)); }
-            catch (reason) { setOpenError(reason instanceof Error ? reason.message : "The draft could not be saved. Stay here and try again."); }
+            catch { setSafariError("The draft could not be saved. Stay here and try again."); }
             finally { setSavingBrowser(false); }
           }}>{savingBrowser ? "Saving draft…" : "Save draft for Safari"}</Button>}
+          {safariError && <p role="alert" className="text-destructive">{safariError}</p>}
           {browserUrl && !savingBrowser && <>
             <Button variant="outline" asChild><a href={safariOpenUrl(browserUrl)} rel="noopener noreferrer">Open saved draft in Safari <ExternalLink className="size-4" /></a></Button>
             <p>Your draft is saved. If this app blocks opening Safari, open Safari yourself and paste the link below into its address bar. This opens the same saved post, not a new post.</p>
