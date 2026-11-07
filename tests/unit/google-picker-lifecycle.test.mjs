@@ -31,7 +31,7 @@ test("Google authentication is not dismissed by elapsed time or foreground event
     setTimeout: (callback) => timers.push(callback),
     clearTimeout() {},
   };
-  const document = { visibilityState: "visible", querySelector: () => null, setAttribute() {}, removeAttribute() {}, ...window };
+  const document = { visibilityState: "visible", querySelector: () => null, body: { setAttribute() {}, removeAttribute() {} }, ...window };
   const useEffect = (callback) => { callback(); };
   new Function("useEffect", "pickerRef", "window", "document", "pickerOpen", "isStandaloneIos", "closePicker", "setOpenError", "attempt", effects)(
     useEffect, { current: { setVisible: () => { closes++; } } }, window, document,
