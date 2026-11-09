@@ -24,6 +24,7 @@ import {
   type DuplicateGuardMatch,
 } from "@/lib/publish-fingerprint";
 import { snapshotAccountIds, unpublishBlockReason } from "@/lib/published-post-management";
+import { orderedPostMedia } from "@/lib/content-review";
 
 type ZernioTarget = {
   platform?: string;
@@ -209,7 +210,7 @@ export async function publishContentItemWithZernio(
       .in("id", item.media_asset_ids)
       .eq("workspace_id", item.workspace_id);
     if (result.error) throw result.error;
-    assets = result.data ?? [];
+    assets = orderedPostMedia(item.media_asset_ids, result.data ?? []);
     if (assets.length !== new Set(item.media_asset_ids).size) {
       throw new Error("One or more selected media files do not belong to this client workspace.");
     }

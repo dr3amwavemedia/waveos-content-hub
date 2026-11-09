@@ -1,3 +1,7 @@
+# Admin social review repair
+- [ ] Add admin-only same-record review editing, explicit save and decisions; preserve staff restrictions and publishing boundaries.
+- [ ] Test caption/media/order/schedule persistence and latest publishing payload; verify desktop/mobile without live publishing.
+
 # Approved mobile refinement
 
 - [ ] Repair iPhone media/Google Picker viewport, safe-area and layering defects; preserve desktop, explicit callbacks and saved-draft Safari handoff; verify mobile/desktop and tests without publishing.
