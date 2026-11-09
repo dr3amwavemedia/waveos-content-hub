@@ -28,7 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { publishContentItem } from "@/lib/publish.functions";
 import { waveAssist } from "@/lib/wave-assist.functions";
@@ -86,6 +86,9 @@ import { PenSquare } from "lucide-react";
 import { formatInTimeZone, isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 import { usePermissions } from "@/hooks/use-permissions";
 import { supabase } from "@/integrations/supabase/client";
+import { getContentReviewAccess, saveContentReview, decideContentReview } from "@/lib/content-review.functions";
+import { canManageContentReview } from "@/lib/content-review";
+import { useCurrentUser } from "@/hooks/use-waveos";
 
 export const Route = createFileRoute("/_authenticated/create")({
   component: () => (
@@ -124,6 +127,18 @@ function CreatePost() {
   const qc = useQueryClient();
 
   const workspaceId = activeWorkspace?.id ?? null;
+  const { data: reviewUser } = useCurrentUser();
+  const reviewAccessFn = useServerFn(getContentReviewAccess);
+  const saveReviewFn = useServerFn(saveContentReview);
+  const decideReviewFn = useServerFn(decideContentReview);
+  const reviewAccess = useQuery({ queryKey: ["content-review-access", workspaceId, reviewUser?.userId], enabled: Boolean(workspaceId), queryFn: () => {
+    if (!workspaceId) throw new Error("No workspace selected.");
+    return reviewAccessFn({ data: { workspaceId } });
+  } });
+  const [reviewEditing, setReviewEditing] = useState(false);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewNote, setReviewNote] = useState("");
+  const [reviewVariantEdits, setReviewVariantEdits] = useState<Record<string, Partial<PostVariant>>>({});
   const workspaceTimeZone = activeWorkspace?.timezone ?? "UTC";
   const [savedId, setSavedId] = useState<string | null>(search.id ?? null);
   const editingId = search.id ?? savedId ?? null;
@@ -413,7 +428,10 @@ function CreatePost() {
   const destinations = destinationLines(platforms, socialConnections.data ?? [], accountSelections);
   const destinationTitle = destinationHeadline(destinations);
   const status = existing.data?.item?.status ?? "draft";
-  const locked = status === "published" || status === "publishing" || status === "in_review";
+  const isReview = status === "in_review";
+  const canManageReview = reviewAccess.data?.canManage === true && canManageContentReview(reviewUser?.roles ?? [], activeWorkspace?.role ?? null);
+  const locked = status === "published" || status === "publishing" || (isReview && (!canManageReview || !reviewEditing)) || reviewBusy;
+  const displayVariants = (existing.data?.variants ?? []).map(variant => ({ ...variant, ...reviewVariantEdits[variant.id] }));
 
   if (!activeWorkspace) {
     return (
@@ -427,6 +445,19 @@ function CreatePost() {
 
   async function ensureSaved(primaryCaption = caption, mediaIds = pickedMedia): Promise<string | null> {
     if (!workspaceId) return null;
+    if (isReview) {
+      const item = existing.data?.item;
+      if (!item || !canManageReview || !reviewEditing) throw new Error("Enter Edit review before saving changes.");
+      await saveReviewFn({ data: {
+        contentId: item.id, expectedUpdatedAt: item.updated_at, title, caption: primaryCaption, mediaIds,
+        scheduledAt: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
+        platforms, variants: Object.entries(reviewVariantEdits).map(([id, patch]) => ({ id, caption: patch.caption, platform_options: patch.platform_options as Record<string, unknown> | undefined })),
+      } });
+      setReviewVariantEdits({});
+      await qc.invalidateQueries({ queryKey: ["content-item", item.id] });
+      await qc.invalidateQueries({ queryKey: ["content-items"] });
+      return item.id;
+    }
     if (savedId) {
       await update.mutateAsync({
         id: savedId,
@@ -494,11 +525,28 @@ function CreatePost() {
       }
 
       setSaveStatus("saved");
-      toast.success("Saved to this workspace. Open Social Media → Posts → Drafts on any device or authorized staff account.");
+      if (isReview) {
+        setReviewEditing(false);
+        toast.success("Changes saved. This same post is still in review.");
+      } else toast.success("Saved to this workspace. Open Social Media → Posts → Drafts on any device or authorized staff account.");
     } catch (e) {
       setSaveStatus("error");
       toast.error((e as Error).message);
     }
+  }
+
+  async function handleReviewDecision(action: "approve" | "schedule" | "publish_now" | "changes_requested") {
+    const item = existing.data?.item;
+    if (!item || !canManageReview || reviewEditing || reviewBusy) return;
+    if (action === "publish_now" && !confirm(`${destinationTitle}\n\nApprove and publish this saved post now?`)) return;
+    setReviewBusy(true);
+    try {
+      await decideReviewFn({ data: { contentId: item.id, expectedUpdatedAt: item.updated_at, action, note: reviewNote || undefined } });
+      if (action === "publish_now") await runPublish(item.id, false, platforms);
+      else toast.success(action === "changes_requested" ? "Changes requested." : action === "schedule" ? "Approved and scheduled for the saved time." : "Approved. Nothing published.");
+      await Promise.all([qc.invalidateQueries({ queryKey: ["content-item", item.id] }), qc.invalidateQueries({ queryKey: ["content-items"] }), qc.invalidateQueries({ queryKey: ["approvals"] })]);
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Review action failed."); }
+    finally { setReviewBusy(false); }
   }
 
   async function handleCaptionAssist() {
@@ -816,7 +864,7 @@ function CreatePost() {
             ) : (
               <FileText className="h-4 w-4" />
             )}
-            Save draft
+            {isReview ? "Save changes" : "Save draft"}
           </button>
 
           <span className="min-w-[90px] text-xs text-muted-foreground" aria-live="polite">
@@ -827,6 +875,17 @@ function CreatePost() {
         </div>
       </div>
 
+      {isReview && canManageReview && <section className="space-y-3 border-y border-border py-4" aria-label="Admin review">
+        <div className="flex flex-wrap items-center gap-2">
+          {!reviewEditing ? <Button variant="outline" disabled={reviewBusy} onClick={() => setReviewEditing(true)}><PenSquare className="size-4" />Edit review</Button> : <Button disabled={saveStatus === "saving" || reviewBusy} onClick={handleSaveDraft}><Check className="size-4" />{saveStatus === "saving" ? "Saving…" : "Save changes"}</Button>}
+          <Button disabled={reviewEditing || reviewBusy} onClick={() => void handleReviewDecision("approve")}>Approve</Button>
+          <Button variant="outline" disabled={reviewEditing || reviewBusy} onClick={() => void handleReviewDecision("changes_requested")}>Request changes</Button>
+          {canSchedule && scheduledAt && <Button disabled={reviewEditing || reviewBusy} onClick={() => void handleReviewDecision("schedule")}><CalendarClock className="size-4" />Approve & schedule</Button>}
+          <Button disabled={reviewEditing || reviewBusy || !caption.trim() || !platforms.length} onClick={() => void handleReviewDecision("publish_now")}><Send className="size-4" />Approve & publish now</Button>
+        </div>
+        <input aria-label="Review note" value={reviewNote} onChange={event => setReviewNote(event.target.value)} placeholder="Review note (optional)" className="w-full rounded-md border border-border bg-elevated px-3 py-2 text-sm" />
+        <p className="text-sm text-muted-foreground">{reviewEditing ? "Save changes before approving. This post stays in review." : "Review the saved post, or edit it before approving."}</p>
+      </section>}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4 lg:gap-6">
           {locked && (
@@ -835,7 +894,7 @@ function CreatePost() {
                 ? "This is a published record. You can review or delete it here, but changing it would not update the live social-platform post."
                 : status === "publishing"
                   ? "This post is publishing now. Editing and deletion will unlock when the publishing attempt finishes."
-                  : "This post is currently in client review. Editing is paused until the review is completed or changes are requested."}
+                  : canManageReview ? "Select Edit review to update this post before approving." : "This post is in review. Editing is paused until changes are requested."}
             </div>
           )}
           <div className="order-2 space-y-3 border-b border-border pb-5">
@@ -844,6 +903,7 @@ function CreatePost() {
             </label>
             <input
               value={title}
+              disabled={locked}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Launch day carousel"
               className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60"
@@ -854,6 +914,7 @@ function CreatePost() {
             </label>
             <textarea
               value={caption}
+              disabled={locked}
               onChange={(e) => setCaption(e.target.value)}
               autoCapitalize="sentences"
               autoCorrect="on"
@@ -890,6 +951,7 @@ function CreatePost() {
                 </div>
               </div>
               <Button variant="outline"
+                disabled={locked}
                 onClick={() => setShowLibrary(true)}
               >
                 <ImagePlus className="h-4 w-4" /> Add Media
@@ -898,9 +960,10 @@ function CreatePost() {
             <MediaPreviewRow
               workspaceId={workspaceId}
               picked={pickedMedia}
-              onRemove={(id) => setPickedMedia((cur) => cur.filter((x) => x !== id))}
+              locked={locked}
+              onRemove={(id) => { if (!locked) setPickedMedia((cur) => cur.filter((x) => x !== id)); }}
               onReorder={(from, to) => setPickedMedia((current) => {
-                if (from === to || from < 0 || to < 0 || from >= current.length || to >= current.length) return current;
+                if (locked || from === to || from < 0 || to < 0 || from >= current.length || to >= current.length) return current;
                 const reordered = [...current];
                 const [moved] = reordered.splice(from, 1);
                 reordered.splice(to, 0, moved);
@@ -950,7 +1013,7 @@ function CreatePost() {
               <div className="mt-4">
                 <VariantEditor
                   contentId={savedId}
-                  variants={existing.data?.variants ?? []}
+                  variants={displayVariants}
                   platform={activePlatform}
                   connections={(socialConnections.data ?? []).filter(
                     (connection) =>
@@ -966,7 +1029,9 @@ function CreatePost() {
                     }))
                   }
                   onUpdate={async (id, patch) => {
-                    await updateVariant.mutateAsync({ id, patch });
+                    if (locked) return;
+                    if (isReview) setReviewVariantEdits(current => ({ ...current, [id]: { ...current[id], ...patch } }));
+                    else await updateVariant.mutateAsync({ id, patch });
                   }}
                 />
                 {!savedId && (
@@ -994,7 +1059,7 @@ function CreatePost() {
               <input
                 type="datetime-local"
                 value={scheduledAt}
-                disabled={!canSchedule}
+                disabled={locked || !canSchedule}
                 onChange={(e) => setScheduledAt(e.target.value)}
                 className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-foreground outline-none focus:border-primary/60"
               />
@@ -1032,7 +1097,7 @@ function CreatePost() {
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
               <button
                 disabled={
-                  locked || publishing !== null || !caption.trim() || !scheduledAt || !canSchedule
+                  isReview || locked || publishing !== null || !caption.trim() || !scheduledAt || !canSchedule
                 }
                 onClick={handleScheduleLater}
                 title={canSchedule ? "Schedule this post" : "Scheduling is included with Current and Tidal"}
@@ -1046,7 +1111,7 @@ function CreatePost() {
                 Post later
               </button>
               <button
-                disabled={locked || publishing !== null || !caption.trim() || !platforms.length}
+                disabled={isReview || locked || publishing !== null || !caption.trim() || !platforms.length}
                 onClick={handlePublishNow}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
               >
@@ -1076,9 +1141,9 @@ function CreatePost() {
           lines={destinations}
         />
         <div className="mt-2 grid grid-cols-3 gap-2">
-        <Button variant="outline" disabled={locked||create.isPending||update.isPending||publishing!==null} onClick={handleSaveDraft}><FileText className="size-4"/>Save Draft</Button>
-        <Button variant="secondary" disabled={locked||publishing!==null||!canSchedule} onClick={()=>{if(scheduledAt)void handleScheduleLater();else window.document.getElementById('post-schedule')?.scrollIntoView({behavior:'smooth',block:'center'});}}><CalendarClock className="size-4"/>Schedule</Button>
-        <Button disabled={locked||publishing!==null||!caption.trim()||!platforms.length} onClick={handlePublishNow}><Send className="size-4"/>Publish</Button>
+        <Button variant="outline" disabled={locked||saveStatus === "saving"||create.isPending||update.isPending||publishing!==null} onClick={handleSaveDraft}><FileText className="size-4"/>{isReview ? "Save changes" : "Save Draft"}</Button>
+        <Button variant="secondary" disabled={isReview||locked||publishing!==null||!canSchedule} onClick={()=>{if(scheduledAt)void handleScheduleLater();else window.document.getElementById('post-schedule')?.scrollIntoView({behavior:'smooth',block:'center'});}}><CalendarClock className="size-4"/>Schedule</Button>
+        <Button disabled={isReview||locked||publishing!==null||!caption.trim()||!platforms.length} onClick={handlePublishNow}><Send className="size-4"/>Publish</Button>
         </div>
       </div>
 
@@ -1582,11 +1647,13 @@ function PublishFormatPicker({
 function MediaPreviewRow({
   workspaceId,
   picked,
+  locked,
   onRemove,
   onReorder,
 }: {
   workspaceId: string | null;
   picked: string[];
+  locked: boolean;
   onRemove: (id: string) => void;
   onReorder: (from: number, to: number) => void;
 }) {
@@ -1624,7 +1691,7 @@ function MediaPreviewRow({
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault();
-                if (dragIndex.current !== null) onReorder(dragIndex.current, index);
+                if (!locked && dragIndex.current !== null) onReorder(dragIndex.current, index);
                 dragIndex.current = null;
               }}
             >
@@ -1632,7 +1699,7 @@ function MediaPreviewRow({
               <div className="absolute bottom-2 left-2 z-10 rounded-md bg-black/75 px-2 py-1 text-xs font-semibold text-white">
                 {index + 1} / {picked.length}
               </div>
-              {picked.length > 1 && (
+              {!locked && picked.length > 1 && (
                 <div
                   role="button"
                   tabIndex={0}
