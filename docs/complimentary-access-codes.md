@@ -48,11 +48,13 @@ The same user or workspace cannot consume the same code twice. A general code ma
 - Every lifecycle action records the actor, code/grant identifier, user, workspace, selected plan, before/after state, reason and timestamp in the activity log.
 - Tables in the exposed schema require RLS and least-privilege grants. Users may read only their own resulting entitlement and cannot write plan or grant state directly.
 
-## Current-state gap confirmed November 9, 2026
+## Implementation status — November 9, 2026
 
-- Current OS promo codes only add limited bonus days to a promotional trial.
-- WaveOS already has an owner-only complimentary invitation flow for a brand-new email, but it is not a user-redeemable code and it rejects existing accounts.
-- That invitation currently uses `internal_test_access`, which mixes complimentary customers with internal product testers and should not become the permanent model for this feature.
-- The administrative `payments_enabled` profile flag explicitly does not change Stripe or subscription entitlement.
+- The repository now contains a dedicated complimentary-code and grant model, separate from promotional trials and `internal_test_access`.
+- Admins create secure, hashed codes in OS Data, select a plan, redemption limit, eligibility and optional expiry, and receive the raw code only once.
+- Eligible WaveOS workspace owners/admins redeem the code from Settings without Stripe Checkout or a payment method.
+- Redemption is rate limited and transactional, locks the code row, enforces the redemption cap, rejects workspaces with Stripe identifiers, and records the durable grant and activity entry together.
+- Plan access uses the explicit `complimentary_code` entitlement source and normal Ripple, Current or Tidal limits. Paid reporting continues to require a Stripe subscription ID.
+- Admins can pause future use and revoke an individual active grant without deleting the workspace or its content.
 
-Therefore, the requested payment-waiver code does not exist yet and must be implemented as a separate, auditable complimentary entitlement.
+The migration is intentionally committed as code first. It must be reviewed and applied to the verified production Supabase project before the controls can be used live.

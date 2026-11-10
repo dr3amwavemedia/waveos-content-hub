@@ -14,6 +14,35 @@ async function requireOwner(userId: string) {
 }
 
 export type OsPromoColor = "ocean" | "violet" | "emerald" | "sunset";
+export type ComplimentaryPlan = "standard" | "full" | "expanded";
+
+export type ComplimentaryAccessCode = {
+  id: string;
+  label: string;
+  code_hint: string;
+  plan: ComplimentaryPlan;
+  max_redemptions: number;
+  redemption_count: number;
+  starts_at: string;
+  expires_at: string | null;
+  access_ends_at: string | null;
+  eligible_email: string | null;
+  eligible_email_domain: string | null;
+  is_active: boolean;
+  created_at: string;
+  grants: Array<{
+    id: string;
+    user_id: string;
+    workspace_id: string;
+    plan: ComplimentaryPlan;
+    status: "active" | "revoked" | "expired";
+    access_ends_at: string | null;
+    granted_at: string;
+    revoked_at: string | null;
+    revoke_reason: string | null;
+    email: string;
+  }>;
+};
 
 export const getOsOperationsStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -171,14 +200,16 @@ export const createOsPromoCode = createServerFn({ method: "POST" })
 // subscriber trial dates, and all other promo codes are intentionally untouched.
 export const updateOsPromoCode = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .validator((data: {
-    promoId: string;
-    name: string;
-    bonusTrialDays: number;
-    maxRedemptions: number;
-    startsAt: string;
-    expiresAt: string | null;
-  }) => data)
+  .validator(
+    (data: {
+      promoId: string;
+      name: string;
+      bonusTrialDays: number;
+      maxRedemptions: number;
+      startsAt: string;
+      expiresAt: string | null;
+    }) => data,
+  )
   .handler(async ({ data, context }) => {
     const admin = await requireOwner(context.userId);
     const { data: currentRaw, error: lookupError } = await admin
@@ -188,22 +219,40 @@ export const updateOsPromoCode = createServerFn({ method: "POST" })
       .maybeSingle();
     if (lookupError) throw lookupError;
     const current = currentRaw as {
-      id: string; code: string; redemption_count: number;
-      max_redemptions: number; bonus_trial_days: number;
-      starts_at: string; expires_at: string | null; name: string;
+      id: string;
+      code: string;
+      redemption_count: number;
+      max_redemptions: number;
+      bonus_trial_days: number;
+      starts_at: string;
+      expires_at: string | null;
+      name: string;
     } | null;
     if (!current) throw new Error("Promo code not found.");
     const name = data.name.trim();
     if (!name || name.length > 80) throw new Error("Enter a name up to 80 characters.");
-    if (!Number.isInteger(data.bonusTrialDays) || data.bonusTrialDays < 1 || data.bonusTrialDays > 30)
-      throw new Error("Trial duration must be between 1 and 30 days under current trial safeguards.");
-    if (!Number.isInteger(data.maxRedemptions) || data.maxRedemptions < Math.max(1, current.redemption_count) || data.maxRedemptions > 100000)
-      throw new Error("Redemption limit must be at least the number already used and at most 100,000.");
+    if (
+      !Number.isInteger(data.bonusTrialDays) ||
+      data.bonusTrialDays < 1 ||
+      data.bonusTrialDays > 30
+    )
+      throw new Error(
+        "Trial duration must be between 1 and 30 days under current trial safeguards.",
+      );
+    if (
+      !Number.isInteger(data.maxRedemptions) ||
+      data.maxRedemptions < Math.max(1, current.redemption_count) ||
+      data.maxRedemptions > 100000
+    )
+      throw new Error(
+        "Redemption limit must be at least the number already used and at most 100,000.",
+      );
     const startsAt = new Date(data.startsAt);
     const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
     if (Number.isNaN(startsAt.getTime()) || (expiresAt && Number.isNaN(expiresAt.getTime())))
       throw new Error("Enter valid promo dates.");
-    if (expiresAt && expiresAt <= startsAt) throw new Error("Expiration must be after the start date.");
+    if (expiresAt && expiresAt <= startsAt)
+      throw new Error("Expiration must be after the start date.");
     const changes = {
       name,
       bonus_trial_days: data.bonusTrialDays,
@@ -225,11 +274,17 @@ export const updateOsPromoCode = createServerFn({ method: "POST" })
       action: "os_promo_code_edited",
       entity_type: "os_promo_code",
       entity_id: data.promoId,
-      safe_metadata: { code: current.code, before: {
-        name: current.name, bonus_trial_days: current.bonus_trial_days,
-        max_redemptions: current.max_redemptions, starts_at: current.starts_at,
-        expires_at: current.expires_at,
-      }, after: changes },
+      safe_metadata: {
+        code: current.code,
+        before: {
+          name: current.name,
+          bonus_trial_days: current.bonus_trial_days,
+          max_redemptions: current.max_redemptions,
+          starts_at: current.starts_at,
+          expires_at: current.expires_at,
+        },
+        after: changes,
+      },
     });
     return { updated: true };
   });
@@ -297,6 +352,181 @@ export const deleteOsPromoCode = createServerFn({ method: "POST" })
       safe_metadata: { code: promo.code, name: promo.name },
     });
     return { deleted: true };
+  });
+
+export const listComplimentaryAccessCodes = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: Record<string, never>) => data)
+  .handler(async ({ context }) => {
+    const admin = await requireOwner(context.userId);
+    const [codesResult, grantsResult] = await Promise.all([
+      admin
+        .from("waveos_complimentary_codes" as never)
+        .select(
+          "id,label,code_hint,plan,max_redemptions,redemption_count,starts_at,expires_at,access_ends_at,eligible_email,eligible_email_domain,is_active,created_at",
+        )
+        .order("created_at", { ascending: false }),
+      admin
+        .from("waveos_complimentary_grants" as never)
+        .select(
+          "id,code_id,user_id,workspace_id,plan,status,access_ends_at,granted_at,revoked_at,revoke_reason",
+        )
+        .order("granted_at", { ascending: false }),
+    ]);
+    if (codesResult.error) throw codesResult.error;
+    if (grantsResult.error) throw grantsResult.error;
+    const grants = (grantsResult.data ?? []) as Array<{
+      id: string;
+      code_id: string;
+      user_id: string;
+      workspace_id: string;
+      plan: ComplimentaryPlan;
+      status: "active" | "revoked" | "expired";
+      access_ends_at: string | null;
+      granted_at: string;
+      revoked_at: string | null;
+      revoke_reason: string | null;
+    }>;
+    const emails = new Map<string, string>();
+    await Promise.all(
+      [...new Set(grants.map((grant) => grant.user_id))].map(async (userId) => {
+        const result = await admin.auth.admin.getUserById(userId);
+        emails.set(userId, result.data.user?.email ?? "Unknown user");
+      }),
+    );
+    return ((codesResult.data ?? []) as Omit<ComplimentaryAccessCode, "grants">[]).map((code) => ({
+      ...code,
+      grants: grants
+        .filter((grant) => grant.code_id === code.id)
+        .map(({ code_id: _codeId, ...grant }) => ({
+          ...grant,
+          email: emails.get(grant.user_id) ?? "Unknown user",
+        })),
+    }));
+  });
+
+export const createComplimentaryAccessCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator(
+    (data: {
+      label: string;
+      plan: ComplimentaryPlan;
+      maxRedemptions: number;
+      startsAt?: string | null;
+      expiresAt?: string | null;
+      accessEndsAt?: string | null;
+      eligibleEmail?: string | null;
+      eligibleEmailDomain?: string | null;
+    }) => data,
+  )
+  .handler(async ({ data, context }) => {
+    const admin = await requireOwner(context.userId);
+    const label = data.label.trim();
+    if (!label || label.length > 80) throw new Error("Add a label up to 80 characters.");
+    if (!(["standard", "full", "expanded"] as const).includes(data.plan))
+      throw new Error("Choose a valid WaveOS tier.");
+    if (
+      !Number.isInteger(data.maxRedemptions) ||
+      data.maxRedemptions < 1 ||
+      data.maxRedemptions > 100000
+    )
+      throw new Error("Redemption limit must be between 1 and 100,000.");
+    const startsAt = data.startsAt ? new Date(data.startsAt) : new Date();
+    const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+    const accessEndsAt = data.accessEndsAt ? new Date(data.accessEndsAt) : null;
+    if (
+      Number.isNaN(startsAt.getTime()) ||
+      (expiresAt && Number.isNaN(expiresAt.getTime())) ||
+      (accessEndsAt && Number.isNaN(accessEndsAt.getTime()))
+    )
+      throw new Error("Enter valid access dates.");
+    if (expiresAt && expiresAt <= startsAt)
+      throw new Error("Code expiration must be after its start date.");
+    if (accessEndsAt && accessEndsAt <= startsAt)
+      throw new Error("Access end must be after the code start date.");
+    const eligibleEmail = data.eligibleEmail?.trim().toLowerCase() || null;
+    if (eligibleEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(eligibleEmail))
+      throw new Error("Enter a valid eligible email address.");
+    const eligibleEmailDomain =
+      data.eligibleEmailDomain?.trim().toLowerCase().replace(/^@/, "") || null;
+    if (eligibleEmailDomain && !/^[a-z0-9.-]+\.[a-z]{2,}$/.test(eligibleEmailDomain))
+      throw new Error("Enter a valid eligible email domain.");
+    if (eligibleEmail && eligibleEmailDomain)
+      throw new Error("Limit by either one email or one domain, not both.");
+
+    const { createHash, randomBytes } = await import("node:crypto");
+    const rawCode = `WAVE-${randomBytes(18).toString("base64url").toUpperCase()}`;
+    const codeHash = createHash("sha256").update(rawCode).digest("hex");
+    const result = await admin.from("waveos_complimentary_codes" as never).insert({
+      label,
+      code_hash: codeHash,
+      code_hint: rawCode.slice(-8),
+      plan: data.plan,
+      max_redemptions: data.maxRedemptions,
+      starts_at: startsAt.toISOString(),
+      expires_at: expiresAt?.toISOString() ?? null,
+      access_ends_at: accessEndsAt?.toISOString() ?? null,
+      eligible_email: eligibleEmail,
+      eligible_email_domain: eligibleEmailDomain,
+      created_by: context.userId,
+    } as never);
+    if (result.error) throw result.error;
+    await admin.from("activity_logs").insert({
+      actor_user_id: context.userId,
+      action: "complimentary_access_code_created",
+      entity_type: "waveos_complimentary_code",
+      safe_metadata: {
+        label,
+        plan: data.plan,
+        max_redemptions: data.maxRedemptions,
+        expires_at: expiresAt?.toISOString() ?? null,
+        access_ends_at: accessEndsAt?.toISOString() ?? null,
+        eligible_email: eligibleEmail,
+        eligible_email_domain: eligibleEmailDomain,
+      },
+    });
+    return { code: rawCode };
+  });
+
+export const setComplimentaryAccessCodeActive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { codeId: string; active: boolean }) => data)
+  .handler(async ({ data, context }) => {
+    const admin = await requireOwner(context.userId);
+    const result = await admin
+      .from("waveos_complimentary_codes" as never)
+      .update({ is_active: data.active, updated_at: new Date().toISOString() } as never)
+      .eq("id", data.codeId);
+    if (result.error) throw result.error;
+    await admin.from("activity_logs").insert({
+      actor_user_id: context.userId,
+      action: data.active
+        ? "complimentary_access_code_resumed"
+        : "complimentary_access_code_paused",
+      entity_type: "waveos_complimentary_code",
+      entity_id: data.codeId,
+    });
+    return { updated: true };
+  });
+
+export const revokeComplimentaryAccessGrant = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { grantId: string; reason?: string }) => data)
+  .handler(async ({ data, context }) => {
+    const admin = await requireOwner(context.userId);
+    const result = await (
+      admin.rpc as unknown as (
+        name: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: boolean | null; error: Error | null }>
+    )("revoke_waveos_complimentary_grant", {
+      _grant_id: data.grantId,
+      _actor_user_id: context.userId,
+      _reason: data.reason?.trim() || null,
+    });
+    if (result.error) throw result.error;
+    if (!result.data) throw new Error("That complimentary grant is no longer active.");
+    return { revoked: true };
   });
 
 export const listOsAccounts = createServerFn({ method: "POST" })
@@ -551,122 +781,4 @@ export const deleteOsAccount = createServerFn({ method: "POST" })
     const result = await admin.auth.admin.deleteUser(data.userId);
     if (result.error) throw result.error;
     return { deleted: true };
-  });
-
-
-export const inviteComplimentaryOsAccount = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .validator((data: {
-    email: string;
-    firstName?: string;
-    lastName?: string;
-    workspaceName?: string;
-    plan: "standard" | "full" | "expanded";
-  }) => data)
-  .handler(async ({ data, context }) => {
-    const admin = await requireOwner(context.userId);
-    const email = data.email.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
-    const planLimits = { standard: 3, full: 4, expanded: 8 } as const;
-    if (!Object.hasOwn(planLimits, data.plan)) throw new Error("Choose a valid WaveOS tier.");
-
-    // Invite only new public-app accounts. Existing users may have real paid
-    // subscriptions or Dream Wave access and must never be silently converted.
-    const existing = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    if (existing.error) throw existing.error;
-    if (existing.data.users.some((user) => user.email?.toLowerCase() === email)) {
-      throw new Error("That email already has a WaveOS account. Use the existing account controls instead of creating a complimentary duplicate.");
-    }
-
-    const origin = process.env.WAVEOS_APP_URL ?? "https://waveos.dreamwavemedia.co";
-    const invite = await admin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: new URL("/reset-password", origin).toString(),
-      data: {
-        first_name: data.firstName?.trim() || "",
-        last_name: data.lastName?.trim() || "",
-        account_source: "os_data",
-        signup_source: "public_trial",
-        workspace_name: data.workspaceName?.trim() || "",
-        complimentary_access: true,
-        complimentary_plan: data.plan,
-      },
-    });
-    if (invite.error || !invite.data.user) throw invite.error ?? new Error("WaveOS invitation could not be created.");
-
-    const userId = invite.data.user.id;
-    const memberships = await admin
-      .from("workspace_members")
-      .select("workspace_id")
-      .eq("user_id", userId);
-    if (memberships.error) throw memberships.error;
-    const membershipIds = (memberships.data ?? []).map((row) => row.workspace_id);
-    const osWorkspace = membershipIds.length
-      ? await admin
-          .from("workspaces")
-          .select("id")
-          .in("id", membershipIds)
-          .eq("data_source", "os_data")
-          .eq("is_archived", false)
-          .limit(1)
-          .maybeSingle()
-      : { data: null, error: null };
-    if (osWorkspace.error) throw osWorkspace.error;
-    const workspaceId = osWorkspace.data?.id;
-    if (!workspaceId) {
-      // Auth invitation already exists, so leave a clear audit trail rather
-      // than guessing at billing state.
-      await admin.from("activity_logs").insert({
-        actor_user_id: context.userId,
-        action: "complimentary_os_invite_needs_provisioning",
-        entity_type: "profile",
-        entity_id: userId,
-        safe_metadata: { email, plan: data.plan },
-      });
-      throw new Error("The invitation was created, but its WaveOS workspace was not provisioned. Do not resend it; check OS Data before retrying.");
-    }
-
-    const current = await admin
-      .from("workspace_social_subscriptions" as never)
-      .select("stripe_subscription_id,stripe_customer_id")
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
-    if (current.error) throw current.error;
-    const paid = current.data as { stripe_subscription_id?: string | null; stripe_customer_id?: string | null } | null;
-    if (paid?.stripe_subscription_id || paid?.stripe_customer_id) {
-      throw new Error("This workspace already has Stripe billing and cannot be converted to complimentary access from this control.");
-    }
-
-    const subscription = await admin
-      .from("workspace_social_subscriptions" as never)
-      .upsert(
-        {
-          workspace_id: workspaceId,
-          plan: data.plan,
-          status: "active",
-          internal_test_access: true,
-          billing_interval: null,
-          account_limit: planLimits[data.plan],
-          trial_started_at: null,
-          trial_ends_at: null,
-          current_period_end: null,
-          cancel_at_period_end: false,
-          payment_failure_count: 0,
-          last_payment_failed_at: null,
-          service_locked_at: null,
-        } as never,
-        { onConflict: "workspace_id" },
-      );
-    if (subscription.error) throw subscription.error;
-
-    await admin.from("profiles" as never).update({ payments_enabled: false } as never).eq("id", userId);
-    await admin.from("activity_logs").insert({
-      workspace_id: workspaceId,
-      actor_user_id: context.userId,
-      action: "complimentary_os_invite_created",
-      entity_type: "workspace",
-      entity_id: workspaceId,
-      safe_metadata: { email, plan: data.plan, account_limit: planLimits[data.plan] },
-    });
-
-    return { invited: true, email, workspaceId, plan: data.plan };
   });

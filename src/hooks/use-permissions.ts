@@ -29,6 +29,8 @@ export interface PublicSubscriptionState {
   plan: "trial" | "standard" | "full" | "expanded";
   status: string;
   internal_test_access: boolean;
+  entitlement_source: "stripe" | "internal_test" | "complimentary_code";
+  complimentary_access_ends_at: string | null;
   trial_ends_at: string | null;
   payment_failure_count: number;
   service_locked_at: string | null;
@@ -82,6 +84,14 @@ const PUBLIC_OS_CURRENT_FEATURES = new Set<FeatureKey>([
 export function publicSubscriptionActive(subscription: PublicSubscriptionState | null) {
   if (!subscription) return false;
   if (subscription.internal_test_access) return true;
+  if (subscription.entitlement_source === "complimentary_code") {
+    return Boolean(
+      subscription.status === "active" &&
+      !subscription.service_locked_at &&
+      (!subscription.complimentary_access_ends_at ||
+        new Date(subscription.complimentary_access_ends_at).getTime() > Date.now()),
+    );
+  }
   if (subscription.service_locked_at) return false;
   if (subscription.status === "trialing") {
     return Boolean(
@@ -126,7 +136,7 @@ export function usePermissions(): WorkspacePermissions {
       const { data, error } = await supabase
         .from("workspace_social_subscriptions")
         .select(
-          "plan,status,internal_test_access,trial_ends_at,payment_failure_count,service_locked_at,stripe_subscription_id",
+          "plan,status,internal_test_access,entitlement_source,complimentary_access_ends_at,trial_ends_at,payment_failure_count,service_locked_at,stripe_subscription_id",
         )
         .eq("workspace_id", workspaceId!)
         .maybeSingle();

@@ -15,6 +15,9 @@ type SocialSubscriptionRow = {
   plan: "trial" | "standard" | "full" | "expanded";
   status: string;
   internal_test_access: boolean;
+  entitlement_source: "stripe" | "internal_test" | "complimentary_code";
+  complimentary_grant_id: string | null;
+  complimentary_access_ends_at: string | null;
   billing_interval: SocialBillingInterval | null;
   account_limit: number;
   trial_ends_at: string | null;
@@ -111,12 +114,21 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
     const result = await supabaseAdmin
       .from("workspace_social_subscriptions" as never)
       .select(
-        "workspace_id,plan,status,internal_test_access,billing_interval,account_limit,trial_ends_at,current_period_end,cancel_at_period_end,payment_failure_count,last_payment_failed_at,service_locked_at,stripe_customer_id",
+        "workspace_id,plan,status,internal_test_access,entitlement_source,complimentary_grant_id,complimentary_access_ends_at,billing_interval,account_limit,trial_ends_at,current_period_end,cancel_at_period_end,payment_failure_count,last_payment_failed_at,service_locked_at,stripe_customer_id",
       )
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
     if (result.error) throw result.error;
     const subscription = result.data as SocialSubscriptionRow | null;
+    const grantResult = subscription?.complimentary_grant_id
+      ? await supabaseAdmin
+          .from("waveos_complimentary_grants" as never)
+          .select("id,plan,status,granted_at,access_ends_at")
+          .eq("id", subscription.complimentary_grant_id)
+          .eq("workspace_id", data.workspaceId)
+          .maybeSingle()
+      : { data: null, error: null };
+    if (grantResult.error) throw grantResult.error;
     const [{ count }, invoiceResult] = await Promise.all([
       supabaseAdmin
         .from("social_connections")
@@ -143,7 +155,56 @@ export const getSocialSubscription = createServerFn({ method: "POST" })
           : subscription,
       connectedAccounts: count ?? 0,
       plans: SOCIAL_PLANS,
+      complimentaryGrant: grantResult.data as {
+        id: string;
+        plan: "standard" | "full" | "expanded";
+        status: "active" | "revoked" | "expired";
+        granted_at: string;
+        access_ends_at: string | null;
+      } | null,
       invoices: canSeeBilling ? ((invoiceResult.data ?? []) as SocialSubscriptionInvoiceRow[]) : [],
+    };
+  });
+
+export const redeemComplimentaryAccessCode = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { workspaceId: string; code: string }) => data)
+  .handler(async ({ data, context }) => {
+    await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
+    await requirePublicOsWorkspace(data.workspaceId);
+    const code = data.code.trim().toUpperCase();
+    if (!code) throw new Error("Enter your complimentary access code.");
+    const result = await (
+      context.supabase.rpc as unknown as (
+        name: string,
+        args: Record<string, unknown>,
+      ) => Promise<{
+        data: {
+          status?: string;
+          plan?: "standard" | "full" | "expanded";
+          access_ends_at?: string | null;
+        } | null;
+        error: Error | null;
+      }>
+    )("redeem_waveos_complimentary_code", {
+      _workspace_id: data.workspaceId,
+      _code: code,
+    });
+    if (result.error) throw result.error;
+    if (result.data?.status === "billing_review_required") {
+      throw new Error(
+        "This workspace has billing or another access grant that must be reviewed by Dream Wave before a code can be applied.",
+      );
+    }
+    if (result.data?.status !== "redeemed") {
+      throw new Error(
+        "That code is unavailable, expired, not eligible for this account, or fully redeemed.",
+      );
+    }
+    return {
+      redeemed: true,
+      plan: result.data.plan!,
+      accessEndsAt: result.data.access_ends_at ?? null,
     };
   });
 
@@ -180,18 +241,25 @@ export const createSocialSubscriptionCheckout = createServerFn({ method: "POST" 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: existingSubscription, error: existingSubscriptionError } = await supabaseAdmin
       .from("workspace_social_subscriptions" as never)
-      .select("internal_test_access,status,stripe_subscription_id,stripe_checkout_session_id")
+      .select(
+        "internal_test_access,entitlement_source,status,stripe_subscription_id,stripe_checkout_session_id",
+      )
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
     if (existingSubscriptionError) throw existingSubscriptionError;
     const existing = existingSubscription as {
       internal_test_access?: boolean;
+      entitlement_source?: string;
       status?: string;
       stripe_subscription_id?: string | null;
       stripe_checkout_session_id?: string | null;
     } | null;
     if (existing?.internal_test_access)
       throw new Error("Internal test accounts do not use Stripe checkout.");
+    if (existing?.entitlement_source === "complimentary_code")
+      throw new Error(
+        "This workspace has complimentary access. Ask Dream Wave to review the grant before starting paid billing.",
+      );
     if (
       existing?.stripe_subscription_id &&
       ["active", "trialing", "past_due"].includes(existing.status ?? "")
@@ -424,16 +492,19 @@ export const createSocialBillingPortal = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const result = await supabaseAdmin
       .from("workspace_social_subscriptions" as never)
-      .select("stripe_customer_id,internal_test_access")
+      .select("stripe_customer_id,internal_test_access,entitlement_source")
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
     if (result.error) throw result.error;
     const subscription = result.data as {
       stripe_customer_id?: string | null;
       internal_test_access?: boolean;
+      entitlement_source?: string;
     } | null;
     if (subscription?.internal_test_access)
       throw new Error("Internal test accounts do not have Stripe billing.");
+    if (subscription?.entitlement_source === "complimentary_code")
+      throw new Error("Complimentary access does not have a Stripe billing account.");
     const customerId = subscription?.stripe_customer_id;
     if (!customerId) throw new Error("No Stripe billing account is connected yet.");
     const { stripeRequest } = await import("@/lib/stripe.server");
