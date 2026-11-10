@@ -31,9 +31,20 @@ import {
   type MetricDirection,
 } from "@/lib/phase-one-planning";
 import { useServerFn } from "@tanstack/react-start";
-import { compareBusinessesIndependent, researchCompetitor } from "@/lib/competitive-research.functions";
-import { independentComparisonSchema, researchReportSchema, RESEARCH_FAILURE_MESSAGE, RESEARCH_SOURCE_WARNING, type IndependentComparison, type ResearchReport } from "@/lib/competitive-research";
+import {
+  compareBusinessesIndependent,
+  researchCompetitor,
+} from "@/lib/competitive-research.functions";
+import {
+  independentComparisonSchema,
+  researchReportSchema,
+  RESEARCH_FAILURE_MESSAGE,
+  RESEARCH_SOURCE_WARNING,
+  type IndependentComparison,
+  type ResearchReport,
+} from "@/lib/competitive-research";
 import { isValidHttpsUrl, normalizeHttpsUrl } from "@/lib/url-validation";
+import { buildNinetyDayPlan, scoreResearchReport } from "@/lib/competitive-scorecard";
 
 export const Route = createFileRoute("/_authenticated/competitive-intelligence")({
   component: () => (
@@ -55,7 +66,10 @@ export const Route = createFileRoute("/_authenticated/competitive-intelligence")
       },
       { name: "robots", content: "noindex" },
       { property: "og:title", content: "Competitive Intelligence — WaveOS" },
-      { property: "og:description", content: "Evidence-backed public competitor research and documented comparisons." },
+      {
+        property: "og:description",
+        content: "Evidence-backed public competitor research and documented comparisons.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
@@ -87,9 +101,119 @@ interface ReportRow {
   created_at: string;
 }
 
-type PublicResearchResult = {report:ResearchReport;inputUrl:string;researchedAt:string;methodology:string};
+type PublicResearchResult = {
+  report: ResearchReport;
+  inputUrl: string;
+  portfolioUrls?: string[];
+  researchedAt: string;
+  methodology: string;
+};
 type ResearchMode = "brand" | "independent";
-type IndependentResearchResult = {comparison:IndependentComparison;inputUrlA:string;inputUrlB:string;researchedAt:string;methodology:string;sourcesFiltered?:boolean};
+type IndependentResearchResult = {
+  comparison: IndependentComparison;
+  inputUrlA: string;
+  inputUrlB: string;
+  researchedAt: string;
+  methodology: string;
+  sourcesFiltered?: boolean;
+};
+
+function ResearchScorecard({ report }: { report: ResearchReport }) {
+  const scorecard = useMemo(() => scoreResearchReport(report), [report]);
+  const plan = useMemo(() => buildNinetyDayPlan(report), [report]);
+  return (
+    <section className="rounded-2xl border border-intelligence/30 bg-gradient-to-br from-intelligence/15 via-card to-primary/5 p-4 sm:p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-intelligence">
+            WaveOS assessment
+          </p>
+          <h3 className="mt-1 text-lg font-semibold">
+            {report.company ?? "Public brand"} scorecard
+          </h3>
+          <p className="mt-1 max-w-2xl text-xs text-muted-foreground">{scorecard.methodology}</p>
+        </div>
+        <div className="rounded-2xl border border-intelligence/30 bg-background/70 px-5 py-3 text-center">
+          <div className="text-3xl font-bold text-intelligence">
+            {scorecard.overall ?? "—"}
+            {scorecard.overall !== null ? "%" : ""}
+          </div>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Overall assessment
+          </div>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {scorecard.categories.map((category) => (
+          <article
+            key={category.key}
+            className="rounded-xl border border-border bg-background/55 p-3"
+          >
+            <div className="flex items-center justify-between gap-2 text-xs">
+              <span className="font-semibold text-foreground">{category.label}</span>
+              <span className="font-bold text-intelligence">
+                {category.score === null ? "Not enough evidence" : `${category.score}%`}
+              </span>
+            </div>
+            <div
+              className="mt-3 h-2 overflow-hidden rounded-full bg-elevated"
+              aria-label={`${category.label} evidence coverage ${category.coverage}%`}
+            >
+              <div
+                className="h-full rounded-full bg-intelligence"
+                style={{ width: `${category.coverage}%` }}
+              />
+            </div>
+            <p className="mt-2 text-[10px] text-muted-foreground">
+              {category.coverage}% evidence coverage · {category.sourceCount} source
+              {category.sourceCount === 1 ? "" : "s"} · {category.confidence} confidence
+            </p>
+          </article>
+        ))}
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-3">
+        {plan.map((phase) => (
+          <article
+            key={phase.window}
+            className="rounded-xl border border-border bg-background/45 p-4"
+          >
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-intelligence">
+              {phase.window}
+            </p>
+            <h4 className="mt-1 font-semibold">{phase.focus}</h4>
+            <ul className="mt-2 space-y-2 text-xs text-muted-foreground">
+              {phase.actions.map((action) => (
+                <li key={action}>• {action}</li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          onClick={() => window.location.assign("/my-agent?from=competitive-intelligence")}
+        >
+          Investigate with My Agent
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => window.location.assign("/campaigns?from=competitive-intelligence")}
+        >
+          Create a campaign
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => window.location.assign("/create?from=competitive-intelligence")}
+        >
+          Prepare content
+        </Button>
+      </div>
+    </section>
+  );
+}
 
 interface CompetitiveDraft {
   researchResults?: PublicResearchResult[];
@@ -147,7 +271,9 @@ function CompetitiveIntelligencePage() {
   const [researchMode, setResearchMode] = useState<ResearchMode>("brand");
   const [independentUrlA, setIndependentUrlA] = useState("");
   const [independentUrlB, setIndependentUrlB] = useState("");
-  const [independentResult, setIndependentResult] = useState<IndependentResearchResult | null>(null);
+  const [independentResult, setIndependentResult] = useState<IndependentResearchResult | null>(
+    null,
+  );
   const [showManual, setShowManual] = useState(false);
   const [researchResults, setResearchResults] = useState<PublicResearchResult[]>([]);
   const [openedReport, setOpenedReport] = useState<ReportRow | null>(null);
@@ -156,44 +282,86 @@ function CompetitiveIntelligencePage() {
   currentWorkspaceRef.current = workspaceId;
   const researchFn = useServerFn(researchCompetitor);
   const independentFn = useServerFn(compareBusinessesIndependent);
-  const research = useMutation({ mutationFn: async (input: {url:string;workspaceId:string}) => {
-    const result = await researchFn({data:input});
-    return {...result,workspaceId:input.workspaceId};
-  }, onSuccess: result => {
-    if (result.workspaceId !== currentWorkspaceRef.current) return;
-    if (result.sourcesFiltered) toast.warning(RESEARCH_SOURCE_WARNING);
-    setResearchResults(current=>{
-      const next=[...current.filter(item=>item.inputUrl!==result.inputUrl),result].slice(-5);
-      window.sessionStorage.setItem(`waveos-research-${result.workspaceId}`,JSON.stringify(next));
-      return next;
-    });
-  } });
-  const independentResearch = useMutation({
-    mutationFn: async (input: {urlA:string;urlB:string;workspaceId:string}) => {
-      const result = await independentFn({data:input});
-      return {...result,workspaceId:input.workspaceId};
+  const research = useMutation({
+    mutationFn: async (input: { url: string; workspaceId: string }) => {
+      const result = await researchFn({ data: input });
+      return { ...result, workspaceId: input.workspaceId };
     },
-    onSuccess: result => {
+    onSuccess: (result) => {
+      if (result.workspaceId !== currentWorkspaceRef.current) return;
+      if (result.sourcesFiltered) toast.warning(RESEARCH_SOURCE_WARNING);
+      setResearchResults((current) => {
+        const next = [...current.filter((item) => item.inputUrl !== result.inputUrl), result].slice(
+          -5,
+        );
+        window.sessionStorage.setItem(
+          `waveos-research-${result.workspaceId}`,
+          JSON.stringify(next),
+        );
+        return next;
+      });
+    },
+  });
+  const independentResearch = useMutation({
+    mutationFn: async (input: { urlA: string; urlB: string; workspaceId: string }) => {
+      const result = await independentFn({ data: input });
+      return { ...result, workspaceId: input.workspaceId };
+    },
+    onSuccess: (result) => {
       if (result.workspaceId !== currentWorkspaceRef.current) return;
       if (result.sourcesFiltered) toast.warning(RESEARCH_SOURCE_WARNING);
       setIndependentResult(result);
-      window.sessionStorage.setItem(`waveos-independent-research-${result.workspaceId}`, JSON.stringify(result));
+      window.sessionStorage.setItem(
+        `waveos-independent-research-${result.workspaceId}`,
+        JSON.stringify(result),
+      );
     },
   });
 
-  useEffect(()=>{
-    setResearchInput(""); setResearchMode("brand"); setIndependentUrlA(""); setIndependentUrlB(""); setIndependentResult(null); setResearchResults([]); setOpenedReport(null); setDraft({...DEFAULT_DRAFT,metrics:DEFAULT_DRAFT.metrics.map(metric=>({...metric}))});setDirty(false);
+  useEffect(() => {
+    setResearchInput("");
+    setResearchMode("brand");
+    setIndependentUrlA("");
+    setIndependentUrlB("");
+    setIndependentResult(null);
+    setResearchResults([]);
+    setOpenedReport(null);
+    setDraft({ ...DEFAULT_DRAFT, metrics: DEFAULT_DRAFT.metrics.map((metric) => ({ ...metric })) });
+    setDirty(false);
     research.reset();
     if (!workspaceId) return;
     try {
-      const stored = JSON.parse(window.sessionStorage.getItem(`waveos-research-${workspaceId}`) ?? "[]");
-      if (Array.isArray(stored)) setResearchResults(stored.flatMap(item=>{const parsed=researchReportSchema.safeParse(item.report);return parsed.success && typeof item.inputUrl==="string" && typeof item.researchedAt==="string" && typeof item.methodology==="string"?[{...item,report:parsed.data}]:[];}).slice(-5));
-      const storedIndependent = JSON.parse(window.sessionStorage.getItem(`waveos-independent-research-${workspaceId}`) ?? "null");
-      if (storedIndependent && independentComparisonSchema.safeParse(storedIndependent.comparison).success) setIndependentResult(storedIndependent);
-    } catch { /* Keep old manual reports intact if local research cannot restore. */ }
-  },[workspaceId]);
+      const stored = JSON.parse(
+        window.sessionStorage.getItem(`waveos-research-${workspaceId}`) ?? "[]",
+      );
+      if (Array.isArray(stored))
+        setResearchResults(
+          stored
+            .flatMap((item) => {
+              const parsed = researchReportSchema.safeParse(item.report);
+              return parsed.success &&
+                typeof item.inputUrl === "string" &&
+                typeof item.researchedAt === "string" &&
+                typeof item.methodology === "string"
+                ? [{ ...item, report: parsed.data }]
+                : [];
+            })
+            .slice(-5),
+        );
+      const storedIndependent = JSON.parse(
+        window.sessionStorage.getItem(`waveos-independent-research-${workspaceId}`) ?? "null",
+      );
+      if (
+        storedIndependent &&
+        independentComparisonSchema.safeParse(storedIndependent.comparison).success
+      )
+        setIndependentResult(storedIndependent);
+    } catch {
+      /* Keep old manual reports intact if local research cannot restore. */
+    }
+  }, [workspaceId]);
   function runResearch(url: string) {
-    if (workspaceId) research.mutate({url,workspaceId});
+    if (workspaceId) research.mutate({ url, workspaceId });
   }
   const workflowDraft = useWorkflowDraft<CompetitiveDraft>({
     workspaceId,
@@ -239,7 +407,10 @@ function CompetitiveIntelligencePage() {
       if (draft.websiteUrl.trim() && !isValidHttpsUrl(normalizeHttpsUrl(draft.websiteUrl))) {
         throw new Error("Use a valid HTTPS website URL or leave it blank.");
       }
-      if (result.score === null) throw new Error("Add at least two comparable metrics with source notes and observation dates.");
+      if (result.score === null)
+        throw new Error(
+          "Add at least two comparable metrics with source notes and observation dates.",
+        );
       const { data: auth, error: authError } = await supabase.auth.getUser();
       if (authError || !auth.user) throw authError ?? new Error("Sign in to save this report.");
 
@@ -339,7 +510,15 @@ function CompetitiveIntelligencePage() {
 
   async function saveServerDraft() {
     try {
-      await workflowDraft.save.mutateAsync({...draft,researchResults,researchInput,researchMode,independentUrlA,independentUrlB,independentResult});
+      await workflowDraft.save.mutateAsync({
+        ...draft,
+        researchResults,
+        researchInput,
+        researchMode,
+        independentUrlA,
+        independentUrlB,
+        independentResult,
+      });
       setDirty(false);
       toast.success("Private server draft saved.");
     } catch (error) {
@@ -354,25 +533,137 @@ function CompetitiveIntelligencePage() {
     return (
       <div className="space-y-5 pb-10">
         <header className="flex items-start justify-between gap-4">
-          <div><div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-intelligence"><Sparkles className="h-4 w-4" /> WaveOS Intelligence</div><h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Competitive Intelligence</h1><p className="mt-2 max-w-2xl text-sm text-muted-foreground">Track competitors, compare documented signals, and turn your research into clearer content opportunities.</p></div>
-          <Button className="hidden sm:inline-flex" onClick={() => setScreen("editor")}><Plus /> Add observation</Button>
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-intelligence">
+              <Sparkles className="h-4 w-4" /> WaveOS Intelligence
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Competitive Intelligence</h1>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Track competitors, compare documented signals, and turn your research into clearer
+              content opportunities.
+            </p>
+          </div>
+          <Button className="hidden sm:inline-flex" onClick={() => setScreen("editor")}>
+            <Plus /> Add observation
+          </Button>
         </header>
         <div className="grid grid-cols-3 gap-2 rounded-xl border border-border bg-background/60 p-1 text-xs sm:w-fit">
-          <button className="min-h-10 rounded-lg bg-intelligence/15 px-3 font-semibold text-intelligence">Overview</button><button className="min-h-10 rounded-lg px-3 text-muted-foreground" onClick={() => window.document.getElementById("tracked-competitors")?.scrollIntoView({behavior:"smooth"})}>Competitors</button><button className="min-h-10 rounded-lg px-3 text-muted-foreground" onClick={() => window.document.getElementById("opportunities")?.scrollIntoView({behavior:"smooth"})}>Opportunities</button>
+          <button className="min-h-10 rounded-lg bg-intelligence/15 px-3 font-semibold text-intelligence">
+            Overview
+          </button>
+          <button
+            className="min-h-10 rounded-lg px-3 text-muted-foreground"
+            onClick={() =>
+              window.document
+                .getElementById("tracked-competitors")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
+          >
+            Competitors
+          </button>
+          <button
+            className="min-h-10 rounded-lg px-3 text-muted-foreground"
+            onClick={() =>
+              window.document
+                .getElementById("opportunities")
+                ?.scrollIntoView({ behavior: "smooth" })
+            }
+          >
+            Opportunities
+          </button>
         </div>
         <section className="rounded-2xl border border-intelligence/30 bg-gradient-to-br from-intelligence/20 via-card to-primary/5 p-5">
-          <div className="flex items-center gap-2 text-sm font-semibold text-intelligence"><Sparkles className="h-4 w-4" /> WaveOS Intelligence</div>
-          <h2 className="mt-3 text-xl font-semibold">{tracked.length ? "Your competitive workspace is ready" : "Start building your competitive picture"}</h2>
-          <p className="mt-2 text-sm text-muted-foreground">{tracked.length ? `${tracked.length} competitor${tracked.length === 1 ? "" : "s"} tracked. Add documented comparisons to surface evidence-backed gaps and opportunities.` : "Add a competitor and record public observations. WaveOS will organize the evidence without scraping accounts or inventing metrics."}</p>
-          <Button variant="outline" className="mt-4 border-intelligence/30" onClick={() => setScreen("editor")}>{tracked.length ? "Add observation" : "Add first competitor"} <ArrowRight /></Button>
+          <div className="flex items-center gap-2 text-sm font-semibold text-intelligence">
+            <Sparkles className="h-4 w-4" /> WaveOS Intelligence
+          </div>
+          <h2 className="mt-3 text-xl font-semibold">
+            {tracked.length
+              ? "Your competitive workspace is ready"
+              : "Start building your competitive picture"}
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {tracked.length
+              ? `${tracked.length} competitor${tracked.length === 1 ? "" : "s"} tracked. Add documented comparisons to surface evidence-backed gaps and opportunities.`
+              : "Add a competitor and record public observations. WaveOS will organize the evidence without scraping accounts or inventing metrics."}
+          </p>
+          <Button
+            variant="outline"
+            className="mt-4 border-intelligence/30"
+            onClick={() => setScreen("editor")}
+          >
+            {tracked.length ? "Add observation" : "Add first competitor"} <ArrowRight />
+          </Button>
         </section>
         <section className="grid grid-cols-2 gap-3">
-          <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4"><div className="text-3xl font-bold text-primary">{tracked.length}</div><div className="mt-1 text-xs text-muted-foreground">Competitors tracked</div></div>
-          <div className="rounded-2xl border border-intelligence/20 bg-intelligence/10 p-4"><div className="text-3xl font-bold text-intelligence">{tracked.filter((c) => c.notes || c.website_url).length}</div><div className="mt-1 text-xs text-muted-foreground">With documented context</div></div>
+          <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4">
+            <div className="text-3xl font-bold text-primary">{tracked.length}</div>
+            <div className="mt-1 text-xs text-muted-foreground">Competitors tracked</div>
+          </div>
+          <div className="rounded-2xl border border-intelligence/20 bg-intelligence/10 p-4">
+            <div className="text-3xl font-bold text-intelligence">
+              {tracked.filter((c) => c.notes || c.website_url).length}
+            </div>
+            <div className="mt-1 text-xs text-muted-foreground">With documented context</div>
+          </div>
         </section>
-        <section id="tracked-competitors" className="surface-card p-4 sm:p-5"><div className="flex items-center justify-between"><div><p className="text-xs font-semibold uppercase tracking-wider text-primary">Tracked competitors</p><h2 className="mt-1 text-lg font-semibold">Competitors</h2></div><Button size="sm" variant="outline" onClick={() => setScreen("editor")}><Plus /> Add</Button></div><div className="mt-4 grid gap-3 sm:grid-cols-2">{tracked.map((competitor) => <button key={competitor.id} type="button" onClick={() => {selectCompetitor(competitor.id);setScreen("editor");}} className="rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary/40"><div className="font-semibold">{competitor.name}</div><div className="mt-1 truncate text-xs text-muted-foreground">{competitor.website_url || "No website added"}</div><div className="mt-3 text-xs text-primary">Open research →</div></button>)}{!competitors.isLoading && !tracked.length && <div className="col-span-full rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">No competitors yet. Add your first public observation to begin.</div>}</div></section>
-        <section id="opportunities" className="surface-card p-5"><div className="flex items-center gap-2 font-semibold"><Target className="h-4 w-4 text-campaign" /> Opportunities</div><p className="mt-2 text-sm text-muted-foreground">{tracked.length ? "WaveOS only surfaces opportunities from comparisons you document. Open a competitor to add metrics and source notes." : "Opportunities will appear after you document comparable competitor signals."}</p><Button variant="ghost" className="mt-2 px-0 text-intelligence" onClick={() => setScreen("editor")}>Document a comparison <ArrowRight /></Button></section>
-        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-xs text-muted-foreground">Competitive Intelligence uses cited public research and documented manual observations. Private account metrics are never inferred.</div>
+        <section id="tracked-competitors" className="surface-card p-4 sm:p-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-primary">
+                Tracked competitors
+              </p>
+              <h2 className="mt-1 text-lg font-semibold">Competitors</h2>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setScreen("editor")}>
+              <Plus /> Add
+            </Button>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {tracked.map((competitor) => (
+              <button
+                key={competitor.id}
+                type="button"
+                onClick={() => {
+                  selectCompetitor(competitor.id);
+                  setScreen("editor");
+                }}
+                className="rounded-xl border border-border bg-background/50 p-4 text-left hover:border-primary/40"
+              >
+                <div className="font-semibold">{competitor.name}</div>
+                <div className="mt-1 truncate text-xs text-muted-foreground">
+                  {competitor.website_url || "No website added"}
+                </div>
+                <div className="mt-3 text-xs text-primary">Open research →</div>
+              </button>
+            ))}
+            {!competitors.isLoading && !tracked.length && (
+              <div className="col-span-full rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                No competitors yet. Add your first public observation to begin.
+              </div>
+            )}
+          </div>
+        </section>
+        <section id="opportunities" className="surface-card p-5">
+          <div className="flex items-center gap-2 font-semibold">
+            <Target className="h-4 w-4 text-campaign" /> Opportunities
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {tracked.length
+              ? "WaveOS only surfaces opportunities from comparisons you document. Open a competitor to add metrics and source notes."
+              : "Opportunities will appear after you document comparable competitor signals."}
+          </p>
+          <Button
+            variant="ghost"
+            className="mt-2 px-0 text-intelligence"
+            onClick={() => setScreen("editor")}
+          >
+            Document a comparison <ArrowRight />
+          </Button>
+        </section>
+        <div className="rounded-xl border border-warning/30 bg-warning/10 p-4 text-xs text-muted-foreground">
+          Competitive Intelligence uses cited public research and documented manual observations.
+          Private account metrics are never inferred.
+        </div>
       </div>
     );
   }
@@ -382,10 +673,17 @@ function CompetitiveIntelligencePage() {
       <UnsavedChangesGuard dirty={dirty} subject="this comparison" />
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <button type="button" onClick={() => setScreen("overview")} className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-intelligence"><ArrowRight className="h-4 w-4 rotate-180" /> Competitive overview</button>
+          <button
+            type="button"
+            onClick={() => setScreen("overview")}
+            className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-intelligence"
+          >
+            <ArrowRight className="h-4 w-4 rotate-180" /> Competitive overview
+          </button>
           <h1 className="mt-2 text-2xl font-semibold sm:text-3xl">Research a competitor</h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Paste their website or public social profile and WaveOS will use it as the starting point for competitive research.
+            Paste their website or public social profile and WaveOS will use it as the starting
+            point for competitive research.
           </p>
         </div>
         <Button
@@ -412,7 +710,15 @@ function CompetitiveIntelligencePage() {
               variant="outline"
               onClick={() => {
                 const restored = workflowDraft.data?.payload;
-                if (restored) {setDraft(restored);setResearchResults(restored.researchResults??[]);setResearchInput(restored.researchInput??"");setResearchMode(restored.researchMode??"brand");setIndependentUrlA(restored.independentUrlA??"");setIndependentUrlB(restored.independentUrlB??"");setIndependentResult(restored.independentResult??null);}
+                if (restored) {
+                  setDraft(restored);
+                  setResearchResults(restored.researchResults ?? []);
+                  setResearchInput(restored.researchInput ?? "");
+                  setResearchMode(restored.researchMode ?? "brand");
+                  setIndependentUrlA(restored.independentUrlA ?? "");
+                  setIndependentUrlB(restored.independentUrlB ?? "");
+                  setIndependentResult(restored.independentResult ?? null);
+                }
                 setDirty(false);
               }}
             >
@@ -426,43 +732,151 @@ function CompetitiveIntelligencePage() {
       )}
 
       <section className="overflow-hidden rounded-2xl border border-intelligence/30 bg-gradient-to-br from-intelligence/15 via-card to-primary/5 p-5 sm:p-7">
-        <div className="flex items-center gap-2 text-sm font-semibold text-intelligence"><Sparkles className="h-4 w-4" /> WaveOS Intelligence</div>
+        <div className="flex items-center gap-2 text-sm font-semibold text-intelligence">
+          <Sparkles className="h-4 w-4" /> WaveOS Intelligence
+        </div>
         <h2 className="mt-3 text-xl font-semibold sm:text-2xl">Competitive Intelligence</h2>
-        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">Choose whether WaveOS should compare a competitor to this workspace's brand profile or run a neutral comparison between two outside businesses.</p>
+        <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+          Choose whether WaveOS should compare a competitor to this workspace's brand profile or run
+          a neutral comparison between two outside businesses.
+        </p>
 
         <div className="mt-5 grid gap-2 sm:grid-cols-2">
-          <button type="button" onClick={()=>setResearchMode("brand")} className={cn("rounded-xl border p-4 text-left transition",researchMode==="brand"?"border-intelligence bg-intelligence/10":"border-border bg-background/50")}>
+          <button
+            type="button"
+            onClick={() => setResearchMode("brand")}
+            className={cn(
+              "rounded-xl border p-4 text-left transition",
+              researchMode === "brand"
+                ? "border-intelligence bg-intelligence/10"
+                : "border-border bg-background/50",
+            )}
+          >
             <div className="font-semibold">My Brand vs Competitor</div>
-            <div className="mt-1 text-xs text-muted-foreground">Uses this workspace's Brand Voice, services, audience and positioning.</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Uses this workspace's Brand Voice, services, audience and positioning.
+            </div>
           </button>
-          <button type="button" onClick={()=>{setResearchMode("independent");setShowManual(false);}} className={cn("rounded-xl border p-4 text-left transition",researchMode==="independent"?"border-intelligence bg-intelligence/10":"border-border bg-background/50")}>
+          <button
+            type="button"
+            onClick={() => {
+              setResearchMode("independent");
+              setShowManual(false);
+            }}
+            className={cn(
+              "rounded-xl border p-4 text-left transition",
+              researchMode === "independent"
+                ? "border-intelligence bg-intelligence/10"
+                : "border-border bg-background/50",
+            )}
+          >
             <div className="font-semibold">Compare Two Businesses</div>
-            <div className="mt-1 text-xs text-muted-foreground">Independent public comparison. Your WaveOS Brand Voice and workspace profile are not used.</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Independent public comparison. Your WaveOS Brand Voice and workspace profile are not
+              used.
+            </div>
           </button>
         </div>
 
-        {researchMode==="brand" ? <>
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <label className="relative flex-1">
-              <Globe2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-              <input className="min-h-14 w-full rounded-xl border border-border bg-background pl-12 pr-4 text-base outline-none focus:border-intelligence focus:ring-2 focus:ring-intelligence/20" inputMode="url" placeholder="Competitor website, Google listing or social profile" value={researchInput} onChange={(event) => setResearchInput(event.target.value)} />
-            </label>
-            <Button className="min-h-14 rounded-xl px-6" disabled={!researchInput.trim() || research.isPending} onClick={() => runResearch(researchInput)}>
-              {research.isPending ? <SurferWaveSpinner className="size-5" /> : <Search />} {research.isPending ? "Researching…" : "Analyze Competitor"}
+        {researchMode === "brand" ? (
+          <>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <label className="relative flex-1">
+                <Globe2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                <textarea
+                  aria-label="Competitor website, Google listing or social profile"
+                  className="min-h-28 w-full resize-y rounded-xl border border-border bg-background py-4 pl-12 pr-4 text-base outline-none focus:border-intelligence focus:ring-2 focus:ring-intelligence/20"
+                  inputMode="url"
+                  placeholder={
+                    "Paste one or more sources — website, Google listing, Instagram, Facebook, LinkedIn…\nOne URL per line"
+                  }
+                  value={researchInput}
+                  onChange={(event) => setResearchInput(event.target.value)}
+                />
+              </label>
+              <Button
+                className="min-h-14 rounded-xl px-6"
+                disabled={!researchInput.trim() || research.isPending}
+                onClick={() => runResearch(researchInput)}
+              >
+                {research.isPending ? <SurferWaveSpinner className="size-5" /> : <Search />}{" "}
+                {research.isPending ? "Researching…" : "Analyze Competitor"}
+              </Button>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">
+              Brand Comparison · Add up to 12 public URLs for a stronger source portfolio. WaveOS
+              also discovers other attributable public sources.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowManual((value) => !value)}
+              className="mt-4 min-h-10 text-sm font-semibold text-intelligence"
+            >
+              {showManual ? "Hide manual details" : "Add details manually"}
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <label>
+                <span className="mb-1 block text-xs font-semibold text-muted-foreground">
+                  Business A
+                </span>
+                <div className="relative">
+                  <Globe2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    className="min-h-14 w-full rounded-xl border border-border bg-background pl-12 pr-4 text-base outline-none focus:border-intelligence focus:ring-2 focus:ring-intelligence/20"
+                    inputMode="url"
+                    placeholder="Website, Google, Facebook, Instagram…"
+                    value={independentUrlA}
+                    onChange={(e) => setIndependentUrlA(e.target.value)}
+                  />
+                </div>
+              </label>
+              <label>
+                <span className="mb-1 block text-xs font-semibold text-muted-foreground">
+                  Business B
+                </span>
+                <div className="relative">
+                  <Globe2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    className="min-h-14 w-full rounded-xl border border-border bg-background pl-12 pr-4 text-base outline-none focus:border-intelligence focus:ring-2 focus:ring-intelligence/20"
+                    inputMode="url"
+                    placeholder="Competitor website or public profile"
+                    value={independentUrlB}
+                    onChange={(e) => setIndependentUrlB(e.target.value)}
+                  />
+                </div>
+              </label>
+            </div>
+            <Button
+              className="mt-3 min-h-14 w-full rounded-xl px-6 sm:w-auto"
+              disabled={
+                !independentUrlA.trim() || !independentUrlB.trim() || independentResearch.isPending
+              }
+              onClick={() =>
+                workspaceId &&
+                independentResearch.mutate({
+                  urlA: independentUrlA,
+                  urlB: independentUrlB,
+                  workspaceId,
+                })
+              }
+            >
+              {independentResearch.isPending ? (
+                <SurferWaveSpinner className="size-5" />
+              ) : (
+                <Search />
+              )}{" "}
+              {independentResearch.isPending ? "Comparing public sources…" : "Compare Businesses"}
             </Button>
-          </div>
-          <p className="mt-3 text-xs text-muted-foreground">Brand Comparison · Recommendations are tailored using the active workspace profile.</p>
-          <button type="button" onClick={() => setShowManual((value) => !value)} className="mt-4 min-h-10 text-sm font-semibold text-intelligence">{showManual ? "Hide manual details" : "Add details manually"}</button>
-        </> : <>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <label><span className="mb-1 block text-xs font-semibold text-muted-foreground">Business A</span><div className="relative"><Globe2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" /><input className="min-h-14 w-full rounded-xl border border-border bg-background pl-12 pr-4 text-base outline-none focus:border-intelligence focus:ring-2 focus:ring-intelligence/20" inputMode="url" placeholder="Website, Google, Facebook, Instagram…" value={independentUrlA} onChange={e=>setIndependentUrlA(e.target.value)} /></div></label>
-            <label><span className="mb-1 block text-xs font-semibold text-muted-foreground">Business B</span><div className="relative"><Globe2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" /><input className="min-h-14 w-full rounded-xl border border-border bg-background pl-12 pr-4 text-base outline-none focus:border-intelligence focus:ring-2 focus:ring-intelligence/20" inputMode="url" placeholder="Competitor website or public profile" value={independentUrlB} onChange={e=>setIndependentUrlB(e.target.value)} /></div></label>
-          </div>
-          <Button className="mt-3 min-h-14 w-full rounded-xl px-6 sm:w-auto" disabled={!independentUrlA.trim()||!independentUrlB.trim()||independentResearch.isPending} onClick={()=>workspaceId&&independentResearch.mutate({urlA:independentUrlA,urlB:independentUrlB,workspaceId})}>
-            {independentResearch.isPending?<SurferWaveSpinner className="size-5"/>:<Search/>} {independentResearch.isPending?"Comparing public sources…":"Compare Businesses"}
-          </Button>
-          <div className="mt-3 rounded-lg border border-success/25 bg-success/10 p-3 text-xs text-muted-foreground"><span className="font-semibold text-foreground">Independent Comparison.</span> This mode intentionally excludes your logged-in workspace's Brand Voice, services, audience, geography and positioning.</div>
-        </>}
+            <div className="mt-3 rounded-lg border border-success/25 bg-success/10 p-3 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">Independent Comparison.</span> This
+              mode intentionally excludes your logged-in workspace's Brand Voice, services,
+              audience, geography and positioning.
+            </div>
+          </>
+        )}
       </section>
 
       {(research.isPending || independentResearch.isPending) && (
@@ -472,26 +886,365 @@ function CompetitiveIntelligencePage() {
           detail="WaveOS is gathering and checking cited public information."
         />
       )}
-      {(research.isError || independentResearch.isError) && <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">{(researchMode === "independent" ? independentResearch.error : research.error)?.message || RESEARCH_FAILURE_MESSAGE}</p>}
-      {researchMode==="independent" && independentResult && <section className="space-y-5 border-t border-border pt-5">
-        <header><div className="text-xs font-semibold uppercase tracking-[0.16em] text-intelligence">Independent Comparison</div><h2 className="mt-1 text-xl font-semibold">{independentResult.comparison.businessA.company??"Business A"} <span className="text-muted-foreground">vs</span> {independentResult.comparison.businessB.company??"Business B"}</h2><p className="mt-1 text-xs text-muted-foreground">Public-source comparison · {new Date(independentResult.researchedAt).toLocaleString()} · Workspace Brand Voice excluded</p></header>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {[independentResult.comparison.businessA,independentResult.comparison.businessB].map((business,index)=><article key={index} className="surface-card p-4"><div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Business {index===0?"A":"B"}</div><h3 className="mt-1 text-lg font-semibold">{business.company??"Identity not found"}</h3><p className="mt-1 text-sm text-muted-foreground">{business.industry??"Industry not found"} · {business.market??"Market not found"}</p>{business.website&&<a href={business.website} target="_blank" rel="noopener noreferrer" className="mt-2 block break-all text-xs text-primary">{business.website}</a>}</article>)}
-        </div>
-        <div className="space-y-3">{independentResult.comparison.comparison.map((row,index)=><article key={index} className="rounded-xl border border-border p-4"><h3 className="font-semibold text-intelligence">{row.title}</h3><div className="mt-3 grid gap-4 sm:grid-cols-2"><div><div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Business A</div><p className="mt-1 text-sm">{row.businessA.text||"Not found"}</p></div><div><div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Business B</div><p className="mt-1 text-sm">{row.businessB.text||"Not found"}</p></div></div><div className="mt-3 border-t border-border pt-3"><div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Takeaway</div><p className="mt-1 text-sm">{row.takeaway.text||"No supported takeaway."}</p><div className="mt-2 flex flex-wrap gap-2">{[...row.businessA.sources,...row.businessB.sources,...row.takeaway.sources].filter((url,i,all)=>all.indexOf(url)===i).map((url,i)=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary">Source {i+1}</a>)}</div></div></article>)}</div>
-        <section className="border-t border-border pt-4"><h3 className="font-semibold">Unclaimed opportunities</h3><div className="mt-3 space-y-3">{independentResult.comparison.opportunities.map((item,index)=><div key={index}><p className="text-sm">{item.text}</p><div className="mt-1 flex flex-wrap gap-2">{item.sources.map((url,i)=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary">Evidence {i+1}</a>)}</div></div>)}</div></section>
-        <details className="border-t border-border pt-3 text-xs text-muted-foreground"><summary>Methodology and coverage</summary><p className="mt-2">{independentResult.methodology}</p>{independentResult.comparison.limitations.map((item,i)=><p key={i} className="mt-2">{item}</p>)}</details>
-      </section>}
-      {researchMode==="brand" && researchResults.map(result=><section key={result.inputUrl} className="space-y-5 border-t border-border pt-5">
-        <header className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">{result.report.company ?? "Identity not found"}</h2><p className="mt-1 text-xs text-muted-foreground">Public-source analysis · {new Date(result.researchedAt).toLocaleString()}</p></div><div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"><Button className="shrink-0" variant="outline" onClick={()=>{setResearchInput(result.inputUrl);setShowManual(true);update("competitorName",result.report.company??"");update("websiteUrl",result.report.website??result.inputUrl);}}>Edit</Button><Button className="shrink-0" variant="outline" disabled={research.isPending} onClick={()=>{setResearchInput(result.inputUrl);runResearch(result.inputUrl);}}>Refresh analysis</Button><Button className="shrink-0" variant="outline" onClick={()=>window.document.getElementById("competitive-landscape")?.scrollIntoView()}>Compare</Button><Button className="shrink-0" variant="outline" onClick={()=>{setResearchInput("");window.scrollTo({top:0,behavior:"smooth"});}}>Add another competitor</Button></div></header>
-        <dl className="grid grid-cols-2 gap-4 text-sm"><div><dt className="text-muted-foreground">Industry</dt><dd>{result.report.industry??"Not found"}</dd></div><div><dt className="text-muted-foreground">Market</dt><dd>{result.report.market??"Not found"}</dd></div><div className="col-span-2"><dt className="text-muted-foreground">Website</dt><dd className="break-all">{result.report.website?<a href={result.report.website} target="_blank" rel="noopener noreferrer" className="text-primary">{result.report.website}</a>:"Not found"}</dd></div></dl>
-        <div className="flex flex-wrap gap-2">{result.report.channels.map(url=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="max-w-full break-all text-xs text-primary">{url}</a>)}</div>
-        <div className="grid gap-5 sm:grid-cols-2">{result.report.sections.map(section=><section key={section.title} className="border-t border-border pt-4"><h3 className="font-semibold text-intelligence">{section.title}</h3><ul className="mt-3 space-y-3 text-sm">{section.findings.map((finding,index)=><li key={index}><p>{finding.text}</p><div className="mt-1 flex flex-wrap gap-2">{finding.sources.map((url,i)=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary">Source {i+1}</a>)}</div></li>)}</ul>{!section.findings.length&&<p className="mt-2 text-sm text-muted-foreground">Not found in accessible sources.</p>}</section>)}</div>
-        <section className="border-t border-border pt-4"><h3 className="font-semibold">Original content ideas</h3><div className="mt-3 space-y-4">{result.report.ideas.map((idea,index)=><div key={index}><p className="text-sm">{idea.text}</p><div className="my-2 flex flex-wrap gap-2">{idea.sources.map((url,i)=><a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary">Evidence {i+1}</a>)}</div><Button variant="outline" onClick={()=>void navigate({to:"/create",search:{brief:idea.text,briefWorkspace:workspaceId??undefined}})}>Create this content <ArrowRight /></Button></div>)}</div></section>
-        <details className="border-t border-border pt-3 text-xs text-muted-foreground"><summary>Methodology and coverage</summary><p className="mt-2">{result.methodology}</p>{result.report.limitations.map((item,i)=><p key={i} className="mt-2">{item}</p>)}</details>
-      </section>)}
-      {researchMode==="brand" && researchResults.length>=2&&<section id="competitive-landscape" className="space-y-4 border-t border-border pt-5"><h2 className="text-xl font-semibold">Competitive Landscape</h2><p className="text-xs text-muted-foreground">Qualitative comparison of reviewed public sources; not market-share or performance scoring.</p><div className="grid gap-3 sm:grid-cols-2">{researchResults.map(item=><article key={item.inputUrl} className="rounded-lg border border-border p-4"><h3 className="font-semibold">{item.report.company??"Identity not found"}</h3><p className="mt-2 text-sm text-muted-foreground">{item.report.industry??"Industry not found"} · {item.report.market??"Market not found"}</p>{item.report.sections.filter(section=>/Messaging|Strengths|Opportunities|Social/.test(section.title)).map(section=><div key={section.title} className="mt-3"><h4 className="text-xs font-semibold text-intelligence">{section.title}</h4><p className="mt-1 text-xs">{section.findings[0]?.text??"Not found"}</p>{section.findings[0]?.sources.map((url,i)=><a key={url} href={url} className="mr-2 text-xs text-primary" target="_blank" rel="noopener noreferrer">Source {i+1}</a>)}</div>)}</article>)}</div></section>}
-      <div className={cn(researchMode==="brand" && showManual ? "grid" : "hidden", "gap-5 xl:grid-cols-[15rem_minmax(0,1fr)]")}>
+      {(research.isError || independentResearch.isError) && (
+        <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">
+          {(researchMode === "independent" ? independentResearch.error : research.error)?.message ||
+            RESEARCH_FAILURE_MESSAGE}
+        </p>
+      )}
+      {researchMode === "independent" && independentResult && (
+        <section className="space-y-5 border-t border-border pt-5">
+          <header>
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-intelligence">
+              Independent Comparison
+            </div>
+            <h2 className="mt-1 text-xl font-semibold">
+              {independentResult.comparison.businessA.company ?? "Business A"}{" "}
+              <span className="text-muted-foreground">vs</span>{" "}
+              {independentResult.comparison.businessB.company ?? "Business B"}
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Public-source comparison · {new Date(independentResult.researchedAt).toLocaleString()}{" "}
+              · Workspace Brand Voice excluded
+            </p>
+          </header>
+          <div className="grid gap-4 xl:grid-cols-2">
+            <ResearchScorecard report={independentResult.comparison.businessA} />
+            <ResearchScorecard report={independentResult.comparison.businessB} />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {[independentResult.comparison.businessA, independentResult.comparison.businessB].map(
+              (business, index) => (
+                <article key={index} className="surface-card p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Business {index === 0 ? "A" : "B"}
+                  </div>
+                  <h3 className="mt-1 text-lg font-semibold">
+                    {business.company ?? "Identity not found"}
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {business.industry ?? "Industry not found"} ·{" "}
+                    {business.market ?? "Market not found"}
+                  </p>
+                  {business.website && (
+                    <a
+                      href={business.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 block break-all text-xs text-primary"
+                    >
+                      {business.website}
+                    </a>
+                  )}
+                </article>
+              ),
+            )}
+          </div>
+          <div className="space-y-3">
+            {independentResult.comparison.comparison.map((row, index) => (
+              <article key={index} className="rounded-xl border border-border p-4">
+                <h3 className="font-semibold text-intelligence">{row.title}</h3>
+                <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Business A
+                    </div>
+                    <p className="mt-1 text-sm">{row.businessA.text || "Not found"}</p>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Business B
+                    </div>
+                    <p className="mt-1 text-sm">{row.businessB.text || "Not found"}</p>
+                  </div>
+                </div>
+                <div className="mt-3 border-t border-border pt-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Takeaway
+                  </div>
+                  <p className="mt-1 text-sm">{row.takeaway.text || "No supported takeaway."}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {[...row.businessA.sources, ...row.businessB.sources, ...row.takeaway.sources]
+                      .filter((url, i, all) => all.indexOf(url) === i)
+                      .map((url, i) => (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary"
+                        >
+                          Source {i + 1}
+                        </a>
+                      ))}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+          <section className="border-t border-border pt-4">
+            <h3 className="font-semibold">Unclaimed opportunities</h3>
+            <div className="mt-3 space-y-3">
+              {independentResult.comparison.opportunities.map((item, index) => (
+                <div key={index}>
+                  <p className="text-sm">{item.text}</p>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    {item.sources.map((url, i) => (
+                      <a
+                        key={url}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary"
+                      >
+                        Evidence {i + 1}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+          <details className="border-t border-border pt-3 text-xs text-muted-foreground">
+            <summary>Methodology and coverage</summary>
+            <p className="mt-2">{independentResult.methodology}</p>
+            {independentResult.comparison.limitations.map((item, i) => (
+              <p key={i} className="mt-2">
+                {item}
+              </p>
+            ))}
+          </details>
+        </section>
+      )}
+      {researchMode === "brand" &&
+        researchResults.map((result) => (
+          <section key={result.inputUrl} className="space-y-5 border-t border-border pt-5">
+            <header className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-xl font-semibold">
+                  {result.report.company ?? "Identity not found"}
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Public-source analysis · {new Date(result.researchedAt).toLocaleString()}
+                </p>
+              </div>
+              <div className="-mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0">
+                <Button
+                  className="shrink-0"
+                  variant="outline"
+                  onClick={() => {
+                    setResearchInput(result.inputUrl);
+                    setShowManual(true);
+                    update("competitorName", result.report.company ?? "");
+                    update("websiteUrl", result.report.website ?? result.inputUrl);
+                  }}
+                >
+                  Edit
+                </Button>
+                <Button
+                  className="shrink-0"
+                  variant="outline"
+                  disabled={research.isPending}
+                  onClick={() => {
+                    setResearchInput(result.inputUrl);
+                    runResearch(result.inputUrl);
+                  }}
+                >
+                  Refresh analysis
+                </Button>
+                <Button
+                  className="shrink-0"
+                  variant="outline"
+                  onClick={() =>
+                    window.document.getElementById("competitive-landscape")?.scrollIntoView()
+                  }
+                >
+                  Compare
+                </Button>
+                <Button
+                  className="shrink-0"
+                  variant="outline"
+                  onClick={() => {
+                    setResearchInput("");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                >
+                  Add another competitor
+                </Button>
+              </div>
+            </header>
+            <ResearchScorecard report={result.report} />
+            <dl className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <dt className="text-muted-foreground">Industry</dt>
+                <dd>{result.report.industry ?? "Not found"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Market</dt>
+                <dd>{result.report.market ?? "Not found"}</dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-muted-foreground">Website</dt>
+                <dd className="break-all">
+                  {result.report.website ? (
+                    <a
+                      href={result.report.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary"
+                    >
+                      {result.report.website}
+                    </a>
+                  ) : (
+                    "Not found"
+                  )}
+                </dd>
+              </div>
+            </dl>
+            <div className="rounded-xl border border-border bg-background/45 p-3">
+              <p className="text-xs font-semibold text-foreground">Source portfolio</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {result.portfolioUrls?.length ?? 1} supplied · {result.report.channels.length}{" "}
+                verified channel{result.report.channels.length === 1 ? "" : "s"}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {result.report.channels.map((url) => (
+                <a
+                  key={url}
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="max-w-full break-all text-xs text-primary"
+                >
+                  {url}
+                </a>
+              ))}
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2">
+              {result.report.sections.map((section) => (
+                <section key={section.title} className="border-t border-border pt-4">
+                  <h3 className="font-semibold text-intelligence">{section.title}</h3>
+                  <ul className="mt-3 space-y-3 text-sm">
+                    {section.findings.map((finding, index) => (
+                      <li key={index}>
+                        <p>{finding.text}</p>
+                        <div className="mt-1 flex flex-wrap gap-2">
+                          {finding.sources.map((url, i) => (
+                            <a
+                              key={url}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-primary"
+                            >
+                              Source {i + 1}
+                            </a>
+                          ))}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                  {!section.findings.length && (
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Not found in accessible sources.
+                    </p>
+                  )}
+                </section>
+              ))}
+            </div>
+            <section className="border-t border-border pt-4">
+              <h3 className="font-semibold">Original content ideas</h3>
+              <div className="mt-3 space-y-4">
+                {result.report.ideas.map((idea, index) => (
+                  <div key={index}>
+                    <p className="text-sm">{idea.text}</p>
+                    <div className="my-2 flex flex-wrap gap-2">
+                      {idea.sources.map((url, i) => (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-primary"
+                        >
+                          Evidence {i + 1}
+                        </a>
+                      ))}
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        void navigate({
+                          to: "/create",
+                          search: { brief: idea.text, briefWorkspace: workspaceId ?? undefined },
+                        })
+                      }
+                    >
+                      Create this content <ArrowRight />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </section>
+            <details className="border-t border-border pt-3 text-xs text-muted-foreground">
+              <summary>Methodology and coverage</summary>
+              <p className="mt-2">{result.methodology}</p>
+              {result.report.limitations.map((item, i) => (
+                <p key={i} className="mt-2">
+                  {item}
+                </p>
+              ))}
+            </details>
+          </section>
+        ))}
+      {researchMode === "brand" && researchResults.length >= 2 && (
+        <section id="competitive-landscape" className="space-y-4 border-t border-border pt-5">
+          <h2 className="text-xl font-semibold">Competitive Landscape</h2>
+          <p className="text-xs text-muted-foreground">
+            Qualitative comparison of reviewed public sources; not market-share or performance
+            scoring.
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {researchResults.map((item) => (
+              <article key={item.inputUrl} className="rounded-lg border border-border p-4">
+                <h3 className="font-semibold">{item.report.company ?? "Identity not found"}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {item.report.industry ?? "Industry not found"} ·{" "}
+                  {item.report.market ?? "Market not found"}
+                </p>
+                {item.report.sections
+                  .filter((section) =>
+                    /Messaging|Strengths|Opportunities|Social/.test(section.title),
+                  )
+                  .map((section) => (
+                    <div key={section.title} className="mt-3">
+                      <h4 className="text-xs font-semibold text-intelligence">{section.title}</h4>
+                      <p className="mt-1 text-xs">{section.findings[0]?.text ?? "Not found"}</p>
+                      {section.findings[0]?.sources.map((url, i) => (
+                        <a
+                          key={url}
+                          href={url}
+                          className="mr-2 text-xs text-primary"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Source {i + 1}
+                        </a>
+                      ))}
+                    </div>
+                  ))}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+      <div
+        className={cn(
+          researchMode === "brand" && showManual ? "grid" : "hidden",
+          "gap-5 xl:grid-cols-[15rem_minmax(0,1fr)]",
+        )}
+      >
         <aside className="surface-card p-4">
           <div className="flex items-center justify-between gap-2">
             <h2 className="font-semibold">Competitors</h2>
@@ -657,7 +1410,13 @@ function CompetitiveIntelligencePage() {
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {(reports.data ?? []).map((report) => (
                   <div key={report.id} className="rounded-lg border border-border p-3">
-                    <Button variant="ghost" className="h-auto justify-start whitespace-normal px-0 text-left text-sm font-semibold" onClick={()=>setOpenedReport(report)}>{report.title}</Button>
+                    <Button
+                      variant="ghost"
+                      className="h-auto justify-start whitespace-normal px-0 text-left text-sm font-semibold"
+                      onClick={() => setOpenedReport(report)}
+                    >
+                      {report.title}
+                    </Button>
                     <div className="mt-1 text-xs text-muted-foreground">
                       Score {report.score ?? "—"} ·{" "}
                       {new Date(report.created_at).toLocaleDateString()}
@@ -673,7 +1432,25 @@ function CompetitiveIntelligencePage() {
             </section>
           )}
 
-          {openedReport && <section className="space-y-3 border-t border-border pt-4"><h3 className="font-semibold">{openedReport.title}</h3><p className="text-xs text-muted-foreground">{openedReport.methodology}</p>{openedReport.metrics.map((metric,index)=><div key={index} className="rounded-lg border border-border p-3 text-sm"><p className="font-semibold">{metric.label}</p><p>Your value: {metric.yourValue??"Unavailable"} · Competitor: {metric.competitorValue??"Unavailable"} {metric.unit}</p><p className="mt-1 text-xs text-muted-foreground">{metric.sourceNote||"Source not recorded"} · {metric.observedAt||"Date not recorded"}</p></div>)}</section>}
+          {openedReport && (
+            <section className="space-y-3 border-t border-border pt-4">
+              <h3 className="font-semibold">{openedReport.title}</h3>
+              <p className="text-xs text-muted-foreground">{openedReport.methodology}</p>
+              {openedReport.metrics.map((metric, index) => (
+                <div key={index} className="rounded-lg border border-border p-3 text-sm">
+                  <p className="font-semibold">{metric.label}</p>
+                  <p>
+                    Your value: {metric.yourValue ?? "Unavailable"} · Competitor:{" "}
+                    {metric.competitorValue ?? "Unavailable"} {metric.unit}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {metric.sourceNote || "Source not recorded"} ·{" "}
+                    {metric.observedAt || "Date not recorded"}
+                  </p>
+                </div>
+              ))}
+            </section>
+          )}
           <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-muted-foreground">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
             Only enter observations you are permitted to use. Scores are directional planning aids,
@@ -681,8 +1458,6 @@ function CompetitiveIntelligencePage() {
           </div>
         </div>
       </div>
-
-
     </div>
   );
 }
@@ -697,26 +1472,112 @@ function MetricEditor({
   onRemove: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const commonMetrics = ["Posts per week", "Engagement rate", "Followers", "Response time", "Average views"];
+  const commonMetrics = [
+    "Posts per week",
+    "Engagement rate",
+    "Followers",
+    "Response time",
+    "Average views",
+  ];
   return (
     <div className="p-4 sm:p-5">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.2fr_.7fr_.7fr_.7fr_auto]">
         <Field label="Metric">
-          <input className={inputClass} list="competitive-metric-options" value={metric.label} onChange={(event) => onChange({ label: event.target.value })} />
-          <datalist id="competitive-metric-options">{commonMetrics.map((option) => <option key={option} value={option} />)}</datalist>
+          <input
+            className={inputClass}
+            list="competitive-metric-options"
+            value={metric.label}
+            onChange={(event) => onChange({ label: event.target.value })}
+          />
+          <datalist id="competitive-metric-options">
+            {commonMetrics.map((option) => (
+              <option key={option} value={option} />
+            ))}
+          </datalist>
         </Field>
-        <Field label="Your value"><input className={inputClass} type="number" min={0} value={metric.yourValue ?? ""} onChange={(event) => onChange({ yourValue: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
-        <Field label="Competitor"><input className={inputClass} type="number" min={0} value={metric.competitorValue ?? ""} onChange={(event) => onChange({ competitorValue: event.target.value === "" ? null : Number(event.target.value) })} /></Field>
-        <Field label="Better when"><select className={inputClass} value={metric.direction} onChange={(event) => onChange({ direction: event.target.value as MetricDirection })}><option value="higher">Higher</option><option value="lower">Lower</option></select></Field>
-        <Button variant="ghost" size="icon" aria-label="Remove metric" className="self-end" onClick={onRemove}><Trash2 /></Button>
+        <Field label="Your value">
+          <input
+            className={inputClass}
+            type="number"
+            min={0}
+            value={metric.yourValue ?? ""}
+            onChange={(event) =>
+              onChange({ yourValue: event.target.value === "" ? null : Number(event.target.value) })
+            }
+          />
+        </Field>
+        <Field label="Competitor">
+          <input
+            className={inputClass}
+            type="number"
+            min={0}
+            value={metric.competitorValue ?? ""}
+            onChange={(event) =>
+              onChange({
+                competitorValue: event.target.value === "" ? null : Number(event.target.value),
+              })
+            }
+          />
+        </Field>
+        <Field label="Better when">
+          <select
+            className={inputClass}
+            value={metric.direction}
+            onChange={(event) => onChange({ direction: event.target.value as MetricDirection })}
+          >
+            <option value="higher">Higher</option>
+            <option value="lower">Lower</option>
+          </select>
+        </Field>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Remove metric"
+          className="self-end"
+          onClick={onRemove}
+        >
+          <Trash2 />
+        </Button>
       </div>
-      <button type="button" onClick={() => setExpanded((value) => !value)} className="mt-3 min-h-10 text-xs font-semibold text-primary sm:hidden">
+      <button
+        type="button"
+        onClick={() => setExpanded((value) => !value)}
+        className="mt-3 min-h-10 text-xs font-semibold text-primary sm:hidden"
+      >
         {expanded ? "Hide source details" : "Source, unit & date"}
       </button>
-      <div className={cn("mt-3 grid gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-5", expanded ? "grid" : "hidden")}>
-        <Field label="Unit"><input className={inputClass} placeholder="%, posts, hours" value={metric.unit} onChange={(event) => onChange({ unit: event.target.value })} /></Field>
-        <div className="sm:col-span-1 lg:col-span-3"><Field label="Source note"><input className={inputClass} placeholder="How and where was this observed?" value={metric.sourceNote} onChange={(event) => onChange({ sourceNote: event.target.value })} /></Field></div>
-        <Field label="Observed"><input className={inputClass} type="date" value={metric.observedAt} onChange={(event) => onChange({ observedAt: event.target.value })} /></Field>
+      <div
+        className={cn(
+          "mt-3 grid gap-3 sm:grid sm:grid-cols-2 lg:grid-cols-5",
+          expanded ? "grid" : "hidden",
+        )}
+      >
+        <Field label="Unit">
+          <input
+            className={inputClass}
+            placeholder="%, posts, hours"
+            value={metric.unit}
+            onChange={(event) => onChange({ unit: event.target.value })}
+          />
+        </Field>
+        <div className="sm:col-span-1 lg:col-span-3">
+          <Field label="Source note">
+            <input
+              className={inputClass}
+              placeholder="How and where was this observed?"
+              value={metric.sourceNote}
+              onChange={(event) => onChange({ sourceNote: event.target.value })}
+            />
+          </Field>
+        </div>
+        <Field label="Observed">
+          <input
+            className={inputClass}
+            type="date"
+            value={metric.observedAt}
+            onChange={(event) => onChange({ observedAt: event.target.value })}
+          />
+        </Field>
       </div>
     </div>
   );

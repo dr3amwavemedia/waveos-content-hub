@@ -29,6 +29,7 @@ import { UnsavedChangesGuard } from "@/components/app/unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
 import { MobileWorkflowSection, MobileWorkflowFooter } from "@/components/app/mobile-workflow";
 import { AiProcessingIndicator, SurferWaveSpinner } from "@/components/app/ai-processing-indicator";
+import { CampaignReadinessPanel } from "@/components/campaign/campaign-readiness-panel";
 import { CAMPAIGN_GOALS } from "@/lib/phase-one-planning";
 import { CAMPAIGN_BUILDER_STEPS, campaignGoalReady } from "@/lib/campaign-builder-steps";
 import { cn } from "@/lib/utils";
@@ -106,6 +107,7 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
     campaigns,
     linkedCampaignContent,
     assetLookup,
+    readiness,
     campaignContentByPlan,
     selectedCampaign,
     selectedCampaignContent,
@@ -127,6 +129,7 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
     generateDirection,
     updateMediaRecommendation,
     moveSequenceItem,
+    removeMediaRecommendation,
     saveServerDraft,
     generatePlan,
     goToStep,
@@ -144,10 +147,15 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
   const transcribableAssets = selectedMediaIds
     .map((id) => assetLookup.get(id))
     .filter((asset): asset is MediaAsset => Boolean(asset && transcribableMedia(asset)));
-  const transcripts = useMediaTranscripts(workspaceId, transcribableAssets.map((asset) => asset.id));
+  const transcripts = useMediaTranscripts(
+    workspaceId,
+    transcribableAssets.map((asset) => asset.id),
+  );
   const transcriptRunner = useTranscriptRunner(workspaceId);
   const saveTranscriptEdits = useSaveTranscriptEdits(workspaceId);
-  const [transcriptBatch, setTranscriptBatch] = useState<{ done: number; total: number } | null>(null);
+  const [transcriptBatch, setTranscriptBatch] = useState<{ done: number; total: number } | null>(
+    null,
+  );
   const [openTranscriptId, setOpenTranscriptId] = useState<string | null>(null);
   const transcriptDone = transcribableAssets.filter((asset) => {
     const status = transcripts.data?.[asset.id]?.status;
@@ -193,14 +201,25 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
             <div className="ocean-eyebrow flex items-center gap-2">
               <Megaphone className="h-4 w-4" /> Campaign Manager
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-4xl">Build a campaign from your content</h1>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-4xl">
+              Build a campaign from your content
+            </h1>
             <p className="mt-2 hidden max-w-2xl text-sm text-muted-foreground sm:block">
-              Pick a goal and your photos or videos. WaveOS reads what it can about each piece, drafts a
-              plan with captions, and saves everything for review — nothing is scheduled or published here.
+              Pick a goal and your photos or videos. WaveOS reads what it can about each piece,
+              drafts a plan with captions, and saves everything for review — nothing is scheduled or
+              published here.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-muted-foreground" role="status">{autoSaveState==="saving"?"Saving draft…":autoSaveState==="saved"?"Draft saved":autoSaveState==="error"?"Auto-save paused":""}</span>
+            <span className="text-xs text-muted-foreground" role="status">
+              {autoSaveState === "saving"
+                ? "Saving draft…"
+                : autoSaveState === "saved"
+                  ? "Draft saved"
+                  : autoSaveState === "error"
+                    ? "Auto-save paused"
+                    : ""}
+            </span>
             <Button
               variant="outline"
               size="sm"
@@ -221,6 +240,8 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
           </div>
         </div>
       </header>
+
+      <CampaignReadinessPanel checks={readiness.checks} />
 
       {workflowDraft.data?.payload && (
         <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">
@@ -252,14 +273,19 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
 
         {continuedFrom && (
           <p className="rounded-xl border border-border bg-surface/50 p-3 text-xs text-muted-foreground">
-            Continuing from “{continuedFrom}”. Saving creates a new campaign with these settings; the
-            original campaign and its posts stay unchanged.
+            Continuing from “{continuedFrom}”. Saving creates a new campaign with these settings;
+            the original campaign and its posts stay unchanged.
           </p>
         )}
 
         {/* Step 1 · Goal */}
         <MobileWorkflowSection active={mobileStep === 0}>
-          <StepCard index={0} title="Goal" detail="Name the campaign, pick what it should achieve and where it runs." done={stepCompletion[0]}>
+          <StepCard
+            index={0}
+            title="Goal"
+            detail="Name the campaign, pick what it should achieve and where it runs."
+            done={stepCompletion[0]}
+          >
             <Field label="Campaign name">
               <input
                 className={inputClass}
@@ -271,7 +297,10 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
             </Field>
             <fieldset className="mt-4">
               <legend className="text-sm font-medium">Primary goal</legend>
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Campaign goal">
+              <div
+                className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5"
+                aria-label="Campaign goal"
+              >
                 {CAMPAIGN_GOALS.map((goal) => (
                   <Button
                     key={goal}
@@ -280,7 +309,8 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                     aria-pressed={input.goal === goal}
                     className={cn(
                       "h-auto min-h-16 whitespace-normal rounded-xl text-sm",
-                      input.goal === goal && "border-neon-cyan/60 bg-neon-cyan/10 text-foreground neon-glow",
+                      input.goal === goal &&
+                        "border-neon-cyan/60 bg-neon-cyan/10 text-foreground neon-glow",
                     )}
                     onClick={() => update("goal", goal)}
                   >
@@ -313,14 +343,36 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
 
         {/* Step 2 · Media */}
         <MobileWorkflowSection active={mobileStep === 1}>
-          <StepCard index={1} title="Media" detail="Choose the photos and videos this campaign is built from." done={stepCompletion[1]}>
+          <StepCard
+            index={1}
+            title="Media"
+            detail="Choose the photos and videos this campaign is built from."
+            done={stepCompletion[1]}
+          >
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" className="min-h-11" onClick={()=>setShowSharedMediaPicker(true)}>
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11"
+                onClick={() => setShowSharedMediaPicker(true)}
+              >
                 <Images className="h-4 w-4" /> Drive / Dropbox / Frame.io
               </Button>
               <label className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground">
-                {uploadMedia.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Upload from device
-                <input ref={mediaInputRef} type="file" multiple accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime" className="hidden" onChange={(event) => void uploadCampaignFiles(event)} />
+                {uploadMedia.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}{" "}
+                Upload from device
+                <input
+                  ref={mediaInputRef}
+                  type="file"
+                  multiple
+                  accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime"
+                  className="hidden"
+                  onChange={(event) => void uploadCampaignFiles(event)}
+                />
               </label>
             </div>
 
@@ -328,10 +380,18 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
               <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
                 <span>
                   {selectedMediaIds.length} selected
-                  {selectedMediaIds.length === 0 ? " · choose at least one piece of content" : ` · up to ${input.maxPosts} become posts`}
+                  {selectedMediaIds.length === 0
+                    ? " · choose at least one piece of content"
+                    : ` · up to ${input.maxPosts} become posts`}
                 </span>
                 {selectedMediaIds.length > 0 && (
-                  <button type="button" className="text-primary" onClick={() => changeSelectedMedia([])}>Clear selection</button>
+                  <button
+                    type="button"
+                    className="text-primary"
+                    onClick={() => changeSelectedMedia([])}
+                  >
+                    Clear selection
+                  </button>
                 )}
               </div>
               {selectedMediaIds.length > 0 && (
@@ -340,12 +400,19 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                     const asset = assetLookup.get(id);
                     return (
                       <div key={id} className="relative w-16 shrink-0">
-                        <MediaThumb asset={asset ?? null} className="aspect-square w-16 rounded-lg" />
-                        <span className="absolute left-1 top-1 rounded-md bg-background/80 px-1 text-[10px] font-bold">{index + 1}</span>
+                        <MediaThumb
+                          asset={asset ?? null}
+                          className="aspect-square w-16 rounded-lg"
+                        />
+                        <span className="absolute left-1 top-1 rounded-md bg-background/80 px-1 text-[10px] font-bold">
+                          {index + 1}
+                        </span>
                         <button
                           type="button"
                           aria-label={`Remove ${asset?.name ?? "media"}`}
-                          onClick={() => changeSelectedMedia((ids) => ids.filter((item) => item !== id))}
+                          onClick={() =>
+                            changeSelectedMedia((ids) => ids.filter((item) => item !== id))
+                          }
                           className="absolute right-0.5 top-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-background/80"
                         >
                           <X className="h-3.5 w-3.5" />
@@ -365,19 +432,51 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                 aria-expanded={mediaSectionOpen}
               >
                 <div>
-                  <div className="flex items-center gap-2 text-sm font-semibold"><FolderOpen className="h-4 w-4 text-neon-cyan" /> Campaign content library</div>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Browse WaveOS folders, or use a whole folder at once.</p>
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    <FolderOpen className="h-4 w-4 text-neon-cyan" /> Campaign content library
+                  </div>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Browse WaveOS folders, or use a whole folder at once.
+                  </p>
                 </div>
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border bg-background/50">
-                  {mediaSectionOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  {mediaSectionOpen ? (
+                    <ChevronUp className="h-4 w-4" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4" />
+                  )}
                 </span>
               </button>
               {mediaSectionOpen && (
                 <div className="mt-3 border-t border-border pt-3">
                   <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                    <Button type="button" variant={mediaFolder==="all"?"default":"outline"} size="sm" onClick={()=>setMediaFolder("all")}>All media</Button>
-                    <Button type="button" variant={mediaFolder==="root"?"default":"outline"} size="sm" onClick={()=>setMediaFolder("root")}>Uncategorized</Button>
-                    {(mediaFolders.data??[]).map(folder=><Button key={folder.id} type="button" variant={mediaFolder===folder.id?"default":"outline"} size="sm" onClick={()=>setMediaFolder(folder.id)}>{folder.name}</Button>)}
+                    <Button
+                      type="button"
+                      variant={mediaFolder === "all" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setMediaFolder("all")}
+                    >
+                      All media
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={mediaFolder === "root" ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setMediaFolder("root")}
+                    >
+                      Uncategorized
+                    </Button>
+                    {(mediaFolders.data ?? []).map((folder) => (
+                      <Button
+                        key={folder.id}
+                        type="button"
+                        variant={mediaFolder === folder.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setMediaFolder(folder.id)}
+                      >
+                        {folder.name}
+                      </Button>
+                    ))}
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Button
@@ -387,7 +486,9 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                       disabled={mediaAssets.isLoading || !(mediaAssets.data ?? []).length}
                       onClick={() => {
                         changeSelectedMedia(
-                          (mediaAssets.data ?? []).map((asset) => asset.id).slice(0, input.maxPosts),
+                          (mediaAssets.data ?? [])
+                            .map((asset) => asset.id)
+                            .slice(0, input.maxPosts),
                         );
                         setMediaSectionOpen(false);
                       }}
@@ -400,11 +501,32 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                   </div>
                   <div className="mt-3 max-h-[28rem] overflow-y-auto rounded-xl pr-1">
                     <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
-                      {(mediaAssets.data??[]).slice(0,48).map(asset=><CampaignMediaTile key={asset.id} asset={asset} selected={selectedMediaIds.includes(asset.id)} onToggle={()=>changeSelectedMedia(ids=>ids.includes(asset.id)?ids.filter(id=>id!==asset.id):[...ids,asset.id])} />)}
+                      {(mediaAssets.data ?? []).slice(0, 48).map((asset) => (
+                        <CampaignMediaTile
+                          key={asset.id}
+                          asset={asset}
+                          selected={selectedMediaIds.includes(asset.id)}
+                          onToggle={() =>
+                            changeSelectedMedia((ids) =>
+                              ids.includes(asset.id)
+                                ? ids.filter((id) => id !== asset.id)
+                                : [...ids, asset.id],
+                            )
+                          }
+                        />
+                      ))}
                     </div>
                   </div>
-                  {mediaAssets.isLoading && <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading media…</p>}
-                  {!mediaAssets.isLoading && !(mediaAssets.data??[]).length && <p className="mt-3 text-sm text-muted-foreground">No media in this folder yet. Upload files or choose another folder.</p>}
+                  {mediaAssets.isLoading && (
+                    <p className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Loading media…
+                    </p>
+                  )}
+                  {!mediaAssets.isLoading && !(mediaAssets.data ?? []).length && (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      No media in this folder yet. Upload files or choose another folder.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -413,12 +535,29 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
 
         {/* Step 3 · Analyze */}
         <MobileWorkflowSection active={mobileStep === 2}>
-          <StepCard index={2} title="Analyze" detail="Optional. WaveOS reviews each piece so the plan and captions fit what's actually in it." done={stepCompletion[2]}>
+          <StepCard
+            index={2}
+            title="Analyze"
+            detail="Optional. WaveOS reviews each piece so the plan and captions fit what's actually in it."
+            done={stepCompletion[2]}
+          >
             <ul className="space-y-1.5 text-xs text-muted-foreground">
-              <li className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> File names, tags, type, length and size</li>
-              <li className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> Photo previews and up to 3 frames from each of the first {MAX_SAMPLED_VIDEOS} videos</li>
-              <li className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> Your earlier corrections in this workspace</li>
-              <li className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> Finished transcripts of what's said in each video (your corrections first)</li>
+              <li className="flex gap-2">
+                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> File names, tags,
+                type, length and size
+              </li>
+              <li className="flex gap-2">
+                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> Photo previews and
+                up to 3 frames from each of the first {MAX_SAMPLED_VIDEOS} videos
+              </li>
+              <li className="flex gap-2">
+                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> Your earlier
+                corrections in this workspace
+              </li>
+              <li className="flex gap-2">
+                <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-neon-cyan" /> Finished
+                transcripts of what's said in each video (your corrections first)
+              </li>
             </ul>
 
             {transcribableAssets.length > 0 && (
@@ -426,18 +565,31 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                 <div className="flex items-center gap-2">
                   <AudioLines className="h-4 w-4 text-neon-cyan" />
                   <p className="text-sm font-semibold">Transcripts</p>
-                  <span className="ml-auto text-xs text-muted-foreground">{transcriptDone} of {transcribableAssets.length} done</span>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    {transcriptDone} of {transcribableAssets.length} done
+                  </span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Optional. Speech-to-text reads what's said so analysis can quote real words instead of guessing.
+                  Optional. Speech-to-text reads what's said so analysis can quote real words
+                  instead of guessing.
                 </p>
                 {transcriptBatch ? (
                   <p className="mt-2 flex items-center gap-2 text-xs" role="status">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-neon-cyan" /> Transcribing {Math.min(transcriptBatch.done + 1, transcriptBatch.total)} of {transcriptBatch.total}…
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-neon-cyan" /> Transcribing{" "}
+                    {Math.min(transcriptBatch.done + 1, transcriptBatch.total)} of{" "}
+                    {transcriptBatch.total}…
                   </p>
                 ) : transcriptPending.length > 0 ? (
-                  <Button size="sm" variant="secondary" className="mt-2" onClick={() => void transcribeAllSelected()}>
-                    <AudioLines /> Transcribe {transcriptPending.length === 1 ? "1 video" : `${transcriptPending.length} videos`}
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="mt-2"
+                    onClick={() => void transcribeAllSelected()}
+                  >
+                    <AudioLines /> Transcribe{" "}
+                    {transcriptPending.length === 1
+                      ? "1 video"
+                      : `${transcriptPending.length} videos`}
                   </Button>
                 ) : null}
                 <ul className="mt-3 space-y-2">
@@ -446,7 +598,10 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                     const run = transcriptRunner.runs[asset.id];
                     const open = openTranscriptId === asset.id;
                     return (
-                      <li key={asset.id} className="rounded-xl border border-border bg-background/40">
+                      <li
+                        key={asset.id}
+                        className="rounded-xl border border-border bg-background/40"
+                      >
                         <button
                           type="button"
                           className="flex w-full items-center gap-3 p-2 text-left"
@@ -455,8 +610,14 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                         >
                           <MediaThumb asset={asset} className="h-10 w-10 shrink-0 rounded-lg" />
                           <span className="min-w-0 flex-1 truncate text-sm">{asset.name}</span>
-                          <span className="shrink-0 text-[10px] font-semibold uppercase text-muted-foreground">{transcriptStatusLabel(row, run)}</span>
-                          {open ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}
+                          <span className="shrink-0 text-[10px] font-semibold uppercase text-muted-foreground">
+                            {transcriptStatusLabel(row, run)}
+                          </span>
+                          {open ? (
+                            <ChevronUp className="h-4 w-4 shrink-0" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 shrink-0" />
+                          )}
                         </button>
                         {open && (
                           <TranscriptPanel
@@ -465,7 +626,9 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                             run={run}
                             canStart={!transcriptBatch && !transcriptRunner.isRunning(asset.id)}
                             onStart={() => void transcriptRunner.start(asset)}
-                            onSave={(input) => saveTranscriptEdits({ mediaAssetId: asset.id, ...input })}
+                            onSave={(input) =>
+                              saveTranscriptEdits({ mediaAssetId: asset.id, ...input })
+                            }
                           />
                         )}
                       </li>
@@ -477,17 +640,23 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
             <Button
               className="mt-4 min-h-12 w-full sm:w-auto"
               onClick={() => void generateDirection()}
-              disabled={!input.platforms.length || directionBusy || selectedMediaIds.length===0}
+              disabled={!input.platforms.length || directionBusy || selectedMediaIds.length === 0}
             >
               {directionBusy ? <SurferWaveSpinner className="size-5" /> : <Sparkles />}
               {campaignDirection ? "Analyze again" : "Analyze & Build Campaign"}
             </Button>
             {selectedMediaIds.length === 0 && (
-              <p className="mt-2 text-xs text-muted-foreground">Choose media in the Media step first.</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Choose media in the Media step first.
+              </p>
             )}
 
             {analysisProgress && (
-              <div className="mt-4 space-y-2 rounded-xl border border-neon-cyan/25 bg-neon-cyan/5 p-3" role="status" aria-live="polite">
+              <div
+                className="mt-4 space-y-2 rounded-xl border border-neon-cyan/25 bg-neon-cyan/5 p-3"
+                role="status"
+                aria-live="polite"
+              >
                 <AiProcessingIndicator
                   className="w-full border-0 bg-transparent px-0 py-1"
                   label="WaveOS is reading your campaign content"
@@ -503,7 +672,11 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                 )}
                 <ProgressRow
                   label={`Wave Assist reviewing ${analysisProgress.assetCount} asset${analysisProgress.assetCount === 1 ? "" : "s"}`}
-                  detail={analysisProgress.phase === "ai" ? "Waiting for the response…" : "Starts after frames are read"}
+                  detail={
+                    analysisProgress.phase === "ai"
+                      ? "Waiting for the response…"
+                      : "Starts after frames are read"
+                  }
                   state={analysisProgress.phase === "ai" ? "running" : "waiting"}
                 />
               </div>
@@ -516,25 +689,80 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                   const asset = assetLookup.get(rec.mediaId);
                   const confirmed = confirmedMediaIds.includes(rec.mediaId);
                   return (
-                    <article key={rec.mediaId + index} className={cn("rounded-xl border bg-background/50 p-3", confirmed ? "border-success/40" : "border-border")}>
+                    <article
+                      key={rec.mediaId + index}
+                      className={cn(
+                        "rounded-xl border bg-background/50 p-3",
+                        confirmed ? "border-success/40" : "border-border",
+                      )}
+                    >
                       <div className="flex items-start gap-3">
-                        <MediaThumb asset={asset ?? null} className="h-16 w-16 shrink-0 rounded-lg" />
+                        <MediaThumb
+                          asset={asset ?? null}
+                          className="h-16 w-16 shrink-0 rounded-lg"
+                        />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold">{asset?.name ?? `Selected media ${index+1}`}</p>
+                          <p className="truncate text-sm font-semibold">
+                            {asset?.name ?? `Selected media ${index + 1}`}
+                          </p>
                           <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] font-semibold uppercase tracking-wide">
-                            <span className={cn("rounded-full px-2 py-0.5", rec.inspectionMode === "metadata_only" ? "bg-warning/15 text-warning" : "bg-neon-cyan/15 text-neon-cyan")}>
-                              {rec.inspectionMode==="video_frames"?"Video visually inspected":rec.inspectionMode==="photo"?"Photo visually inspected":"Metadata only"}
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-0.5",
+                                rec.inspectionMode === "metadata_only"
+                                  ? "bg-warning/15 text-warning"
+                                  : "bg-neon-cyan/15 text-neon-cyan",
+                              )}
+                            >
+                              {rec.inspectionMode === "video_frames"
+                                ? "Video visually inspected"
+                                : rec.inspectionMode === "photo"
+                                  ? "Photo visually inspected"
+                                  : "Metadata only"}
                             </span>
-                            <span className="rounded-full bg-surface px-2 py-0.5 text-muted-foreground">{rec.confidence} confidence</span>
-                            <span className="rounded-full bg-surface px-2 py-0.5 text-muted-foreground">Hook {rec.hookPotential}</span>
+                            <span className="rounded-full bg-surface px-2 py-0.5 text-muted-foreground">
+                              {rec.confidence} confidence
+                            </span>
+                            <span className="rounded-full bg-surface px-2 py-0.5 text-muted-foreground">
+                              Hook {rec.hookPotential}
+                            </span>
                           </div>
                         </div>
                       </div>
                       <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
-                        <label className="block"><span className="text-muted-foreground">What WaveOS thinks this is</span><input className="mt-1 min-h-10 w-full rounded-md border border-border bg-background px-2 py-1.5 font-medium" value={rec.contentType} onChange={(event)=>updateMediaRecommendation(index,{contentType:event.target.value})}/></label>
-                        <label className="block"><span className="text-muted-foreground">Main message or purpose</span><input className="mt-1 min-h-10 w-full rounded-md border border-border bg-background px-2 py-1.5" value={rec.likelyPurpose} onChange={(event)=>updateMediaRecommendation(index,{likelyPurpose:event.target.value})}/></label>
+                        <label className="block">
+                          <span className="text-muted-foreground">What WaveOS thinks this is</span>
+                          <input
+                            className="mt-1 min-h-10 w-full rounded-md border border-border bg-background px-2 py-1.5 font-medium"
+                            value={rec.contentType}
+                            onChange={(event) =>
+                              updateMediaRecommendation(index, { contentType: event.target.value })
+                            }
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-muted-foreground">Main message or purpose</span>
+                          <input
+                            className="mt-1 min-h-10 w-full rounded-md border border-border bg-background px-2 py-1.5"
+                            value={rec.likelyPurpose}
+                            onChange={(event) =>
+                              updateMediaRecommendation(index, {
+                                likelyPurpose: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
                       </div>
-                      <label className="mt-2 block text-xs"><span className="text-muted-foreground">What it shows</span><textarea className="mt-1 min-h-16 w-full rounded-md border border-border bg-background px-2 py-1.5" value={rec.visualSummary} onChange={(event)=>updateMediaRecommendation(index,{visualSummary:event.target.value})}/></label>
+                      <label className="mt-2 block text-xs">
+                        <span className="text-muted-foreground">What it shows</span>
+                        <textarea
+                          className="mt-1 min-h-16 w-full rounded-md border border-border bg-background px-2 py-1.5"
+                          value={rec.visualSummary}
+                          onChange={(event) =>
+                            updateMediaRecommendation(index, { visualSummary: event.target.value })
+                          }
+                        />
+                      </label>
                       <p className="mt-2 text-xs text-muted-foreground">
                         <span className="font-medium text-foreground">Speech evidence:</span>{" "}
                         {rec.transcriptEvidence === "user_corrected_transcript"
@@ -545,40 +773,114 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                               ? "no transcript — spoken words were not analyzed"
                               : "none (photo)"}
                       </p>
-                      <Button type="button" size="sm" className="mt-3" variant={confirmed?"secondary":"outline"} onClick={()=>setConfirmedMediaIds((current)=>current.includes(rec.mediaId)?current.filter((id)=>id!==rec.mediaId):[...current,rec.mediaId])}>
-                        <Check className="h-4 w-4" /> {confirmed?"Confirmed · edit again":"Confirm understanding"}
-                      </Button>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <Button
+                          aria-label="Confirm understanding and use this content"
+                          type="button"
+                          size="sm"
+                          variant={confirmed ? "secondary" : "default"}
+                          onClick={() =>
+                            setConfirmedMediaIds((current) =>
+                              current.includes(rec.mediaId)
+                                ? current.filter((id) => id !== rec.mediaId)
+                                : [...current, rec.mediaId],
+                            )
+                          }
+                        >
+                          <Check className="h-4 w-4" /> {confirmed ? "Using this" : "Use this"}
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          disabled={index === campaignDirection.mediaRecommendations.length - 1}
+                          onClick={() => moveSequenceItem(index, 1)}
+                        >
+                          Show another first
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            updateMediaRecommendation(index, {
+                              contentType: "",
+                              visualSummary: "",
+                              likelyPurpose: "",
+                            });
+                            setConfirmedMediaIds((current) =>
+                              current.filter((id) => id !== rec.mediaId),
+                            );
+                          }}
+                        >
+                          Wrong interpretation
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => removeMediaRecommendation(index)}
+                        >
+                          Not relevant
+                        </Button>
+                      </div>
                     </article>
                   );
                 })}
-                <p className="text-xs text-muted-foreground">{builderState.confirmedCount} of {campaignDirection.mediaRecommendations.length} assets confirmed. Corrections stay private to this workspace and guide future campaign analysis.</p>
+                <p className="text-xs text-muted-foreground">
+                  {builderState.confirmedCount} of {campaignDirection.mediaRecommendations.length}{" "}
+                  assets confirmed. Corrections stay private to this workspace and guide future
+                  campaign analysis.
+                </p>
               </div>
             )}
             {campaignDirection && campaignDirection.mediaRecommendations.length === 0 && (
-              <p className="mt-4 text-sm text-muted-foreground">Wave Assist returned campaign direction but no per-asset recommendations. You can still plan and save.</p>
+              <p className="mt-4 text-sm text-muted-foreground">
+                Wave Assist returned campaign direction but no per-asset recommendations. You can
+                still plan and save.
+              </p>
             )}
           </StepCard>
         </MobileWorkflowSection>
 
         {/* Step 4 · Plan */}
         <MobileWorkflowSection active={mobileStep === 3}>
-          <StepCard index={3} title="Plan" detail="Arrange the post order, edit captions, and set when the campaign runs." done={stepCompletion[3]}>
+          <StepCard
+            index={3}
+            title="Plan"
+            detail="Arrange the post order, edit captions, and set when the campaign runs."
+            done={stepCompletion[3]}
+          >
             {campaignDirection && (
               <div className="rounded-xl border border-neon-violet/30 bg-neon-violet/5 p-3">
                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neon-violet">
                   <Sparkles className="h-3.5 w-3.5" /> Wave Assist · Campaign Direction
                 </p>
                 <p className="mt-1 text-sm font-medium">{campaignDirection.angle}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{campaignDirection.audienceInsight}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {campaignDirection.audienceInsight}
+                </p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {campaignDirection.pillars.map((pillar) => (
-                    <span key={pillar.name} title={pillar.purpose} className="rounded-full border border-border bg-background/60 px-2.5 py-1 text-xs">{pillar.name}</span>
+                    <span
+                      key={pillar.name}
+                      title={pillar.purpose}
+                      className="rounded-full border border-border bg-background/60 px-2.5 py-1 text-xs"
+                    >
+                      {pillar.name}
+                    </span>
                   ))}
                 </div>
                 {campaignDirection.hooks.length > 0 && (
                   <details className="mt-3 text-xs">
-                    <summary className="cursor-pointer font-medium">Hooks to explore ({campaignDirection.hooks.length})</summary>
-                    <ul className="mt-2 space-y-1 text-muted-foreground">{campaignDirection.hooks.map((hook, index) => <li key={index}>• {hook}</li>)}</ul>
+                    <summary className="cursor-pointer font-medium">
+                      Hooks to explore ({campaignDirection.hooks.length})
+                    </summary>
+                    <ul className="mt-2 space-y-1 text-muted-foreground">
+                      {campaignDirection.hooks.map((hook, index) => (
+                        <li key={index}>• {hook}</li>
+                      ))}
+                    </ul>
                   </details>
                 )}
               </div>
@@ -587,10 +889,14 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
             <div className="mt-4">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold">Post sequence</p>
-                <span className="text-xs text-muted-foreground">{sequenceMediaIds.length} post{sequenceMediaIds.length === 1 ? "" : "s"}</span>
+                <span className="text-xs text-muted-foreground">
+                  {sequenceMediaIds.length} post{sequenceMediaIds.length === 1 ? "" : "s"}
+                </span>
               </div>
               {sequenceMediaIds.length === 0 ? (
-                <p className="mt-2 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">Choose media in the Media step to build a sequence.</p>
+                <p className="mt-2 rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
+                  Choose media in the Media step to build a sequence.
+                </p>
               ) : (
                 <ol className="mt-2 space-y-2">
                   {(campaignDirection
@@ -601,29 +907,87 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                     const rec = campaignDirection?.mediaRecommendations[index];
                     const slot = preview[index];
                     return (
-                      <li key={mediaId + index} className="rounded-xl border border-border bg-background/40 p-3">
+                      <li
+                        key={mediaId + index}
+                        className="rounded-xl border border-border bg-background/40 p-3"
+                      >
                         <div className="flex items-start gap-3">
-                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg neon-fill text-xs font-bold text-primary-foreground">{index + 1}</span>
-                          <MediaThumb asset={asset ?? null} className="h-14 w-14 shrink-0 rounded-lg" />
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg neon-fill text-xs font-bold text-primary-foreground">
+                            {index + 1}
+                          </span>
+                          <MediaThumb
+                            asset={asset ?? null}
+                            className="h-14 w-14 shrink-0 rounded-lg"
+                          />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold">{asset?.name ?? "Selected media"}</p>
+                            <p className="truncate text-sm font-semibold">
+                              {asset?.name ?? "Selected media"}
+                            </p>
                             <p className="mt-0.5 text-[11px] text-muted-foreground">
-                              {slot ? `${slot.plannedDate} · ${slot.localTime} · ${slot.platform} ${slot.contentFormat}` : rec ? `Suggested: ${rec.suggestedDay}` : "Dates assigned when you build the schedule"}
+                              {slot
+                                ? `${slot.plannedDate} · ${slot.localTime} · ${slot.platform} ${slot.contentFormat}`
+                                : rec
+                                  ? `Suggested: ${rec.suggestedDay}`
+                                  : "Dates assigned when you build the schedule"}
                             </p>
                           </div>
                           <div className="flex shrink-0 flex-col gap-1">
-                            <Button type="button" size="icon" variant="ghost" className="h-8 w-8" aria-label="Move earlier" disabled={index === 0} onClick={() => moveSequenceItem(index, -1)}><ArrowUp className="h-4 w-4" /></Button>
-                            <Button type="button" size="icon" variant="ghost" className="h-8 w-8" aria-label="Move later" disabled={index === list.length - 1} onClick={() => moveSequenceItem(index, 1)}><ArrowDown className="h-4 w-4" /></Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              aria-label="Move earlier"
+                              disabled={index === 0}
+                              onClick={() => moveSequenceItem(index, -1)}
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8"
+                              aria-label="Move later"
+                              disabled={index === list.length - 1}
+                              onClick={() => moveSequenceItem(index, 1)}
+                            >
+                              <ArrowDown className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                         {rec && (
                           <>
-                            <label className="mt-3 block text-xs"><span className="font-medium">Proposed caption / angle</span><textarea className="mt-1 min-h-24 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm" value={rec.caption} onChange={(event)=>updateMediaRecommendation(index,{caption:event.target.value})}/></label>
+                            <label className="mt-3 block text-xs">
+                              <span className="font-medium">Proposed caption / angle</span>
+                              <textarea
+                                className="mt-1 min-h-24 w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+                                value={rec.caption}
+                                onChange={(event) =>
+                                  updateMediaRecommendation(index, { caption: event.target.value })
+                                }
+                              />
+                            </label>
                             <div className="mt-2 flex flex-wrap items-center gap-2">
-                              <select aria-label="Placement" className="min-h-9 rounded-md border border-border bg-background px-2 text-xs" value={rec.placement} onChange={(event)=>updateMediaRecommendation(index,{placement:event.target.value as "feed"|"story"|"both"})}>
-                                <option value="feed">Feed post</option><option value="story">Story</option><option value="both">Feed + Story</option>
+                              <select
+                                aria-label="Placement"
+                                className="min-h-9 rounded-md border border-border bg-background px-2 text-xs"
+                                value={rec.placement}
+                                onChange={(event) =>
+                                  updateMediaRecommendation(index, {
+                                    placement: event.target.value as "feed" | "story" | "both",
+                                  })
+                                }
+                              >
+                                <option value="feed">Feed post</option>
+                                <option value="story">Story</option>
+                                <option value="both">Feed + Story</option>
                               </select>
-                              {rec.hashtags.map(tag=><span key={tag} className="text-xs text-primary">{tag.startsWith("#")?tag:`#${tag}`}</span>)}
+                              {rec.hashtags.map((tag) => (
+                                <span key={tag} className="text-xs text-primary">
+                                  {tag.startsWith("#") ? tag : `#${tag}`}
+                                </span>
+                              ))}
                             </div>
                           </>
                         )}
@@ -637,22 +1001,42 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                   No captions yet. Run Analyze for draft captions, or generate them after saving.
                 </p>
               )}
-              {campaignDirection && selectedMediaIds.length > campaignDirection.mediaRecommendations.length && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {selectedMediaIds.length - campaignDirection.mediaRecommendations.length} selected piece(s) weren't covered by the analysis and will be added at the end without captions.
-                </p>
-              )}
+              {campaignDirection &&
+                selectedMediaIds.length > campaignDirection.mediaRecommendations.length && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {selectedMediaIds.length - campaignDirection.mediaRecommendations.length}{" "}
+                    selected piece(s) weren't covered by the analysis and will be added at the end
+                    without captions.
+                  </p>
+                )}
             </div>
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <Field label="Start date">
-                <input className={inputClass} type="date" value={input.startDate} onChange={(event) => update("startDate", event.target.value)} />
+                <input
+                  className={inputClass}
+                  type="date"
+                  value={input.startDate}
+                  onChange={(event) => update("startDate", event.target.value)}
+                />
               </Field>
               <Field label="End date">
-                <input className={inputClass} type="date" value={input.endDate} onChange={(event) => update("endDate", event.target.value)} />
+                <input
+                  className={inputClass}
+                  type="date"
+                  value={input.endDate}
+                  onChange={(event) => update("endDate", event.target.value)}
+                />
               </Field>
               <Field label="Maximum posts">
-                <input className={inputClass} type="number" min={1} max={60} value={input.maxPosts} onChange={(event) => update("maxPosts", Number(event.target.value))} />
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={1}
+                  max={60}
+                  value={input.maxPosts}
+                  onChange={(event) => update("maxPosts", Number(event.target.value))}
+                />
               </Field>
               <Field label="Planning times" hint="Local workspace times, comma separated">
                 <input
@@ -679,7 +1063,12 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                 onToggle={(value) => toggleList("excludedDays", value)}
               />
             </div>
-            <Button className="mt-4 min-h-11" variant="secondary" onClick={generatePlan} disabled={errors.length > 0}>
+            <Button
+              className="mt-4 min-h-11"
+              variant="secondary"
+              onClick={generatePlan}
+              disabled={errors.length > 0}
+            >
               <CalendarDays /> Build plan
             </Button>
 
@@ -687,26 +1076,48 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
               <div className="mt-4 overflow-hidden rounded-xl border border-border">
                 <div className="border-b border-border bg-surface/50 px-3 py-2">
                   <p className="text-sm font-semibold">Draft plan · {preview.length} items</p>
-                  <p className="text-xs text-muted-foreground">Planning windows only — nothing is scheduled. Review every working title before saving.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Planning windows only — nothing is scheduled. Review every working title before
+                    saving.
+                  </p>
                 </div>
                 <ol className="divide-y divide-border">
                   {preview.map((item, index) => {
                     const assetId = sequenceMediaIds[index];
                     const asset = assetId ? assetLookup.get(assetId) : undefined;
                     return (
-                      <li key={`${item.plannedDate}-${item.localTime}-${item.sequence}`} className="flex gap-3 p-3">
+                      <li
+                        key={`${item.plannedDate}-${item.localTime}-${item.sequence}`}
+                        className="flex gap-3 p-3"
+                      >
                         <div className="w-16 shrink-0 text-[11px] text-muted-foreground">
-                          <div className="flex items-center gap-1"><CalendarDays className="h-3 w-3" /> {item.plannedDate.slice(5)}</div>
-                          <div className="mt-1 flex items-center gap-1"><Clock3 className="h-3 w-3" /> {item.localTime}</div>
+                          <div className="flex items-center gap-1">
+                            <CalendarDays className="h-3 w-3" /> {item.plannedDate.slice(5)}
+                          </div>
+                          <div className="mt-1 flex items-center gap-1">
+                            <Clock3 className="h-3 w-3" /> {item.localTime}
+                          </div>
                         </div>
-                        {asset ? <MediaThumb asset={asset} className="h-12 w-12 shrink-0 rounded-lg" /> : <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-dashed border-border text-[10px] text-muted-foreground">No media</span>}
+                        {asset ? (
+                          <MediaThumb asset={asset} className="h-12 w-12 shrink-0 rounded-lg" />
+                        ) : (
+                          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-dashed border-border text-[10px] text-muted-foreground">
+                            No media
+                          </span>
+                        )}
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap gap-1">
-                            <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">{item.platform}</span>
-                            <span className="rounded-full border border-border bg-elevated px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">{item.contentFormat}</span>
+                            <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-primary">
+                              {item.platform}
+                            </span>
+                            <span className="rounded-full border border-border bg-elevated px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground">
+                              {item.contentFormat}
+                            </span>
                           </div>
                           <p className="mt-1 truncate text-sm font-semibold">{item.workingTitle}</p>
-                          <p className="line-clamp-2 text-xs text-muted-foreground">{item.copyBrief}</p>
+                          <p className="line-clamp-2 text-xs text-muted-foreground">
+                            {item.copyBrief}
+                          </p>
                         </div>
                       </li>
                     );
@@ -719,22 +1130,50 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
 
         {/* Step 5 · Launch */}
         <MobileWorkflowSection active={mobileStep === 4}>
-          <StepCard index={4} title="Launch" detail="Save for review. Posts are approved one by one before anything is scheduled." done={stepCompletion[4]}>
+          <StepCard
+            index={4}
+            title="Launch"
+            detail="Save for review. Posts are approved one by one before anything is scheduled."
+            done={stepCompletion[4]}
+          >
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 rounded-xl border border-border bg-surface/50 p-4 text-sm">
-              <dt className="text-muted-foreground">Campaign</dt><dd className="break-words">{input.name || "Not named"}</dd>
-              <dt className="text-muted-foreground">Goal</dt><dd>{GOAL_LABELS[input.goal]}</dd>
-              <dt className="text-muted-foreground">Platforms</dt><dd className="break-words capitalize">{input.platforms.join(", ") || "None"}</dd>
-              <dt className="text-muted-foreground">Formats</dt><dd className="break-words capitalize">{input.contentFormats.join(", ") || "None"}</dd>
-              <dt className="text-muted-foreground">Posts</dt><dd>{Math.min(sequenceMediaIds.length, input.maxPosts)} of {input.maxPosts} max</dd>
-              <dt className="text-muted-foreground">Captions</dt><dd>{campaignDirection ? `${campaignDirection.mediaRecommendations.filter((rec) => rec.caption.trim()).length} drafted for review` : "Generate after saving"}</dd>
-              <dt className="text-muted-foreground">Dates</dt><dd>{input.startDate} – {input.endDate}</dd>
+              <dt className="text-muted-foreground">Campaign</dt>
+              <dd className="break-words">{input.name || "Not named"}</dd>
+              <dt className="text-muted-foreground">Goal</dt>
+              <dd>{GOAL_LABELS[input.goal]}</dd>
+              <dt className="text-muted-foreground">Platforms</dt>
+              <dd className="break-words capitalize">{input.platforms.join(", ") || "None"}</dd>
+              <dt className="text-muted-foreground">Formats</dt>
+              <dd className="break-words capitalize">
+                {input.contentFormats.join(", ") || "None"}
+              </dd>
+              <dt className="text-muted-foreground">Posts</dt>
+              <dd>
+                {Math.min(sequenceMediaIds.length, input.maxPosts)} of {input.maxPosts} max
+              </dd>
+              <dt className="text-muted-foreground">Captions</dt>
+              <dd>
+                {campaignDirection
+                  ? `${campaignDirection.mediaRecommendations.filter((rec) => rec.caption.trim()).length} drafted for review`
+                  : "Generate after saving"}
+              </dd>
+              <dt className="text-muted-foreground">Dates</dt>
+              <dd>
+                {input.startDate} – {input.endDate}
+              </dd>
             </dl>
 
             <ol className="mt-4 grid gap-2 sm:grid-cols-3">
               {[
                 ["Save for review", "Creates draft posts linked to this campaign."],
-                ["Approve each post", "Review captions and media in the campaign workspace or Approvals."],
-                ["Schedule approved posts", "Only approved posts are scheduled, from Create Post or Calendar."],
+                [
+                  "Approve each post",
+                  "Review captions and media in the campaign workspace or Approvals.",
+                ],
+                [
+                  "Schedule approved posts",
+                  "Only approved posts are scheduled, from Create Post or Calendar.",
+                ],
               ].map(([title, detail], index) => (
                 <li key={title} className="rounded-xl border border-border bg-background/40 p-3">
                   <p className="text-xs font-semibold text-neon-cyan">Step {index + 1}</p>
@@ -760,12 +1199,32 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
             </label>
             <fieldset className="mt-3 rounded-xl border border-border bg-background/40 p-4">
               <legend className="px-1 text-sm font-semibold">Campaign optimization</legend>
-              <p className="mt-1 text-xs text-muted-foreground">Only upcoming, unpublished items can ever be changed. Published posts are never altered.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {"Only upcoming, unpublished items can ever be changed. Published posts are never altered."}
+              </p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <Button type="button" variant={input.optimizationMode==="approval_required"?"secondary":"outline"} className="h-auto min-h-14 whitespace-normal" onClick={()=>update("optimizationMode","approval_required")}>Approval Required</Button>
-                <Button type="button" variant={input.optimizationMode==="automatic"?"secondary":"outline"} className="h-auto min-h-14 whitespace-normal" onClick={()=>update("optimizationMode","automatic")}>Automatic Optimization</Button>
+                <Button
+                  type="button"
+                  variant={input.optimizationMode === "approval_required" ? "secondary" : "outline"}
+                  className="h-auto min-h-14 whitespace-normal"
+                  onClick={() => update("optimizationMode", "approval_required")}
+                >
+                  Approval Required
+                </Button>
+                <Button
+                  type="button"
+                  variant={input.optimizationMode === "automatic" ? "secondary" : "outline"}
+                  className="h-auto min-h-14 whitespace-normal"
+                  onClick={() => update("optimizationMode", "automatic")}
+                >
+                  Automatic Optimization
+                </Button>
               </div>
-              <p className="mt-2 text-xs text-muted-foreground">{input.optimizationMode==="automatic"?"WaveOS may optimize future unpublished items and will notify you.":"WaveOS recommends changes and waits for your approval."}</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {input.optimizationMode === "automatic"
+                  ? "WaveOS may optimize future unpublished items and will notify you."
+                  : "WaveOS recommends changes and waits for your approval."}
+              </p>
             </fieldset>
 
             <div className="mt-3 rounded-xl border border-border bg-background/40 p-4">
@@ -776,16 +1235,20 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                 <li>• Nothing here schedules or publishes automatically.</li>
                 <li>• Times are user-selected planning windows, not performance claims.</li>
                 <li>• Approval status is preserved on every generated item.</li>
-                <li>• AI suggestions are creative direction only; they never schedule or publish.</li>
+                <li>
+                  • AI suggestions are creative direction only; they never schedule or publish.
+                </li>
               </ul>
             </div>
 
             {(errors.length > 0 || launchBlocker) && (
               <ul className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
                 {launchBlocker && <li>• {launchBlocker}</li>}
-                {errors.filter((error) => error !== launchBlocker).map((error) => (
-                  <li key={error}>• {error}</li>
-                ))}
+                {errors
+                  .filter((error) => error !== launchBlocker)
+                  .map((error) => (
+                    <li key={error}>• {error}</li>
+                  ))}
               </ul>
             )}
 
@@ -797,7 +1260,11 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                     ? "Its draft posts are in the campaign workspace below. Approve them before scheduling."
                     : "The campaign is saved, but its posts could not be linked. Reopen it below and reconnect the media."}
                 </p>
-                <Button asChild size="sm" variant="outline" className="mt-2"><a href="#your-campaigns">Open campaign <ArrowRight /></a></Button>
+                <Button asChild size="sm" variant="outline" className="mt-2">
+                  <a href="#your-campaigns">
+                    Open campaign <ArrowRight />
+                  </a>
+                </Button>
               </div>
             )}
 
@@ -809,7 +1276,13 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
           step={mobileStep}
           total={CAMPAIGN_BUILDER_STEPS.length}
           onChange={setMobileStep}
-          canNext={mobileStep === 0 ? campaignGoalReady(builderState) : mobileStep === 1 ? selectedMediaIds.length > 0 : true}
+          canNext={
+            mobileStep === 0
+              ? campaignGoalReady(builderState)
+              : mobileStep === 1
+                ? selectedMediaIds.length > 0
+                : true
+          }
           final={saveButton}
         />
       </section>
@@ -818,9 +1291,9 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
         <MediaPicker
           workspaceId={workspaceId}
           picked={selectedMediaIds}
-          onClose={()=>setShowSharedMediaPicker(false)}
-          onConfirm={(ids)=>{
-            changeSelectedMedia(ids.slice(0,24));
+          onClose={() => setShowSharedMediaPicker(false)}
+          onConfirm={(ids) => {
+            changeSelectedMedia(ids.slice(0, 24));
             setShowSharedMediaPicker(false);
             void mediaAssets.refetch();
             void allMediaAssets.refetch();
@@ -873,7 +1346,8 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                       </span>
                     </div>
                     <p className="mt-1 text-[11px] text-muted-foreground">
-                      {contentCount} linked post{contentCount === 1 ? "" : "s"} · {campaign.max_posts} max
+                      {contentCount} linked post{contentCount === 1 ? "" : "s"} ·{" "}
+                      {campaign.max_posts} max
                     </p>
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       {campaign.start_date} → {campaign.end_date}
@@ -887,7 +1361,10 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
             </div>
 
             {selectedCampaign && (
-              <div id="campaign-command-detail" className="scroll-mt-24 mt-3 rounded-2xl border border-primary/15 bg-background/35 p-4">
+              <div
+                id="campaign-command-detail"
+                className="scroll-mt-24 mt-3 rounded-2xl border border-primary/15 bg-background/35 p-4"
+              >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="text-lg font-semibold">{selectedCampaign.name}</p>
@@ -902,17 +1379,24 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                     <Button
                       size="sm"
                       variant="secondary"
-                      disabled={bulkCaptionBusy || !selectedCampaignContent.some((item) => !item.primary_caption?.trim())}
+                      disabled={
+                        bulkCaptionBusy ||
+                        !selectedCampaignContent.some((item) => !item.primary_caption?.trim())
+                      }
                       onClick={() => void generateMissingCampaignCaptions()}
                     >
                       {bulkCaptionBusy ? <SurferWaveSpinner className="size-5" /> : <Sparkles />}
                       Generate missing captions
                     </Button>
                     <Button asChild size="sm" variant="outline">
-                      <Link to="/content"><Images /> Content library</Link>
+                      <Link to="/content">
+                        <Images /> Content library
+                      </Link>
                     </Button>
                     <Button asChild size="sm" variant="outline">
-                      <Link to="/calendar"><CalendarDays /> Calendar</Link>
+                      <Link to="/calendar">
+                        <CalendarDays /> Calendar
+                      </Link>
                     </Button>
                   </div>
                 </div>
@@ -926,9 +1410,14 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                     ["Scheduled", selectedCampaignCounts.scheduled],
                     ["Published", selectedCampaignCounts.published],
                   ].map(([label, value]) => (
-                    <div key={String(label)} className="rounded-xl border border-border bg-background/40 p-2 text-center">
+                    <div
+                      key={String(label)}
+                      className="rounded-xl border border-border bg-background/40 p-2 text-center"
+                    >
                       <p className="text-lg font-semibold">{value}</p>
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        {label}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -938,19 +1427,31 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="text-sm font-semibold">Campaign captions</p>
-                        <p className="text-xs text-muted-foreground">Generate, rewrite, edit, and save each caption without leaving Campaign Manager.</p>
+                        <p className="text-xs text-muted-foreground">
+                          Generate, rewrite, edit, and save each caption without leaving Campaign
+                          Manager.
+                        </p>
                       </div>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {selectedCampaignContent.filter((item) => item.primary_caption?.trim()).length}/{selectedCampaignContent.length} ready
+                        {
+                          selectedCampaignContent.filter((item) => item.primary_caption?.trim())
+                            .length
+                        }
+                        /{selectedCampaignContent.length} ready
                       </span>
                     </div>
                     {selectedCampaignContent.slice(0, 12).map((item, index) => {
                       const caption = campaignCaptionDrafts[item.id] ?? item.primary_caption ?? "";
                       const savedCaption = item.primary_caption ?? "";
                       const changed = caption.trim() !== savedCaption.trim();
-                      const asset = item.media_asset_ids?.[0] ? assetLookup.get(item.media_asset_ids[0]) : undefined;
+                      const asset = item.media_asset_ids?.[0]
+                        ? assetLookup.get(item.media_asset_ids[0])
+                        : undefined;
                       return (
-                        <article key={item.id} className="rounded-2xl border border-border bg-surface/50 p-3">
+                        <article
+                          key={item.id}
+                          className="rounded-2xl border border-border bg-surface/50 p-3"
+                        >
                           <div className="flex items-start gap-3">
                             {asset ? (
                               <MediaThumb asset={asset} className="h-11 w-11 shrink-0 rounded-lg" />
@@ -960,11 +1461,19 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                               </span>
                             )}
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold">{item.title || `Campaign post ${index + 1}`}</p>
+                              <p className="truncate text-sm font-semibold">
+                                {item.title || `Campaign post ${index + 1}`}
+                              </p>
                               <p className="mt-0.5 text-[11px] capitalize text-muted-foreground">
-                                {typeof item.metadata?.platform === "string" ? item.metadata.platform : "Platform TBD"}
-                                {typeof item.metadata?.plannedDate === "string" ? ` · ${item.metadata.plannedDate}` : ""}
-                                {typeof item.metadata?.plannedTime === "string" ? ` ${item.metadata.plannedTime}` : ""}
+                                {typeof item.metadata?.platform === "string"
+                                  ? item.metadata.platform
+                                  : "Platform TBD"}
+                                {typeof item.metadata?.plannedDate === "string"
+                                  ? ` · ${item.metadata.plannedDate}`
+                                  : ""}
+                                {typeof item.metadata?.plannedTime === "string"
+                                  ? ` ${item.metadata.plannedTime}`
+                                  : ""}
                               </p>
                             </div>
                             <span className="rounded-full bg-background/50 px-2 py-1 text-[10px] uppercase text-muted-foreground">
@@ -990,7 +1499,11 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                               disabled={captionBusyId === item.id}
                               onClick={() => void generateCampaignCaption(item)}
                             >
-                              {captionBusyId === item.id ? <SurferWaveSpinner className="size-5" /> : <Sparkles />}
+                              {captionBusyId === item.id ? (
+                                <SurferWaveSpinner className="size-5" />
+                              ) : (
+                                <Sparkles />
+                              )}
                               {item.primary_caption ? "Rewrite" : "Generate caption"}
                             </Button>
                             <Button
@@ -1021,7 +1534,8 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                     })}
                     {selectedCampaignContent.length > 12 && (
                       <p className="px-1 text-xs text-muted-foreground">
-                        +{selectedCampaignContent.length - 12} more linked posts in the Content Library.
+                        +{selectedCampaignContent.length - 12} more linked posts in the Content
+                        Library.
                       </p>
                     )}
                   </div>
@@ -1033,7 +1547,9 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                 )}
 
                 <div className="mt-4 rounded-xl border border-primary/15 bg-primary/5 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">Next step</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                    Next step
+                  </p>
                   <p className="mt-1 text-sm">
                     {selectedCampaignCounts.total === 0
                       ? "Attach content and build the campaign direction."
@@ -1053,15 +1569,17 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
           </>
         ) : campaigns.isError ? (
           <div className="mt-4 rounded-xl border border-warning/25 bg-warning/5 p-5 text-sm text-warning">
-            WaveOS could not load your saved campaigns. Your campaigns were not deleted. Refresh this
-            page or try again in a moment.
+            WaveOS could not load your saved campaigns. Your campaigns were not deleted. Refresh
+            this page or try again in a moment.
           </div>
         ) : campaigns.isPending ? (
-          <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading campaigns…</p>
+          <p className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading campaigns…
+          </p>
         ) : (
           <div className="mt-4 rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
-            No saved campaigns were returned for this workspace. Build a campaign above, or refresh if
-            you expected an existing campaign to appear.
+            No saved campaigns were returned for this workspace. Build a campaign above, or refresh
+            if you expected an existing campaign to appear.
           </div>
         )}
       </section>
@@ -1106,14 +1624,24 @@ function CampaignStepper({
                 >
                   {done && !current ? <Check className="h-4 w-4" /> : index + 1}
                 </span>
-                <span className={cn("text-[11px] font-semibold", current ? "text-foreground" : "text-muted-foreground")}>{label}</span>
+                <span
+                  className={cn(
+                    "text-[11px] font-semibold",
+                    current ? "text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {label}
+                </span>
               </button>
             </li>
           );
         })}
       </ol>
       <div className="mt-2 h-1 overflow-hidden rounded-full bg-muted">
-        <div className="h-full neon-fill transition-all" style={{ width: `${Math.round(progress * 100)}%` }} />
+        <div
+          className="h-full neon-fill transition-all"
+          style={{ width: `${Math.round(progress * 100)}%` }}
+        />
       </div>
     </nav>
   );
@@ -1133,14 +1661,24 @@ function StepCard({
   children: React.ReactNode;
 }) {
   return (
-    <section id={`campaign-step-${index}`} className="wave-panel scroll-mt-24 p-4 sm:p-5" aria-labelledby={`campaign-step-${index}-title`}>
+    <section
+      id={`campaign-step-${index}`}
+      className="wave-panel scroll-mt-24 p-4 sm:p-5"
+      aria-labelledby={`campaign-step-${index}-title`}
+    >
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-neon-cyan">Step {index + 1} of {CAMPAIGN_BUILDER_STEPS.length}</p>
-          <h2 id={`campaign-step-${index}-title`} className="mt-0.5 text-lg font-semibold">{title}</h2>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-neon-cyan">
+            Step {index + 1} of {CAMPAIGN_BUILDER_STEPS.length}
+          </p>
+          <h2 id={`campaign-step-${index}-title`} className="mt-0.5 text-lg font-semibold">
+            {title}
+          </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p>
         </div>
-        {done && <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-label="Step complete" />}
+        {done && (
+          <CheckCircle2 className="h-5 w-5 shrink-0 text-success" aria-label="Step complete" />
+        )}
       </div>
       {children}
     </section>
@@ -1173,7 +1711,10 @@ function ProgressRow({
       </div>
       {value !== undefined && (
         <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-muted">
-          <div className="h-full neon-fill transition-all" style={{ width: `${Math.round(value * 100)}%` }} />
+          <div
+            className="h-full neon-fill transition-all"
+            style={{ width: `${Math.round(value * 100)}%` }}
+          />
         </div>
       )}
     </div>
@@ -1216,7 +1757,8 @@ function ChoiceGroup({
         {values.map((value) => {
           const active = selected.includes(value);
           return (
-            <Button variant="outline"
+            <Button
+              variant="outline"
               key={value}
               type="button"
               onClick={() => onToggle(value)}
@@ -1247,9 +1789,15 @@ function useMediaThumbUrl(asset: MediaAsset | null) {
     setUrl(null);
     if (!asset) return;
     void getMediaPreviewUrl(asset, 3600, "thumbnail")
-      .then((value) => { if (!cancelled) setUrl(value); })
-      .catch(() => { if (!cancelled) setUrl(null); });
-    return () => { cancelled = true; };
+      .then((value) => {
+        if (!cancelled) setUrl(value);
+      })
+      .catch(() => {
+        if (!cancelled) setUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [asset]);
   return url;
 }
@@ -1263,9 +1811,21 @@ function MediaThumb({ asset, className }: { asset: MediaAsset | null; className?
     <span className={cn("block overflow-hidden border border-border bg-elevated", className)}>
       {url && !broken ? (
         showVideo ? (
-          <video src={`${url}#t=0.1`} className="pointer-events-none h-full w-full object-cover" muted playsInline preload="metadata" onError={() => setBroken(true)} />
+          <video
+            src={`${url}#t=0.1`}
+            className="pointer-events-none h-full w-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+            onError={() => setBroken(true)}
+          />
         ) : (
-          <img src={url} alt="" className="h-full w-full object-cover" onError={() => setBroken(true)} />
+          <img
+            src={url}
+            alt=""
+            className="h-full w-full object-cover"
+            onError={() => setBroken(true)}
+          />
         )
       ) : (
         <span className="flex h-full w-full items-center justify-center text-muted-foreground">
@@ -1276,14 +1836,58 @@ function MediaThumb({ asset, className }: { asset: MediaAsset | null; className?
   );
 }
 
-function CampaignMediaTile({asset,selected,onToggle}:{asset:MediaAsset;selected:boolean;onToggle:()=>void}) {
+function CampaignMediaTile({
+  asset,
+  selected,
+  onToggle,
+}: {
+  asset: MediaAsset;
+  selected: boolean;
+  onToggle: () => void;
+}) {
   const url = useMediaThumbUrl(asset);
-  const isVideo=asset.mime_type.startsWith("video/");
-  return <button type="button" onClick={onToggle} aria-pressed={selected} aria-label={asset.name} className={cn("relative aspect-square overflow-hidden rounded-xl border bg-elevated",selected?"border-neon-cyan ring-2 ring-neon-cyan/30":"border-border")}>
-    {url ? (isVideo ? <video src={url} className="h-full w-full object-cover" muted playsInline preload="metadata" /> : <img src={url} alt={asset.name} className="h-full w-full object-cover" />) : <div className="flex h-full items-center justify-center text-muted-foreground">{isVideo?<Video className="h-5 w-5"/>:<Images className="h-5 w-5"/>}</div>}
-    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent px-1.5 pb-1.5 pt-5 text-left text-[10px] text-foreground"><span className="line-clamp-1">{asset.name}</span></div>
-    {isVideo && <span className="absolute left-1 top-1 rounded bg-background/70 p-0.5"><Video className="h-3 w-3" /></span>}
-    {selected&&<span className="absolute right-1 top-1 rounded-full bg-primary p-0.5 text-primary-foreground"><CheckCircle2 className="h-4 w-4"/></span>}
-  </button>;
+  const isVideo = asset.mime_type.startsWith("video/");
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={selected}
+      aria-label={asset.name}
+      className={cn(
+        "relative aspect-square overflow-hidden rounded-xl border bg-elevated",
+        selected ? "border-neon-cyan ring-2 ring-neon-cyan/30" : "border-border",
+      )}
+    >
+      {url ? (
+        isVideo ? (
+          <video
+            src={url}
+            className="h-full w-full object-cover"
+            muted
+            playsInline
+            preload="metadata"
+          />
+        ) : (
+          <img src={url} alt={asset.name} className="h-full w-full object-cover" />
+        )
+      ) : (
+        <div className="flex h-full items-center justify-center text-muted-foreground">
+          {isVideo ? <Video className="h-5 w-5" /> : <Images className="h-5 w-5" />}
+        </div>
+      )}
+      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-background/90 to-transparent px-1.5 pb-1.5 pt-5 text-left text-[10px] text-foreground">
+        <span className="line-clamp-1">{asset.name}</span>
+      </div>
+      {isVideo && (
+        <span className="absolute left-1 top-1 rounded bg-background/70 p-0.5">
+          <Video className="h-3 w-3" />
+        </span>
+      )}
+      {selected && (
+        <span className="absolute right-1 top-1 rounded-full bg-primary p-0.5 text-primary-foreground">
+          <CheckCircle2 className="h-4 w-4" />
+        </span>
+      )}
+    </button>
+  );
 }
-

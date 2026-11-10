@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ArrowUp,
   BarChart3,
+  BriefcaseBusiness,
   CheckCircle2,
   CalendarClock,
   FileText,
@@ -42,6 +43,7 @@ import { researchCompetitor } from "@/lib/competitive-research.functions";
 import { analyzeSeoGrowth } from "@/lib/seo-growth.functions";
 import { useMediaAssets, useMediaFolders } from "@/hooks/use-media";
 import { cn } from "@/lib/utils";
+import { usePermissions } from "@/hooks/use-permissions";
 
 type AgentMessage = { role: "user" | "assistant"; content: string };
 
@@ -196,6 +198,7 @@ function AgentMessageContent({ content }: { content: string }) {
 
 function MyAgentPage() {
   const { activeWorkspace } = useWorkspace();
+  const permissions = usePermissions();
   const navigate = useNavigate();
   const assist = useServerFn(waveAssist);
   const getPerformance = useServerFn(getAgentPerformanceSnapshot);
@@ -220,7 +223,17 @@ function MyAgentPage() {
   const [listening, setListening] = useState(false);
   const [voiceReplies, setVoiceReplies] = useState(false);
   const [activeTool, setActiveTool] = useState<
-    "campaign" | "performance" | "post" | "studio" | "trends" | "competitive" | "seo" | "media" | "publish" | null
+    | "campaign"
+    | "performance"
+    | "post"
+    | "studio"
+    | "trends"
+    | "competitive"
+    | "seo"
+    | "media"
+    | "publish"
+    | "operations"
+    | null
   >(null);
   const [toolBusy, setToolBusy] = useState(false);
   const [toolError, setToolError] = useState<string | null>(null);
@@ -392,7 +405,7 @@ function MyAgentPage() {
   }
 
   function openAgentTool(
-    tool: "trends" | "competitive" | "seo" | "media" | "publish",
+    tool: "trends" | "competitive" | "seo" | "media" | "publish" | "operations",
     prompt?: string,
   ) {
     if (prompt) addUserMessage(prompt);
@@ -430,7 +443,9 @@ function MyAgentPage() {
         setToolError(result.message ?? "No strong trend matches were found.");
       }
     } catch (caught) {
-      setToolError(caught instanceof Error ? caught.message : "Trend research could not be completed.");
+      setToolError(
+        caught instanceof Error ? caught.message : "Trend research could not be completed.",
+      );
     } finally {
       setToolBusy(false);
     }
@@ -460,7 +475,9 @@ function MyAgentPage() {
       });
       setCompetitiveReport(result.report as AgentCompetitiveReport);
     } catch (caught) {
-      setToolError(caught instanceof Error ? caught.message : "Competitive research could not be completed.");
+      setToolError(
+        caught instanceof Error ? caught.message : "Competitive research could not be completed.",
+      );
     } finally {
       setToolBusy(false);
     }
@@ -504,7 +521,8 @@ function MyAgentPage() {
   }
 
   async function finishCampaign() {
-    if (!workspaceId || toolBusy || !campaignDraft.name.trim() || !campaignDraft.platforms.length) return;
+    if (!workspaceId || toolBusy || !campaignDraft.name.trim() || !campaignDraft.platforms.length)
+      return;
     setToolBusy(true);
     setToolError(null);
     try {
@@ -544,7 +562,9 @@ function MyAgentPage() {
     let nextStep = campaignStep;
     let nextDraft = { ...campaignDraft };
 
-    const nameMatch = input.match(/(?:call|name)(?:\s+the campaign)?\s+(?:it\s+)?["“]?(.+?)["”]?$/i);
+    const nameMatch = input.match(
+      /(?:call|name)(?:\s+the campaign)?\s+(?:it\s+)?["“]?(.+?)["”]?$/i,
+    );
     if (nameMatch?.[1]?.trim()) {
       nextDraft.name = nameMatch[1].trim().slice(0, 120);
       handled = true;
@@ -588,8 +608,11 @@ function MyAgentPage() {
     if (durationMatch) {
       const amount = Number(durationMatch[1]);
       const unit = durationMatch[2];
-      const days =
-        unit.startsWith("week") ? amount * 7 : unit.startsWith("month") ? amount * 30 : amount;
+      const days = unit.startsWith("week")
+        ? amount * 7
+        : unit.startsWith("month")
+          ? amount * 30
+          : amount;
       nextDraft.durationDays = Math.max(1, Math.min(180, days));
       handled = true;
       if (campaignStep <= 3) nextStep = 4;
@@ -631,15 +654,22 @@ function MyAgentPage() {
     if (nextDraft.name !== campaignDraft.name) updates.push(`name: ${nextDraft.name}`);
     if (nextDraft.goal !== campaignDraft.goal) updates.push(`goal: ${nextDraft.goal}`);
     if (nextDraft.maxPosts !== campaignDraft.maxPosts) updates.push(`${nextDraft.maxPosts} posts`);
-    if (nextDraft.durationDays !== campaignDraft.durationDays) updates.push(`${nextDraft.durationDays} days`);
-    if (nextDraft.platforms.join(",") !== campaignDraft.platforms.join(",")) updates.push(`platforms: ${nextDraft.platforms.join(", ")}`);
-    setMessages((current) => [
-      ...current,
-      { role: "user" as const, content: input },
-      { role: "assistant" as const, content: updates.length
-        ? `Updated your campaign: ${updates.join(" · ")}. Your existing media selections are unchanged. Review the plan before saving.`
-        : "Got it. I've kept the current campaign settings. You can adjust the details before saving." },
-    ].slice(-8));
+    if (nextDraft.durationDays !== campaignDraft.durationDays)
+      updates.push(`${nextDraft.durationDays} days`);
+    if (nextDraft.platforms.join(",") !== campaignDraft.platforms.join(","))
+      updates.push(`platforms: ${nextDraft.platforms.join(", ")}`);
+    setMessages((current) =>
+      [
+        ...current,
+        { role: "user" as const, content: input },
+        {
+          role: "assistant" as const,
+          content: updates.length
+            ? `Updated your campaign: ${updates.join(" · ")}. Your existing media selections are unchanged. Review the plan before saving.`
+            : "Got it. I've kept the current campaign settings. You can adjust the details before saving.",
+        },
+      ].slice(-8),
+    );
     setCampaignDraft(nextDraft);
     setCampaignStep(nextStep);
     setDraft("");
@@ -664,24 +694,43 @@ function MyAgentPage() {
 
     const normalized = input.toLowerCase();
     // A follow-up narrows the current report without reopening or losing it.
-    const metricFocus = normalized.match(/\b(?:just|only|specifically|focus on|show(?: me)?)\s+(?:my\s+)?(views?|impressions?|reach|clicks?|leads?|followers?|messages?|saves?|shares?)\b/);
+    const metricFocus = normalized.match(
+      /\b(?:just|only|specifically|focus on|show(?: me)?)\s+(?:my\s+)?(views?|impressions?|reach|clicks?|leads?|followers?|messages?|saves?|shares?)\b/,
+    );
     if (activeTool === "performance" && metricFocus && performance) {
       const metric = metricFocus[1].replace(/s$/, "");
-      setPerformanceFocus(metric === "view" ? "views" : metric === "click" ? "clicks" : metric === "lead" ? "leads" : metric === "impression" ? "impressions" : metric === "follower" ? "followers" : metric === "message" ? "messages" : metric === "save" ? "saves" : metric === "share" ? "shares" : metric);
+      setPerformanceFocus(
+        metric === "view"
+          ? "views"
+          : metric === "click"
+            ? "clicks"
+            : metric === "lead"
+              ? "leads"
+              : metric === "impression"
+                ? "impressions"
+                : metric === "follower"
+                  ? "followers"
+                  : metric === "message"
+                    ? "messages"
+                    : metric === "save"
+                      ? "saves"
+                      : metric === "share"
+                        ? "shares"
+                        : metric,
+      );
       addUserMessage(input);
       setDraft("");
       return;
     }
-    if (
-      /(campaign)/.test(normalized) &&
-      /(create|build|start|make|new)/.test(normalized)
-    ) {
+    if (/(campaign)/.test(normalized) && /(create|build|start|make|new)/.test(normalized)) {
       startCampaignBuilder(input);
       return;
     }
     if (
       !/\b(how|why|improve|increase|fix|better|strategy|recommend|should)\b/.test(normalized) &&
-      /(performance|analytics|growth|results|how (am|are) .*doing|how .*performing)/.test(normalized)
+      /(performance|analytics|growth|results|how (am|are) .*doing|how .*performing)/.test(
+        normalized,
+      )
     ) {
       void openPerformanceSnapshot(input);
       return;
@@ -690,17 +739,21 @@ function MyAgentPage() {
     // Refinements such as "make the captions shorter", "rewrite that reel",
     // or "let's draft shorter captions" belong in the ongoing conversation.
     const explicitNewPostRequest =
-      /\b(?:create|make|start|build|draft|write)\s+(?:(?:me|us)\s+)?(?:(?:a|an|another|new|some|one|two|three)\s+)?(?:social\s+media\s+)?(?:post|reel|story|caption)(?:s)?\b/.test(normalized) ||
-      /\b(?:new|another)\s+(?:post|reel|story|caption)\b/.test(normalized);
+      /\b(?:create|make|start|build|draft|write)\s+(?:(?:me|us)\s+)?(?:(?:a|an|another|new|some|one|two|three)\s+)?(?:social\s+media\s+)?(?:post|reel|story|caption)(?:s)?\b/.test(
+        normalized,
+      ) || /\b(?:new|another)\s+(?:post|reel|story|caption)\b/.test(normalized);
     const isRevision =
-      /\b(?:shorter|longer|short|brief|concise|rewrite|revise|adjust|change|edit|improve|tweak|less|more|instead|those|these|them|that|existing|already)\b/.test(normalized) ||
-      /\b(?:let'?s|we should|can you)\s+(?:make|keep|have)\b/.test(normalized);
+      /\b(?:shorter|longer|short|brief|concise|rewrite|revise|adjust|change|edit|improve|tweak|less|more|instead|those|these|them|that|existing|already)\b/.test(
+        normalized,
+      ) || /\b(?:let'?s|we should|can you)\s+(?:make|keep|have)\b/.test(normalized);
     if (explicitNewPostRequest && !isRevision) {
       startPostBuilder(input);
       return;
     }
     if (
-      /(creative studio|graphic|design|photo editor|edit photo|video maker|edit video)/.test(normalized)
+      /(creative studio|graphic|design|photo editor|edit photo|video maker|edit video)/.test(
+        normalized,
+      )
     ) {
       openStudioLauncher(input);
       return;
@@ -717,7 +770,10 @@ function MyAgentPage() {
       openAgentTool("seo", input);
       return;
     }
-    if (/(media|library|files|footage|photos|videos)/.test(normalized) && /(find|pick|choose|open|select|browse)/.test(normalized)) {
+    if (
+      /(media|library|files|footage|photos|videos)/.test(normalized) &&
+      /(find|pick|choose|open|select|browse)/.test(normalized)
+    ) {
       openAgentTool("media", input);
       return;
     }
@@ -725,11 +781,16 @@ function MyAgentPage() {
       openAgentTool("publish", input);
       return;
     }
+    if (
+      /(client|invoice|contract|delivery|signwell|project)/.test(normalized) &&
+      /(create|make|add|manage|open|send|review|new)/.test(normalized)
+    ) {
+      openAgentTool("operations", input);
+      return;
+    }
 
     const prior = messages.slice(-6);
-    setMessages((current) =>
-      [...current, { role: "user" as const, content: input }].slice(-8),
-    );
+    setMessages((current) => [...current, { role: "user" as const, content: input }].slice(-8));
     setDraft("");
     setBusy(true);
     setError(null);
@@ -773,7 +834,9 @@ function MyAgentPage() {
     };
     const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
     if (!Recognition) {
-      setError("Voice input is not supported in this browser. You can keep using this same conversation by typing.");
+      setError(
+        "Voice input is not supported in this browser. You can keep using this same conversation by typing.",
+      );
       return;
     }
     const recognition = new Recognition();
@@ -788,7 +851,9 @@ function MyAgentPage() {
       if (transcript) void sendMessage(transcript, true);
     };
     recognition.onerror = () => {
-      setError("I couldn't hear that clearly. Try the microphone again or type your message below.");
+      setError(
+        "I couldn't hear that clearly. Try the microphone again or type your message below.",
+      );
       setListening(false);
     };
     recognition.onend = () => setListening(false);
@@ -879,7 +944,10 @@ function MyAgentPage() {
                 className="flex min-h-20 items-center gap-3 rounded-2xl border border-cyan-200/15 bg-cyan-200/[.06] p-3 text-left hover:bg-cyan-200/10"
               >
                 <Megaphone className="h-5 w-5 shrink-0 text-cyan-200" />
-                <span><span className="block text-sm font-semibold">Create campaign</span><span className="text-[11px] text-slate-400">Build it step by step</span></span>
+                <span>
+                  <span className="block text-sm font-semibold">Create campaign</span>
+                  <span className="text-[11px] text-slate-400">Build it step by step</span>
+                </span>
               </button>
               <button
                 type="button"
@@ -887,7 +955,10 @@ function MyAgentPage() {
                 className="flex min-h-20 items-center gap-3 rounded-2xl border border-cyan-200/15 bg-cyan-200/[.06] p-3 text-left hover:bg-cyan-200/10"
               >
                 <BarChart3 className="h-5 w-5 shrink-0 text-cyan-200" />
-                <span><span className="block text-sm font-semibold">Performance</span><span className="text-[11px] text-slate-400">See a live snapshot</span></span>
+                <span>
+                  <span className="block text-sm font-semibold">Performance</span>
+                  <span className="text-[11px] text-slate-400">See a live snapshot</span>
+                </span>
               </button>
               <button
                 type="button"
@@ -902,6 +973,13 @@ function MyAgentPage() {
                 className="rounded-2xl border border-cyan-200/15 bg-cyan-200/[.04] px-3 py-3 text-xs font-semibold text-cyan-50 hover:bg-cyan-200/10"
               >
                 Open Creative Studio
+              </button>
+              <button
+                type="button"
+                onClick={() => openAgentTool("operations", "Help me manage workspace operations")}
+                className="col-span-2 rounded-2xl border border-cyan-200/15 bg-cyan-200/[.04] px-3 py-3 text-xs font-semibold text-cyan-50 hover:bg-cyan-200/10"
+              >
+                Manage clients, deliveries & approvals
               </button>
             </div>
           </div>
@@ -936,15 +1014,22 @@ function MyAgentPage() {
                     <div className="flex gap-2">
                       <input
                         value={campaignDraft.name}
-                        onChange={(event) => setCampaignDraft((current) => ({ ...current, name: event.target.value }))}
+                        onChange={(event) =>
+                          setCampaignDraft((current) => ({ ...current, name: event.target.value }))
+                        }
                         onKeyDown={(event) => {
-                          if (event.key === "Enter" && campaignDraft.name.trim()) setCampaignStep(1);
+                          if (event.key === "Enter" && campaignDraft.name.trim())
+                            setCampaignStep(1);
                         }}
                         placeholder="Campaign name"
                         maxLength={120}
                         className="min-h-11 min-w-0 flex-1 rounded-xl border border-violet-200/20 bg-[#06182d] px-3 text-sm outline-none focus:border-violet-300/60"
                       />
-                      <Button size="sm" disabled={!campaignDraft.name.trim()} onClick={() => setCampaignStep(1)}>
+                      <Button
+                        size="sm"
+                        disabled={!campaignDraft.name.trim()}
+                        onClick={() => setCampaignStep(1)}
+                      >
                         Continue <ArrowRight />
                       </Button>
                     </div>
@@ -954,19 +1039,21 @@ function MyAgentPage() {
                   <div className="mt-4">
                     <p className="text-sm text-slate-300">What is the main goal?</p>
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      {(["awareness", "engagement", "leads", "launch", "retention"] as const).map((goal) => (
-                        <Button
-                          key={goal}
-                          variant={campaignDraft.goal === goal ? "secondary" : "outline"}
-                          className="justify-start capitalize"
-                          onClick={() => {
-                            setCampaignDraft((current) => ({ ...current, goal }));
-                            setCampaignStep(2);
-                          }}
-                        >
-                          {goal}
-                        </Button>
-                      ))}
+                      {(["awareness", "engagement", "leads", "launch", "retention"] as const).map(
+                        (goal) => (
+                          <Button
+                            key={goal}
+                            variant={campaignDraft.goal === goal ? "secondary" : "outline"}
+                            className="justify-start capitalize"
+                            onClick={() => {
+                              setCampaignDraft((current) => ({ ...current, goal }));
+                              setCampaignStep(2);
+                            }}
+                          >
+                            {goal}
+                          </Button>
+                        ),
+                      )}
                     </div>
                   </div>
                 )}
@@ -1012,27 +1099,29 @@ function MyAgentPage() {
                   <div className="mt-4">
                     <p className="text-sm text-slate-300">Where should it run?</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {["instagram", "facebook", "tiktok", "linkedin", "youtube", "x"].map((platform) => {
-                        const selected = campaignDraft.platforms.includes(platform);
-                        return (
-                          <Button
-                            key={platform}
-                            size="sm"
-                            variant={selected ? "secondary" : "outline"}
-                            className="capitalize"
-                            onClick={() =>
-                              setCampaignDraft((current) => ({
-                                ...current,
-                                platforms: selected
-                                  ? current.platforms.filter((item) => item !== platform)
-                                  : [...current.platforms, platform],
-                              }))
-                            }
-                          >
-                            {platform}
-                          </Button>
-                        );
-                      })}
+                      {["instagram", "facebook", "tiktok", "linkedin", "youtube", "x"].map(
+                        (platform) => {
+                          const selected = campaignDraft.platforms.includes(platform);
+                          return (
+                            <Button
+                              key={platform}
+                              size="sm"
+                              variant={selected ? "secondary" : "outline"}
+                              className="capitalize"
+                              onClick={() =>
+                                setCampaignDraft((current) => ({
+                                  ...current,
+                                  platforms: selected
+                                    ? current.platforms.filter((item) => item !== platform)
+                                    : [...current.platforms, platform],
+                                }))
+                              }
+                            >
+                              {platform}
+                            </Button>
+                          );
+                        },
+                      )}
                     </div>
                     <Button
                       className="mt-4 w-full"
@@ -1046,9 +1135,12 @@ function MyAgentPage() {
                 {campaignStep === 5 && (
                   <div className="mt-4 space-y-3">
                     <div>
-                      <p className="text-sm font-medium text-slate-200">Choose the content for this campaign</p>
+                      <p className="text-sm font-medium text-slate-200">
+                        Choose the content for this campaign
+                      </p>
                       <p className="mt-1 text-xs text-slate-400">
-                        Use an entire WaveOS folder or pick individual media from WaveOS, Google Drive, Dropbox, Files, Camera Roll / Photos, or Frame.io.
+                        Use an entire WaveOS folder or pick individual media from WaveOS, Google
+                        Drive, Dropbox, Files, Camera Roll / Photos, or Frame.io.
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -1073,7 +1165,10 @@ function MyAgentPage() {
                       <Button
                         variant="outline"
                         className="w-full"
-                        disabled={campaignFolderAssets.isLoading || !(campaignFolderAssets.data ?? []).length}
+                        disabled={
+                          campaignFolderAssets.isLoading ||
+                          !(campaignFolderAssets.data ?? []).length
+                        }
                         onClick={() =>
                           setCampaignMediaIds(
                             (campaignFolderAssets.data ?? [])
@@ -1085,13 +1180,19 @@ function MyAgentPage() {
                         Use this entire folder
                       </Button>
                     )}
-                    <Button className="w-full" variant="outline" onClick={() => setShowAgentMediaPicker(true)}>
+                    <Button
+                      className="w-full"
+                      variant="outline"
+                      onClick={() => setShowAgentMediaPicker(true)}
+                    >
                       <FolderOpen /> Pick individual media
                     </Button>
                     <div className="rounded-xl border border-violet-200/10 bg-black/10 p-3 text-xs text-slate-300">
-                      <strong>{campaignDraft.name}</strong> · {campaignDraft.maxPosts} posts · {campaignDraft.durationDays} days · {campaignDraft.goal}
+                      <strong>{campaignDraft.name}</strong> · {campaignDraft.maxPosts} posts ·{" "}
+                      {campaignDraft.durationDays} days · {campaignDraft.goal}
                       <div className="mt-1 text-violet-200">
-                        {campaignMediaIds.length} content item{campaignMediaIds.length === 1 ? "" : "s"} selected
+                        {campaignMediaIds.length} content item
+                        {campaignMediaIds.length === 1 ? "" : "s"} selected
                       </div>
                     </div>
                     <Button
@@ -1099,7 +1200,8 @@ function MyAgentPage() {
                       disabled={!campaignMediaIds.length || toolBusy}
                       onClick={() => void finishCampaign()}
                     >
-                      {toolBusy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Create campaign with content
+                      {toolBusy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Create
+                      campaign with content
                     </Button>
                   </div>
                 )}
@@ -1110,12 +1212,19 @@ function MyAgentPage() {
                         <CheckCircle2 className="h-4 w-4" /> Campaign created
                       </div>
                       <p className="mt-1 text-xs text-slate-300">
-                        {campaignSaved.name} · {campaignSaved.plannedItems} planned slots · {campaignMediaIds.length} linked content item{campaignMediaIds.length === 1 ? "" : "s"} · {campaignSaved.startDate} to {campaignSaved.endDate}
+                        {campaignSaved.name} · {campaignSaved.plannedItems} planned slots ·{" "}
+                        {campaignMediaIds.length} linked content item
+                        {campaignMediaIds.length === 1 ? "" : "s"} · {campaignSaved.startDate} to{" "}
+                        {campaignSaved.endDate}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" onClick={() => void navigate({ to: "/campaigns" })}>Open Campaign Manager</Button>
-                      <Button variant="outline" onClick={() => startCampaignBuilder()}>Build another</Button>
+                      <Button variant="outline" onClick={() => void navigate({ to: "/campaigns" })}>
+                        Open Campaign Manager
+                      </Button>
+                      <Button variant="outline" onClick={() => startCampaignBuilder()}>
+                        Build another
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -1136,26 +1245,64 @@ function MyAgentPage() {
                     <p className="mt-1 text-[11px] text-slate-400">
                       {performance.rangeStart} to {performance.rangeEnd} · as of {performance.asOf}
                     </p>
-                    {performanceFocus && <button type="button" className="mt-2 text-xs text-cyan-200 underline" onClick={() => setPerformanceFocus(null)}>Show all available metrics</button>}
-                    {performanceFocus && !performance.metrics.some((metric) => metric.key === performanceFocus) && <p className="mt-2 text-sm text-slate-400">This metric is not available in the current connected snapshot. No estimate is being substituted.</p>}
+                    {performanceFocus && (
+                      <button
+                        type="button"
+                        className="mt-2 text-xs text-cyan-200 underline"
+                        onClick={() => setPerformanceFocus(null)}
+                      >
+                        Show all available metrics
+                      </button>
+                    )}
+                    {performanceFocus &&
+                      !performance.metrics.some((metric) => metric.key === performanceFocus) && (
+                        <p className="mt-2 text-sm text-slate-400">
+                          This metric is not available in the current connected snapshot. No
+                          estimate is being substituted.
+                        </p>
+                      )}
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      {performance.metrics.filter((metric) => !performanceFocus || metric.key === performanceFocus).map((metric) => (
-                        <div key={metric.key} className="rounded-xl border border-cyan-200/10 bg-black/10 p-3">
-                          <p className="text-[10px] uppercase tracking-wide text-slate-400">{metric.label}</p>
-                          <p className="mt-1 text-xl font-semibold">{Intl.NumberFormat().format(metric.value)}</p>
-                          <p className={cn("mt-1 text-[11px]", metric.changePercent === null ? "text-slate-500" : metric.changePercent >= 0 ? "text-slate-300" : "text-rose-300")}>
-                            {metric.changePercent === null ? "No equal prior period" : `${metric.changePercent >= 0 ? "+" : ""}${metric.changePercent.toFixed(1)}% vs prior period (${Intl.NumberFormat().format(metric.previousValue ?? 0)} → ${Intl.NumberFormat().format(metric.value)})`}
-                          </p>
-                        </div>
-                      ))}
+                      {performance.metrics
+                        .filter((metric) => !performanceFocus || metric.key === performanceFocus)
+                        .map((metric) => (
+                          <div
+                            key={metric.key}
+                            className="rounded-xl border border-cyan-200/10 bg-black/10 p-3"
+                          >
+                            <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                              {metric.label}
+                            </p>
+                            <p className="mt-1 text-xl font-semibold">
+                              {Intl.NumberFormat().format(metric.value)}
+                            </p>
+                            <p
+                              className={cn(
+                                "mt-1 text-[11px]",
+                                metric.changePercent === null
+                                  ? "text-slate-500"
+                                  : metric.changePercent >= 0
+                                    ? "text-slate-300"
+                                    : "text-rose-300",
+                              )}
+                            >
+                              {metric.changePercent === null
+                                ? "No equal prior period"
+                                : `${metric.changePercent >= 0 ? "+" : ""}${metric.changePercent.toFixed(1)}% vs prior period (${Intl.NumberFormat().format(metric.previousValue ?? 0)} → ${Intl.NumberFormat().format(metric.value)})`}
+                            </p>
+                          </div>
+                        ))}
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button variant="outline" onClick={() => void navigate({ to: "/analytics" })}>Open Analytics</Button>
+                      <Button variant="outline" onClick={() => void navigate({ to: "/analytics" })}>
+                        Open Analytics
+                      </Button>
                       <Button onClick={() => startCampaignBuilder()}>Build a campaign</Button>
                     </div>
                   </>
                 ) : (
-                  <p className="mt-4 text-sm text-slate-400">{performance?.message ?? toolError ?? "No performance data is available yet."}</p>
+                  <p className="mt-4 text-sm text-slate-400">
+                    {performance?.message ?? toolError ?? "No performance data is available yet."}
+                  </p>
                 )}
               </section>
             )}
@@ -1166,11 +1313,15 @@ function MyAgentPage() {
                 </div>
                 {postStep === 0 && (
                   <div className="mt-4 space-y-3">
-                    <p className="text-sm text-slate-300">What do you want this post to be about?</p>
+                    <p className="text-sm text-slate-300">
+                      What do you want this post to be about?
+                    </p>
                     <div className="flex gap-2">
                       <input
                         value={postDraft.idea}
-                        onChange={(event) => setPostDraft((current) => ({ ...current, idea: event.target.value }))}
+                        onChange={(event) =>
+                          setPostDraft((current) => ({ ...current, idea: event.target.value }))
+                        }
                         onKeyDown={(event) => {
                           if (event.key === "Enter" && postDraft.idea.trim()) setPostStep(1);
                         }}
@@ -1178,7 +1329,11 @@ function MyAgentPage() {
                         maxLength={500}
                         className="min-h-11 min-w-0 flex-1 rounded-xl border border-fuchsia-200/20 bg-[#06182d] px-3 text-sm outline-none focus:border-fuchsia-300/60"
                       />
-                      <Button size="sm" disabled={!postDraft.idea.trim()} onClick={() => setPostStep(1)}>
+                      <Button
+                        size="sm"
+                        disabled={!postDraft.idea.trim()}
+                        onClick={() => setPostStep(1)}
+                      >
                         Continue <ArrowRight />
                       </Button>
                     </div>
@@ -1188,7 +1343,9 @@ function MyAgentPage() {
                   <div className="mt-4">
                     <p className="text-sm text-slate-300">Which platform?</p>
                     <div className="mt-3 flex flex-wrap gap-2">
-                      {(["instagram", "facebook", "tiktok", "linkedin", "youtube", "x"] as const).map((platform) => (
+                      {(
+                        ["instagram", "facebook", "tiktok", "linkedin", "youtube", "x"] as const
+                      ).map((platform) => (
                         <Button
                           key={platform}
                           size="sm"
@@ -1233,20 +1390,32 @@ function MyAgentPage() {
                 {postStep === 3 && (
                   <div className="mt-4 space-y-3">
                     <div className="rounded-xl border border-fuchsia-200/10 bg-black/10 p-3">
-                      <p className="text-[10px] uppercase tracking-wide text-slate-400">Caption preview</p>
+                      <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                        Caption preview
+                      </p>
                       <textarea
                         value={postDraft.caption}
-                        onChange={(event) => setPostDraft((current) => ({ ...current, caption: event.target.value }))}
+                        onChange={(event) =>
+                          setPostDraft((current) => ({ ...current, caption: event.target.value }))
+                        }
                         rows={6}
                         className="mt-2 w-full resize-y bg-transparent text-sm leading-6 text-slate-200 outline-none"
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" disabled={toolBusy} onClick={() => void generatePostCaption()}>
+                      <Button
+                        variant="outline"
+                        disabled={toolBusy}
+                        onClick={() => void generatePostCaption()}
+                      >
                         <Sparkles /> Rewrite
                       </Button>
-                      <Button disabled={!postDraft.caption.trim() || toolBusy} onClick={() => void finishPostDraft()}>
-                        {toolBusy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Save draft
+                      <Button
+                        disabled={!postDraft.caption.trim() || toolBusy}
+                        onClick={() => void finishPostDraft()}
+                      >
+                        {toolBusy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Save
+                        draft
                       </Button>
                     </div>
                   </div>
@@ -1260,7 +1429,12 @@ function MyAgentPage() {
                       <p className="mt-1 text-xs text-slate-300">{postSaved.title}</p>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline" onClick={() => void navigate({ to: "/create", search: { id: postSaved.id } })}>
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          void navigate({ to: "/create", search: { id: postSaved.id } })
+                        }
+                      >
                         Open draft
                       </Button>
                       <Button onClick={() => openStudioLauncher()}>Add creative</Button>
@@ -1279,14 +1453,34 @@ function MyAgentPage() {
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => void navigate({ to: "/creative-studio", search: { post: undefined, workspace: undefined, media: undefined, photo: false } })}
+                    onClick={() =>
+                      void navigate({
+                        to: "/creative-studio",
+                        search: {
+                          post: undefined,
+                          workspace: undefined,
+                          media: undefined,
+                          photo: false,
+                        },
+                      })
+                    }
                     className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-cyan-200/15 bg-black/10 px-2 text-xs font-semibold hover:bg-cyan-200/10"
                   >
                     <WandSparkles className="h-5 w-5 text-cyan-200" /> Graphic
                   </button>
                   <button
                     type="button"
-                    onClick={() => void navigate({ to: "/creative-studio", search: { post: undefined, workspace: undefined, media: undefined, photo: true } })}
+                    onClick={() =>
+                      void navigate({
+                        to: "/creative-studio",
+                        search: {
+                          post: undefined,
+                          workspace: undefined,
+                          media: undefined,
+                          photo: true,
+                        },
+                      })
+                    }
                     className="flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border border-cyan-200/15 bg-black/10 px-2 text-xs font-semibold hover:bg-cyan-200/10"
                   >
                     <ImageIcon className="h-5 w-5 text-cyan-200" /> Photo
@@ -1300,7 +1494,8 @@ function MyAgentPage() {
                   </button>
                 </div>
                 <p className="mt-3 text-[11px] text-slate-400">
-                  My Agent stays the central assistant. These open the existing editing tools rather than creating a second chat.
+                  My Agent stays the central assistant. These open the existing editing tools rather
+                  than creating a second chat.
                 </p>
               </section>
             )}
@@ -1312,7 +1507,13 @@ function MyAgentPage() {
                 <p className="mt-2 text-sm text-slate-300">What kind of trend should I look for?</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {(["topic", "hook", "format", "audio"] as const).map((type) => (
-                    <Button key={type} size="sm" variant={trendType === type ? "secondary" : "outline"} className="capitalize" onClick={() => setTrendType(type)}>
+                    <Button
+                      key={type}
+                      size="sm"
+                      variant={trendType === type ? "secondary" : "outline"}
+                      className="capitalize"
+                      onClick={() => setTrendType(type)}
+                    >
                       {type}
                     </Button>
                   ))}
@@ -1331,15 +1532,28 @@ function MyAgentPage() {
                 {trendResults.length > 0 && (
                   <div className="mt-4 space-y-2">
                     {trendResults.map((trend) => (
-                      <div key={trend.id} className="rounded-xl border border-orange-200/10 bg-black/10 p-3">
+                      <div
+                        key={trend.id}
+                        className="rounded-xl border border-orange-200/10 bg-black/10 p-3"
+                      >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-slate-100">{trend.title}</p>
                             <p className="mt-1 text-[11px] text-slate-400">
-                              {[trend.platform, trend.creator, trend.engagementEvidence].filter(Boolean).join(" · ")}
+                              {[trend.platform, trend.creator, trend.engagementEvidence]
+                                .filter(Boolean)
+                                .join(" · ")}
                             </p>
                           </div>
-                          <Button size="sm" variant="outline" onClick={() => startPostFromIdea(`Create an original post inspired by this trend: ${trend.title}. ${trend.excerpt}`)}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() =>
+                              startPostFromIdea(
+                                `Create an original post inspired by this trend: ${trend.title}. ${trend.excerpt}`,
+                              )
+                            }
+                          >
                             Adapt
                           </Button>
                         </div>
@@ -1348,7 +1562,13 @@ function MyAgentPage() {
                   </div>
                 )}
                 {toolError && <p className="mt-3 text-xs text-amber-200">{toolError}</p>}
-                <Button className="mt-3 w-full" variant="outline" onClick={() => void navigate({ to: "/trending-now" })}>Open full Trending Now</Button>
+                <Button
+                  className="mt-3 w-full"
+                  variant="outline"
+                  onClick={() => void navigate({ to: "/trending-now" })}
+                >
+                  Open full Trending Now
+                </Button>
               </section>
             )}
             {activeTool === "competitive" && (
@@ -1356,7 +1576,9 @@ function MyAgentPage() {
                 <div className="flex items-center gap-2 text-sm font-semibold text-indigo-100">
                   <Globe2 className="h-4 w-4" /> Competitive Intelligence
                 </div>
-                <p className="mt-2 text-sm text-slate-300">Paste a competitor website or public profile.</p>
+                <p className="mt-2 text-sm text-slate-300">
+                  Paste a competitor website or public profile.
+                </p>
                 <div className="mt-3 flex gap-2">
                   <input
                     value={competitiveUrl}
@@ -1364,32 +1586,52 @@ function MyAgentPage() {
                     placeholder="https://competitor.com"
                     className="min-h-11 min-w-0 flex-1 rounded-xl border border-indigo-200/20 bg-[#06182d] px-3 text-sm outline-none"
                   />
-                  <Button disabled={!competitiveUrl.trim() || toolBusy} onClick={() => void runCompetitiveResearch()}>
+                  <Button
+                    disabled={!competitiveUrl.trim() || toolBusy}
+                    onClick={() => void runCompetitiveResearch()}
+                  >
                     {toolBusy ? <Loader2 className="animate-spin" /> : <Search />} Research
                   </Button>
                 </div>
                 {competitiveReport && (
                   <div className="mt-4 space-y-3">
                     <div className="rounded-xl border border-indigo-200/10 bg-black/10 p-3">
-                      <p className="font-semibold">{competitiveReport.company ?? "Competitor research"}</p>
+                      <p className="font-semibold">
+                        {competitiveReport.company ?? "Competitor research"}
+                      </p>
                       <div className="mt-2 space-y-2 text-xs text-slate-300">
                         {competitiveReport.sections
-                          .flatMap((section) => section.findings.slice(0, 1).map((finding) => ({ section: section.title, text: finding.text })))
+                          .flatMap((section) =>
+                            section.findings
+                              .slice(0, 1)
+                              .map((finding) => ({ section: section.title, text: finding.text })),
+                          )
                           .slice(0, 3)
                           .map((finding, index) => (
-                            <p key={index}><strong>{finding.section}:</strong> {finding.text}</p>
+                            <p key={index}>
+                              <strong>{finding.section}:</strong> {finding.text}
+                            </p>
                           ))}
                       </div>
                     </div>
                     {competitiveReport.ideas[0] && (
-                      <Button className="w-full" onClick={() => startPostFromIdea(competitiveReport.ideas[0].text)}>
+                      <Button
+                        className="w-full"
+                        onClick={() => startPostFromIdea(competitiveReport.ideas[0].text)}
+                      >
                         Turn opportunity into a post
                       </Button>
                     )}
                   </div>
                 )}
                 {toolError && <p className="mt-3 text-xs text-amber-200">{toolError}</p>}
-                <Button className="mt-3 w-full" variant="outline" onClick={() => void navigate({ to: "/competitive-intelligence" })}>Open full report tool</Button>
+                <Button
+                  className="mt-3 w-full"
+                  variant="outline"
+                  onClick={() => void navigate({ to: "/competitive-intelligence" })}
+                >
+                  Open full report tool
+                </Button>
               </section>
             )}
             {activeTool === "seo" && (
@@ -1405,27 +1647,42 @@ function MyAgentPage() {
                     placeholder="yourbusiness.com"
                     className="min-h-11 min-w-0 flex-1 rounded-xl border border-emerald-200/20 bg-[#06182d] px-3 text-sm outline-none"
                   />
-                  <Button disabled={!seoWebsite.trim() || toolBusy} onClick={() => void runSeoResearch()}>
+                  <Button
+                    disabled={!seoWebsite.trim() || toolBusy}
+                    onClick={() => void runSeoResearch()}
+                  >
                     {toolBusy ? <Loader2 className="animate-spin" /> : <Search />} Audit
                   </Button>
                 </div>
                 {seoReport && (
                   <div className="mt-4 space-y-3">
                     <div className="rounded-xl border border-emerald-200/10 bg-black/10 p-3">
-                      <p className="text-sm font-semibold">{seoReport.business ?? "SEO snapshot"}</p>
+                      <p className="text-sm font-semibold">
+                        {seoReport.business ?? "SEO snapshot"}
+                      </p>
                       <p className="mt-2 text-xs leading-5 text-slate-300">{seoReport.summary}</p>
                     </div>
                     <div className="grid gap-2">
                       {seoReport.quickWins.slice(0, 3).map((win, index) => (
-                        <div key={index} className="rounded-xl border border-emerald-200/10 bg-black/10 px-3 py-2 text-xs text-slate-300">
-                          <span className="mr-2 font-semibold text-emerald-200">{index + 1}.</span>{win}
+                        <div
+                          key={index}
+                          className="rounded-xl border border-emerald-200/10 bg-black/10 px-3 py-2 text-xs text-slate-300"
+                        >
+                          <span className="mr-2 font-semibold text-emerald-200">{index + 1}.</span>
+                          {win}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
                 {toolError && <p className="mt-3 text-xs text-amber-200">{toolError}</p>}
-                <Button className="mt-3 w-full" variant="outline" onClick={() => void navigate({ to: "/analytics" })}>Open SEO Growth</Button>
+                <Button
+                  className="mt-3 w-full"
+                  variant="outline"
+                  onClick={() => void navigate({ to: "/analytics" })}
+                >
+                  Open SEO Growth
+                </Button>
               </section>
             )}
             {activeTool === "media" && (
@@ -1461,7 +1718,20 @@ function MyAgentPage() {
                   >
                     <FileText /> Use in a post
                   </Button>
-                  <Button variant="outline" onClick={() => void navigate({ to: "/creative-studio", search: { post: undefined, workspace: undefined, media: agentPickedMedia[0], photo: false } })}>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void navigate({
+                        to: "/creative-studio",
+                        search: {
+                          post: undefined,
+                          workspace: undefined,
+                          media: agentPickedMedia[0],
+                          photo: false,
+                        },
+                      })
+                    }
+                  >
                     <ImageIcon /> Graphic
                   </Button>
                   <Button variant="outline" onClick={() => void navigate({ to: "/video-maker" })}>
@@ -1470,7 +1740,8 @@ function MyAgentPage() {
                 </div>
                 {agentPickedMedia.length > 0 && (
                   <p className="mt-3 text-xs text-cyan-100">
-                    {agentPickedMedia.length} media item{agentPickedMedia.length === 1 ? "" : "s"} selected.
+                    {agentPickedMedia.length} media item{agentPickedMedia.length === 1 ? "" : "s"}{" "}
+                    selected.
                   </p>
                 )}
               </section>
@@ -1481,14 +1752,61 @@ function MyAgentPage() {
                   <CalendarClock className="h-4 w-4" /> Schedule & Publish Review
                 </div>
                 <p className="mt-2 text-sm text-slate-300">
-                  My Agent can prepare the next step, but publishing stays review-first so nothing goes live accidentally.
+                  My Agent can prepare the next step, but publishing stays review-first so nothing
+                  goes live accidentally.
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-2">
-                  <Button variant="outline" onClick={() => void navigate({ to: "/content" })}>Review drafts</Button>
-                  <Button variant="outline" onClick={() => void navigate({ to: "/calendar" })}>Open calendar</Button>
-                  <Button variant="outline" onClick={() => void navigate({ to: "/approvals" })}>Approvals</Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/content" })}>
+                    Review drafts
+                  </Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/calendar" })}>
+                    Open calendar
+                  </Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/approvals" })}>
+                    Approvals
+                  </Button>
                   <Button onClick={() => startPostBuilder()}>Create next post</Button>
                 </div>
+              </section>
+            )}
+            {activeTool === "operations" && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-sky-300/20 bg-sky-300/[.05] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-sky-100">
+                  <BriefcaseBusiness className="h-4 w-4" /> Workspace Operations
+                </div>
+                <p className="mt-2 text-sm text-slate-300">
+                  My Agent opens the correct workspace tool and keeps the final action review-first.
+                  Every screen still enforces your staff or client permissions.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {permissions.isStaff && (
+                    <Button onClick={() => void navigate({ to: "/clients" })}>
+                      Clients, invoices & contracts
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => void navigate({ to: "/deliveries" })}>
+                    Deliveries & Frame.io
+                  </Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/approvals" })}>
+                    Approvals
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      void navigate({ to: permissions.isStaff ? "/projects" : "/my-projects" })
+                    }
+                  >
+                    Projects
+                  </Button>
+                  <Button variant="outline" onClick={() => void navigate({ to: "/content" })}>
+                    Content library
+                  </Button>
+                </div>
+                <p className="mt-3 text-[11px] leading-5 text-slate-400">
+                  {permissions.isStaff
+                    ? "Staff operations are available for the active workspace. Destructive, billing, contract-send, and publishing actions require confirmation in their source tool."
+                    : "Only the operations included in your workspace access are shown. Ask an administrator if a needed action is unavailable."}
+                </p>
               </section>
             )}
             {busy && (
@@ -1523,9 +1841,7 @@ function MyAgentPage() {
               disabled={busy}
               className={cn(
                 "flex h-11 w-11 shrink-0 items-center justify-center rounded-xl transition-colors",
-                listening
-                  ? "bg-rose-400/20 text-rose-200"
-                  : "text-cyan-200 hover:bg-cyan-300/10",
+                listening ? "bg-rose-400/20 text-rose-200" : "text-cyan-200 hover:bg-cyan-300/10",
               )}
               aria-label={listening ? "Stop listening" : "Talk to My Agent"}
             >
@@ -1575,7 +1891,9 @@ function MyAgentPage() {
       {showAgentMediaPicker && workspaceId && (
         <MediaPicker
           workspaceId={workspaceId}
-          picked={activeTool === "campaign" && campaignStep === 5 ? campaignMediaIds : agentPickedMedia}
+          picked={
+            activeTool === "campaign" && campaignStep === 5 ? campaignMediaIds : agentPickedMedia
+          }
           onClose={() => setShowAgentMediaPicker(false)}
           onConfirm={(ids) => {
             if (activeTool === "campaign" && campaignStep === 5) {
