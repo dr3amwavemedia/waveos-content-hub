@@ -36,6 +36,10 @@ const createCampaignInput = workspaceInput.extend({
   mediaFolderId: z.string().uuid().nullable().optional(),
 });
 
+const campaignReviewInput = workspaceInput.extend({
+  request: z.string().trim().min(1).max(2_000),
+});
+
 function addDays(isoDate: string, days: number) {
   const date = new Date(`${isoDate}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
@@ -47,31 +51,30 @@ async function requireWorkspaceAccess(
   workspaceId: string,
   feature?: string,
 ) {
-  const [{ data: member }, { data: manageable }, { data: roles }, featureResult] = await Promise.all([
-    context.supabase
-      .from("workspace_members")
-      .select("workspace_id")
-      .eq("workspace_id", workspaceId)
-      .eq("user_id", context.userId)
-      .maybeSingle(),
-    context.supabase.rpc("can_staff_manage_workspace", {
-      _user_id: context.userId,
-      _workspace_id: workspaceId,
-    }),
-    context.supabase
-      .from("user_roles")
-      .select("role,staff_type")
-      .eq("user_id", context.userId),
-    feature
-      ? context.supabase.rpc("has_feature", { _workspace_id: workspaceId, _feature: feature })
-      : Promise.resolve({ data: true }),
-  ]);
+  const [{ data: member }, { data: manageable }, { data: roles }, featureResult] =
+    await Promise.all([
+      context.supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("workspace_id", workspaceId)
+        .eq("user_id", context.userId)
+        .maybeSingle(),
+      context.supabase.rpc("can_staff_manage_workspace", {
+        _user_id: context.userId,
+        _workspace_id: workspaceId,
+      }),
+      context.supabase.from("user_roles").select("role,staff_type").eq("user_id", context.userId),
+      feature
+        ? context.supabase.rpc("has_feature", { _workspace_id: workspaceId, _feature: feature })
+        : Promise.resolve({ data: true }),
+    ]);
   const staffIdentity = (roles ?? []).some(
     (row: { role: string }) => row.role === "dream_wave_owner" || row.role === "dream_wave_team",
   );
   const staff = manageable === true || (staffIdentity && workspaceId === STAFF_WORKSPACE_ID);
   if (!member && !staff) throw new Error("forbidden");
-  if (!staff && feature && !featureResult.data) throw new Error("This tool is not included in this plan.");
+  if (!staff && feature && !featureResult.data)
+    throw new Error("This tool is not included in this plan.");
   return { staff };
 }
 
@@ -113,10 +116,11 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
 
     const latestEnd = observations[0].range_end;
     const currentRows = observations.filter((row: any) => row.range_end === latestEnd);
-    const latestStart = currentRows
-      .map((row: any) => row.range_start)
-      .sort()
-      .at(-1) ?? currentRows[0].range_start;
+    const latestStart =
+      currentRows
+        .map((row: any) => row.range_start)
+        .sort()
+        .at(-1) ?? currentRows[0].range_start;
     const sameWindow = currentRows.filter((row: any) => row.range_start === latestStart);
 
     // Prioritize actionable outcomes over vanity metrics when space is limited.
@@ -172,7 +176,9 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
           : null;
       return {
         key: row.metric_key,
-        label: row.metric_key.replaceAll("_", " ").replace(/\b\w/g, (letter: string) => letter.toUpperCase()),
+        label: row.metric_key
+          .replaceAll("_", " ")
+          .replace(/\b\w/g, (letter: string) => letter.toUpperCase()),
         value,
         unit: row.unit || "count",
         previousValue,
@@ -186,6 +192,115 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
       rangeEnd: latestEnd,
       metrics,
       message: null,
+    };
+  });
+
+export const getAgentCampaignReview = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input) => campaignReviewInput.parse(input))
+  .handler(async ({ data, context }) => {
+    await requireWorkspaceAccess(context as any, data.workspaceId, "can_use_campaign_manager");
+
+    const { data: plans, error: plansError } = await (context.supabase as any)
+      .from("campaign_plans")
+      .select("id,name,goal,start_date,end_date,platforms,max_posts,status,created_at")
+      .eq("workspace_id", data.workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(12);
+    if (plansError) throw new Error("Saved campaigns could not be reviewed.");
+    if (!(plans ?? []).length) return { campaign: null, findings: [] };
+
+    const request = data.request.toLowerCase();
+    const named = (plans ?? []).find((plan: any) =>
+      request.includes(String(plan.name ?? "").toLowerCase()),
+    );
+    const campaign = named ?? plans[0];
+    const [{ data: items, error: itemsError }, { data: linked, error: linkedError }] =
+      await Promise.all([
+        (context.supabase as any)
+          .from("campaign_plan_items")
+          .select(
+            "id,position,planned_date,planned_time,platform,content_pillar,working_title,copy_brief,status",
+          )
+          .eq("workspace_id", data.workspaceId)
+          .eq("campaign_plan_id", campaign.id)
+          .order("position", { ascending: true })
+          .limit(120),
+        (context.supabase as any)
+          .from("content_items")
+          .select("id,title,status,primary_caption,media_asset_ids,scheduled_at,metadata")
+          .eq("workspace_id", data.workspaceId)
+          .contains("metadata", { campaignPlanId: campaign.id })
+          .limit(120),
+      ]);
+    if (itemsError || linkedError) throw new Error("Campaign details could not be reviewed.");
+
+    const planItems = items ?? [];
+    const linkedContent = linked ?? [];
+    const findings: string[] = [];
+    if (!planItems.length) findings.push("The campaign has no planned posting slots.");
+    if (planItems.length < Number(campaign.max_posts ?? 0))
+      findings.push(
+        `Only ${planItems.length} of ${campaign.max_posts} planned slots are currently defined.`,
+      );
+    const incompleteItems = planItems.filter(
+      (item: any) =>
+        !item.planned_date ||
+        !item.platform ||
+        !String(item.working_title ?? "").trim() ||
+        !String(item.copy_brief ?? "").trim(),
+    ).length;
+    if (incompleteItems) {
+      findings.push(
+        `${incompleteItems} planned slot${incompleteItems === 1 ? " is" : "s are"} missing a date, platform, title, or brief.`,
+      );
+    }
+    if (!linkedContent.length) findings.push("No content drafts are linked to this campaign yet.");
+    const missingCaptions = linkedContent.filter(
+      (item: any) => !String(item.primary_caption ?? "").trim(),
+    ).length;
+    if (missingCaptions) {
+      findings.push(
+        `${missingCaptions} linked post${missingCaptions === 1 ? " needs" : "s need"} a caption.`,
+      );
+    }
+    const missingMedia = linkedContent.filter(
+      (item: any) => !Array.isArray(item.media_asset_ids) || item.media_asset_ids.length === 0,
+    ).length;
+    if (missingMedia) {
+      findings.push(
+        `${missingMedia} linked post${missingMedia === 1 ? " has" : "s have"} no media selected.`,
+      );
+    }
+    if (!findings.length) {
+      findings.push(
+        "The saved campaign has complete plan details, linked media, and captions ready for review.",
+      );
+    }
+
+    return {
+      campaign: {
+        id: campaign.id as string,
+        name: String(campaign.name),
+        goal: String(campaign.goal ?? ""),
+        startDate: String(campaign.start_date),
+        endDate: String(campaign.end_date),
+        platforms: Array.isArray(campaign.platforms) ? campaign.platforms : [],
+        status: String(campaign.status),
+        maxPosts: Number(campaign.max_posts ?? 0),
+        plannedItems: planItems.length,
+        linkedPosts: linkedContent.length,
+        captionReady: linkedContent.length - missingCaptions,
+        items: planItems.slice(0, 24).map((item: any) => ({
+          position: Number(item.position ?? 0),
+          plannedDate: item.planned_date,
+          platform: item.platform,
+          workingTitle: item.working_title,
+          copyBrief: String(item.copy_brief ?? "").slice(0, 600),
+          status: item.status,
+        })),
+      },
+      findings,
     };
   });
 
@@ -260,23 +375,21 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
       throw new Error("Campaign plan could not be saved.");
     }
 
-    const { error: itemsError } = await (supabaseAdmin as any)
-      .from("campaign_plan_items")
-      .insert(
-        plannedItems.map((item) => ({
-          workspace_id: data.workspaceId,
-          campaign_plan_id: plan.id,
-          position: item.sequence,
-          planned_date: item.plannedDate,
-          planned_time: item.localTime,
-          platform: item.platform,
-          content_pillar: item.pillar,
-          working_title: item.workingTitle,
-          copy_brief: item.copyBrief,
-          approval_required: true,
-          status: "draft",
-        })),
-      );
+    const { error: itemsError } = await (supabaseAdmin as any).from("campaign_plan_items").insert(
+      plannedItems.map((item) => ({
+        workspace_id: data.workspaceId,
+        campaign_plan_id: plan.id,
+        position: item.sequence,
+        planned_date: item.plannedDate,
+        planned_time: item.localTime,
+        platform: item.platform,
+        content_pillar: item.pillar,
+        working_title: item.workingTitle,
+        copy_brief: item.copyBrief,
+        approval_required: true,
+        status: "draft",
+      })),
+    );
     if (itemsError) {
       console.error("My Agent campaign item insert failed", {
         code: itemsError.code ?? "unknown",
@@ -345,19 +458,19 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
       });
     } else if ((createdDrafts ?? []).length) {
       const variantRows = (createdDrafts ?? []).flatMap((draft: any) => {
-        const metadata =
-          draft.metadata && typeof draft.metadata === "object" ? draft.metadata : {};
+        const metadata = draft.metadata && typeof draft.metadata === "object" ? draft.metadata : {};
         const platform = typeof metadata.platform === "string" ? metadata.platform : null;
         if (!platform) return [];
-        return [{
-          content_item_id: draft.id,
-          workspace_id: data.workspaceId,
-          platform,
-          enabled: true,
-          caption: "",
-          platform_options:
-            metadata.contentFormat === "story" ? { contentType: "story" } : {},
-        }];
+        return [
+          {
+            content_item_id: draft.id,
+            workspace_id: data.workspaceId,
+            platform,
+            enabled: true,
+            caption: "",
+            platform_options: metadata.contentFormat === "story" ? { contentType: "story" } : {},
+          },
+        ];
       });
       if (variantRows.length) {
         const { error: variantError } = await (supabaseAdmin as any)
@@ -385,7 +498,6 @@ export const createAgentCampaign = createServerFn({ method: "POST" })
       contentLinked,
     };
   });
-
 
 export const createAgentPostDraft = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

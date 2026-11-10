@@ -12,6 +12,7 @@ import {
   Globe2,
   ImageIcon,
   Loader2,
+  ListChecks,
   Megaphone,
   MessageSquareText,
   Mic,
@@ -36,8 +37,10 @@ import { waveAssist } from "@/lib/wave-assist.functions";
 import {
   createAgentCampaign,
   createAgentPostDraft,
+  getAgentCampaignReview,
   getAgentPerformanceSnapshot,
 } from "@/lib/my-agent-actions.functions";
+import { campaignIntent } from "@/lib/my-agent-intent";
 import { discoverTrends } from "@/lib/trending-now.functions";
 import { researchCompetitor } from "@/lib/competitive-research.functions";
 import { analyzeSeoGrowth } from "@/lib/seo-growth.functions";
@@ -45,7 +48,48 @@ import { useMediaAssets, useMediaFolders } from "@/hooks/use-media";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/use-permissions";
 
-type AgentMessage = { role: "user" | "assistant"; content: string };
+type AgentMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: number;
+};
+
+const MAX_VISIBLE_MESSAGES = 24;
+
+function newAgentMessage(role: AgentMessage["role"], content: string): AgentMessage {
+  return {
+    id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    role,
+    content,
+    createdAt: Date.now(),
+  };
+}
+
+function restoreAgentMessages(value: unknown): AgentMessage[] {
+  if (!Array.isArray(value)) return [];
+  const baseTime = Date.now() - value.length;
+  return value
+    .filter(
+      (message) =>
+        (message?.role === "user" || message?.role === "assistant") &&
+        typeof message.content === "string",
+    )
+    .map((message, index) => ({
+      id:
+        typeof message.id === "string" && message.id
+          ? message.id
+          : `restored-${baseTime + index}-${index}`,
+      role: message.role as AgentMessage["role"],
+      content: message.content as string,
+      createdAt:
+        typeof message.createdAt === "number" && Number.isFinite(message.createdAt)
+          ? message.createdAt
+          : baseTime + index,
+    }))
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .slice(-MAX_VISIBLE_MESSAGES);
+}
 
 type AgentPerformanceSnapshot = {
   asOf: string;
@@ -68,6 +112,31 @@ type AgentCampaignDraft = {
   durationDays: number;
   maxPosts: number;
   platforms: string[];
+};
+
+type AgentCampaignReview = {
+  campaign: null | {
+    id: string;
+    name: string;
+    goal: string;
+    startDate: string;
+    endDate: string;
+    platforms: string[];
+    status: string;
+    maxPosts: number;
+    plannedItems: number;
+    linkedPosts: number;
+    captionReady: number;
+    items: Array<{
+      position: number;
+      plannedDate: string | null;
+      platform: string | null;
+      workingTitle: string | null;
+      copyBrief: string;
+      status: string;
+    }>;
+  };
+  findings: string[];
 };
 
 type AgentPostDraft = {
@@ -202,6 +271,7 @@ function MyAgentPage() {
   const navigate = useNavigate();
   const assist = useServerFn(waveAssist);
   const getPerformance = useServerFn(getAgentPerformanceSnapshot);
+  const reviewCampaign = useServerFn(getAgentCampaignReview);
   const saveAgentCampaign = useServerFn(createAgentCampaign);
   const saveAgentPost = useServerFn(createAgentPostDraft);
   const findTrends = useServerFn(discoverTrends);
@@ -224,6 +294,7 @@ function MyAgentPage() {
   const [voiceReplies, setVoiceReplies] = useState(false);
   const [activeTool, setActiveTool] = useState<
     | "campaign"
+    | "campaign_review"
     | "performance"
     | "post"
     | "studio"
@@ -238,6 +309,7 @@ function MyAgentPage() {
   const [toolBusy, setToolBusy] = useState(false);
   const [toolError, setToolError] = useState<string | null>(null);
   const [performance, setPerformance] = useState<AgentPerformanceSnapshot | null>(null);
+  const [campaignReview, setCampaignReview] = useState<AgentCampaignReview | null>(null);
   const [performanceFocus, setPerformanceFocus] = useState<string | null>(null);
   const [campaignStep, setCampaignStep] = useState(0);
   const [campaignSaved, setCampaignSaved] = useState<null | {
@@ -273,32 +345,29 @@ function MyAgentPage() {
   const [agentPickedMedia, setAgentPickedMedia] = useState<string[]>([]);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!storageKey) return;
+    if (!storageKey) {
+      setMessages([]);
+      setLoadedStorageKey(null);
+      return;
+    }
     try {
       const stored = sessionStorage.getItem(storageKey);
-      const parsed = stored ? (JSON.parse(stored) as AgentMessage[]) : [];
-      setMessages(
-        Array.isArray(parsed)
-          ? parsed
-              .filter(
-                (message) =>
-                  (message?.role === "user" || message?.role === "assistant") &&
-                  typeof message.content === "string",
-              )
-              .slice(-8)
-          : [],
-      );
+      setMessages(restoreAgentMessages(stored ? JSON.parse(stored) : []));
     } catch {
       setMessages([]);
     }
+    setLoadedStorageKey(storageKey);
   }, [storageKey]);
 
   useEffect(() => {
-    if (storageKey) sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-8)));
+    if (storageKey && loadedStorageKey === storageKey) {
+      sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-MAX_VISIBLE_MESSAGES)));
+    }
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, storageKey]);
+  }, [loadedStorageKey, messages, storageKey]);
 
   useEffect(
     () => () => {
@@ -309,7 +378,9 @@ function MyAgentPage() {
   );
 
   function addUserMessage(content: string) {
-    setMessages((current) => [...current, { role: "user" as const, content }].slice(-8));
+    setMessages((current) =>
+      [...current, newAgentMessage("user", content)].slice(-MAX_VISIBLE_MESSAGES),
+    );
   }
 
   function startCampaignBuilder(prompt?: string) {
@@ -520,6 +591,66 @@ function MyAgentPage() {
     }
   }
 
+  async function openCampaignReview(prompt: string, speakReply = false) {
+    if (!workspaceId || busy || toolBusy) return;
+    const prior = messages.slice(-8).map(({ role, content }) => ({ role, content }));
+    addUserMessage(prompt);
+    setDraft("");
+    setError(null);
+    setToolError(null);
+    setCampaignReview(null);
+    setActiveTool("campaign_review");
+    setBusy(true);
+    try {
+      const review = (await reviewCampaign({
+        data: { workspaceId, localDate: localDateKey(), request: prompt },
+      })) as AgentCampaignReview;
+      setCampaignReview(review);
+      if (!review.campaign) {
+        setMessages((current) =>
+          [
+            ...current,
+            newAgentMessage(
+              "assistant",
+              "I checked this workspace and there is no saved campaign to review yet. I did not create a new one.",
+            ),
+          ].slice(-MAX_VISIBLE_MESSAGES),
+        );
+        return;
+      }
+      const { id: _campaignId, ...reviewedCampaign } = review.campaign;
+      const result = await assist({
+        data: {
+          mode: "advisor",
+          input: prompt,
+          workspaceId,
+          conversation: prior,
+          context: JSON.stringify({
+            workspace: activeWorkspace?.name ?? "WaveOS",
+            surface: "My Agent",
+            intent: "review_existing_campaign",
+            localDate: localDateKey(),
+            reviewedCampaign,
+            verifiedFindings: review.findings,
+          }),
+        },
+      });
+      setMessages((current) =>
+        [...current, newAgentMessage("assistant", result.suggestion)].slice(-MAX_VISIBLE_MESSAGES),
+      );
+      if (speakReply && voiceReplies && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(result.suggestion));
+      }
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "Campaign review could not be completed.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function finishCampaign() {
     if (!workspaceId || toolBusy || !campaignDraft.name.trim() || !campaignDraft.platforms.length)
       return;
@@ -661,14 +792,14 @@ function MyAgentPage() {
     setMessages((current) =>
       [
         ...current,
-        { role: "user" as const, content: input },
-        {
-          role: "assistant" as const,
-          content: updates.length
+        newAgentMessage("user", input),
+        newAgentMessage(
+          "assistant",
+          updates.length
             ? `Updated your campaign: ${updates.join(" · ")}. Your existing media selections are unchanged. Review the plan before saving.`
             : "Got it. I've kept the current campaign settings. You can adjust the details before saving.",
-        },
-      ].slice(-8),
+        ),
+      ].slice(-MAX_VISIBLE_MESSAGES),
     );
     setCampaignDraft(nextDraft);
     setCampaignStep(nextStep);
@@ -722,7 +853,12 @@ function MyAgentPage() {
       setDraft("");
       return;
     }
-    if (/(campaign)/.test(normalized) && /(create|build|start|make|new)/.test(normalized)) {
+    const requestedCampaignIntent = campaignIntent(input);
+    if (requestedCampaignIntent === "review_existing") {
+      void openCampaignReview(input, speakReply);
+      return;
+    }
+    if (requestedCampaignIntent === "create_new") {
       startCampaignBuilder(input);
       return;
     }
@@ -789,8 +925,10 @@ function MyAgentPage() {
       return;
     }
 
-    const prior = messages.slice(-6);
-    setMessages((current) => [...current, { role: "user" as const, content: input }].slice(-8));
+    const prior = messages.slice(-8).map(({ role, content }) => ({ role, content }));
+    setMessages((current) =>
+      [...current, newAgentMessage("user", input)].slice(-MAX_VISIBLE_MESSAGES),
+    );
     setDraft("");
     setBusy(true);
     setError(null);
@@ -810,7 +948,7 @@ function MyAgentPage() {
         },
       });
       setMessages((current) =>
-        [...current, { role: "assistant" as const, content: result.suggestion }].slice(-8),
+        [...current, newAgentMessage("assistant", result.suggestion)].slice(-MAX_VISIBLE_MESSAGES),
       );
       if (speakReply && voiceReplies && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
@@ -907,6 +1045,7 @@ function MyAgentPage() {
               setError(null);
               setActiveTool(null);
               setPerformance(null);
+              setCampaignReview(null);
               setToolError(null);
               setCampaignSaved(null);
               setCampaignMediaFolderId(null);
@@ -984,10 +1123,10 @@ function MyAgentPage() {
             </div>
           </div>
         ) : (
-          <div className="mx-auto max-w-3xl space-y-4">
-            {messages.map((message, index) => (
+          <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end gap-4">
+            {messages.map((message) => (
               <article
-                key={`${message.role}-${index}`}
+                key={message.id}
                 className={cn(
                   "max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6",
                   message.role === "assistant"
@@ -1003,6 +1142,58 @@ function MyAgentPage() {
                 <AgentMessageContent content={message.content} />
               </article>
             ))}
+            {activeTool === "campaign_review" && campaignReview?.campaign && (
+              <section className="mr-auto w-full max-w-xl rounded-2xl border border-cyan-300/20 bg-cyan-300/[.05] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
+                  <ListChecks className="h-4 w-4" /> Reviewed saved campaign
+                </div>
+                <p className="mt-3 font-semibold text-slate-100">{campaignReview.campaign.name}</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {campaignReview.campaign.status} · {campaignReview.campaign.startDate} to{" "}
+                  {campaignReview.campaign.endDate}
+                </p>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                  <div className="rounded-xl bg-black/15 p-2">
+                    <strong className="block text-base text-cyan-100">
+                      {campaignReview.campaign.plannedItems}
+                    </strong>
+                    Planned
+                  </div>
+                  <div className="rounded-xl bg-black/15 p-2">
+                    <strong className="block text-base text-cyan-100">
+                      {campaignReview.campaign.linkedPosts}
+                    </strong>
+                    Linked
+                  </div>
+                  <div className="rounded-xl bg-black/15 p-2">
+                    <strong className="block text-base text-cyan-100">
+                      {campaignReview.campaign.captionReady}
+                    </strong>
+                    Captions
+                  </div>
+                </div>
+                <ul className="mt-3 space-y-1.5 text-xs leading-5 text-slate-300">
+                  {campaignReview.findings.slice(0, 4).map((finding) => (
+                    <li key={finding} className="flex gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />
+                      <span>{finding}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  className="mt-4 w-full"
+                  onClick={() => {
+                    sessionStorage.setItem(
+                      `waveos.campaign.open.${workspaceId}`,
+                      campaignReview.campaign!.id,
+                    );
+                    void navigate({ to: "/campaigns" });
+                  }}
+                >
+                  Review fixes in this campaign <ArrowRight />
+                </Button>
+              </section>
+            )}
             {activeTool === "campaign" && (
               <section className="mr-auto w-full max-w-xl rounded-2xl border border-violet-300/20 bg-violet-300/[.06] p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-violet-100">

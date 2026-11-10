@@ -376,10 +376,22 @@ export function useCampaignManager() {
   });
 
   useEffect(() => {
-    if (!selectedCampaignId && campaigns.data?.[0]?.id) {
-      setSelectedCampaignId(campaigns.data[0].id);
+    if (!campaigns.data?.length) return;
+    const openKey = workspaceId ? `waveos.campaign.open.${workspaceId}` : null;
+    const requestedId = openKey ? sessionStorage.getItem(openKey) : null;
+    if (requestedId && campaigns.data.some((campaign) => campaign.id === requestedId)) {
+      setSelectedCampaignId(requestedId);
+      setMediaSectionOpen(true);
+      sessionStorage.removeItem(openKey!);
+      window.requestAnimationFrame(() =>
+        document
+          .getElementById("campaign-command-detail")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+      return;
     }
-  }, [campaigns.data, selectedCampaignId]);
+    if (!selectedCampaignId) setSelectedCampaignId(campaigns.data[0].id);
+  }, [campaigns.data, selectedCampaignId, workspaceId]);
 
   const assetLookup = useMemo(() => {
     const map = new Map<string, MediaAsset>();
