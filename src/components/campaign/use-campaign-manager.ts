@@ -103,6 +103,22 @@ export interface CampaignLinkedContentRow {
   internal_notes?: string | null;
 }
 
+export function campaignCaptionBrief(item: CampaignLinkedContentRow) {
+  const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  const details = [
+    item.title?.trim() ? `Post/clip title: ${item.title.trim()}` : null,
+    typeof metadata.campaignBrief === "string" && metadata.campaignBrief.trim()
+      ? `Campaign direction: ${metadata.campaignBrief.trim()}`
+      : null,
+    typeof metadata.contentPillar === "string" && metadata.contentPillar.trim()
+      ? `Content pillar: ${metadata.contentPillar.trim()}`
+      : null,
+  ].filter((value): value is string => Boolean(value));
+  return details.length
+    ? details.join("\n")
+    : "Create an organic social caption for this campaign post.";
+}
+
 export type MediaRecommendation = {
   mediaId: string;
   reason: string;
@@ -682,11 +698,7 @@ export function useCampaignManager() {
       typeof metadata.platform === "string" && PLATFORM_OPTIONS.includes(metadata.platform)
         ? metadata.platform
         : "instagram";
-    const brief =
-      (typeof metadata.campaignBrief === "string" ? metadata.campaignBrief.trim() : "") ||
-      (typeof metadata.contentPillar === "string" ? metadata.contentPillar : "") ||
-      item.title ||
-      "Create an organic social caption for this campaign post.";
+    const brief = campaignCaptionBrief(item);
 
     setCaptionBusyId(item.id);
     try {
@@ -760,6 +772,8 @@ export function useCampaignManager() {
     }
     setBulkCaptionBusy(true);
     let completed = 0;
+    let failed = 0;
+    const generatedCaptions: string[] = [];
     try {
       for (const item of missing) {
         const metadata =
@@ -768,72 +782,79 @@ export function useCampaignManager() {
           typeof metadata.platform === "string" && PLATFORM_OPTIONS.includes(metadata.platform)
             ? metadata.platform
             : "instagram";
-        const brief =
-          (typeof metadata.campaignBrief === "string" ? metadata.campaignBrief.trim() : "") ||
-          (typeof metadata.contentPillar === "string" ? metadata.contentPillar : "") ||
-          item.title ||
-          "Create an organic social caption for this campaign post.";
-
-        const generated = await captionAssistFn({
-          data: {
-            mode: "caption_suite",
-            input: brief,
-            workspaceId,
-            platforms: [plannedPlatform],
-          },
-        });
-        const primaryCaption = generated.primaryCaption ?? generated.suggestion;
-        const { error: contentError } = await db
-          .from("content_items")
-          .update({
-            primary_caption: primaryCaption,
-            metadata: { ...metadata, captionState: "generated_for_review" },
-          })
-          .eq("id", item.id)
-          .eq("workspace_id", workspaceId);
-        if (contentError) throw contentError;
-
-        const { data: existingVariants, error: variantReadError } = await db
-          .from("post_variants")
-          .select("id,platform")
-          .eq("content_item_id", item.id)
-          .eq("workspace_id", workspaceId);
-        if (variantReadError) throw variantReadError;
-        const variant = (existingVariants ?? []).find(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (row: any) => row.platform === plannedPlatform,
-        );
-        const platformCaption =
-          generated.variants?.find((row) => row.platform === plannedPlatform)?.caption ??
-          primaryCaption;
-        if (variant?.id) {
-          const { error } = await db
-            .from("post_variants")
-            .update({ caption: platformCaption, enabled: true })
-            .eq("id", variant.id);
-          if (error) throw error;
-        } else {
-          const { error } = await db.from("post_variants").insert({
-            content_item_id: item.id,
-            workspace_id: workspaceId,
-            platform: plannedPlatform,
-            enabled: true,
-            caption: platformCaption,
-            platform_options:
-              metadata.contentFormat === "story" ? { contentType: "story" } : {},
+        try {
+          const generated = await captionAssistFn({
+            data: {
+              mode: "caption_suite",
+              input: campaignCaptionBrief(item),
+              workspaceId,
+              platforms: [plannedPlatform],
+              mediaAssetIds: item.media_asset_ids ?? [],
+              context: generatedCaptions.length
+                ? `Captions already used in this campaign. Write a materially different hook and structure:\n${generatedCaptions.slice(-8).join("\n---\n")}`
+                : undefined,
+            },
           });
-          if (error) throw error;
+          const primaryCaption = generated.primaryCaption ?? generated.suggestion;
+          const { error: contentError } = await db
+            .from("content_items")
+            .update({
+              primary_caption: primaryCaption,
+              metadata: { ...metadata, captionState: "generated_for_review" },
+            })
+            .eq("id", item.id)
+            .eq("workspace_id", workspaceId);
+          if (contentError) throw contentError;
+
+          const { data: existingVariants, error: variantReadError } = await db
+            .from("post_variants")
+            .select("id,platform")
+            .eq("content_item_id", item.id)
+            .eq("workspace_id", workspaceId);
+          if (variantReadError) throw variantReadError;
+          const variant = (existingVariants ?? []).find(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (row: any) => row.platform === plannedPlatform,
+          );
+          const platformCaption =
+            generated.variants?.find((row) => row.platform === plannedPlatform)?.caption ??
+            primaryCaption;
+          if (variant?.id) {
+            const { error } = await db
+              .from("post_variants")
+              .update({ caption: platformCaption, enabled: true })
+              .eq("id", variant.id);
+            if (error) throw error;
+          } else {
+            const { error } = await db.from("post_variants").insert({
+              content_item_id: item.id,
+              workspace_id: workspaceId,
+              platform: plannedPlatform,
+              enabled: true,
+              caption: platformCaption,
+              platform_options:
+                metadata.contentFormat === "story" ? { contentType: "story" } : {},
+            });
+            if (error) throw error;
+          }
+          generatedCaptions.push(primaryCaption);
+          completed += 1;
+        } catch {
+          failed += 1;
         }
-        completed += 1;
       }
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campaign-linked-content", workspaceId] }),
         queryClient.invalidateQueries({ queryKey: ["content-items", workspaceId] }),
       ]);
-      toast.success(
-        `Generated ${completed} campaign caption${completed === 1 ? "" : "s"} for review.`,
-      );
+      if (completed) {
+        toast.success(
+          `Generated ${completed} campaign caption${completed === 1 ? "" : "s"} for review${failed ? `; ${failed} need a retry` : ""}.`,
+        );
+      } else {
+        toast.error("Campaign captions could not be generated. Please retry.");
+      }
     } catch (error) {
       toast.error(
         error instanceof Error

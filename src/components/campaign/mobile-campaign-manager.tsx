@@ -28,6 +28,7 @@ import { MediaPicker } from "@/routes/_authenticated/create";
 import { UnsavedChangesGuard } from "@/components/app/unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
 import { MobileWorkflowSection, MobileWorkflowFooter } from "@/components/app/mobile-workflow";
+import { AiProcessingIndicator, SurferWaveSpinner } from "@/components/app/ai-processing-indicator";
 import { CAMPAIGN_GOALS } from "@/lib/phase-one-planning";
 import { CAMPAIGN_BUILDER_STEPS, campaignGoalReady } from "@/lib/campaign-builder-steps";
 import { cn } from "@/lib/utils";
@@ -478,7 +479,7 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
               onClick={() => void generateDirection()}
               disabled={!input.platforms.length || directionBusy || selectedMediaIds.length===0}
             >
-              {directionBusy ? <Loader2 className="animate-spin" /> : <Sparkles />}
+              {directionBusy ? <SurferWaveSpinner className="size-5" /> : <Sparkles />}
               {campaignDirection ? "Analyze again" : "Analyze & Build Campaign"}
             </Button>
             {selectedMediaIds.length === 0 && (
@@ -487,6 +488,11 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
 
             {analysisProgress && (
               <div className="mt-4 space-y-2 rounded-xl border border-neon-cyan/25 bg-neon-cyan/5 p-3" role="status" aria-live="polite">
+                <AiProcessingIndicator
+                  className="w-full border-0 bg-transparent px-0 py-1"
+                  label="WaveOS is reading your campaign content"
+                  detail="The surfer stays in motion while the AI builds recommendations."
+                />
                 {analysisProgress.framesTotal > 0 && (
                   <ProgressRow
                     label="Sampling video frames"
@@ -899,7 +905,7 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                       disabled={bulkCaptionBusy || !selectedCampaignContent.some((item) => !item.primary_caption?.trim())}
                       onClick={() => void generateMissingCampaignCaptions()}
                     >
-                      {bulkCaptionBusy ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                      {bulkCaptionBusy ? <SurferWaveSpinner className="size-5" /> : <Sparkles />}
                       Generate missing captions
                     </Button>
                     <Button asChild size="sm" variant="outline">
@@ -984,7 +990,7 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
                               disabled={captionBusyId === item.id}
                               onClick={() => void generateCampaignCaption(item)}
                             >
-                              {captionBusyId === item.id ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                              {captionBusyId === item.id ? <SurferWaveSpinner className="size-5" /> : <Sparkles />}
                               {item.primary_caption ? "Rewrite" : "Generate caption"}
                             </Button>
                             <Button

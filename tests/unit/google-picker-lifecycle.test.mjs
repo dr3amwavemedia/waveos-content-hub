@@ -5,6 +5,8 @@ import { drivePickerOutcome } from "../../src/lib/drive-picker-return.ts";
 
 const source = readFileSync(new URL("../../src/routes/_authenticated/create.tsx", import.meta.url), "utf8");
 const picker = source.slice(source.indexOf("function GoogleDrivePicker("), source.indexOf("function isGoogleDriveMedia("));
+const startRoute = readFileSync(new URL("../../src/routes/api/external-media/$provider.ts", import.meta.url), "utf8");
+const callbackRoute = readFileSync(new URL("../../src/routes/api/external-media/$provider.callback.ts", import.meta.url), "utf8");
 
 test("Picker callbacks keep cancel, provider error and empty selection distinct without import", () => {
   const body = picker.slice(picker.indexOf('          if (currentAttempt !== attempt.current) return;', picker.indexOf('.setCallback(')), picker.indexOf('          closePicker();\n          try {'));
@@ -71,4 +73,20 @@ test("denied draft checkpoint storage never prevents workspace token issuance", 
   assert.equal(requestedWorkspace, "workspace-a");
   assert.equal(config.accessToken, "synthetic-token");
   assert.ok(notice);
+});
+
+test("installed iPhone flow uses Google's top-level mobile Picker with a saved return", () => {
+  assert.match(picker, /startGoogleDriveMobilePicker/);
+  assert.match(picker, /Save draft & choose Drive files/);
+  assert.match(startRoute, /trigger_onepick/);
+  assert.match(startRoute, /allow_multiple/);
+  assert.match(startRoute, /scope: mobilePicker \? GOOGLE_DRIVE_SCOPE/);
+});
+
+test("mobile Picker callback binds the connected account and validates selected IDs server-side", () => {
+  assert.match(callbackRoute, /about\?fields=user\(emailAddress\)/);
+  assert.match(callbackRoute, /google_account_mismatch/);
+  assert.match(callbackRoute, /picked_file_ids/);
+  assert.match(callbackRoute, /supportsAllDrives/);
+  assert.match(callbackRoute, /selection_flow: "google_mobile_picker"/);
 });

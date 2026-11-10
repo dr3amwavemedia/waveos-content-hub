@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { driveBrowserReturnUrl, prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safariOpenUrl } from "../../src/lib/drive-picker-return.ts";
+import { driveBrowserReturnUrl, driveMobilePickerResultPath, prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safeDrivePickerReturnPath, safariOpenUrl } from "../../src/lib/drive-picker-return.ts";
 
 test("standalone wording recognizes installed iOS without classifying regular Safari as embedded", () => {
   assert.equal(isIosHomeScreen({ userAgent: "iPhone", standalone: true }, false), true);
@@ -53,4 +53,21 @@ test("return checkpoints cannot collide between workspaces or saved/new posts", 
   assert.notEqual(driveCheckpointKey("workspace-a", null), driveCheckpointKey("workspace-b", null));
   assert.notEqual(driveCheckpointKey("workspace-a", null), driveCheckpointKey("workspace-a", "post-1"));
   assert.notEqual(driveCheckpointKey("workspace-a", "post-1"), driveCheckpointKey("workspace-a", "post-2"));
+});
+
+test("mobile Picker return is restricted to one saved Create Post UUID", () => {
+  const id = "123e4567-e89b-42d3-a456-426614174000";
+  assert.equal(safeDrivePickerReturnPath(`/create?id=${id}`), `/create?id=${id}`);
+  assert.equal(
+    driveMobilePickerResultPath(`/create?id=${id}`, { mediaIds: [id] }),
+    `/create?id=${id}&drive_media=${id}`,
+  );
+  for (const path of [
+    "/settings?id=123e4567-e89b-42d3-a456-426614174000",
+    "/create?id=not-a-uuid",
+    `/create?id=${id}&next=https://evil.test`,
+    "https://evil.test/create?id=123e4567-e89b-42d3-a456-426614174000",
+  ]) {
+    assert.throws(() => safeDrivePickerReturnPath(path));
+  }
 });

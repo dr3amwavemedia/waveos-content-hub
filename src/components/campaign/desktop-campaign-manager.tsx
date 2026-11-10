@@ -26,6 +26,7 @@ import { UnsavedChangesGuard } from "@/components/app/unsaved-changes-guard";
 import { Button } from "@/components/ui/button";
 import { CampaignTranscripts } from "@/components/media/campaign-transcripts";
 import { MobileWorkflowSteps, MobileWorkflowSection, MobileWorkflowFooter } from "@/components/app/mobile-workflow";
+import { AiProcessingIndicator, SurferWaveSpinner } from "@/components/app/ai-processing-indicator";
 import { CAMPAIGN_GOALS, type CampaignGoal } from "@/lib/phase-one-planning";
 import { cn } from "@/lib/utils";
 import { getMediaPreviewUrl, type MediaAsset } from "@/hooks/use-media";
@@ -155,7 +156,7 @@ export function DesktopCampaignManager({ controller }: { controller: CampaignMan
             Save draft
           </Button>
           <Button onClick={() => void generateDirection()} disabled={!input.platforms.length || directionBusy || selectedMediaIds.length===0}>
-            {directionBusy ? <Loader2 className="animate-spin" /> : <Sparkles />} Analyze & Build Campaign
+            {directionBusy ? <SurferWaveSpinner className="size-5" /> : <Sparkles />} Analyze & Build Campaign
           </Button>
           <Button className="hidden sm:inline-flex" onClick={generatePlan} disabled={errors.length > 0}>
             <Sparkles /> Build plan
@@ -163,6 +164,14 @@ export function DesktopCampaignManager({ controller }: { controller: CampaignMan
         </div>
         </div>
       </header>
+
+      {analysisProgress && (
+        <AiProcessingIndicator
+          className="w-full"
+          label="WaveOS is reading your campaign content"
+          detail="The surfer stays in motion while the AI builds recommendations."
+        />
+      )}
 
       <section className="rounded-2xl border border-primary/20 bg-[linear-gradient(145deg,rgba(8,35,60,.92),rgba(28,20,59,.9))] p-4 sm:p-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -253,7 +262,7 @@ export function DesktopCampaignManager({ controller }: { controller: CampaignMan
                       disabled={bulkCaptionBusy || !selectedCampaignContent.some((item) => !item.primary_caption?.trim())}
                       onClick={() => void generateMissingCampaignCaptions()}
                     >
-                      {bulkCaptionBusy ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                      {bulkCaptionBusy ? <SurferWaveSpinner className="size-5" /> : <Sparkles />}
                       Generate missing captions
                     </Button>
                     <Button asChild size="sm" variant="outline">
@@ -333,7 +342,7 @@ export function DesktopCampaignManager({ controller }: { controller: CampaignMan
                               disabled={captionBusyId === item.id}
                               onClick={() => void generateCampaignCaption(item)}
                             >
-                              {captionBusyId === item.id ? <Loader2 className="animate-spin" /> : <Sparkles />}
+                              {captionBusyId === item.id ? <SurferWaveSpinner className="size-5" /> : <Sparkles />}
                               {item.primary_caption ? "Rewrite" : "Generate caption"}
                             </Button>
                             <Button

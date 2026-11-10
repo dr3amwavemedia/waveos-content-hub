@@ -85,7 +85,11 @@ export async function frameioAccessToken() {
   return tokens.access_token;
 }
 
-type FrameioPage<T> = { data?: T[]; links?: { next?: string | null } };
+type FrameioPage<T> = {
+  data?: T[];
+  links?: { next?: string | null };
+  total_count?: number;
+};
 
 async function frameioGet<T>(path: string, experimental = false) {
   const response = await fetch(`https://api.frame.io${path}`, {
@@ -99,11 +103,34 @@ async function frameioGet<T>(path: string, experimental = false) {
   return result;
 }
 
-async function frameioPages<T>(path: string) {
+function frameioPagePath(path: string, stickyQuery: Record<string, string>) {
+  const url = new URL(path, "https://api.frame.io");
+  if (url.origin !== "https://api.frame.io" || !url.pathname.startsWith("/v4/")) {
+    throw new Error("frameio_invalid_pagination_link");
+  }
+  for (const [key, value] of Object.entries(stickyQuery)) {
+    if (!url.searchParams.has(key)) url.searchParams.set(key, value);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+async function frameioPages<T>(
+  path: string,
+  options: { experimental?: boolean; stickyQuery?: Record<string, string> } = {},
+) {
   const items: T[] = [];
-  let next: string | null = path;
-  for (let page = 0; next && page < 20; page += 1) {
-    const result: FrameioPage<T> = await frameioGet<FrameioPage<T>>(next);
+  const stickyQuery = options.stickyQuery ?? {};
+  let next: string | null = frameioPagePath(path, stickyQuery);
+  const seen = new Set<string>();
+  for (let page = 0; next; page += 1) {
+    if (page >= 500) throw new Error("frameio_pagination_limit");
+    const requestPath = frameioPagePath(next, stickyQuery);
+    if (seen.has(requestPath)) throw new Error("frameio_pagination_loop");
+    seen.add(requestPath);
+    const result: FrameioPage<T> = await frameioGet<FrameioPage<T>>(
+      requestPath,
+      options.experimental,
+    );
     items.push(...(Array.isArray(result.data) ? result.data : []));
     next = typeof result.links?.next === "string" ? result.links.next : null;
   }
@@ -154,44 +181,88 @@ export type FrameioFile = {
   width: number | null;
   height: number | null;
   durationSeconds: number | null;
+  folderPath: string[];
 };
 
+const FRAMEIO_LIST_QUERY = {
+  page_size: "100",
+  include_total_count: "true",
+  include: "media_links.thumbnail",
+};
+
+function frameioEntryFile(entry: Record<string, unknown>, folderPath: string[]): FrameioFile | null {
+  if (entry.type !== "file" || !entry.id) return null;
+  const links = (entry.media_links ?? {}) as Record<
+    string,
+    Record<string, unknown> | undefined
+  >;
+  const metadata =
+    entry.metadata && typeof entry.metadata === "object"
+      ? (entry.metadata as Record<string, unknown>)
+      : {};
+  return {
+    id: String(entry.id),
+    name: String(entry.name ?? "Untitled"),
+    mediaType: String(entry.media_type ?? "application/octet-stream"),
+    sizeBytes: Number(entry.file_size ?? 0),
+    thumbnailUrl: frameioThumbnailLink(links),
+    viewUrl: typeof entry.view_url === "string" ? entry.view_url : null,
+    width: positiveFrameioNumber(entry.width ?? metadata.width),
+    height: positiveFrameioNumber(entry.height ?? metadata.height),
+    durationSeconds: frameioDurationSeconds(entry.duration ?? metadata.duration),
+    folderPath,
+  };
+}
+
 export async function listFrameioShareFiles(accountId: string, shareId: string) {
-  const result = await frameioGet<FrameioPage<Record<string, unknown>>>(
-    `/v4/accounts/${encodeURIComponent(accountId)}/shares/${encodeURIComponent(shareId)}/assets?page_size=100&include=media_links.thumbnail`,
-    true,
+  const rootEntries = await frameioPages<Record<string, unknown>>(
+    `/v4/accounts/${encodeURIComponent(accountId)}/shares/${encodeURIComponent(shareId)}/assets`,
+    { experimental: true, stickyQuery: FRAMEIO_LIST_QUERY },
   );
-  return (result.data ?? [])
-    .map((entry): FrameioFile | null => {
-      const links = (entry.media_links ?? {}) as Record<
-        string,
-        Record<string, unknown> | undefined
-      >;
-      const mediaType = String(entry.media_type ?? "application/octet-stream");
-      if (
-        !["image/jpeg", "image/png", "video/mp4", "video/quicktime"].includes(
-          mediaType.toLowerCase(),
-        ) ||
-        entry.type !== "file"
-      )
-        return null;
-      const metadata =
-        entry.metadata && typeof entry.metadata === "object"
-          ? (entry.metadata as Record<string, unknown>)
-          : {};
-      return {
-        id: String(entry.id ?? ""),
-        name: String(entry.name ?? "Untitled"),
-        mediaType,
-        sizeBytes: Number(entry.file_size ?? 0),
-        thumbnailUrl: frameioThumbnailLink(links),
-        viewUrl: typeof entry.view_url === "string" ? entry.view_url : null,
-        width: positiveFrameioNumber(entry.width ?? metadata.width),
-        height: positiveFrameioNumber(entry.height ?? metadata.height),
-        durationSeconds: frameioDurationSeconds(entry.duration ?? metadata.duration),
-      };
-    })
-    .filter((file): file is FrameioFile => Boolean(file?.id));
+  const files = new Map<string, FrameioFile>();
+  const containers: Array<{ type: "folder" | "version_stack"; id: string; path: string[] }> = [];
+  const visitedContainers = new Set<string>();
+
+  const collect = (entries: Record<string, unknown>[], folderPath: string[]) => {
+    for (const entry of entries) {
+      const file = frameioEntryFile(entry, folderPath);
+      if (file) {
+        if (!files.has(file.id)) files.set(file.id, file);
+        continue;
+      }
+      const type = entry.type;
+      if ((type === "folder" || type === "version_stack") && entry.id) {
+        containers.push({
+          type,
+          id: String(entry.id),
+          path: [...folderPath, String(entry.name ?? (type === "folder" ? "Folder" : "Versions"))],
+        });
+      }
+    }
+  };
+
+  collect(rootEntries, []);
+  for (let index = 0; index < containers.length; index += 1) {
+    if (containers.length > 10_000 || files.size > 100_000) {
+      throw new Error("frameio_share_too_large");
+    }
+    const container = containers[index]!;
+    const key = `${container.type}:${container.id}`;
+    if (visitedContainers.has(key)) continue;
+    visitedContainers.add(key);
+    const segment = container.type === "folder" ? "folders" : "version_stacks";
+    const children = await frameioPages<Record<string, unknown>>(
+      `/v4/accounts/${encodeURIComponent(accountId)}/${segment}/${encodeURIComponent(container.id)}/children`,
+      {
+        // Version-stack children moved to the stable V4 API in September 2025.
+        experimental: container.type === "folder",
+        stickyQuery: FRAMEIO_LIST_QUERY,
+      },
+    );
+    collect(children, container.path);
+  }
+
+  return [...files.values()];
 }
 
 function positiveFrameioNumber(value: unknown) {

@@ -60,6 +60,14 @@ export function startExternalMediaConnection(provider: ExternalMediaProvider, wo
   return providerRequest<{ url: string }>(provider, "", { action: "connect", workspaceId });
 }
 
+export function startGoogleDriveMobilePicker(workspaceId: string, returnPath: string) {
+  return providerRequest<{ url: string }>("google_drive", "", {
+    action: "mobile_picker",
+    workspaceId,
+    returnPath,
+  });
+}
+
 export function disconnectExternalMedia(provider: ExternalMediaProvider, workspaceId: string) {
   return providerRequest<{ connected: false; revoked: boolean }>(provider, "", {
     action: "disconnect",

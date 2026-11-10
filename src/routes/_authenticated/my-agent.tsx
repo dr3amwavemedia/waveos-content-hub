@@ -27,6 +27,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 
 import { RequireFeature } from "@/components/app/require-feature";
+import { AiProcessingIndicator } from "@/components/app/ai-processing-indicator";
 import { MediaPicker } from "@/routes/_authenticated/create";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
@@ -1491,9 +1492,11 @@ function MyAgentPage() {
               </section>
             )}
             {busy && (
-              <div className="mr-auto flex w-fit items-center gap-2 rounded-2xl border border-cyan-200/10 bg-cyan-200/[.04] px-4 py-3 text-xs text-cyan-100">
-                <span aria-hidden="true" className="inline-block text-lg motion-safe:animate-bounce">🏄</span><span>Catching the right wave…</span>
-              </div>
+              <AiProcessingIndicator
+                className="mr-auto"
+                label="Catching the right wave…"
+                detail="My Agent is working through your request."
+              />
             )}
             {error && (
               <p className="rounded-xl border border-amber-300/20 bg-amber-300/10 p-3 text-xs text-amber-100">

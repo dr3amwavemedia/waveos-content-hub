@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequireFeature } from "@/components/app/require-feature";
+import { AiProcessingIndicator, SurferWaveSpinner } from "@/components/app/ai-processing-indicator";
 import { UnsavedChangesGuard } from "@/components/app/unsaved-changes-guard";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
@@ -447,7 +448,7 @@ function CompetitiveIntelligencePage() {
               <input className="min-h-14 w-full rounded-xl border border-border bg-background pl-12 pr-4 text-base outline-none focus:border-intelligence focus:ring-2 focus:ring-intelligence/20" inputMode="url" placeholder="Competitor website, Google listing or social profile" value={researchInput} onChange={(event) => setResearchInput(event.target.value)} />
             </label>
             <Button className="min-h-14 rounded-xl px-6" disabled={!researchInput.trim() || research.isPending} onClick={() => runResearch(researchInput)}>
-              {research.isPending ? <Loader2 className="animate-spin" /> : <Search />} {research.isPending ? "Researching…" : "Analyze Competitor"}
+              {research.isPending ? <SurferWaveSpinner className="size-5" /> : <Search />} {research.isPending ? "Researching…" : "Analyze Competitor"}
             </Button>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">Brand Comparison · Recommendations are tailored using the active workspace profile.</p>
@@ -458,12 +459,19 @@ function CompetitiveIntelligencePage() {
             <label><span className="mb-1 block text-xs font-semibold text-muted-foreground">Business B</span><div className="relative"><Globe2 className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" /><input className="min-h-14 w-full rounded-xl border border-border bg-background pl-12 pr-4 text-base outline-none focus:border-intelligence focus:ring-2 focus:ring-intelligence/20" inputMode="url" placeholder="Competitor website or public profile" value={independentUrlB} onChange={e=>setIndependentUrlB(e.target.value)} /></div></label>
           </div>
           <Button className="mt-3 min-h-14 w-full rounded-xl px-6 sm:w-auto" disabled={!independentUrlA.trim()||!independentUrlB.trim()||independentResearch.isPending} onClick={()=>workspaceId&&independentResearch.mutate({urlA:independentUrlA,urlB:independentUrlB,workspaceId})}>
-            {independentResearch.isPending?<Loader2 className="animate-spin"/>:<Search/>} {independentResearch.isPending?"Comparing public sources…":"Compare Businesses"}
+            {independentResearch.isPending?<SurferWaveSpinner className="size-5"/>:<Search/>} {independentResearch.isPending?"Comparing public sources…":"Compare Businesses"}
           </Button>
           <div className="mt-3 rounded-lg border border-success/25 bg-success/10 p-3 text-xs text-muted-foreground"><span className="font-semibold text-foreground">Independent Comparison.</span> This mode intentionally excludes your logged-in workspace's Brand Voice, services, audience, geography and positioning.</div>
         </>}
       </section>
 
+      {(research.isPending || independentResearch.isPending) && (
+        <AiProcessingIndicator
+          className="w-full"
+          label={research.isPending ? "Surfing public sources…" : "Comparing both businesses…"}
+          detail="WaveOS is gathering and checking cited public information."
+        />
+      )}
       {(research.isError || independentResearch.isError) && <p role="alert" className="rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">{(researchMode === "independent" ? independentResearch.error : research.error)?.message || RESEARCH_FAILURE_MESSAGE}</p>}
       {researchMode==="independent" && independentResult && <section className="space-y-5 border-t border-border pt-5">
         <header><div className="text-xs font-semibold uppercase tracking-[0.16em] text-intelligence">Independent Comparison</div><h2 className="mt-1 text-xl font-semibold">{independentResult.comparison.businessA.company??"Business A"} <span className="text-muted-foreground">vs</span> {independentResult.comparison.businessB.company??"Business B"}</h2><p className="mt-1 text-xs text-muted-foreground">Public-source comparison · {new Date(independentResult.researchedAt).toLocaleString()} · Workspace Brand Voice excluded</p></header>

@@ -5,6 +5,9 @@ import test from "node:test";
 const agent = fs.readFileSync("src/routes/_authenticated/my-agent.tsx", "utf8");
 const actions = fs.readFileSync("src/lib/my-agent-actions.functions.ts", "utf8");
 const assist = fs.readFileSync("src/lib/wave-assist.functions.ts", "utf8");
+const authenticatedRoute = fs.readFileSync("src/routes/_authenticated/route.tsx", "utf8");
+const shell = fs.readFileSync("src/components/app/app-shell.tsx", "utf8");
+const socialAccess = fs.readFileSync("src/lib/zernio.server.ts", "utf8");
 
 test("My Agent launches interactive WaveOS tools from natural prompts", () => {
   assert.match(agent, /Campaign Builder/);
@@ -45,6 +48,15 @@ test("My Agent composer reserves space above mobile navigation", () => {
   assert.match(agent, /mb-24/);
   assert.match(agent, /100dvh/);
   assert.match(agent, /shrink-0 border-t/);
+});
+
+test("every staff role can open My Agent within its existing workspace limits", () => {
+  assert.match(authenticatedRoute, /TEAM_ALLOWED_ROUTES = \[[\s\S]*"\/my-agent"/);
+  assert.match(authenticatedRoute, /CREW_ALLOWED_ROUTES = \[[\s\S]*"\/my-agent"/);
+  assert.match(shell, /TEAM_NAV: NavItem\[\] = \[[\s\S]*"\/my-agent"/);
+  assert.match(actions, /staffIdentity && workspaceId === STAFF_WORKSPACE_ID/);
+  assert.match(assist, /staffIdentity && data\.workspaceId === STAFF_WORKSPACE_ID/);
+  assert.match(socialAccess, /staffWorkspaceAccess/);
 });
 
 

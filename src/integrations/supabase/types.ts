@@ -2014,7 +2014,9 @@ export type Database = {
           code_verifier: string
           created_at: string
           expires_at: string
+          flow_kind: string
           provider: string
+          return_path: string | null
           state: string
           user_id: string
           workspace_id: string
@@ -2023,7 +2025,9 @@ export type Database = {
           code_verifier: string
           created_at?: string
           expires_at: string
+          flow_kind?: string
           provider: string
+          return_path?: string | null
           state: string
           user_id: string
           workspace_id: string
@@ -2032,7 +2036,9 @@ export type Database = {
           code_verifier?: string
           created_at?: string
           expires_at?: string
+          flow_kind?: string
           provider?: string
+          return_path?: string | null
           state?: string
           user_id?: string
           workspace_id?: string

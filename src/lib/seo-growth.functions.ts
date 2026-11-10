@@ -162,7 +162,7 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const website = publicHttps(data.website);
-    const [{ data: member }, { data: manageable }] = await Promise.all([
+    const [{ data: member }, { data: manageable }, { data: roles }] = await Promise.all([
       context.supabase
         .from("workspace_members")
         .select("workspace_id")
@@ -173,8 +173,15 @@ export const analyzeSeoGrowth = createServerFn({ method: "POST" })
         "can_staff_manage_workspace" as never,
         { _user_id: context.userId, _workspace_id: data.workspaceId } as never,
       ),
+      context.supabase.from("user_roles").select("role").eq("user_id", context.userId),
     ]);
-    if (!member && (manageable as unknown as boolean | null) !== true) throw new Error("forbidden");
+    const staffWorkspaceAccess =
+      data.workspaceId === "11111111-1111-1111-1111-111111111111" &&
+      (roles ?? []).some(
+        (row) => row.role === "dream_wave_owner" || row.role === "dream_wave_team",
+      );
+    if (!member && (manageable as unknown as boolean | null) !== true && !staffWorkspaceAccess)
+      throw new Error("forbidden");
 
     const { data: brand } = await context.supabase
       .from("brand_profiles")

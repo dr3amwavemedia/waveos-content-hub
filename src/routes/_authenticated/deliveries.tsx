@@ -109,7 +109,15 @@ function YourContentRoute() {
       ) : (
         !!frameioQ.data?.files.length && (
           <section className="space-y-3">
-            <h2 className="text-lg font-semibold">{frameioQ.data.label ?? "Connected media"}</h2>
+            <div className="flex flex-wrap items-end justify-between gap-2">
+              <div>
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">Complete Frame.io delivery</p>
+                <h2 className="mt-1 text-lg font-semibold">{frameioQ.data.label ?? "Connected media"}</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {frameioQ.data.files.length} {frameioQ.data.files.length === 1 ? "file" : "files"}
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {frameioQ.data.files.map((file) => (
                 <FrameioCard key={file.id} file={file} />
@@ -155,6 +163,11 @@ function FrameioCard({ file }: { file: FrameioProviderFile }) {
             {file.name}
           </p>
         </div>
+        {!!file.folderPath.length && (
+          <p className="truncate text-[11px] text-muted-foreground" title={file.folderPath.join(" / ")}>
+            {file.folderPath.join(" / ")}
+          </p>
+        )}
         {isValidHttpsUrl(file.viewUrl) && (
           <a
             href={file.viewUrl!}

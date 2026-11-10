@@ -4,10 +4,13 @@ function oauthResult(
   appUrl: string,
   provider: string,
   result: { connected?: boolean; error?: string },
+  destinationPath = "/settings",
 ) {
-  const destination = new URL("/settings", appUrl);
-  if (result.connected) destination.searchParams.set("storage_connected", provider);
-  if (result.error) destination.searchParams.set("storage_error", result.error);
+  const destination = new URL(destinationPath, appUrl);
+  if (destinationPath === "/settings") {
+    if (result.connected) destination.searchParams.set("storage_connected", provider);
+    if (result.error) destination.searchParams.set("storage_error", result.error);
+  }
   const message = JSON.stringify({
     type: "waveos:external-media-oauth",
     provider,
@@ -39,6 +42,7 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
           externalMediaEnv,
           externalMediaRequestOrigin,
           externalMediaRedirectUri,
+          getExternalConnection,
           hasGoogleDriveScope,
         } = await import("@/lib/external-media.server");
         const appUrl = externalMediaRequestOrigin(request);
@@ -59,8 +63,25 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
           workspace_id: string;
           user_id: string;
           code_verifier: string;
+          flow_kind: "connect" | "mobile_picker";
+          return_path: string | null;
         } | null;
-        if (!oauthState || !code) return oauthResult(appUrl, provider, { error: "invalid_state" });
+        if (!oauthState) return oauthResult(appUrl, provider, { error: "invalid_state" });
+        const mobilePicker = provider === "google_drive" && oauthState.flow_kind === "mobile_picker";
+        const mobileResult = async (result: { mediaIds?: string[]; error?: string }) => {
+          await supabaseAdmin
+            .from("external_media_oauth_states" as never)
+            .delete()
+            .eq("state", state);
+          const { driveMobilePickerResultPath } = await import("@/lib/drive-picker-return");
+          const path = driveMobilePickerResultPath(oauthState.return_path ?? "", result);
+          return oauthResult(appUrl, provider, {}, path);
+        };
+        if (!code) {
+          return mobilePicker
+            ? mobileResult({ error: url.searchParams.get("error") ?? "picker_cancelled" })
+            : oauthResult(appUrl, provider, { error: "invalid_state" });
+        }
 
         let tokenResponse: Response;
         if (provider === "google_drive") {
@@ -95,7 +116,9 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
         }
         const tokens = (await tokenResponse.json()) as Record<string, unknown>;
         if (!tokenResponse.ok || typeof tokens.access_token !== "string") {
-          return oauthResult(appUrl, provider, { error: "token_exchange" });
+          return mobilePicker
+            ? mobileResult({ error: "token_exchange" })
+            : oauthResult(appUrl, provider, { error: "token_exchange" });
         }
 
         if (
@@ -111,7 +134,119 @@ export const Route = createFileRoute("/api/external-media/$provider/callback")({
             .from("external_media_oauth_states" as never)
             .delete()
             .eq("state", state);
-          return oauthResult(appUrl, provider, { error: "google_scope_required" });
+          return mobilePicker
+            ? mobileResult({ error: "google_scope_required" })
+            : oauthResult(appUrl, provider, { error: "google_scope_required" });
+        }
+
+        if (mobilePicker) {
+          const pickedIds = [...new Set((url.searchParams.get("picked_file_ids") ?? "").split(","))]
+            .map((id) => id.trim())
+            .filter((id) => /^[A-Za-z0-9_-]{10,200}$/.test(id))
+            .slice(0, 20);
+          if (!pickedIds.length) return mobileResult({ error: "picker_cancelled" });
+
+          const connection = await getExternalConnection(oauthState.workspace_id, "google_drive");
+          if (!connection?.account_email)
+            return mobileResult({ error: "google_drive_reconnect_required" });
+          const aboutResponse = await fetch(
+            "https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)",
+            { headers: { Authorization: `Bearer ${tokens.access_token}` } },
+          );
+          const about = (await aboutResponse.json().catch(() => null)) as {
+            user?: { emailAddress?: string };
+          } | null;
+          if (
+            !aboutResponse.ok ||
+            !about?.user?.emailAddress ||
+            about.user.emailAddress.toLowerCase() !== connection.account_email.toLowerCase()
+          ) {
+            return mobileResult({ error: "google_account_mismatch" });
+          }
+
+          const supported = new Set([
+            "image/jpeg",
+            "image/png",
+            "video/mp4",
+            "video/quicktime",
+          ]);
+          const files = await Promise.all(
+            pickedIds.map(async (id) => {
+              const endpoint = new URL(
+                `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`,
+              );
+              endpoint.search = new URLSearchParams({
+                supportsAllDrives: "true",
+                fields:
+                  "id,name,mimeType,size,thumbnailLink,webViewLink,parents,modifiedTime,videoMediaMetadata,imageMediaMetadata",
+              }).toString();
+              const response = await fetch(endpoint, {
+                headers: { Authorization: `Bearer ${tokens.access_token}` },
+              });
+              const file = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+              if (!response.ok || !file || file.id !== id) return null;
+              return file;
+            }),
+          );
+          const importedIds: string[] = [];
+          for (const file of files) {
+            const mimeType = typeof file?.mimeType === "string" ? file.mimeType.toLowerCase() : "";
+            if (!file || !supported.has(mimeType) || typeof file.id !== "string") continue;
+            const parents = Array.isArray(file.parents) ? file.parents : [];
+            const image =
+              file.imageMediaMetadata && typeof file.imageMediaMetadata === "object"
+                ? (file.imageMediaMetadata as Record<string, unknown>)
+                : {};
+            const video =
+              file.videoMediaMetadata && typeof file.videoMediaMetadata === "object"
+                ? (file.videoMediaMetadata as Record<string, unknown>)
+                : {};
+            const positive = (value: unknown) => {
+              const parsed = Number(value);
+              return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+            };
+            const row = {
+              workspace_id: oauthState.workspace_id,
+              name: typeof file.name === "string" ? file.name : "Untitled",
+              storage_path: null,
+              mime_type: mimeType,
+              size_bytes: Number(file.size ?? 0),
+              tags: [],
+              uploaded_by: oauthState.user_id,
+              source_provider: "google_drive",
+              external_file_id: file.id,
+              external_parent_id: typeof parents[0] === "string" ? parents[0] : null,
+              source_web_url: typeof file.webViewLink === "string" ? file.webViewLink : null,
+              thumbnail_url: typeof file.thumbnailLink === "string" ? file.thumbnailLink : null,
+              width: positive(image.width ?? video.width),
+              height: positive(image.height ?? video.height),
+              duration_seconds: positive(video.durationMillis)
+                ? positive(video.durationMillis)! / 1000
+                : null,
+              source_metadata: {
+                imported_at: new Date().toISOString(),
+                source_modified_at:
+                  typeof file.modifiedTime === "string" ? file.modifiedTime : null,
+                selection_flow: "google_mobile_picker",
+              },
+            };
+            const { data: existing } = await supabaseAdmin
+              .from("media_assets")
+              .select("id")
+              .eq("workspace_id", oauthState.workspace_id)
+              .eq("source_provider", "google_drive")
+              .eq("external_file_id", file.id)
+              .maybeSingle();
+            const query = existing?.id
+              ? supabaseAdmin.from("media_assets").update(row as never).eq("id", existing.id)
+              : supabaseAdmin.from("media_assets").insert(row as never);
+            const { data: saved, error: saveError } = await query.select("id").single();
+            if (saveError) return mobileResult({ error: "file_import_failed" });
+            importedIds.push(saved.id);
+          }
+          return importedIds.length
+            ? mobileResult({ mediaIds: importedIds })
+            : mobileResult({ error: "no_supported_files" });
         }
 
         let externalAccountId = "";

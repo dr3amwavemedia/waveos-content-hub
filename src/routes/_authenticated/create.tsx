@@ -57,6 +57,7 @@ import {
   getGooglePickerToken,
   importExternalMedia,
   listExternalMedia,
+  startGoogleDriveMobilePicker,
   startExternalMediaConnection,
   type ExternalMediaProvider,
   type ExternalProviderFile,
@@ -102,12 +103,18 @@ export const Route = createFileRoute("/_authenticated/create")({
   ),
   validateSearch: (
     s: Record<string, unknown>,
-  ): { id?: string; media?: string; studio?:string; destination?: "feed" | "story"; brief?: string; briefWorkspace?: string } => ({
+  ): { id?: string; media?: string; driveMedia?: string; driveError?: string; studio?:string; destination?: "feed" | "story"; brief?: string; briefWorkspace?: string } => ({
     ...(typeof s.studio === "string" ? {studio:s.studio}:{}),
     ...(typeof s.brief === "string" && s.brief.length <= 6000 ? { brief: s.brief } : {}),
     ...(typeof s.briefWorkspace === "string" ? { briefWorkspace: s.briefWorkspace } : {}),
     ...(typeof s.id === "string" ? { id: s.id } : {}),
     ...(typeof s.media === "string" ? { media: s.media } : {}),
+    ...(typeof s.drive_media === "string" && s.drive_media.length <= 800
+      ? { driveMedia: s.drive_media }
+      : {}),
+    ...(typeof s.drive_error === "string" && s.drive_error.length <= 80
+      ? { driveError: s.drive_error }
+      : {}),
     ...(s.destination === "feed" || s.destination === "story"
       ? { destination: s.destination }
       : {}),
@@ -167,7 +174,8 @@ function CreatePost() {
   const [showLibrary, setShowLibrary] = useState(false);
   const restoredStudio=useRef<string|null>(null);
   const restoredDrive = useRef<string | null>(null);
-  const [driveReturnNotice, setDriveReturnNotice] = useState(false);
+  const [driveReturnNotice, setDriveReturnNotice] = useState<string | null>(null);
+  const restoredMobileDrive = useRef<string | null>(null);
 
   useEffect(() => {
     if (
@@ -369,9 +377,33 @@ function CreatePost() {
       setDraftPlatformOptions(snapshot.platformOptions);
       restoredDrive.current = key;
       sessionStorage.removeItem(key);
-      setDriveReturnNotice(true);
-    } catch { setDriveReturnNotice(true); }
+      setDriveReturnNotice("Your post was restored after leaving Google Drive. No files were added by that return.");
+    } catch { setDriveReturnNotice("Your post was restored after leaving Google Drive. No files were added by that return."); }
   }, [workspaceId, editingId, existing.data?.item?.id, search.studio]);
+  useEffect(() => {
+    if (!editingId || !existing.data?.item || (!search.driveMedia && !search.driveError)) return;
+    const key = `${editingId}:${search.driveMedia ?? ""}:${search.driveError ?? ""}`;
+    if (restoredMobileDrive.current === key) return;
+    restoredMobileDrive.current = key;
+    if (search.driveMedia) {
+      const ids = search.driveMedia
+        .split(",")
+        .filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+        .slice(0, 20);
+      setPickedMedia((current) => [...new Set([...current, ...ids])]);
+      setDriveReturnNotice(
+        ids.length
+          ? `${ids.length} Google Drive item${ids.length === 1 ? " was" : "s were"} added to this saved draft. Review and save when ready.`
+          : "Google Drive returned without a supported file.",
+      );
+    } else {
+      setDriveReturnNotice(
+        search.driveError === "google_account_mismatch"
+          ? "Google Drive used a different account than the one connected to this workspace. No files were added."
+          : "Google Drive closed without adding files. Your saved draft is unchanged.",
+      );
+    }
+  }, [editingId, existing.data?.item, search.driveError, search.driveMedia]);
   useEffect(() => {
     if (!search.studio || !workspaceId || restoredStudio.current === search.studio) return;
 
@@ -1185,7 +1217,7 @@ function CreatePost() {
           }}
         />
       )}
-      {driveReturnNotice && <div role="status" className="border border-border bg-elevated p-3 text-sm text-foreground">Your post was restored after leaving Google Drive. No files were added by that return. <Button variant="outline" onClick={() => { setDriveReturnNotice(false); setShowLibrary(true); }}>Choose media again</Button></div>}
+      {driveReturnNotice && <div role="status" className="border border-border bg-elevated p-3 text-sm text-foreground">{driveReturnNotice} <Button variant="outline" onClick={() => { setDriveReturnNotice(null); setShowLibrary(true); }}>Choose media again</Button></div>}
     </div>
   );
 }
@@ -2633,6 +2665,7 @@ function GoogleDrivePicker({
   const [savingBrowser, setSavingBrowser] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [authorizedBrowser, setAuthorizedBrowser] = useState(false);
+  const [mobileStarting, setMobileStarting] = useState(false);
   const attempt = useRef(0);
   useEffect(() => { setStandaloneIos(isIosHomeScreen(window.navigator, window.matchMedia("(display-mode: standalone)").matches)); }, []);
 
@@ -2786,6 +2819,28 @@ function GoogleDrivePicker({
     }
   }
 
+  async function openMobilePicker() {
+    if (!driveReturn || mobileStarting) return;
+    const browserTab = window.open("about:blank", "_blank");
+    setMobileStarting(true);
+    setOpenError(null);
+    try {
+      const savedUrl = new URL(await driveReturn.prepareBrowser(selected));
+      const result = await startGoogleDriveMobilePicker(
+        workspaceId,
+        `${savedUrl.pathname}${savedUrl.search}`,
+      );
+      if (browserTab) browserTab.location.replace(result.url);
+      else window.location.assign(result.url);
+    } catch (reason) {
+      browserTab?.close();
+      setOpenError(
+        reason instanceof Error ? reason.message : "Google Drive could not open in Safari.",
+      );
+      setMobileStarting(false);
+    }
+  }
+
   if (authorizedBrowser) return <DriveAuthorizedBrowser workspaceId={workspaceId} selected={selected} onImported={onImported} onBack={() => setAuthorizedBrowser(false)} />;
 
   return (
@@ -2824,8 +2879,18 @@ function GoogleDrivePicker({
         {openError && <p role="alert" className="mt-2 max-w-md text-xs text-destructive">{openError}</p>}
         {notice && <p role="status" className="mt-2 max-w-md text-xs text-muted-foreground">{notice}</p>}
       </div>
+      {isStandaloneIos && !pickerOpen && !opening && (
+        <div className="max-w-sm space-y-2 rounded-xl border border-primary/25 bg-primary/5 p-3 text-left text-xs text-muted-foreground">
+          <p className="font-semibold text-foreground">Open Google Drive in Safari</p>
+          <p>Your draft is saved first. Google then opens its mobile Picker in the system browser and returns the selected files to this same post.</p>
+          <Button disabled={!driveReturn || mobileStarting} onClick={() => void openMobilePicker()}>
+            {mobileStarting ? <Loader2 className="animate-spin" /> : <ExternalLink className="size-4" />}
+            {mobileStarting ? "Opening Safari…" : "Save draft & choose Drive files"}
+          </Button>
+        </div>
+      )}
       {!pickerOpen && !opening && !isStandaloneIos && !showSafariHelp && <Button variant="outline" onClick={() => setShowSafariHelp(true)}>Continue in Safari <ExternalLink className="size-4" /></Button>}
-      {(isStandaloneIos || showSafariHelp) && !pickerOpen && !opening && (
+      {showSafariHelp && !isStandaloneIos && !pickerOpen && !opening && (
         <div className="max-w-sm space-y-2 border-t border-border pt-3 text-left text-xs text-muted-foreground">
           <p className="font-semibold text-foreground">{isStandaloneIos ? "Continue from the Home Screen app in Safari" : "Continue in Safari"}</p>
           <p>If Google shows an account or cookie error inside another app, exit Google Drive and open the same saved post in regular Safari. You may need to sign in to WaveOS there. After adding files, confirm your selection and save the draft in Safari, then reopen that saved draft in WaveOS.</p>
@@ -2848,7 +2913,7 @@ function GoogleDrivePicker({
       )}
       {opening ? (
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      ) : !pickerOpen ? (
+      ) : !pickerOpen && !isStandaloneIos ? (
         <Button
           type="button"
           onClick={openPicker}

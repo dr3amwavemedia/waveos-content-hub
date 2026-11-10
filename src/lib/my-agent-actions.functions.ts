@@ -9,6 +9,8 @@ import {
   type CampaignPlanningInput,
 } from "@/lib/phase-one-planning";
 
+const STAFF_WORKSPACE_ID = "11111111-1111-1111-1111-111111111111";
+
 const workspaceInput = z.object({
   workspaceId: z.string().uuid(),
   localDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -45,7 +47,7 @@ async function requireWorkspaceAccess(
   workspaceId: string,
   feature?: string,
 ) {
-  const [{ data: member }, { data: manageable }, featureResult] = await Promise.all([
+  const [{ data: member }, { data: manageable }, { data: roles }, featureResult] = await Promise.all([
     context.supabase
       .from("workspace_members")
       .select("workspace_id")
@@ -56,11 +58,18 @@ async function requireWorkspaceAccess(
       _user_id: context.userId,
       _workspace_id: workspaceId,
     }),
+    context.supabase
+      .from("user_roles")
+      .select("role,staff_type")
+      .eq("user_id", context.userId),
     feature
       ? context.supabase.rpc("has_feature", { _workspace_id: workspaceId, _feature: feature })
       : Promise.resolve({ data: true }),
   ]);
-  const staff = manageable === true;
+  const staffIdentity = (roles ?? []).some(
+    (row: { role: string }) => row.role === "dream_wave_owner" || row.role === "dream_wave_team",
+  );
+  const staff = manageable === true || (staffIdentity && workspaceId === STAFF_WORKSPACE_ID);
   if (!member && !staff) throw new Error("forbidden");
   if (!staff && feature && !featureResult.data) throw new Error("This tool is not included in this plan.");
   return { staff };

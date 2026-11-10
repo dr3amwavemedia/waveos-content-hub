@@ -8,6 +8,7 @@ import { recordAiUsage } from "@/lib/ai-usage.server";
 // Use Lovable's current everyday reasoning model for stronger brand judgment
 // and more natural conversation while retaining responsive latency.
 const MODEL = "google/gemini-3.8-flash";
+const STAFF_WORKSPACE_ID = "11111111-1111-1111-1111-111111111111";
 
 type AssistMode =
   "advisor" | "caption" | "caption_suite" | "comment_reply" | "hashtags" | "tone" | "translate";
@@ -84,7 +85,7 @@ export const waveAssist = createServerFn({ method: "POST" })
 
     let brandContext =
       "No saved Brand Voice profile was found. Keep the writing clear and natural.";
-    const [{ data: member }, { data: manageable }, { data: entitled }] = await Promise.all([
+    const [{ data: member }, { data: manageable }, { data: roles }, { data: entitled }] = await Promise.all([
       context.supabase
         .from("workspace_members")
         .select("workspace_id")
@@ -95,12 +96,21 @@ export const waveAssist = createServerFn({ method: "POST" })
         "can_staff_manage_workspace" as never,
         { _user_id: context.userId, _workspace_id: data.workspaceId } as never,
       ),
+      context.supabase
+        .from("user_roles")
+        .select("role,staff_type")
+        .eq("user_id", context.userId),
       context.supabase.rpc("has_feature", {
         _workspace_id: data.workspaceId,
         _feature: "can_use_ai_tools",
       }),
     ]);
-    const staff = (manageable as unknown as boolean | null) === true;
+    const staffIdentity = (roles ?? []).some(
+      (row) => row.role === "dream_wave_owner" || row.role === "dream_wave_team",
+    );
+    const staff =
+      (manageable as unknown as boolean | null) === true ||
+      (staffIdentity && data.workspaceId === STAFF_WORKSPACE_ID);
     if (!member && !staff) throw new Error("forbidden");
     if (!staff && !entitled) throw new Error("AI Assist is available on Current and Tidal plans.");
     const { data: profile } = await context.supabase
@@ -130,7 +140,27 @@ export const waveAssist = createServerFn({ method: "POST" })
         context.supabase.from("media_transcripts").select("media_asset_id,status,transcript_text,segments,has_timestamps,key_moments,edited_text,edited_segments,edited_at").eq("workspace_id", data.workspaceId).eq("status", "completed").in("media_asset_id", data.mediaAssetIds),
       ]);
       const transcriptMap = new Map((relevantTranscripts ?? []).map((row) => [row.media_asset_id, transcriptExcerptForAi(row, 1200)]));
-      observedWorkspaceContext = JSON.stringify({ suppliedContext: data.context || null, selectedMedia: (relevantMedia ?? []).map((asset) => ({ ...asset, transcript: transcriptMap.get(asset.id) ?? null })) });
+      observedWorkspaceContext = JSON.stringify({
+        suppliedContext: data.context || null,
+        selectedMedia: (relevantMedia ?? []).map((asset) => {
+          const metadata =
+            asset.source_metadata && typeof asset.source_metadata === "object"
+              ? (asset.source_metadata as Record<string, unknown>)
+              : {};
+          return {
+            id: asset.id,
+            filename: asset.name,
+            mimeType: asset.mime_type,
+            tags: asset.tags ?? [],
+            durationSeconds: asset.duration_seconds,
+            learnedVisualUnderstanding:
+              metadata.waveos_campaign_intelligence ?? null,
+            userCorrectedUnderstanding:
+              metadata.waveos_campaign_correction ?? null,
+            transcript: transcriptMap.get(asset.id) ?? null,
+          };
+        }),
+      });
     }
     if (data.mode === "advisor") {
       const [intelligence, snapshots, campaigns, content, mediaAssets] = await Promise.all([
@@ -268,7 +298,7 @@ export const waveAssist = createServerFn({ method: "POST" })
               role: "user",
               content:
                 data.mode === "caption_suite"
-                  ? `Platforms: ${data.platforms.join(", ")}\nPost brief or base message: ${data.input}`
+                  ? `Platforms: ${data.platforms.join(", ")}\nPost brief or base message: ${data.input}\n\nAuthorized selected media context (may be partial):\n${observedWorkspaceContext}`
                   : data.mode === "advisor"
                     ? `Current WaveOS context (observed, may be partial):\n${observedWorkspaceContext}\n\nQuestion:\n${data.input}`
                     : data.input,

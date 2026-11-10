@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { RequireFeature } from "@/components/app/require-feature";
+import { AiProcessingIndicator, SurferWaveSpinner } from "@/components/app/ai-processing-indicator";
 import { UnsavedChangesGuard } from "@/components/app/unsaved-changes-guard";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { Button } from "@/components/ui/button";
@@ -1406,7 +1407,7 @@ function CreativeStudioPage() {
             onClick={() => void sendToPost("feed")}
             disabled={uploadAsset.isPending}
           >
-            {uploadAsset.isPending ? <Loader2 className="animate-spin" /> : <ImagePlus />}
+            {uploadAsset.isPending ? <SurferWaveSpinner className="size-5" /> : <ImagePlus />}
             Post to feed
           </Button>
           <Button
@@ -1414,15 +1415,23 @@ function CreativeStudioPage() {
             onClick={() => void sendToPost("story")}
             disabled={uploadAsset.isPending}
           >
-            {uploadAsset.isPending ? <Loader2 className="animate-spin" /> : <ImagePlus />}
+            {uploadAsset.isPending ? <SurferWaveSpinner className="size-5" /> : <ImagePlus />}
             Post to story
           </Button>
           <Button onClick={() => saveDesign.mutate()} disabled={saveDesign.isPending}>
-            {saveDesign.isPending ? <Loader2 className="animate-spin" /> : <Save />}
+            {saveDesign.isPending ? <SurferWaveSpinner className="size-5" /> : <Save />}
             Save design
           </Button>
         </div>
       </header>
+
+      {(uploadAsset.isPending || saveDesign.isPending) && (
+        <AiProcessingIndicator
+          className="w-full"
+          label={uploadAsset.isPending ? "Preparing your studio artwork…" : "Saving your studio design…"}
+          detail="Keep this screen open while the surfer finishes the task."
+        />
+      )}
 
       {!mobileStarted && (
         <section className="grid gap-3 sm:hidden" aria-label="Creative Studio tools">

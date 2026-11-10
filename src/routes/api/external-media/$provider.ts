@@ -31,7 +31,7 @@ export const Route = createFileRoute("/api/external-media/$provider")({
         if (!workspaceId) return json({ error: "workspace_required" }, 400);
         const action = typeof body.action === "string" ? body.action : "";
         const auth =
-          action === "status"
+          action === "status" || action === "mobile_picker"
             ? await requireExternalMediaWorkspace(request, workspaceId)
             : await requireExternalMediaWorkspaceManager(request, workspaceId);
         if (!auth) return json({ error: "not_authorized" }, 403);
@@ -92,7 +92,26 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           return json({ connected: false, revoked });
         }
 
-        if (action !== "connect") return json({ error: "invalid_action" }, 400);
+        if (action !== "connect" && action !== "mobile_picker")
+          return json({ error: "invalid_action" }, 400);
+
+        const mobilePicker = action === "mobile_picker";
+        if (mobilePicker && provider !== "google_drive")
+          return json({ error: "invalid_action" }, 400);
+        let returnPath: string | null = null;
+        if (mobilePicker) {
+          const { safeDrivePickerReturnPath } = await import("@/lib/drive-picker-return");
+          try {
+            returnPath = safeDrivePickerReturnPath(
+              typeof body.returnPath === "string" ? body.returnPath : "",
+            );
+          } catch {
+            return json({ error: "saved_draft_required" }, 400);
+          }
+          const connection = await getExternalConnection(workspaceId, "google_drive");
+          if (!connection?.account_email)
+            return json({ error: "google_drive_reconnect_required" }, 409);
+        }
 
         const verifier = randomHex(48);
         const state = randomHex(32);
@@ -112,6 +131,8 @@ export const Route = createFileRoute("/api/external-media/$provider")({
             user_id: auth.user.id,
             provider,
             code_verifier: verifier,
+            flow_kind: mobilePicker ? "mobile_picker" : "connect",
+            return_path: returnPath,
             expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
           } as never);
         if (stateError) return json({ error: "oauth_state_failed" }, 500);
@@ -122,7 +143,7 @@ export const Route = createFileRoute("/api/external-media/$provider")({
             client_id: externalMediaEnv("GOOGLE_DRIVE_CLIENT_ID"),
             redirect_uri: externalMediaRedirectUri(provider, requestOrigin),
             response_type: "code",
-            scope: `openid email profile ${GOOGLE_DRIVE_SCOPE}`,
+            scope: mobilePicker ? GOOGLE_DRIVE_SCOPE : `openid email profile ${GOOGLE_DRIVE_SCOPE}`,
             access_type: "offline",
             include_granted_scopes: "false",
             prompt: "consent select_account",
@@ -130,6 +151,14 @@ export const Route = createFileRoute("/api/external-media/$provider")({
             code_challenge: challenge,
             code_challenge_method: "S256",
           }).toString();
+          if (mobilePicker) {
+            authorize.searchParams.set("trigger_onepick", "true");
+            authorize.searchParams.set("allow_multiple", "true");
+            authorize.searchParams.set(
+              "mimetypes",
+              "image/jpeg,image/png,video/mp4,video/quicktime",
+            );
+          }
           return json({ url: authorize.toString() });
         }
 
