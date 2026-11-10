@@ -1,7 +1,32 @@
-export function isIosHomeScreen(navigator: { userAgent: string; platform?: string; maxTouchPoints?: number; standalone?: boolean }, standalone: boolean) {
-  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+type DriveNavigator = {
+  userAgent: string;
+  platform?: string;
+  maxTouchPoints?: number;
+  standalone?: boolean;
+};
+
+function isIosDevice(navigator: DriveNavigator) {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === "MacIntel" && (navigator.maxTouchPoints ?? 0) > 1);
-  return ios && (standalone || navigator.standalone === true);
+}
+
+export function isIosHomeScreen(navigator: DriveNavigator, standalone: boolean) {
+  return isIosDevice(navigator) && (standalone || navigator.standalone === true);
+}
+
+export function requiresExternalSafariForDrive(
+  navigator: DriveNavigator,
+  standalone: boolean,
+  framed: boolean,
+) {
+  if (!isIosDevice(navigator)) return false;
+  if (isIosHomeScreen(navigator, standalone) || framed) return true;
+  const userAgent = navigator.userAgent;
+  const fullBrowser =
+    (/Version\/\d+/i.test(userAgent) && /Safari\//i.test(userAgent)) ||
+    /CriOS|FxiOS|EdgiOS|OPiOS/i.test(userAgent);
+  const embeddedApp = /ChatGPT|OpenAI|FBAN|FBAV|Instagram|LinkedInApp|Twitter/i.test(userAgent);
+  return embeddedApp || (/AppleWebKit/i.test(userAgent) && !fullBrowser);
 }
 
 // No credentials or unsaved content in handoff URLs; Safari authenticates normally.

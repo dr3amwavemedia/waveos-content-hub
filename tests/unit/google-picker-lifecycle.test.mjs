@@ -77,9 +77,10 @@ test("denied draft checkpoint storage never prevents workspace token issuance", 
 
 test("installed iPhone flow uses Google's top-level mobile Picker with a saved return", () => {
   assert.match(picker, /startGoogleDriveMobilePicker/);
-  assert.match(picker, /Choose Drive files/);
+  assert.match(picker, /Continue in Safari/);
   assert.doesNotMatch(picker, /Save draft & choose Drive files/);
-  assert.match(picker, /Choose files in Safari, then return to this post/);
+  assert.match(picker, /requiresExternalSafariForDrive/);
+  assert.match(picker, /safariOpenUrl\(result\.url\)/);
   assert.match(startRoute, /trigger_onepick/);
   assert.match(startRoute, /allow_multiple/);
   assert.match(startRoute, /scope: mobilePicker \? GOOGLE_DRIVE_SCOPE/);

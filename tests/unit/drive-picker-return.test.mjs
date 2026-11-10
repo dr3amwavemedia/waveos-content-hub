@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { driveBrowserReturnUrl, driveMobilePickerResultPath, prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safeDrivePickerReturnPath, safariOpenUrl } from "../../src/lib/drive-picker-return.ts";
+import { driveBrowserReturnUrl, driveMobilePickerResultPath, prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, requiresExternalSafariForDrive, safeDrivePickerReturnPath, safariOpenUrl } from "../../src/lib/drive-picker-return.ts";
 
 test("standalone wording recognizes installed iOS without classifying regular Safari as embedded", () => {
   assert.equal(isIosHomeScreen({ userAgent: "iPhone", standalone: true }, false), true);
@@ -8,6 +8,15 @@ test("standalone wording recognizes installed iOS without classifying regular Sa
   assert.equal(isIosHomeScreen({ userAgent: "Macintosh", platform: "MacIntel", maxTouchPoints: 5 }, true), true);
   assert.equal(isIosHomeScreen({ userAgent: "Macintosh", platform: "MacIntel", maxTouchPoints: 0 }, true), false);
   assert.equal(isIosHomeScreen({ userAgent: "Android" }, true), false);
+});
+
+test("iPhone embedded previews use Safari while regular Safari keeps the inline Picker", () => {
+  const safari = { userAgent: "Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1" };
+  const chatgpt = { userAgent: "Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 ChatGPT/1.2026.301" };
+  assert.equal(requiresExternalSafariForDrive(safari, false, false), false);
+  assert.equal(requiresExternalSafariForDrive(safari, false, true), true);
+  assert.equal(requiresExternalSafariForDrive(chatgpt, false, false), true);
+  assert.equal(requiresExternalSafariForDrive({ userAgent: "Android" }, false, true), false);
 });
 
 test("Safari handoff waits for the explicit save and uses its returned saved draft only", async () => {

@@ -2,7 +2,7 @@ import { RequireFeature } from "@/components/app/require-feature";
 import { Button } from "@/components/ui/button";
 import { DriveAuthorizedBrowser } from "@/components/media/drive-authorized-browser";
 import { studioPostKey,studioReturnedMedia,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
-import { prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safariOpenUrl } from "@/lib/drive-picker-return";
+import { prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, requiresExternalSafariForDrive, safariOpenUrl } from "@/lib/drive-picker-return";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -2670,6 +2670,7 @@ function GoogleDrivePicker({
   const [openError, setOpenError] = useState<string | null>(null);
   const pickerRef = useRef<GooglePickerInstance | null>(null);
   const [isStandaloneIos, setStandaloneIos] = useState(false);
+  const [useSafariHandoff, setUseSafariHandoff] = useState(false);
   const [showSafariHelp, setShowSafariHelp] = useState(false);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
   const [safariError, setSafariError] = useState<string | null>(null);
@@ -2678,7 +2679,13 @@ function GoogleDrivePicker({
   const [authorizedBrowser, setAuthorizedBrowser] = useState(false);
   const [mobileStarting, setMobileStarting] = useState(false);
   const attempt = useRef(0);
-  useEffect(() => { setStandaloneIos(isIosHomeScreen(window.navigator, window.matchMedia("(display-mode: standalone)").matches)); }, []);
+  useEffect(() => {
+    const standalone = window.matchMedia("(display-mode: standalone)").matches;
+    setStandaloneIos(isIosHomeScreen(window.navigator, standalone));
+    setUseSafariHandoff(
+      requiresExternalSafariForDrive(window.navigator, standalone, window.self !== window.top),
+    );
+  }, []);
 
   function closePicker() {
     attempt.current += 1;
@@ -2832,7 +2839,7 @@ function GoogleDrivePicker({
 
   async function openMobilePicker() {
     if (!driveReturn || mobileStarting) return;
-    const browserTab = window.open("about:blank", "_blank");
+    const browserTab = useSafariHandoff ? null : window.open("about:blank", "_blank");
     setMobileStarting(true);
     setOpenError(null);
     try {
@@ -2841,7 +2848,8 @@ function GoogleDrivePicker({
         workspaceId,
         `${savedUrl.pathname}${savedUrl.search}`,
       );
-      if (browserTab) browserTab.location.replace(result.url);
+      if (useSafariHandoff) window.location.assign(safariOpenUrl(result.url));
+      else if (browserTab) browserTab.location.replace(result.url);
       else window.location.assign(result.url);
     } catch (reason) {
       browserTab?.close();
@@ -2884,7 +2892,7 @@ function GoogleDrivePicker({
                 : "Google Drive"}
         </p>
         <p className="mt-1 max-w-md text-xs text-muted-foreground sm:hidden">
-          {isStandaloneIos ? "Choose files in Safari, then return to this post." : "Choose photos or videos from Drive."}
+          {useSafariHandoff ? "Google sign-in needs Safari. Your draft stays saved." : "Choose photos or videos from Drive."}
         </p>
         <p className="mt-1 hidden max-w-md text-xs text-muted-foreground sm:block">
           Browse My Drive, shared folders and Shared drives. WaveOS only receives the photos or videos you select.
@@ -2892,13 +2900,13 @@ function GoogleDrivePicker({
         {openError && <p role="alert" className="mt-2 max-w-md text-xs text-destructive">{openError}</p>}
         {notice && <p role="status" className="mt-2 max-w-md text-xs text-muted-foreground">{notice}</p>}
       </div>
-      {isStandaloneIos && !pickerOpen && !opening && (
+      {useSafariHandoff && !pickerOpen && !opening && (
         <Button disabled={!driveReturn || mobileStarting} onClick={() => void openMobilePicker()}>
           {mobileStarting ? <Loader2 className="animate-spin" /> : <ExternalLink className="size-4" />}
-          {mobileStarting ? "Opening Safari…" : "Choose Drive files"}
+          {mobileStarting ? "Opening Safari…" : "Continue in Safari"}
         </Button>
       )}
-      {showSafariHelp && !isStandaloneIos && !pickerOpen && !opening && (
+      {showSafariHelp && !useSafariHandoff && !pickerOpen && !opening && (
         <div className="max-w-sm space-y-2 border-t border-border pt-3 text-left text-xs text-muted-foreground">
           <p className="font-semibold text-foreground">{isStandaloneIos ? "Continue from the Home Screen app in Safari" : "Continue in Safari"}</p>
           <p className="sm:hidden">Save this post, then continue in Safari.</p>
@@ -2922,7 +2930,7 @@ function GoogleDrivePicker({
       )}
       {opening ? (
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      ) : !pickerOpen && !isStandaloneIos ? (
+      ) : !pickerOpen && !useSafariHandoff ? (
         <Button
           type="button"
           onClick={openPicker}
@@ -2931,7 +2939,7 @@ function GoogleDrivePicker({
           {openError ? "Try Google Drive again" : "Browse Google Drive"}
         </Button>
       ) : null}
-      {!pickerOpen && !opening && !isStandaloneIos && !showSafariHelp && (
+      {!pickerOpen && !opening && !useSafariHandoff && !showSafariHelp && (
         <Button variant="ghost" className="text-xs text-muted-foreground" onClick={() => setShowSafariHelp(true)}>
           Open in Safari <ExternalLink className="size-3.5" />
         </Button>
