@@ -135,7 +135,15 @@ export const Route = createFileRoute("/api/external-media/$provider")({
             return_path: returnPath,
             expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
           } as never);
-        if (stateError) return json({ error: "oauth_state_failed" }, 500);
+        if (stateError) {
+          console.error("external_media_oauth_state_insert_failed", {
+            action,
+            provider,
+            code: stateError.code,
+            message: stateError.message,
+          });
+          return json({ error: "oauth_state_failed" }, 500);
+        }
 
         if (provider === "google_drive") {
           const authorize = new URL("https://accounts.google.com/o/oauth2/v2/auth");

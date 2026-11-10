@@ -77,10 +77,18 @@ test("denied draft checkpoint storage never prevents workspace token issuance", 
 
 test("installed iPhone flow uses Google's top-level mobile Picker with a saved return", () => {
   assert.match(picker, /startGoogleDriveMobilePicker/);
-  assert.match(picker, /Save draft & choose Drive files/);
+  assert.match(picker, /Choose Drive files/);
+  assert.doesNotMatch(picker, /Save draft & choose Drive files/);
+  assert.match(picker, /Choose files in Safari, then return to this post/);
   assert.match(startRoute, /trigger_onepick/);
   assert.match(startRoute, /allow_multiple/);
   assert.match(startRoute, /scope: mobilePicker \? GOOGLE_DRIVE_SCOPE/);
+});
+
+test("mobile Drive errors are customer-friendly instead of exposing internal state codes", () => {
+  const hook = readFileSync(new URL("../../src/hooks/use-external-media.ts", import.meta.url), "utf8");
+  assert.match(hook, /oauth_state_failed: "Google Drive could not start\. Please try again\."/);
+  assert.doesNotMatch(picker, />\{openError\}<\/p>.*oauth_state_failed/s);
 });
 
 test("mobile Picker callback binds the connected account and validates selected IDs server-side", () => {
