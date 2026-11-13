@@ -349,7 +349,7 @@ function MyAgentPage() {
           input: postDraft.idea,
           workspaceId,
           platform: postDraft.platform,
-          conversation: [],
+          conversation: messages.slice(-6).map((message) => ({ ...message, content: message.content.slice(0, 2000) })),
           context: JSON.stringify({
             workspace: activeWorkspace?.name ?? "WaveOS",
             surface: "My Agent Post Builder",
@@ -725,7 +725,7 @@ function MyAgentPage() {
       return;
     }
 
-    const prior = messages.slice(-6);
+    const prior = messages.slice(-6).map((message) => ({ ...message, content: message.content.slice(0, 2000) }));
     setMessages((current) =>
       [...current, { role: "user" as const, content: input }].slice(-8),
     );
