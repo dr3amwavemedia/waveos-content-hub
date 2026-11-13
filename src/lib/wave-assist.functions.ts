@@ -106,7 +106,7 @@ export const waveAssist = createServerFn({ method: "POST" })
     const { data: profile } = await context.supabase
       .from("brand_profiles")
       .select(
-        "business_name,target_audience,brand_summary,tone_traits,preferred_phrases,words_to_avoid,default_ctas,default_hashtags,emoji_preference,preferred_caption_length,primary_language,secondary_language",
+        "business_name,website,industry,primary_services,service_area,target_audience,brand_summary,tone_traits,preferred_phrases,words_to_avoid,default_ctas,default_hashtags,emoji_preference,preferred_caption_length,primary_language,secondary_language",
       )
       .eq("workspace_id", data.workspaceId)
       .maybeSingle();
