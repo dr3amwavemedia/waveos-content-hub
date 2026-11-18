@@ -19,6 +19,8 @@ test("full Drive access is explicit, manager-controlled, and distinguishable fro
   assert.match(start, /accessMode: driveAccessMode/);
   assert.match(hook, /startGoogleDriveFullConnection/);
   assert.match(settings, /Enable full browsing/);
+  assert.match(settings, /window\.location\.hostname\.endsWith\("\.lovable\.app"\)/);
+  assert.match(settings, /isLovablePreview \|\| window\.matchMedia/);
 });
 
 test("the in-app browser covers My Drive, Shared with me, Shared drives, and pagination", () => {

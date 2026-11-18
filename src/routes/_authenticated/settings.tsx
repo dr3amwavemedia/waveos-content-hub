@@ -1160,7 +1160,13 @@ function StorageConnectionCard({
     provider === "google_drive" && status.data?.accessMode === "selected_files";
 
   function beginConnect(fullDrive = false) {
-    const useSameWindow = window.matchMedia("(max-width: 767px), (pointer: coarse)").matches;
+    // Lovable previews broker authentication through lovable.dev. A blank popup opened from the
+    // preview can therefore become cross-origin before the API returns Google's authorization URL,
+    // which prevents WaveOS from navigating that popup. Keep preview authorization in the current
+    // tab; the OAuth callback returns the manager to Settings after consent.
+    const isLovablePreview = window.location.hostname.endsWith(".lovable.app");
+    const useSameWindow =
+      isLovablePreview || window.matchMedia("(max-width: 767px), (pointer: coarse)").matches;
     const popup = useSameWindow
       ? null
       : window.open(
