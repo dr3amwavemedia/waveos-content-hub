@@ -25,6 +25,7 @@ import {
   disconnectExternalMedia,
   getExternalMediaStatus,
   startExternalMediaConnection,
+  startGoogleDriveFullConnection,
   type ExternalMediaProvider,
 } from "@/hooks/use-external-media";
 import {
@@ -1126,9 +1127,12 @@ function StorageConnectionCard({
     queryFn: () => getExternalMediaStatus(provider, workspaceId),
   });
   const connect = useMutation({
-    mutationFn: async ({ popup }: { popup: Window | null }) => {
-      if (reconnectRequired) await disconnectExternalMedia(provider, workspaceId);
-      const result = await startExternalMediaConnection(provider, workspaceId);
+    mutationFn: async ({ popup, fullDrive }: { popup: Window | null; fullDrive?: boolean }) => {
+      if (reconnectRequired && !fullDrive) await disconnectExternalMedia(provider, workspaceId);
+      const result =
+        fullDrive && provider === "google_drive"
+          ? await startGoogleDriveFullConnection(workspaceId)
+          : await startExternalMediaConnection(provider, workspaceId);
       if (popup) popup.location.href = result.url;
       else window.location.assign(result.url);
     },
@@ -1152,9 +1156,23 @@ function StorageConnectionCard({
   const connected = status.data?.connected === true;
   const reconnectRequired = status.data?.reconnectRequired === true;
   const configured = status.data?.configured !== false;
+  const selectedFilesOnly =
+    provider === "google_drive" && status.data?.accessMode === "selected_files";
+
+  function beginConnect(fullDrive = false) {
+    const useSameWindow = window.matchMedia("(max-width: 767px), (pointer: coarse)").matches;
+    const popup = useSameWindow
+      ? null
+      : window.open(
+          "about:blank",
+          `waveos-${provider}-${fullDrive ? "full" : "connect"}`,
+          "popup,width=560,height=720",
+        );
+    connect.mutate({ popup, fullDrive });
+  }
 
   return (
-    <div className="surface-card flex items-center justify-between gap-4 p-5">
+    <div className="surface-card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/20">
           <Cloud className="h-5 w-5" />
@@ -1175,6 +1193,11 @@ function StorageConnectionCard({
                     ? "Not connected"
                     : "Developer credentials needed"}
           </p>
+          {connected && provider === "google_drive" && (
+            <p className="mt-1 text-[11px] font-medium text-primary">
+              {selectedFilesOnly ? "Selected files only" : "Full Drive browsing enabled"}
+            </p>
+          )}
         </div>
       </div>
       {!canManage ? (
@@ -1182,35 +1205,40 @@ function StorageConnectionCard({
           Shared access
         </span>
       ) : connected ? (
-        <button
-          type="button"
-          onClick={() => disconnect.mutate()}
-          disabled={disconnect.isPending}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
-        >
-          {disconnect.isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Unplug className="h-4 w-4" />
+        <div className="flex w-full flex-wrap justify-end gap-2 sm:w-auto">
+          {selectedFilesOnly && (
+            <button
+              type="button"
+              onClick={() => beginConnect(true)}
+              disabled={connect.isPending}
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
+            >
+              {connect.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-4 w-4" />
+              )}
+              Enable full browsing
+            </button>
           )}
-          Disconnect
-        </button>
+          <button
+            type="button"
+            onClick={() => disconnect.mutate()}
+            disabled={disconnect.isPending || connect.isPending}
+            className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            {disconnect.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Unplug className="h-4 w-4" />
+            )}
+            Disconnect
+          </button>
+        </div>
       ) : (
         <button
           type="button"
-          onClick={() => {
-            const useSameWindow = window.matchMedia(
-              "(max-width: 767px), (pointer: coarse)",
-            ).matches;
-            const popup = useSameWindow
-              ? null
-              : window.open(
-                  "about:blank",
-                  `waveos-${provider}-connect`,
-                  "popup,width=560,height=720",
-                );
-            connect.mutate({ popup });
-          }}
+          onClick={() => beginConnect(provider === "google_drive")}
           disabled={!configured || status.isLoading || connect.isPending}
           className="inline-flex shrink-0 items-center gap-2 rounded-full bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground disabled:opacity-50"
         >
@@ -1219,7 +1247,11 @@ function StorageConnectionCard({
           ) : (
             <ExternalLink className="h-4 w-4" />
           )}
-          {reconnectRequired ? "Reconnect" : "Connect"}
+          {reconnectRequired
+            ? "Reconnect"
+            : provider === "google_drive"
+              ? "Connect full Drive"
+              : "Connect"}
         </button>
       )}
     </div>

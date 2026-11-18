@@ -22,6 +22,8 @@ export type ExternalProviderFolder = {
   name: string;
   parentId: string | null;
   path: string | null;
+  driveId?: string | null;
+  kind?: "folder" | "shared_drive" | "shared_with_me";
 };
 
 async function providerRequest<T>(
@@ -63,7 +65,12 @@ export function getExternalMediaStatus(provider: ExternalMediaProvider, workspac
     configured: boolean;
     connected: boolean;
     reconnectRequired: boolean;
-    diagnosis?: "not_connected" | "missing_permission" | "expired_authorization" | "connection_record_present";
+    accessMode?: "none" | "selected_files" | "full_drive" | null;
+    diagnosis?:
+      | "not_connected"
+      | "missing_permission"
+      | "expired_authorization"
+      | "connection_record_present";
     suggestedAction?: "reconnect_with_provider_consent" | "check_picker_or_provider_api";
     account: { email: string | null; updatedAt: string | null } | null;
   }>(provider, "", { action: "status", workspaceId });
@@ -71,6 +78,13 @@ export function getExternalMediaStatus(provider: ExternalMediaProvider, workspac
 
 export function startExternalMediaConnection(provider: ExternalMediaProvider, workspaceId: string) {
   return providerRequest<{ url: string }>(provider, "", { action: "connect", workspaceId });
+}
+
+export function startGoogleDriveFullConnection(workspaceId: string) {
+  return providerRequest<{ url: string }>("google_drive", "", {
+    action: "connect_full",
+    workspaceId,
+  });
 }
 
 export function startGoogleDriveMobilePicker(workspaceId: string, returnPath: string) {
@@ -93,6 +107,7 @@ export function listExternalMedia(
   workspaceId: string,
   query: string,
   folderId?: string | null,
+  driveId?: string | null,
 ) {
   return providerRequest<{ files: ExternalProviderFile[]; folders: ExternalProviderFolder[] }>(
     provider,
@@ -102,6 +117,7 @@ export function listExternalMedia(
       workspaceId,
       query,
       folderId: folderId ?? null,
+      driveId: driveId ?? null,
     },
   );
 }

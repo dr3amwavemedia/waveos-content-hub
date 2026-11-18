@@ -1,8 +1,19 @@
 import { RequireFeature } from "@/components/app/require-feature";
 import { Button } from "@/components/ui/button";
 import { DriveAuthorizedBrowser } from "@/components/media/drive-authorized-browser";
-import { studioPostKey,studioReturnedMedia,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
-import { prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, requiresExternalSafariForDrive, safariOpenUrl } from "@/lib/drive-picker-return";
+import {
+  studioPostKey,
+  studioReturnedMedia,
+  type StudioPostSnapshot,
+} from "@/lib/studio-post-handoff";
+import {
+  prepareDriveBrowserReturn,
+  driveCheckpointKey,
+  drivePickerOutcome,
+  isIosHomeScreen,
+  requiresExternalSafariForDrive,
+  safariOpenUrl,
+} from "@/lib/drive-picker-return";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -47,16 +58,13 @@ import {
 import type { MediaAsset } from "@/hooks/use-media";
 import { mediaThumbRenderKind } from "@/lib/frameio-media-preview";
 import type { DuplicateGuardMatch } from "@/lib/publish-fingerprint";
-import {
-  destinationHeadline,
-  destinationLines,
-  sameDestinations,
-} from "@/lib/publish-targets";
+import { destinationHeadline, destinationLines, sameDestinations } from "@/lib/publish-targets";
 import {
   getExternalMediaStatus,
   getGooglePickerToken,
   importExternalMedia,
   listExternalMedia,
+  startGoogleDriveFullConnection,
   startGoogleDriveMobilePicker,
   startExternalMediaConnection,
   type ExternalMediaProvider,
@@ -87,7 +95,11 @@ import { PenSquare } from "lucide-react";
 import { formatInTimeZone, isoToDateTimeLocal, zonedDateTimeToIso } from "@/lib/date-time";
 import { usePermissions } from "@/hooks/use-permissions";
 import { supabase } from "@/integrations/supabase/client";
-import { getContentReviewAccess, saveContentReview, decideContentReview } from "@/lib/content-review.functions";
+import {
+  getContentReviewAccess,
+  saveContentReview,
+  decideContentReview,
+} from "@/lib/content-review.functions";
 import { canManageContentReview } from "@/lib/content-review";
 import { useCurrentUser } from "@/hooks/use-waveos";
 
@@ -103,8 +115,17 @@ export const Route = createFileRoute("/_authenticated/create")({
   ),
   validateSearch: (
     s: Record<string, unknown>,
-  ): { id?: string; media?: string; driveMedia?: string; driveError?: string; studio?:string; destination?: "feed" | "story"; brief?: string; briefWorkspace?: string } => ({
-    ...(typeof s.studio === "string" ? {studio:s.studio}:{}),
+  ): {
+    id?: string;
+    media?: string;
+    driveMedia?: string;
+    driveError?: string;
+    studio?: string;
+    destination?: "feed" | "story";
+    brief?: string;
+    briefWorkspace?: string;
+  } => ({
+    ...(typeof s.studio === "string" ? { studio: s.studio } : {}),
     ...(typeof s.brief === "string" && s.brief.length <= 6000 ? { brief: s.brief } : {}),
     ...(typeof s.briefWorkspace === "string" ? { briefWorkspace: s.briefWorkspace } : {}),
     ...(typeof s.id === "string" ? { id: s.id } : {}),
@@ -120,7 +141,18 @@ export const Route = createFileRoute("/_authenticated/create")({
       : {}),
   }),
   head: () => ({
-    meta: [{ title: "Create Post — WaveOS" }, { name: "description", content: "Review and draft social content in your WaveOS workspace." }, { property: "og:title", content: "Create Post — WaveOS" }, { property: "og:description", content: "Review and draft social content in your WaveOS workspace." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" }, { name: "robots", content: "noindex" }],
+    meta: [
+      { title: "Create Post — WaveOS" },
+      { name: "description", content: "Review and draft social content in your WaveOS workspace." },
+      { property: "og:title", content: "Create Post — WaveOS" },
+      {
+        property: "og:description",
+        content: "Review and draft social content in your WaveOS workspace.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+      { name: "robots", content: "noindex" },
+    ],
   }),
 });
 
@@ -138,20 +170,26 @@ function CreatePost() {
   const reviewAccessFn = useServerFn(getContentReviewAccess);
   const saveReviewFn = useServerFn(saveContentReview);
   const decideReviewFn = useServerFn(decideContentReview);
-  const reviewAccess = useQuery({ queryKey: ["content-review-access", workspaceId, reviewUser?.userId], enabled: Boolean(workspaceId), queryFn: () => {
-    if (!workspaceId) throw new Error("No workspace selected.");
-    return reviewAccessFn({ data: { workspaceId } });
-  } });
+  const reviewAccess = useQuery({
+    queryKey: ["content-review-access", workspaceId, reviewUser?.userId],
+    enabled: Boolean(workspaceId),
+    queryFn: () => {
+      if (!workspaceId) throw new Error("No workspace selected.");
+      return reviewAccessFn({ data: { workspaceId } });
+    },
+  });
   const [reviewEditing, setReviewEditing] = useState(false);
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewNote, setReviewNote] = useState("");
-  const [reviewVariantEdits, setReviewVariantEdits] = useState<Record<string, Partial<PostVariant>>>({});
+  const [reviewVariantEdits, setReviewVariantEdits] = useState<
+    Record<string, Partial<PostVariant>>
+  >({});
   const workspaceTimeZone = activeWorkspace?.timezone ?? "UTC";
   const [savedId, setSavedId] = useState<string | null>(search.id ?? null);
   const editingId = search.id ?? savedId ?? null;
   const existing = useContentItem(editingId);
   const socialConnections = useSocialConnections(workspaceId);
-  const composerAssets=useMediaAssets(workspaceId,{});
+  const composerAssets = useMediaAssets(workspaceId, {});
   const create = useCreateContentItem(workspaceId);
   const update = useUpdateContentItem();
   const updateVariant = useUpdateVariant();
@@ -161,7 +199,7 @@ function CreatePost() {
 
   const [title, setTitle] = useState("");
   const briefApplied = useRef<string | null>(null);
-  const [pendingBrief,setPendingBrief] = useState<string | null>(null);
+  const [pendingBrief, setPendingBrief] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
   const [campaignBrief, setCampaignBrief] = useState("");
   const [platforms, setPlatforms] = useState<SocialPlatform[]>([]);
@@ -172,7 +210,7 @@ function CreatePost() {
     Partial<Record<SocialPlatform, { contentType?: "story" }>>
   >({});
   const [showLibrary, setShowLibrary] = useState(false);
-  const restoredStudio=useRef<string|null>(null);
+  const restoredStudio = useRef<string | null>(null);
   const restoredDrive = useRef<string | null>(null);
   const [driveReturnNotice, setDriveReturnNotice] = useState<string | null>(null);
   const restoredMobileDrive = useRef<string | null>(null);
@@ -184,7 +222,8 @@ function CreatePost() {
       editingId ||
       pickedMedia.length ||
       composerAssets.isPending
-    ) return;
+    )
+      return;
     setPickedMedia([search.media]);
     const handedOffAsset = composerAssets.data?.find((asset) => asset.id === search.media);
     const mediaLabel = handedOffAsset?.mime_type.startsWith("video/") ? "Video" : "Media";
@@ -208,11 +247,19 @@ function CreatePost() {
   const draftStorageKey = workspaceId ? `waveos-create-draft-${workspaceId}` : null;
 
   useEffect(() => {
-    if (search.brief && search.briefWorkspace === workspaceId && !editingId && briefApplied.current !== search.brief) {
+    if (
+      search.brief &&
+      search.briefWorkspace === workspaceId &&
+      !editingId &&
+      briefApplied.current !== search.brief
+    ) {
       briefApplied.current = search.brief;
       const stored = draftStorageKey ? window.localStorage.getItem(draftStorageKey) : null;
       if (stored) setPendingBrief(search.brief);
-      else { setTitle("Research-inspired content"); setCaption(search.brief); }
+      else {
+        setTitle("Research-inspired content");
+        setCaption(search.brief);
+      }
     }
   }, [search.brief, search.briefWorkspace, workspaceId, editingId]);
 
@@ -314,7 +361,7 @@ function CreatePost() {
     draftPlatformOptions,
   ]);
   useEffect(() => {
-    if(search.studio)return;
+    if (search.studio) return;
     if (!existing.data?.item) return;
     const it = existing.data.item;
     const metadata =
@@ -328,17 +375,19 @@ function CreatePost() {
       /^Draft an organic\b/i.test(it.primary_caption.trim());
     const needsCampaignCaption =
       isCampaignDraft &&
-      (metadata.captionState === "needs_generation" || legacyPlanningCaption || !it.primary_caption?.trim());
+      (metadata.captionState === "needs_generation" ||
+        legacyPlanningCaption ||
+        !it.primary_caption?.trim());
 
     setTitle(it.title ?? "");
     setCampaignBrief(
       typeof metadata.campaignBrief === "string" && metadata.campaignBrief.trim()
         ? metadata.campaignBrief
         : legacyPlanningCaption
-          ? it.primary_caption ?? ""
+          ? (it.primary_caption ?? "")
           : "",
     );
-    setCaption(needsCampaignCaption ? "" : it.primary_caption ?? "");
+    setCaption(needsCampaignCaption ? "" : (it.primary_caption ?? ""));
     setPickedMedia(it.media_asset_ids ?? []);
     setScheduledAt(it.scheduled_at ? isoToDateTimeLocal(it.scheduled_at, workspaceTimeZone) : "");
 
@@ -371,14 +420,24 @@ function CreatePost() {
       if (snapshot.workspaceId !== workspaceId || snapshot.id !== editingId) return;
       setTitle(snapshot.title);
       setCaption(snapshot.caption);
-      setPlatforms(snapshot.platforms.filter((platform): platform is SocialPlatform => ALL_PLATFORMS.includes(platform as SocialPlatform)));
+      setPlatforms(
+        snapshot.platforms.filter((platform): platform is SocialPlatform =>
+          ALL_PLATFORMS.includes(platform as SocialPlatform),
+        ),
+      );
       setPickedMedia(snapshot.pickedMedia);
       setScheduledAt(snapshot.scheduledAt);
       setDraftPlatformOptions(snapshot.platformOptions);
       restoredDrive.current = key;
       sessionStorage.removeItem(key);
-      setDriveReturnNotice("Your post was restored after leaving Google Drive. No files were added by that return.");
-    } catch { setDriveReturnNotice("Your post was restored after leaving Google Drive. No files were added by that return."); }
+      setDriveReturnNotice(
+        "Your post was restored after leaving Google Drive. No files were added by that return.",
+      );
+    } catch {
+      setDriveReturnNotice(
+        "Your post was restored after leaving Google Drive. No files were added by that return.",
+      );
+    }
   }, [workspaceId, editingId, existing.data?.item?.id, search.studio]);
   useEffect(() => {
     if (!editingId || !existing.data?.item || (!search.driveMedia && !search.driveError)) return;
@@ -414,9 +473,8 @@ function CreatePost() {
       const snapshot = JSON.parse(raw) as StudioPostSnapshot;
       if (snapshot.workspaceId !== workspaceId || snapshot.id !== search.id) return;
 
-      const restoredPlatforms = snapshot.platforms.filter(
-        (platform): platform is SocialPlatform =>
-          ALL_PLATFORMS.includes(platform as SocialPlatform),
+      const restoredPlatforms = snapshot.platforms.filter((platform): platform is SocialPlatform =>
+        ALL_PLATFORMS.includes(platform as SocialPlatform),
       );
 
       setTitle(snapshot.title);
@@ -461,9 +519,18 @@ function CreatePost() {
   const destinationTitle = destinationHeadline(destinations);
   const status = existing.data?.item?.status ?? "draft";
   const isReview = status === "in_review";
-  const canManageReview = reviewAccess.data?.canManage === true && canManageContentReview(reviewUser?.roles ?? [], activeWorkspace?.role ?? null);
-  const locked = status === "published" || status === "publishing" || (isReview && (!canManageReview || !reviewEditing)) || reviewBusy;
-  const displayVariants = (existing.data?.variants ?? []).map(variant => ({ ...variant, ...reviewVariantEdits[variant.id] }));
+  const canManageReview =
+    reviewAccess.data?.canManage === true &&
+    canManageContentReview(reviewUser?.roles ?? [], activeWorkspace?.role ?? null);
+  const locked =
+    status === "published" ||
+    status === "publishing" ||
+    (isReview && (!canManageReview || !reviewEditing)) ||
+    reviewBusy;
+  const displayVariants = (existing.data?.variants ?? []).map((variant) => ({
+    ...variant,
+    ...reviewVariantEdits[variant.id],
+  }));
 
   if (!activeWorkspace) {
     return (
@@ -475,16 +542,31 @@ function CreatePost() {
     );
   }
 
-  async function ensureSaved(primaryCaption = caption, mediaIds = pickedMedia): Promise<string | null> {
+  async function ensureSaved(
+    primaryCaption = caption,
+    mediaIds = pickedMedia,
+  ): Promise<string | null> {
     if (!workspaceId) return null;
     if (isReview) {
       const item = existing.data?.item;
-      if (!item || !canManageReview || !reviewEditing) throw new Error("Enter Edit review before saving changes.");
-      await saveReviewFn({ data: {
-        contentId: item.id, expectedUpdatedAt: item.updated_at, title, caption: primaryCaption, mediaIds,
-        scheduledAt: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
-        platforms, variants: Object.entries(reviewVariantEdits).map(([id, patch]) => ({ id, caption: patch.caption, platform_options: patch.platform_options as Record<string, unknown> | undefined })),
-      } });
+      if (!item || !canManageReview || !reviewEditing)
+        throw new Error("Enter Edit review before saving changes.");
+      await saveReviewFn({
+        data: {
+          contentId: item.id,
+          expectedUpdatedAt: item.updated_at,
+          title,
+          caption: primaryCaption,
+          mediaIds,
+          scheduledAt: scheduledAt ? zonedDateTimeToIso(scheduledAt, workspaceTimeZone) : null,
+          platforms,
+          variants: Object.entries(reviewVariantEdits).map(([id, patch]) => ({
+            id,
+            caption: patch.caption,
+            platform_options: patch.platform_options as Record<string, unknown> | undefined,
+          })),
+        },
+      });
       setReviewVariantEdits({});
       await qc.invalidateQueries({ queryKey: ["content-item", item.id] });
       await qc.invalidateQueries({ queryKey: ["content-items"] });
@@ -560,30 +642,63 @@ function CreatePost() {
       if (isReview) {
         setReviewEditing(false);
         toast.success("Changes saved. This same post is still in review.");
-      } else toast.success("Saved to this workspace. Open Social Media → Posts → Drafts on any device or authorized staff account.");
+      } else
+        toast.success(
+          "Saved to this workspace. Open Social Media → Posts → Drafts on any device or authorized staff account.",
+        );
     } catch (e) {
       setSaveStatus("error");
       toast.error((e as Error).message);
     }
   }
 
-  async function handleReviewDecision(action: "approve" | "schedule" | "publish_now" | "changes_requested") {
+  async function handleReviewDecision(
+    action: "approve" | "schedule" | "publish_now" | "changes_requested",
+  ) {
     const item = existing.data?.item;
     if (!item || !canManageReview || reviewEditing || reviewBusy) return;
-    if (action === "publish_now" && !confirm(`${destinationTitle}\n\nApprove and publish this saved post now?`)) return;
+    if (
+      action === "publish_now" &&
+      !confirm(`${destinationTitle}\n\nApprove and publish this saved post now?`)
+    )
+      return;
     setReviewBusy(true);
     try {
-      await decideReviewFn({ data: { contentId: item.id, expectedUpdatedAt: item.updated_at, action, note: reviewNote || undefined } });
+      await decideReviewFn({
+        data: {
+          contentId: item.id,
+          expectedUpdatedAt: item.updated_at,
+          action,
+          note: reviewNote || undefined,
+        },
+      });
       if (action === "publish_now") await runPublish(item.id, false, platforms);
-      else toast.success(action === "changes_requested" ? "Changes requested." : action === "schedule" ? "Approved and scheduled for the saved time." : "Approved. Nothing published.");
-      await Promise.all([qc.invalidateQueries({ queryKey: ["content-item", item.id] }), qc.invalidateQueries({ queryKey: ["content-items"] }), qc.invalidateQueries({ queryKey: ["approvals"] })]);
-    } catch (error) { toast.error(error instanceof Error ? error.message : "Review action failed."); }
-    finally { setReviewBusy(false); }
+      else
+        toast.success(
+          action === "changes_requested"
+            ? "Changes requested."
+            : action === "schedule"
+              ? "Approved and scheduled for the saved time."
+              : "Approved. Nothing published.",
+        );
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ["content-item", item.id] }),
+        qc.invalidateQueries({ queryKey: ["content-items"] }),
+        qc.invalidateQueries({ queryKey: ["approvals"] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Review action failed.");
+    } finally {
+      setReviewBusy(false);
+    }
   }
 
   async function handleCaptionAssist() {
     if (!workspaceId) return;
-    if (!canUseAiAssist) return toast.info("AI Assist is included with Current and Tidal. Your Ripple draft is still ready to edit manually.");
+    if (!canUseAiAssist)
+      return toast.info(
+        "AI Assist is included with Current and Tidal. Your Ripple draft is still ready to edit manually.",
+      );
     const brief = caption.trim() || campaignBrief.trim() || title.trim();
     if (!brief) return toast.error("Add a short post idea or post title first.");
     setAssisting(true);
@@ -611,7 +726,9 @@ function CreatePost() {
           });
       }
       await qc.invalidateQueries({ queryKey: ["content-item", id] });
-      toast.success("Wave Assist prepared a Brand Voice draft and platform adaptations for review.");
+      toast.success(
+        "Wave Assist prepared a Brand Voice draft and platform adaptations for review.",
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Caption assistant failed.");
     } finally {
@@ -621,7 +738,10 @@ function CreatePost() {
 
   async function handleScheduleLater() {
     if (!workspaceId) return;
-    if (!canSchedule) return toast.info("Scheduling is included with Current and Tidal. You can still publish this post now on Ripple.");
+    if (!canSchedule)
+      return toast.info(
+        "Scheduling is included with Current and Tidal. You can still publish this post now on Ripple.",
+      );
     if (!caption.trim()) return toast.error("Add a caption before scheduling");
     if (!platforms.length) return toast.error("Pick at least one platform");
     const missingDestination = platforms.find((selectedPlatform) => {
@@ -703,13 +823,22 @@ function CreatePost() {
         .eq("content_item_id", id)
         .eq("enabled", true);
       if (savedVariantsError) throw savedVariantsError;
-      if (!sameDestinations((savedVariants ?? []).map((row) => row.platform), shownPlatforms)) {
+      if (
+        !sameDestinations(
+          (savedVariants ?? []).map((row) => row.platform),
+          shownPlatforms,
+        )
+      ) {
         await qc.invalidateQueries({ queryKey: ["content-item", id] });
         return toast.error(
           "The saved platforms don't match what's selected here. Nothing was sent. Review the destinations and press Publish again.",
         );
       }
-      const lines = destinationLines(shownPlatforms, socialConnections.data ?? [], accountSelections);
+      const lines = destinationLines(
+        shownPlatforms,
+        socialConnections.data ?? [],
+        accountSelections,
+      );
       if (
         !confirm(
           `${destinationHeadline(lines)}\n\n${lines.map((line) => `• ${line.text}`).join("\n")}\n\nPublish right now?`,
@@ -734,7 +863,11 @@ function CreatePost() {
     }
   }
 
-  async function runPublish(id: string, allowDuplicate: boolean, expectedPlatforms: SocialPlatform[]) {
+  async function runPublish(
+    id: string,
+    allowDuplicate: boolean,
+    expectedPlatforms: SocialPlatform[],
+  ) {
     const res = await publishFn({ data: { contentId: id, allowDuplicate, expectedPlatforms } });
     qc.invalidateQueries({ queryKey: ["content-items"] });
     qc.invalidateQueries({ queryKey: ["content-item", id] });
@@ -773,7 +906,9 @@ function CreatePost() {
   function showPublishError(e: unknown) {
     const message = (e as Error).message;
     if (message === "frameio_share_not_ready") {
-      toast.error("Frame.io media is not ready. Re-sync the assigned Frame.io Share and try again.");
+      toast.error(
+        "Frame.io media is not ready. Re-sync the assigned Frame.io Share and try again.",
+      );
     } else if (message === "frameio_file_removed_from_share") {
       toast.error(
         "This file is no longer in the assigned Frame.io Share. Pick it again or choose another file.",
@@ -832,14 +967,35 @@ function CreatePost() {
     toast.success("New post ready. Your previous saved draft is still available under Posts.");
   }
 
-  function openStudio(assetId:string,photo=false){
-    if(!workspaceId)return;
-    if(!can("can_use_creative_studio")){toast.error("Creative Studio is not included in this plan.");return;}
-    const asset=composerAssets.data?.find(item=>item.id===assetId);
-    if(!asset?.mime_type.startsWith('image/')){toast.error('Creative Studio currently supports photos. Video editing is unavailable.');return;}
-    const token=crypto.randomUUID();
-    sessionStorage.setItem(studioPostKey(workspaceId,token),JSON.stringify({workspaceId,id:savedId??undefined,title,caption,platforms,pickedMedia,scheduledAt,platformOptions:draftPlatformOptions}));
-    void navigate({to:'/creative-studio',search:{post:token,workspace:workspaceId,media:assetId,photo}});
+  function openStudio(assetId: string, photo = false) {
+    if (!workspaceId) return;
+    if (!can("can_use_creative_studio")) {
+      toast.error("Creative Studio is not included in this plan.");
+      return;
+    }
+    const asset = composerAssets.data?.find((item) => item.id === assetId);
+    if (!asset?.mime_type.startsWith("image/")) {
+      toast.error("Creative Studio currently supports photos. Video editing is unavailable.");
+      return;
+    }
+    const token = crypto.randomUUID();
+    sessionStorage.setItem(
+      studioPostKey(workspaceId, token),
+      JSON.stringify({
+        workspaceId,
+        id: savedId ?? undefined,
+        title,
+        caption,
+        platforms,
+        pickedMedia,
+        scheduledAt,
+        platformOptions: draftPlatformOptions,
+      }),
+    );
+    void navigate({
+      to: "/creative-studio",
+      search: { post: token, workspace: workspaceId, media: assetId, photo },
+    });
   }
 
   return (
@@ -863,7 +1019,24 @@ function CreatePost() {
             <h1 className="text-xl font-semibold text-foreground">
               {savedId ? "Edit post" : "Create post"}
             </h1>
-              {pendingBrief && search.briefWorkspace === workspaceId && <div className="mt-3 border-l-2 border-intelligence pl-3 text-sm"><p>A research idea is ready. Your existing draft is unchanged.</p><Button variant="outline" className="mt-2" onClick={()=>{setCaption(current=>[current,pendingBrief].filter(Boolean).join("\n\n"));setPendingBrief(null);}}>Add idea to draft</Button><Button variant="ghost" onClick={()=>setPendingBrief(null)}>Dismiss</Button></div>}
+            {pendingBrief && search.briefWorkspace === workspaceId && (
+              <div className="mt-3 border-l-2 border-intelligence pl-3 text-sm">
+                <p>A research idea is ready. Your existing draft is unchanged.</p>
+                <Button
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => {
+                    setCaption((current) => [current, pendingBrief].filter(Boolean).join("\n\n"));
+                    setPendingBrief(null);
+                  }}
+                >
+                  Add idea to draft
+                </Button>
+                <Button variant="ghost" onClick={() => setPendingBrief(null)}>
+                  Dismiss
+                </Button>
+              </div>
+            )}
             <p className="text-xs uppercase tracking-widest text-muted-foreground">
               {activeWorkspace.name} · Status: {status.replace("_", " ")}
             </p>
@@ -907,17 +1080,68 @@ function CreatePost() {
         </div>
       </div>
 
-      {isReview && canManageReview && <section className="space-y-3 border-y border-border py-4" aria-label="Admin review">
-        <div className="flex flex-wrap items-center gap-2">
-          {!reviewEditing ? <Button variant="outline" disabled={reviewBusy} onClick={() => setReviewEditing(true)}><PenSquare className="size-4" />Edit review</Button> : <Button disabled={saveStatus === "saving" || reviewBusy} onClick={handleSaveDraft}><Check className="size-4" />{saveStatus === "saving" ? "Saving…" : "Save changes"}</Button>}
-          <Button disabled={reviewEditing || reviewBusy} onClick={() => void handleReviewDecision("approve")}>Approve</Button>
-          <Button variant="outline" disabled={reviewEditing || reviewBusy} onClick={() => void handleReviewDecision("changes_requested")}>Request changes</Button>
-          {canSchedule && scheduledAt && <Button disabled={reviewEditing || reviewBusy} onClick={() => void handleReviewDecision("schedule")}><CalendarClock className="size-4" />Approve & schedule</Button>}
-          <Button disabled={reviewEditing || reviewBusy || !caption.trim() || !platforms.length} onClick={() => void handleReviewDecision("publish_now")}><Send className="size-4" />Approve & publish now</Button>
-        </div>
-        <input aria-label="Review note" value={reviewNote} onChange={event => setReviewNote(event.target.value)} placeholder="Review note (optional)" className="w-full rounded-md border border-border bg-elevated px-3 py-2 text-sm" />
-        <p className="text-sm text-muted-foreground">{reviewEditing ? "Save changes before approving. This post stays in review." : "Review the saved post, or edit it before approving."}</p>
-      </section>}
+      {isReview && canManageReview && (
+        <section className="space-y-3 border-y border-border py-4" aria-label="Admin review">
+          <div className="flex flex-wrap items-center gap-2">
+            {!reviewEditing ? (
+              <Button
+                variant="outline"
+                disabled={reviewBusy}
+                onClick={() => setReviewEditing(true)}
+              >
+                <PenSquare className="size-4" />
+                Edit review
+              </Button>
+            ) : (
+              <Button disabled={saveStatus === "saving" || reviewBusy} onClick={handleSaveDraft}>
+                <Check className="size-4" />
+                {saveStatus === "saving" ? "Saving…" : "Save changes"}
+              </Button>
+            )}
+            <Button
+              disabled={reviewEditing || reviewBusy}
+              onClick={() => void handleReviewDecision("approve")}
+            >
+              Approve
+            </Button>
+            <Button
+              variant="outline"
+              disabled={reviewEditing || reviewBusy}
+              onClick={() => void handleReviewDecision("changes_requested")}
+            >
+              Request changes
+            </Button>
+            {canSchedule && scheduledAt && (
+              <Button
+                disabled={reviewEditing || reviewBusy}
+                onClick={() => void handleReviewDecision("schedule")}
+              >
+                <CalendarClock className="size-4" />
+                Approve & schedule
+              </Button>
+            )}
+            <Button
+              disabled={reviewEditing || reviewBusy || !caption.trim() || !platforms.length}
+              onClick={() => void handleReviewDecision("publish_now")}
+            >
+              <Send className="size-4" />
+              Approve & publish now
+            </Button>
+          </div>
+          <input
+            aria-label="Review note"
+            value={reviewNote}
+            onChange={(event) => setReviewNote(event.target.value)}
+            placeholder="Review note (optional)"
+            className="w-full rounded-md border border-border bg-elevated px-3 py-2 text-sm"
+          />
+          <p className="text-sm text-muted-foreground">
+            {reviewEditing
+              ? "Save changes before approving. This post stays in review."
+              : "Review the saved post, or edit it before approving."}
+          </p>
+        </section>
+      )}
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="flex min-w-0 flex-col gap-4 lg:gap-6">
           {locked && (
@@ -926,7 +1150,9 @@ function CreatePost() {
                 ? "This is a published record. You can review or delete it here, but changing it would not update the live social-platform post."
                 : status === "publishing"
                   ? "This post is publishing now. Editing and deletion will unlock when the publishing attempt finishes."
-                  : canManageReview ? "Select Edit review to update this post before approving." : "This post is in review. Editing is paused until changes are requested."}
+                  : canManageReview
+                    ? "Select Edit review to update this post before approving."
+                    : "This post is in review. Editing is paused until changes are requested."}
             </div>
           )}
           <div className="order-2 space-y-3 border-b border-border pb-5">
@@ -982,10 +1208,7 @@ function CreatePost() {
                   Choose from your library. Same media applies to all platforms.
                 </div>
               </div>
-              <Button variant="outline"
-                disabled={locked}
-                onClick={() => setShowLibrary(true)}
-              >
+              <Button variant="outline" disabled={locked} onClick={() => setShowLibrary(true)}>
                 <ImagePlus className="h-4 w-4" /> Add Media
               </Button>
             </div>
@@ -993,21 +1216,63 @@ function CreatePost() {
               workspaceId={workspaceId}
               picked={pickedMedia}
               locked={locked}
-              onRemove={(id) => { if (!locked) setPickedMedia((cur) => cur.filter((x) => x !== id)); }}
-              onReorder={(from, to) => setPickedMedia((current) => {
-                if (locked || from === to || from < 0 || to < 0 || from >= current.length || to >= current.length) return current;
-                const reordered = [...current];
-                const [moved] = reordered.splice(from, 1);
-                reordered.splice(to, 0, moved);
-                return reordered;
-              })}
+              onRemove={(id) => {
+                if (!locked) setPickedMedia((cur) => cur.filter((x) => x !== id));
+              }}
+              onReorder={(from, to) =>
+                setPickedMedia((current) => {
+                  if (
+                    locked ||
+                    from === to ||
+                    from < 0 ||
+                    to < 0 ||
+                    from >= current.length ||
+                    to >= current.length
+                  )
+                    return current;
+                  const reordered = [...current];
+                  const [moved] = reordered.splice(from, 1);
+                  reordered.splice(to, 0, moved);
+                  return reordered;
+                })
+              }
             />
-            {pickedMedia.length>0 && <div className="mt-3 flex flex-wrap gap-2"><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0],true)}><PenSquare/>Edit</Button><Button variant="outline" disabled={locked} onClick={()=>openStudio(pickedMedia[0])}><Sparkles/>Design</Button><Button variant="ghost" disabled={locked} onClick={()=>setShowLibrary(true)}><ImagePlus/>Replace</Button></div>}
-            <details className="mt-3"><summary className="cursor-pointer text-xs text-muted-foreground">Media format & export guidance</summary><PlatformMediaGuide platforms={platforms} /></details>
+            {pickedMedia.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  disabled={locked}
+                  onClick={() => openStudio(pickedMedia[0], true)}
+                >
+                  <PenSquare />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={locked}
+                  onClick={() => openStudio(pickedMedia[0])}
+                >
+                  <Sparkles />
+                  Design
+                </Button>
+                <Button variant="ghost" disabled={locked} onClick={() => setShowLibrary(true)}>
+                  <ImagePlus />
+                  Replace
+                </Button>
+              </div>
+            )}
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs text-muted-foreground">
+                Media format & export guidance
+              </summary>
+              <PlatformMediaGuide platforms={platforms} />
+            </details>
           </div>
 
           <details className="order-3 border-b border-border pb-5" open={undefined}>
-            <summary className="cursor-pointer py-2 text-sm font-semibold">Platform settings{platforms.length ? ` · ${platforms.join(", ")}` : ""}</summary>
+            <summary className="cursor-pointer py-2 text-sm font-semibold">
+              Platform settings{platforms.length ? ` · ${platforms.join(", ")}` : ""}
+            </summary>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-foreground">Per-platform captions</div>
@@ -1062,7 +1327,11 @@ function CreatePost() {
                   }
                   onUpdate={async (id, patch) => {
                     if (locked) return;
-                    if (isReview) setReviewVariantEdits(current => ({ ...current, [id]: { ...current[id], ...patch } }));
+                    if (isReview)
+                      setReviewVariantEdits((current) => ({
+                        ...current,
+                        [id]: { ...current[id], ...patch },
+                      }));
                     else await updateVariant.mutateAsync({ id, patch });
                   }}
                 />
@@ -1074,7 +1343,9 @@ function CreatePost() {
               </div>
             ) : (
               <p className="mt-4 rounded-lg border border-dashed border-border bg-elevated/40 p-3 text-sm text-muted-foreground">
-                {"Select the exact connected platform you want this post to use. WaveOS will not add a linked Meta account automatically."}
+                {
+                  "Select the exact connected platform you want this post to use. WaveOS will not add a linked Meta account automatically."
+                }
               </p>
             )}
           </details>
@@ -1121,18 +1392,24 @@ function CreatePost() {
               </p>
             </div>
 
-            <PublishDestinations
-              title={destinationTitle}
-              lines={destinations}
-            />
+            <PublishDestinations title={destinationTitle} lines={destinations} />
 
             <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
               <button
                 disabled={
-                  isReview || locked || publishing !== null || !caption.trim() || !scheduledAt || !canSchedule
+                  isReview ||
+                  locked ||
+                  publishing !== null ||
+                  !caption.trim() ||
+                  !scheduledAt ||
+                  !canSchedule
                 }
                 onClick={handleScheduleLater}
-                title={canSchedule ? "Schedule this post" : "Scheduling is included with Current and Tidal"}
+                title={
+                  canSchedule
+                    ? "Schedule this post"
+                    : "Scheduling is included with Current and Tidal"
+                }
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
               >
                 {publishing === "schedule" ? (
@@ -1143,7 +1420,9 @@ function CreatePost() {
                 Post later
               </button>
               <button
-                disabled={isReview || locked || publishing !== null || !caption.trim() || !platforms.length}
+                disabled={
+                  isReview || locked || publishing !== null || !caption.trim() || !platforms.length
+                }
                 onClick={handlePublishNow}
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:brightness-110 disabled:opacity-50"
               >
@@ -1166,16 +1445,49 @@ function CreatePost() {
           </div>
         </aside>
       </div>
-      <div className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 border-y border-border bg-background px-3 pb-3 pt-2 lg:hidden" aria-label="Post actions">
-        <PublishDestinations
-          compact
-          title={destinationTitle}
-          lines={destinations}
-        />
+      <div
+        className="fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 border-y border-border bg-background px-3 pb-3 pt-2 lg:hidden"
+        aria-label="Post actions"
+      >
+        <PublishDestinations compact title={destinationTitle} lines={destinations} />
         <div className="mt-2 grid grid-cols-3 gap-2">
-        <Button variant="outline" disabled={locked||saveStatus === "saving"||create.isPending||update.isPending||publishing!==null} onClick={handleSaveDraft}><FileText className="size-4"/>{isReview ? "Save changes" : "Save Draft"}</Button>
-        <Button variant="secondary" disabled={isReview||locked||publishing!==null||!canSchedule} onClick={()=>{if(scheduledAt)void handleScheduleLater();else window.document.getElementById('post-schedule')?.scrollIntoView({behavior:'smooth',block:'center'});}}><CalendarClock className="size-4"/>Schedule</Button>
-        <Button disabled={isReview||locked||publishing!==null||!caption.trim()||!platforms.length} onClick={handlePublishNow}><Send className="size-4"/>Publish</Button>
+          <Button
+            variant="outline"
+            disabled={
+              locked ||
+              saveStatus === "saving" ||
+              create.isPending ||
+              update.isPending ||
+              publishing !== null
+            }
+            onClick={handleSaveDraft}
+          >
+            <FileText className="size-4" />
+            {isReview ? "Save changes" : "Save Draft"}
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={isReview || locked || publishing !== null || !canSchedule}
+            onClick={() => {
+              if (scheduledAt) void handleScheduleLater();
+              else
+                window.document
+                  .getElementById("post-schedule")
+                  ?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+          >
+            <CalendarClock className="size-4" />
+            Schedule
+          </Button>
+          <Button
+            disabled={
+              isReview || locked || publishing !== null || !caption.trim() || !platforms.length
+            }
+            onClick={handlePublishNow}
+          >
+            <Send className="size-4" />
+            Publish
+          </Button>
         </div>
       </div>
 
@@ -1196,9 +1508,24 @@ function CreatePost() {
           driveReturn={{
             checkpoint: () => {
               if (!workspaceId) throw new Error("Choose a workspace first.");
-              sessionStorage.setItem(driveCheckpointKey(workspaceId, editingId), JSON.stringify({ workspaceId, id: editingId, title, caption, platforms, pickedMedia, scheduledAt, platformOptions: draftPlatformOptions }));
+              sessionStorage.setItem(
+                driveCheckpointKey(workspaceId, editingId),
+                JSON.stringify({
+                  workspaceId,
+                  id: editingId,
+                  title,
+                  caption,
+                  platforms,
+                  pickedMedia,
+                  scheduledAt,
+                  platformOptions: draftPlatformOptions,
+                }),
+              );
             },
-            clear: () => { if (workspaceId) sessionStorage.removeItem(driveCheckpointKey(workspaceId, editingId)); },
+            clear: () => {
+              if (workspaceId)
+                sessionStorage.removeItem(driveCheckpointKey(workspaceId, editingId));
+            },
             prepareBrowser: async (ids) => {
               if (locked) throw new Error("This post cannot be edited right now.");
               const url = await prepareDriveBrowserReturn(window.location.origin, async () => {
@@ -1217,7 +1544,20 @@ function CreatePost() {
           }}
         />
       )}
-      {driveReturnNotice && <div role="status" className="border border-border bg-elevated p-3 text-sm text-foreground">{driveReturnNotice} <Button variant="outline" onClick={() => { setDriveReturnNotice(null); setShowLibrary(true); }}>Choose media again</Button></div>}
+      {driveReturnNotice && (
+        <div role="status" className="border border-border bg-elevated p-3 text-sm text-foreground">
+          {driveReturnNotice}{" "}
+          <Button
+            variant="outline"
+            onClick={() => {
+              setDriveReturnNotice(null);
+              setShowLibrary(true);
+            }}
+          >
+            Choose media again
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1241,7 +1581,9 @@ function PublishDestinations({
       data-testid="publish-destinations"
       aria-live="polite"
     >
-      <p className={cn("font-semibold text-foreground", compact ? "text-xs" : "text-sm")}>{title}</p>
+      <p className={cn("font-semibold text-foreground", compact ? "text-xs" : "text-sm")}>
+        {title}
+      </p>
       {lines.length > 1 && (
         <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
           {lines.map((line) => (
@@ -1250,7 +1592,9 @@ function PublishDestinations({
         </ul>
       )}
       {lines.some((line) => !line.connected) && (
-        <p className="mt-1 text-xs text-destructive">Connect every selected platform before publishing.</p>
+        <p className="mt-1 text-xs text-destructive">
+          Connect every selected platform before publishing.
+        </p>
       )}
     </div>
   );
@@ -1700,7 +2044,8 @@ function MediaPreviewRow({
   if (!picked.length) {
     return (
       <div className="flex min-h-52 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-elevated/30 p-6 text-center text-sm text-muted-foreground">
-        <ImagePlus className="size-8"/>Add a photo or video
+        <ImagePlus className="size-8" />
+        Add a photo or video
       </div>
     );
   }
@@ -1741,13 +2086,25 @@ function MediaPreviewRow({
                     dragIndex.current = index;
                     event.dataTransfer.effectAllowed = "move";
                   }}
-                  onDragEnd={() => { dragIndex.current = null; }}
-                  onTouchStart={() => { dragIndex.current = index; }}
+                  onDragEnd={() => {
+                    dragIndex.current = null;
+                  }}
+                  onTouchStart={() => {
+                    dragIndex.current = index;
+                  }}
                   onTouchEnd={(event) => {
                     const touch = event.changedTouches[0];
-                    const target = touch && document.elementFromPoint(touch.clientX, touch.clientY)?.closest("[data-carousel-index]");
+                    const target =
+                      touch &&
+                      document
+                        .elementFromPoint(touch.clientX, touch.clientY)
+                        ?.closest("[data-carousel-index]");
                     const destination = target?.getAttribute("data-carousel-index");
-                    if (dragIndex.current !== null && destination !== null && destination !== undefined) {
+                    if (
+                      dragIndex.current !== null &&
+                      destination !== null &&
+                      destination !== undefined
+                    ) {
                       onReorder(dragIndex.current, Number(destination));
                     }
                     dragIndex.current = null;
@@ -1853,7 +2210,11 @@ function MediaThumb({ asset, onRemove }: { asset?: MediaAsset; onRemove: () => v
   );
 }
 
-type DriveReturnControls = { checkpoint: () => void; clear: () => void; prepareBrowser: (ids: string[]) => Promise<string> };
+type DriveReturnControls = {
+  checkpoint: () => void;
+  clear: () => void;
+  prepareBrowser: (ids: string[]) => Promise<string>;
+};
 
 export function MediaPicker({
   workspaceId,
@@ -1883,7 +2244,9 @@ export function MediaPicker({
   useEffect(() => {
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = previous; };
+    return () => {
+      document.body.style.overflow = previous;
+    };
   }, []);
 
   async function handleDeviceFiles(files: FileList | null) {
@@ -1936,7 +2299,12 @@ export function MediaPicker({
   }, [assets.data]);
 
   return (
-    <div className="waveos-media-overlay fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur" role="dialog" aria-modal="true" aria-label="Pick from library">
+    <div
+      className="waveos-media-overlay fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Pick from library"
+    >
       <div className="waveos-media-panel surface-card w-full max-w-4xl overflow-hidden">
         <div className="grid shrink-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 border-b border-border p-4 sm:flex sm:justify-between">
           <div>
@@ -1954,203 +2322,220 @@ export function MediaPicker({
           </Button>
         </div>
         <div className="waveos-media-scroll sm:contents">
-        <div className="border-b border-border p-4">
-          <div className="mb-3 flex flex-wrap gap-2">
-            {(
-              [
-                ["waveos", "WaveOS"],
-                ["google_drive", "Google Drive"],
-                ["dropbox", "Dropbox"],
-                ["frameio", "Frame.io"],
-              ] as const
-            ).map(([value, label]) => (
+          <div className="border-b border-border p-4">
+            <div className="mb-3 flex flex-wrap gap-2">
+              {(
+                [
+                  ["waveos", "WaveOS"],
+                  ["google_drive", "Google Drive"],
+                  ["dropbox", "Dropbox"],
+                  ["frameio", "Frame.io"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setSource(value)}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-xs font-medium",
+                    source === value
+                      ? "border-primary/40 bg-primary/15 text-foreground"
+                      : "border-border text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime"
+                multiple
+                className="sr-only"
+                onChange={(event) => void handleDeviceFiles(event.target.files)}
+              />
+              <input
+                ref={cameraRollInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                className="sr-only"
+                onChange={(event) => void handleDeviceFiles(event.target.files)}
+              />
               <button
-                key={value}
                 type="button"
-                onClick={() => setSource(value)}
-                className={cn(
-                  "rounded-full border px-3 py-1.5 text-xs font-medium",
-                  source === value
-                    ? "border-primary/40 bg-primary/15 text-foreground"
-                    : "border-border text-muted-foreground hover:text-foreground",
-                )}
+                disabled={deviceUploading}
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/40 hover:text-primary disabled:opacity-50"
               >
-                {label}
+                {deviceUploading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <FileText className="h-3.5 w-3.5" />
+                )}
+                {deviceUploading ? "Adding…" : "Files"}
               </button>
-            ))}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".jpg,.jpeg,.png,.mp4,.mov,image/jpeg,image/png,video/mp4,video/quicktime"
-              multiple
-              className="sr-only"
-              onChange={(event) => void handleDeviceFiles(event.target.files)}
-            />
-            <input
-              ref={cameraRollInputRef}
-              type="file"
-              accept="image/*,video/*"
-              multiple
-              className="sr-only"
-              onChange={(event) => void handleDeviceFiles(event.target.files)}
-            />
-            <button
-              type="button"
-              disabled={deviceUploading}
-              onClick={() => fileInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-elevated px-3 py-1.5 text-xs font-semibold text-foreground hover:border-primary/40 hover:text-primary disabled:opacity-50"
-            >
-              {deviceUploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-              {deviceUploading ? "Adding…" : "Files"}
-            </button>
-            <button
-              type="button"
-              disabled={deviceUploading}
-              onClick={() => cameraRollInputRef.current?.click()}
-              className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
-            >
-              {deviceUploading ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Camera className="h-3.5 w-3.5" />
-              )}
-              {deviceUploading ? "Adding…" : "Camera roll / Photos"}
-            </button>
+              <button
+                type="button"
+                disabled={deviceUploading}
+                onClick={() => cameraRollInputRef.current?.click()}
+                className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50"
+              >
+                {deviceUploading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Camera className="h-3.5 w-3.5" />
+                )}
+                {deviceUploading ? "Adding…" : "Camera roll / Photos"}
+              </button>
+            </div>
+            {source === "waveos" && (
+              <div className="mb-3 rounded-lg border border-border bg-elevated/50 px-3 py-2 text-[11px] text-muted-foreground">
+                <span className="sm:hidden">
+                  Temporary storage:{" "}
+                  {formatFileSize(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)}{" "}
+                  available.
+                </span>
+                <span className="hidden sm:inline">
+                  Temporary media: {formatFileSize(storageUsage.data?.usedBytes ?? 0)} of 500 MB
+                  used · {formatFileSize(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)}{" "}
+                  available. Published camera-roll media is removed after every destination confirms
+                  the post.
+                </span>
+              </div>
+            )}
+            {source === "waveos" && (
+              <p className="mb-3 hidden text-xs leading-relaxed text-muted-foreground sm:block">
+                Choose Google Drive or Dropbox to use existing files without saving them to your
+                device. Camera roll and device uploads use WaveOS temporary storage.
+              </p>
+            )}
+            {(assets.data ?? []).filter(
+              (asset) =>
+                selected.includes(asset.id) &&
+                preflightMediaAsset({
+                  name: asset.name,
+                  mimeType: asset.mime_type,
+                  sizeBytes: asset.size_bytes,
+                  sourceProvider: asset.source_provider,
+                }).status === "warning",
+            ).length > 0 && (
+              <div
+                role="status"
+                className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-xs leading-relaxed text-foreground"
+              >
+                <strong>Large video selected.</strong> Some social platforms and posting connections
+                have file-size or encoding limits. WaveOS has not compressed this file. Check each
+                destination's requirements before publishing; if needed, export a smaller H.264 MP4
+                from your editor. Your original stays unchanged. An automatic quality-comparison and
+                compression preview is planned, but is not available yet.
+              </div>
+            )}
+            {source !== "google_drive" && (
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or tag"
+                className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm outline-none focus:border-primary/60"
+              />
+            )}
           </div>
-          {source === "waveos" && (
-            <div className="mb-3 rounded-lg border border-border bg-elevated/50 px-3 py-2 text-[11px] text-muted-foreground">
-              <span className="sm:hidden">
-                Temporary storage: {formatFileSize(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available.
-              </span>
-              <span className="hidden sm:inline">
-                Temporary media: {formatFileSize(storageUsage.data?.usedBytes ?? 0)} of 500 MB used ·{" "}
-                {formatFileSize(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available.
-                Published camera-roll media is removed after every destination confirms the post.
-              </span>
-            </div>
-          )}
-          {source === "waveos" && (
-            <p className="mb-3 hidden text-xs leading-relaxed text-muted-foreground sm:block">
-              Choose Google Drive or Dropbox to use existing files without saving them to your device.
-              Camera roll and device uploads use WaveOS temporary storage.
-            </p>
-          )}
-          {(assets.data ?? []).filter((asset) => selected.includes(asset.id) && preflightMediaAsset({ name: asset.name, mimeType: asset.mime_type, sizeBytes: asset.size_bytes, sourceProvider: asset.source_provider }).status === "warning").length > 0 && (
-            <div role="status" className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-xs leading-relaxed text-foreground">
-              <strong>Large video selected.</strong> Some social platforms and posting connections have file-size or encoding limits.
-              WaveOS has not compressed this file. Check each destination's requirements before publishing;
-              if needed, export a smaller H.264 MP4 from your editor. Your original stays unchanged.
-              An automatic quality-comparison and compression preview is planned, but is not available yet.
-            </div>
-          )}
-          {source !== "google_drive" && (
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or tag"
-              className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm outline-none focus:border-primary/60"
-            />
-          )}
-        </div>
-        <div className="p-4 sm:max-h-[60vh] sm:overflow-y-auto">
-          {source === "frameio" ? (
-            <FrameioProviderPicker
-              workspaceId={workspaceId}
-              query={search}
-              selected={selected}
-              onImported={(ids) => {
-                setSelected((current) => Array.from(new Set([...current, ...ids])));
-                void assets.refetch();
-              }}
-            />
-          ) : source !== "waveos" ? (
-            <ExternalProviderPicker
-              provider={source}
-              driveReturn={driveReturn}
-              workspaceId={workspaceId}
-              query={search}
-              selected={selected}
-              onImported={(ids) => {
-                setSelected((current) => Array.from(new Set([...current, ...ids])));
-                void assets.refetch();
-              }}
-            />
-          ) : assets.isLoading ? (
-            <div className="flex items-center justify-center py-16 text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
-            </div>
-          ) : (assets.data ?? []).length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground">
-              No media yet. Choose Files or Camera roll / Photos to add media from this device.
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
-              {(assets.data ?? []).map((a) => {
-                const isSel = selected.includes(a.id);
-                return (
-                  <button
-                    key={a.id}
-                    onClick={() =>
-                      setSelected((s) => (isSel ? s.filter((x) => x !== a.id) : [...s, a.id]))
-                    }
-                    className={cn(
-                      "group relative aspect-square overflow-hidden rounded-lg border bg-elevated",
-                      isSel
-                        ? "border-primary ring-2 ring-primary/40"
-                        : "border-border hover:border-primary/40",
-                    )}
-                  >
-                    {(() => {
-                      const preview = urls[a.id];
-                      const kind = mediaThumbRenderKind({
-                        url: preview?.url,
-                        failed: brokenPreviews.includes(a.id),
-                        sourceProvider: a.source_provider,
-                        mimeType: a.mime_type,
-                        previewKind: preview?.kind,
-                      });
-                      const markBroken = () =>
-                        setBrokenPreviews((current) => [...current, a.id]);
-                      return kind === "image" ? (
-                        <img
-                          src={preview!.url!}
-                          alt={a.name}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                          onError={markBroken}
-                        />
-                      ) : kind === "video" ? (
-                        <video
-                          src={preview!.url!}
-                          className="h-full w-full object-cover"
-                          muted
-                          onError={markBroken}
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] text-muted-foreground">
-                          {a.name}
-                        </div>
-                      );
-                    })()}
-                    {isSel && (
-                      <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                        <Check className="h-3 w-3" />
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </div>
+          <div className="p-4 sm:max-h-[60vh] sm:overflow-y-auto">
+            {source === "frameio" ? (
+              <FrameioProviderPicker
+                workspaceId={workspaceId}
+                query={search}
+                selected={selected}
+                onImported={(ids) => {
+                  setSelected((current) => Array.from(new Set([...current, ...ids])));
+                  void assets.refetch();
+                }}
+              />
+            ) : source !== "waveos" ? (
+              <ExternalProviderPicker
+                provider={source}
+                driveReturn={driveReturn}
+                workspaceId={workspaceId}
+                query={search}
+                selected={selected}
+                onImported={(ids) => {
+                  setSelected((current) => Array.from(new Set([...current, ...ids])));
+                  void assets.refetch();
+                }}
+              />
+            ) : assets.isLoading ? (
+              <div className="flex items-center justify-center py-16 text-muted-foreground">
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+              </div>
+            ) : (assets.data ?? []).length === 0 ? (
+              <div className="py-16 text-center text-sm text-muted-foreground">
+                No media yet. Choose Files or Camera roll / Photos to add media from this device.
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-5">
+                {(assets.data ?? []).map((a) => {
+                  const isSel = selected.includes(a.id);
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={() =>
+                        setSelected((s) => (isSel ? s.filter((x) => x !== a.id) : [...s, a.id]))
+                      }
+                      className={cn(
+                        "group relative aspect-square overflow-hidden rounded-lg border bg-elevated",
+                        isSel
+                          ? "border-primary ring-2 ring-primary/40"
+                          : "border-border hover:border-primary/40",
+                      )}
+                    >
+                      {(() => {
+                        const preview = urls[a.id];
+                        const kind = mediaThumbRenderKind({
+                          url: preview?.url,
+                          failed: brokenPreviews.includes(a.id),
+                          sourceProvider: a.source_provider,
+                          mimeType: a.mime_type,
+                          previewKind: preview?.kind,
+                        });
+                        const markBroken = () => setBrokenPreviews((current) => [...current, a.id]);
+                        return kind === "image" ? (
+                          <img
+                            src={preview!.url!}
+                            alt={a.name}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                            onError={markBroken}
+                          />
+                        ) : kind === "video" ? (
+                          <video
+                            src={preview!.url!}
+                            className="h-full w-full object-cover"
+                            muted
+                            onError={markBroken}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center p-2 text-center text-[10px] text-muted-foreground">
+                            {a.name}
+                          </div>
+                        );
+                      })()}
+                      {isSel && (
+                        <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <Check className="h-3 w-3" />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
         <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border p-4">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button
-            onClick={() => onConfirm(selected)}
-          >
+          <Button onClick={() => onConfirm(selected)}>
             Use {selected.length} item{selected.length === 1 ? "" : "s"}
           </Button>
         </div>
@@ -2367,17 +2752,21 @@ function ExternalProviderPicker({
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
   const [configured, setConfigured] = useState(true);
+  const [driveAccessMode, setDriveAccessMode] = useState<"none" | "selected_files" | "full_drive">(
+    "none",
+  );
+  const [driveSearch, setDriveSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const providerLabel = provider === "google_drive" ? "Google Drive" : "Dropbox";
-  // The Google Picker is the only Drive flow that can grant access to user-selected
-  // files with the current drive.file OAuth scope. Do not replace it with a
-  // server-side list in iOS standalone mode: that list may be empty.
   const currentFolderId = folderStack.at(-1)?.id ?? null;
+  const currentDriveId = folderStack.at(-1)?.driveId ?? null;
+  const effectiveQuery = provider === "google_drive" ? driveSearch : query;
 
   useEffect(() => {
     setFolderStack([]);
     setChosen([]);
+    setDriveSearch("");
   }, [provider, workspaceId]);
 
   useEffect(() => {
@@ -2390,17 +2779,24 @@ function ExternalProviderPicker({
         if (!active) return;
         setConnected(status.connected);
         setConfigured(status.configured);
+        setDriveAccessMode(provider === "google_drive" ? (status.accessMode ?? "none") : "none");
         if (!status.connected) {
           setFiles([]);
           setFolders([]);
           return;
         }
-        if (provider === "google_drive") {
+        if (provider === "google_drive" && status.accessMode !== "full_drive") {
           setFiles([]);
           setFolders([]);
           return;
         }
-        const result = await listExternalMedia(provider, workspaceId, query, currentFolderId);
+        const result = await listExternalMedia(
+          provider,
+          workspaceId,
+          effectiveQuery,
+          currentFolderId,
+          currentDriveId,
+        );
         if (active) {
           setFiles(result.files);
           setFolders(result.folders);
@@ -2415,11 +2811,14 @@ function ExternalProviderPicker({
       active = false;
       window.clearTimeout(timeout);
     };
-  }, [provider, workspaceId, query, currentFolderId]);
+  }, [provider, workspaceId, effectiveQuery, currentFolderId, currentDriveId]);
 
   async function connect() {
     try {
-      const result = await startExternalMediaConnection(provider, workspaceId);
+      const result =
+        provider === "google_drive"
+          ? await startGoogleDriveFullConnection(workspaceId)
+          : await startExternalMediaConnection(provider, workspaceId);
       window.location.assign(result.url);
     } catch (reason) {
       toast.error(reason instanceof Error ? reason.message : "Connection failed.");
@@ -2482,18 +2881,55 @@ function ExternalProviderPicker({
   if (error) {
     return <div className="py-16 text-center text-sm text-destructive">{error}</div>;
   }
-  if (provider === "google_drive") {
+  if (provider === "google_drive" && driveAccessMode !== "full_drive") {
     return (
-      <GoogleDrivePicker workspaceId={workspaceId} selected={selected} onImported={onImported} driveReturn={driveReturn} />
+      <div className="space-y-3">
+        <div className="rounded-xl border border-primary/30 bg-primary/10 p-3 text-xs text-muted-foreground">
+          <p className="font-semibold text-foreground">Want Drive to stay inside WaveOS?</p>
+          <p className="mt-1">
+            A workspace manager can enable Full Drive browsing once in Settings. Until then, Google
+            may open Safari for new files on iPhone.
+          </p>
+          <Link
+            to="/settings"
+            className="mt-2 inline-flex min-h-9 items-center rounded-full border border-primary/40 px-3 font-semibold text-primary"
+          >
+            Open Drive settings
+          </Link>
+        </div>
+        <GoogleDrivePicker
+          workspaceId={workspaceId}
+          selected={selected}
+          onImported={onImported}
+          driveReturn={driveReturn}
+        />
+      </div>
     );
   }
   return (
     <div className="space-y-4">
+      {provider === "google_drive" && (
+        <div className="rounded-xl border border-primary/30 bg-primary/10 p-3">
+          <p className="text-sm font-semibold text-foreground">Drive stays inside WaveOS</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Browse My Drive, Shared with me, and Shared drives without leaving this app.
+          </p>
+          <input
+            value={driveSearch}
+            onChange={(event) => setDriveSearch(event.target.value)}
+            placeholder="Search Google Drive"
+            className="mt-3 w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm outline-none focus:border-primary/60"
+          />
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-elevated/60 px-3 py-2">
         <div className="flex min-w-0 items-center gap-1 text-xs">
           <button
             type="button"
-            onClick={() => setFolderStack([])}
+            onClick={() => {
+              setDriveSearch("");
+              setFolderStack([]);
+            }}
             className="rounded-md px-2 py-1 font-medium text-foreground hover:bg-surface-2"
           >
             {providerLabel}
@@ -2503,7 +2939,10 @@ function ExternalProviderPicker({
               <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
               <button
                 type="button"
-                onClick={() => setFolderStack((current) => current.slice(0, index + 1))}
+                onClick={() => {
+                  setDriveSearch("");
+                  setFolderStack((current) => current.slice(0, index + 1));
+                }}
                 className="max-w-40 truncate rounded-md px-2 py-1 text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               >
                 {folder.name}
@@ -2514,7 +2953,7 @@ function ExternalProviderPicker({
         <span className="text-[11px] text-muted-foreground">JPG · PNG · MP4 · MOV only</span>
       </div>
 
-      {!query && folders.length > 0 && (
+      {!effectiveQuery && folders.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Folders
@@ -2524,7 +2963,10 @@ function ExternalProviderPicker({
               <button
                 key={folder.id}
                 type="button"
-                onClick={() => setFolderStack((current) => [...current, folder])}
+                onClick={() => {
+                  setDriveSearch("");
+                  setFolderStack((current) => [...current, folder]);
+                }}
                 className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-elevated p-3 text-left hover:border-primary/40 hover:bg-surface-2"
               >
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-400/10 text-sky-300">
@@ -2535,7 +2977,7 @@ function ExternalProviderPicker({
                     {folder.name}
                   </span>
                   <span className="block truncate text-[11px] text-muted-foreground">
-                    {folder.path ?? "Dropbox folder"}
+                    {folder.path ?? `${providerLabel} folder`}
                   </span>
                 </span>
                 <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" />
@@ -2547,7 +2989,7 @@ function ExternalProviderPicker({
 
       {files.length === 0 && folders.length === 0 ? (
         <div className="py-16 text-center text-sm text-muted-foreground">
-          {query
+          {effectiveQuery
             ? "No matching media found."
             : "No compatible photos, videos or folders found here."}
         </div>
@@ -2602,7 +3044,7 @@ function ExternalProviderPicker({
                     {file.name}
                   </span>
                   <span className="mt-1 block truncate text-[11px] text-muted-foreground">
-                    {file.path ?? "Dropbox"}
+                    {file.path ?? providerLabel}
                   </span>
                   <span className="mt-2 block text-[11px] text-muted-foreground">
                     {externalFileDetails(file).join(" · ")}
@@ -2711,13 +3153,18 @@ function GoogleDrivePicker({
 
   useEffect(() => {
     if (pickerOpen) document.body.setAttribute("data-waveos-drive-picker", "true");
-    return () => { document.body.removeAttribute("data-waveos-drive-picker"); };
+    return () => {
+      document.body.removeAttribute("data-waveos-drive-picker");
+    };
   }, [pickerOpen]);
 
-  useEffect(() => () => {
-    attempt.current += 1;
-    pickerRef.current?.setVisible(false);
-  }, []);
+  useEffect(
+    () => () => {
+      attempt.current += 1;
+      pickerRef.current?.setVisible(false);
+    },
+    [],
+  );
   // Google owns its cross-origin dialog and storage-access prompts. Private DOM
   // classes and foreground timing cannot tell us whether authentication failed.
   // Close only on an explicit callback, Exit, or component unmount.
@@ -2732,7 +3179,9 @@ function GoogleDrivePicker({
         driveReturn?.checkpoint();
       } catch {
         // Optional local draft recovery must never gate a valid Google token.
-        setNotice("Automatic draft recovery is unavailable in this browser. Keep this page open; save your draft before leaving it.");
+        setNotice(
+          "Automatic draft recovery is unavailable in this browser. Keep this page open; save your draft before leaving it.",
+        );
       }
       const config = await getGooglePickerToken(workspaceId);
       await loadGooglePickerScript();
@@ -2778,7 +3227,11 @@ function GoogleDrivePicker({
           }
           if (outcome === "failed" || outcome === "empty") {
             closePicker();
-            setOpenError(outcome === "empty" ? "Google Drive returned no files. Choose files and try again." : "Google Drive reported a problem. No files were added. Try again or continue in Safari.");
+            setOpenError(
+              outcome === "empty"
+                ? "Google Drive returned no files. Choose files and try again."
+                : "Google Drive reported a problem. No files were added. Try again or continue in Safari.",
+            );
             return;
           }
           if (outcome !== "picked" || !data.docs?.length) return;
@@ -2815,9 +3268,13 @@ function GoogleDrivePicker({
             toast.success(
               `Added ${imported.imported.length} item${imported.imported.length === 1 ? "" : "s"} from Google Drive.`,
             );
-            setNotice("Files added to your media selection. Confirm your selection to attach them to the post.");
+            setNotice(
+              "Files added to your media selection. Confirm your selection to attach them to the post.",
+            );
           } catch (reason) {
-            setOpenError(reason instanceof Error ? reason.message : "Could not add Google Drive media.");
+            setOpenError(
+              reason instanceof Error ? reason.message : "Could not add Google Drive media.",
+            );
             toast.error(
               reason instanceof Error ? reason.message : "Could not add Google Drive media.",
             );
@@ -2860,7 +3317,15 @@ function GoogleDrivePicker({
     }
   }
 
-  if (authorizedBrowser) return <DriveAuthorizedBrowser workspaceId={workspaceId} selected={selected} onImported={onImported} onBack={() => setAuthorizedBrowser(false)} />;
+  if (authorizedBrowser)
+    return (
+      <DriveAuthorizedBrowser
+        workspaceId={workspaceId}
+        selected={selected}
+        onImported={onImported}
+        onBack={() => setAuthorizedBrowser(false)}
+      />
+    );
 
   return (
     <div className="flex min-w-0 flex-col items-center justify-center gap-3 py-4 text-center sm:py-14 [&_button]:h-auto [&_button]:min-h-10 [&_button]:max-w-full [&_button]:whitespace-normal">
@@ -2892,40 +3357,108 @@ function GoogleDrivePicker({
                 : "Google Drive"}
         </p>
         <p className="mt-1 max-w-md text-xs text-muted-foreground sm:hidden">
-          {useSafariHandoff ? "Google sign-in needs Safari. Your draft stays saved." : "Choose photos or videos from Drive."}
+          {useSafariHandoff
+            ? "Google sign-in needs Safari. Your draft stays saved."
+            : "Choose photos or videos from Drive."}
         </p>
         <p className="mt-1 hidden max-w-md text-xs text-muted-foreground sm:block">
-          Browse My Drive, shared folders and Shared drives. WaveOS only receives the photos or videos you select.
+          Browse My Drive, shared folders and Shared drives. WaveOS only receives the photos or
+          videos you select.
         </p>
-        {openError && <p role="alert" className="mt-2 max-w-md text-xs text-destructive">{openError}</p>}
-        {notice && <p role="status" className="mt-2 max-w-md text-xs text-muted-foreground">{notice}</p>}
+        {openError && (
+          <p role="alert" className="mt-2 max-w-md text-xs text-destructive">
+            {openError}
+          </p>
+        )}
+        {notice && (
+          <p role="status" className="mt-2 max-w-md text-xs text-muted-foreground">
+            {notice}
+          </p>
+        )}
       </div>
       {useSafariHandoff && !pickerOpen && !opening && (
         <Button disabled={!driveReturn || mobileStarting} onClick={() => void openMobilePicker()}>
-          {mobileStarting ? <Loader2 className="animate-spin" /> : <ExternalLink className="size-4" />}
+          {mobileStarting ? (
+            <Loader2 className="animate-spin" />
+          ) : (
+            <ExternalLink className="size-4" />
+          )}
           {mobileStarting ? "Opening Safari…" : "Continue in Safari"}
         </Button>
       )}
       {showSafariHelp && !useSafariHandoff && !pickerOpen && !opening && (
         <div className="max-w-sm space-y-2 border-t border-border pt-3 text-left text-xs text-muted-foreground">
-          <p className="font-semibold text-foreground">{isStandaloneIos ? "Continue from the Home Screen app in Safari" : "Continue in Safari"}</p>
+          <p className="font-semibold text-foreground">
+            {isStandaloneIos ? "Continue from the Home Screen app in Safari" : "Continue in Safari"}
+          </p>
           <p className="sm:hidden">Save this post, then continue in Safari.</p>
-          <p className="hidden sm:block">If this browser blocks Google, save the post and open the same draft in Safari. After choosing files, save the draft in Safari and reopen it in WaveOS.</p>
-          {driveReturn && !browserUrl && <Button variant="outline" disabled={savingBrowser || opening || pickerOpen} onClick={async () => {
-            setSavingBrowser(true);
-            setSafariError(null);
-            try { setBrowserUrl(await driveReturn.prepareBrowser(selected)); }
-            catch { setSafariError("The draft could not be saved. Stay here and try again."); }
-            finally { setSavingBrowser(false); }
-          }}>{savingBrowser ? "Saving draft…" : "Save draft for Safari"}</Button>}
-          {safariError && <p role="alert" className="text-destructive">{safariError}</p>}
-          {browserUrl && !savingBrowser && <>
-            <Button variant="outline" asChild><a href={safariOpenUrl(browserUrl)} rel="noopener noreferrer">Open saved draft in Safari <ExternalLink className="size-4" /></a></Button>
-            <p>Your draft is saved. If this app blocks opening Safari, open Safari yourself and paste the link below into its address bar. This opens the same saved post, not a new post.</p>
-            <Button variant="outline" onClick={async () => { try { await navigator.clipboard.writeText(browserUrl); setNotice("Saved-draft link copied. Open Safari and paste it into the address bar."); } catch { setNotice("Copy the saved-draft link below and paste it into Safari."); } }}>Copy saved-draft link</Button>
-            <input aria-label="Saved-draft Safari link" value={browserUrl} readOnly onFocus={(event) => event.target.select()} className="w-full rounded border border-border bg-background p-2 text-foreground" />
-          </>}
-          {!driveReturn && <p>Close the media window and save your post before continuing in Safari.</p>}
+          <p className="hidden sm:block">
+            If this browser blocks Google, save the post and open the same draft in Safari. After
+            choosing files, save the draft in Safari and reopen it in WaveOS.
+          </p>
+          {driveReturn && !browserUrl && (
+            <Button
+              variant="outline"
+              disabled={savingBrowser || opening || pickerOpen}
+              onClick={async () => {
+                setSavingBrowser(true);
+                setSafariError(null);
+                try {
+                  setBrowserUrl(await driveReturn.prepareBrowser(selected));
+                } catch {
+                  setSafariError("The draft could not be saved. Stay here and try again.");
+                } finally {
+                  setSavingBrowser(false);
+                }
+              }}
+            >
+              {savingBrowser ? "Saving draft…" : "Save draft for Safari"}
+            </Button>
+          )}
+          {safariError && (
+            <p role="alert" className="text-destructive">
+              {safariError}
+            </p>
+          )}
+          {browserUrl && !savingBrowser && (
+            <>
+              <Button variant="outline" asChild>
+                <a href={safariOpenUrl(browserUrl)} rel="noopener noreferrer">
+                  Open saved draft in Safari <ExternalLink className="size-4" />
+                </a>
+              </Button>
+              <p>
+                Your draft is saved. If this app blocks opening Safari, open Safari yourself and
+                paste the link below into its address bar. This opens the same saved post, not a new
+                post.
+              </p>
+              <Button
+                variant="outline"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(browserUrl);
+                    setNotice(
+                      "Saved-draft link copied. Open Safari and paste it into the address bar.",
+                    );
+                  } catch {
+                    setNotice("Copy the saved-draft link below and paste it into Safari.");
+                  }
+                }}
+              >
+                Copy saved-draft link
+              </Button>
+              <input
+                aria-label="Saved-draft Safari link"
+                value={browserUrl}
+                readOnly
+                onFocus={(event) => event.target.select()}
+                className="w-full rounded border border-border bg-background p-2 text-foreground"
+              />
+            </>
+          )}
+          {!driveReturn && (
+            <p>Close the media window and save your post before continuing in Safari.</p>
+          )}
         </div>
       )}
       {opening ? (
@@ -2940,17 +3473,25 @@ function GoogleDrivePicker({
         </Button>
       ) : null}
       {!pickerOpen && !opening && !useSafariHandoff && !showSafariHelp && (
-        <Button variant="ghost" className="text-xs text-muted-foreground" onClick={() => setShowSafariHelp(true)}>
+        <Button
+          variant="ghost"
+          className="text-xs text-muted-foreground"
+          onClick={() => setShowSafariHelp(true)}
+        >
           Open in Safari <ExternalLink className="size-3.5" />
         </Button>
       )}
-      {!opening && !pickerOpen && <>
-        <Button variant="outline" onClick={() => setAuthorizedBrowser(true)}>
-          <span className="sm:hidden">Previously authorized</span>
-          <span className="hidden sm:inline">Browse previously authorized files</span>
-        </Button>
-        <p className="hidden max-w-md text-xs text-muted-foreground sm:block">Use this only when Google cannot open. It cannot grant access to new files.</p>
-      </>}
+      {!opening && !pickerOpen && (
+        <>
+          <Button variant="outline" onClick={() => setAuthorizedBrowser(true)}>
+            <span className="sm:hidden">Previously authorized</span>
+            <span className="hidden sm:inline">Browse previously authorized files</span>
+          </Button>
+          <p className="hidden max-w-md text-xs text-muted-foreground sm:block">
+            Use this only when Google cannot open. It cannot grant access to new files.
+          </p>
+        </>
+      )}
     </div>
   );
 }
@@ -3037,9 +3578,19 @@ function loadGooglePickerScript() {
     return Promise.resolve();
   if (googlePickerLoader) return googlePickerLoader;
   googlePickerLoader = new Promise<void>((resolve, reject) => {
-    const timeout = window.setTimeout(() => reject(new Error("Google Drive took too long to load. Try again or continue in Safari.")), 15000);
-    const finish = () => { window.clearTimeout(timeout); resolve(); };
-    const fail = (message: string) => { window.clearTimeout(timeout); reject(new Error(message)); };
+    const timeout = window.setTimeout(
+      () =>
+        reject(new Error("Google Drive took too long to load. Try again or continue in Safari.")),
+      15000,
+    );
+    const finish = () => {
+      window.clearTimeout(timeout);
+      resolve();
+    };
+    const fail = (message: string) => {
+      window.clearTimeout(timeout);
+      reject(new Error(message));
+    };
     const script = document.createElement("script");
     script.src = "https://apis.google.com/js/api.js";
     script.async = true;
@@ -3052,6 +3603,9 @@ function loadGooglePickerScript() {
     };
     script.onerror = () => fail("Google Picker could not be downloaded.");
     document.head.appendChild(script);
-  }).catch((reason) => { googlePickerLoader = null; throw reason; });
+  }).catch((reason) => {
+    googlePickerLoader = null;
+    throw reason;
+  });
   return googlePickerLoader;
 }

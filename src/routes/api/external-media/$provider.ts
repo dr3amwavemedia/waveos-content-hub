@@ -15,6 +15,8 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           externalMediaRequestOrigin,
           externalMediaRedirectUri,
           getExternalConnection,
+          googleDriveAccessMode,
+          GOOGLE_DRIVE_READONLY_SCOPE,
           GOOGLE_DRIVE_SCOPE,
           pkceChallenge,
           randomHex,
@@ -38,9 +40,9 @@ export const Route = createFileRoute("/api/external-media/$provider")({
 
         if (action === "status") {
           const connection = await getExternalConnection(workspaceId, provider);
-          const hasRequiredDriveScope =
-            provider !== "google_drive" ||
-            connection?.scopes.split(/\s+/).includes(GOOGLE_DRIVE_SCOPE) === true;
+          const driveAccessMode =
+            provider === "google_drive" ? googleDriveAccessMode(connection?.scopes) : null;
+          const hasRequiredDriveScope = provider !== "google_drive" || driveAccessMode !== "none";
           const tokenExpired =
             Boolean(connection?.token_expires_at) &&
             Date.parse(connection!.token_expires_at as string) <= Date.now();
@@ -56,6 +58,7 @@ export const Route = createFileRoute("/api/external-media/$provider")({
                 : Boolean(process.env.DROPBOX_APP_KEY && process.env.DROPBOX_APP_SECRET),
             connected: Boolean(connection) && !reconnectRequired,
             reconnectRequired,
+            accessMode: driveAccessMode,
             // Safe, read-only diagnosis for My Agent and the connection picker.
             // Never return OAuth tokens, granted scope strings, or account secrets.
             diagnosis: !connection
@@ -65,9 +68,10 @@ export const Route = createFileRoute("/api/external-media/$provider")({
                 : tokenExpired && !connection.refresh_token_encrypted
                   ? "expired_authorization"
                   : "connection_record_present",
-            suggestedAction: !connection || reconnectRequired
-              ? "reconnect_with_provider_consent"
-              : "check_picker_or_provider_api",
+            suggestedAction:
+              !connection || reconnectRequired
+                ? "reconnect_with_provider_consent"
+                : "check_picker_or_provider_api",
             account: connection
               ? {
                   email: connection.account_email,
@@ -92,12 +96,14 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           return json({ connected: false, revoked });
         }
 
-        if (action !== "connect" && action !== "mobile_picker")
+        if (action !== "connect" && action !== "connect_full" && action !== "mobile_picker")
           return json({ error: "invalid_action" }, 400);
 
         const mobilePicker = action === "mobile_picker";
+        const fullDrive = action === "connect_full";
         if (mobilePicker && provider !== "google_drive")
           return json({ error: "invalid_action" }, 400);
+        if (fullDrive && provider !== "google_drive") return json({ error: "invalid_action" }, 400);
         let returnPath: string | null = null;
         if (mobilePicker) {
           const { safeDrivePickerReturnPath } = await import("@/lib/drive-picker-return");
@@ -151,7 +157,9 @@ export const Route = createFileRoute("/api/external-media/$provider")({
             client_id: externalMediaEnv("GOOGLE_DRIVE_CLIENT_ID"),
             redirect_uri: externalMediaRedirectUri(provider, requestOrigin),
             response_type: "code",
-            scope: mobilePicker ? GOOGLE_DRIVE_SCOPE : `openid email profile ${GOOGLE_DRIVE_SCOPE}`,
+            scope: mobilePicker
+              ? GOOGLE_DRIVE_SCOPE
+              : `openid email profile ${fullDrive ? GOOGLE_DRIVE_READONLY_SCOPE : GOOGLE_DRIVE_SCOPE}`,
             access_type: "offline",
             include_granted_scopes: "false",
             prompt: "consent select_account",
