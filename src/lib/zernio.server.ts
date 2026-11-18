@@ -154,7 +154,7 @@ export async function requireWorkspaceFeatureAccess(
   workspaceId: string,
   feature: string,
 ) {
-  const [{ data: member }, { data: manageable }, { data: entitled }] = await Promise.all([
+  const [{ data: member }, { data: manageable }, { data: roles }, { data: entitled }] = await Promise.all([
     supabase
       .from("workspace_members")
       .select("workspace_id,role")
@@ -165,12 +165,22 @@ export async function requireWorkspaceFeatureAccess(
       "can_staff_manage_workspace" as never,
       { _user_id: userId, _workspace_id: workspaceId } as never,
     ),
+    supabase.from("user_roles").select("role").eq("user_id", userId),
     supabase.rpc("has_feature", { _workspace_id: workspaceId, _feature: feature }),
   ]);
   const canStaffManage = manageable as unknown as boolean | null;
-  if (!member && canStaffManage !== true) throw new Error("forbidden");
-  if (canStaffManage !== true && !entitled) throw new Error("forbidden");
-  return { memberRole: member?.role ?? null, canStaffManage: canStaffManage === true };
+  const staffWorkspaceAccess =
+    workspaceId === "11111111-1111-1111-1111-111111111111" &&
+    (roles ?? []).some(
+      (row) => row.role === "dream_wave_owner" || row.role === "dream_wave_team",
+    );
+  if (!member && canStaffManage !== true && !staffWorkspaceAccess) throw new Error("forbidden");
+  if (canStaffManage !== true && !staffWorkspaceAccess && !entitled) throw new Error("forbidden");
+  return {
+    memberRole: member?.role ?? null,
+    canStaffManage: canStaffManage === true,
+    staffWorkspaceAccess,
+  };
 }
 
 export async function requireSocialWorkspaceManager(

@@ -41,7 +41,20 @@ async function providerRequest<T>(
     body: JSON.stringify(body),
   });
   const json = (await response.json().catch(() => ({}))) as T & { error?: string };
-  if (!response.ok) throw new Error(json.error ?? "External media request failed.");
+  if (!response.ok) {
+    const friendlyErrors: Record<string, string> = {
+      oauth_state_failed: "Google Drive could not start. Please try again.",
+      saved_draft_required: "Save this post as a draft, then try Google Drive again.",
+      google_drive_reconnect_required: "Reconnect Google Drive, then try again.",
+      not_authorized: "You no longer have access to this workspace. Sign in again.",
+    };
+    throw new Error(
+      (json.error && friendlyErrors[json.error]) ??
+        (provider === "google_drive"
+          ? "Google Drive could not start. Please try again."
+          : "External media request failed."),
+    );
+  }
   return json;
 }
 
@@ -58,6 +71,14 @@ export function getExternalMediaStatus(provider: ExternalMediaProvider, workspac
 
 export function startExternalMediaConnection(provider: ExternalMediaProvider, workspaceId: string) {
   return providerRequest<{ url: string }>(provider, "", { action: "connect", workspaceId });
+}
+
+export function startGoogleDriveMobilePicker(workspaceId: string, returnPath: string) {
+  return providerRequest<{ url: string }>("google_drive", "", {
+    action: "mobile_picker",
+    workspaceId,
+    returnPath,
+  });
 }
 
 export function disconnectExternalMedia(provider: ExternalMediaProvider, workspaceId: string) {

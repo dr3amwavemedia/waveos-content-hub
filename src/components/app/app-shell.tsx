@@ -199,6 +199,7 @@ const STAFF_NAV: NavItem[] = [
 
 const TEAM_NAV: NavItem[] = [
   { to: "/home", label: "Overview", icon: Home },
+  { to: "/my-agent", label: "My Agent", icon: Sparkles, feature: "can_use_ai_tools" },
   { to: "/crm", label: "CRM", icon: BriefcaseBusiness, staffOnly: true },
   { to: "/approvals", label: "Approvals", icon: CheckSquare, staffOnly: true },
   { to: "/vision-studio", label: "Vision Studio", icon: Sparkles, staffOnly: true },
@@ -364,7 +365,7 @@ function Shell({ children }: { children: ReactNode }) {
 
   const baseClientNav = isCrew
     ? CLIENT_NAV.filter(
-        (item) => ["/deliveries", "/content", "/calendar"].includes(item.to) && !item.hash,
+        (item) => ["/my-agent", "/deliveries", "/content", "/calendar"].includes(item.to) && !item.hash,
       )
     : isSales
       ? TEAM_NAV.slice(0, 1)
@@ -402,7 +403,10 @@ function Shell({ children }: { children: ReactNode }) {
       : filterByFeature(STAFF_NAV)
     : [];
   const mobileNav = isCrew
-    ? filterByFeature(STAFF_NAV.filter((item) => item.to === "/videographer"))
+    ? filterByFeature([
+        { to: "/my-agent", label: "My Agent", icon: Sparkles, feature: "can_use_ai_tools" },
+        ...STAFF_NAV.filter((item) => item.to === "/videographer"),
+      ])
     : isSales
       ? TEAM_NAV
       : isMediaManager

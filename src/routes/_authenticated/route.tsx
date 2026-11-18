@@ -7,6 +7,7 @@ import { getActingStaff } from "@/hooks/use-acting-staff";
 
 const TEAM_ALLOWED_ROUTES = [
   "/home",
+  "/my-agent",
   "/updates",
   "/deliveries",
   "/crm",
@@ -15,6 +16,7 @@ const TEAM_ALLOWED_ROUTES = [
 ];
 const OUTLOOK_INTEGRATIONS_ENABLED = false;
 const CREW_ALLOWED_ROUTES = [
+  "/my-agent",
   "/videographer",
   "/vision-board",
   "/calendar",

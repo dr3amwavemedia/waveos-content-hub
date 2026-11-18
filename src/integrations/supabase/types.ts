@@ -2014,7 +2014,9 @@ export type Database = {
           code_verifier: string
           created_at: string
           expires_at: string
+          flow_kind: string
           provider: string
+          return_path: string | null
           state: string
           user_id: string
           workspace_id: string
@@ -2023,7 +2025,9 @@ export type Database = {
           code_verifier: string
           created_at?: string
           expires_at: string
+          flow_kind?: string
           provider: string
+          return_path?: string | null
           state: string
           user_id: string
           workspace_id: string
@@ -2032,7 +2036,9 @@ export type Database = {
           code_verifier?: string
           created_at?: string
           expires_at?: string
+          flow_kind?: string
           provider?: string
+          return_path?: string | null
           state?: string
           user_id?: string
           workspace_id?: string
@@ -4578,7 +4584,10 @@ export type Database = {
           billing_interval: string | null
           cancel_at_period_end: boolean
           created_at: string
+          complimentary_access_ends_at: string | null
+          complimentary_grant_id: string | null
           current_period_end: string | null
+          entitlement_source: string
           internal_test_access: boolean
           last_payment_failed_at: string | null
           payment_failure_count: number
@@ -4598,7 +4607,10 @@ export type Database = {
           billing_interval?: string | null
           cancel_at_period_end?: boolean
           created_at?: string
+          complimentary_access_ends_at?: string | null
+          complimentary_grant_id?: string | null
           current_period_end?: string | null
+          entitlement_source?: string
           internal_test_access?: boolean
           last_payment_failed_at?: string | null
           payment_failure_count?: number
@@ -4618,7 +4630,10 @@ export type Database = {
           billing_interval?: string | null
           cancel_at_period_end?: boolean
           created_at?: string
+          complimentary_access_ends_at?: string | null
+          complimentary_grant_id?: string | null
           current_period_end?: string | null
+          entitlement_source?: string
           internal_test_access?: boolean
           last_payment_failed_at?: string | null
           payment_failure_count?: number
@@ -5521,6 +5536,10 @@ export type Database = {
       social_subscription_is_active: {
         Args: { _workspace_id: string }
         Returns: boolean
+      }
+      redeem_waveos_complimentary_code: {
+        Args: { _code: string; _workspace_id: string }
+        Returns: Json
       }
       staff_release_content: {
         Args: {

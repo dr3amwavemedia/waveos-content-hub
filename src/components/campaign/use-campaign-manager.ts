@@ -36,6 +36,7 @@ import {
   useUploadAsset,
   type MediaAsset,
 } from "@/hooks/use-media";
+import { buildCampaignReadiness } from "@/lib/campaign-readiness";
 
 export const db = supabase as unknown as {
   // Phase 1 additive tables can land before regenerated client definitions.
@@ -44,7 +45,15 @@ export const db = supabase as unknown as {
 };
 
 export const PLATFORM_OPTIONS = ["instagram", "facebook", "linkedin", "tiktok", "youtube", "x"];
-export const DAY_OPTIONS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+export const DAY_OPTIONS = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
 export const MAX_SAMPLED_VIDEOS = 6;
 export const GOAL_LABELS: Record<CampaignGoal, string> = {
   awareness: "Brand Awareness",
@@ -103,6 +112,22 @@ export interface CampaignLinkedContentRow {
   internal_notes?: string | null;
 }
 
+export function campaignCaptionBrief(item: CampaignLinkedContentRow) {
+  const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+  const details = [
+    item.title?.trim() ? `Post/clip title: ${item.title.trim()}` : null,
+    typeof metadata.campaignBrief === "string" && metadata.campaignBrief.trim()
+      ? `Campaign direction: ${metadata.campaignBrief.trim()}`
+      : null,
+    typeof metadata.contentPillar === "string" && metadata.contentPillar.trim()
+      ? `Content pillar: ${metadata.contentPillar.trim()}`
+      : null,
+  ].filter((value): value is string => Boolean(value));
+  return details.length
+    ? details.join("\n")
+    : "Create an organic social caption for this campaign post.";
+}
+
 export type MediaRecommendation = {
   mediaId: string;
   reason: string;
@@ -138,7 +163,6 @@ export type AnalysisProgress = {
   assetCount: number;
 };
 
-
 export function useCampaignManager() {
   const { activeWorkspace } = useWorkspace();
   const workspaceId = activeWorkspace?.id ?? null;
@@ -146,7 +170,7 @@ export function useCampaignManager() {
   const [input, setInput] = useState<CampaignPlanningInput>(DEFAULT_INPUT);
   const [preview, setPreview] = useState<CampaignPlanningItem[]>([]);
   const [dirty, setDirty] = useState(false);
-  const [autoSaveState, setAutoSaveState] = useState<"idle"|"saving"|"saved"|"error">("idle");
+  const [autoSaveState, setAutoSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const editRevisionRef = useRef(0);
   const [mobileStep, setMobileStep] = useState(0);
   const campaignDirectionFn = useServerFn(generateCampaignDirection);
@@ -157,15 +181,86 @@ export function useCampaignManager() {
   const captionAssistFn = useServerFn(waveAssist);
   const [campaignDirection, setCampaignDirection] = useState<CampaignDirection | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState<AnalysisProgress | null>(null);
-  const [selectedMediaIds,setSelectedMediaIds]=useState<string[]>([]);
-  const [confirmedMediaIds,setConfirmedMediaIds]=useState<string[]>([]);
-  const [showSharedMediaPicker,setShowSharedMediaPicker]=useState(false);
-  const [mediaFolder,setMediaFolder]=useState<string>("all");
-  const mediaInputRef=useRef<HTMLInputElement|null>(null);
-  const mediaFolders=useMediaFolders(workspaceId);
-  const mediaAssets=useMediaAssets(workspaceId,{folderId:mediaFolder==="all"?undefined:mediaFolder==="root"?null:mediaFolder});
+  const [selectedMediaIds, setSelectedMediaIds] = useState<string[]>([]);
+  const [confirmedMediaIds, setConfirmedMediaIds] = useState<string[]>([]);
+  const [showSharedMediaPicker, setShowSharedMediaPicker] = useState(false);
+  const [mediaFolder, setMediaFolder] = useState<string>("all");
+  const mediaInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaFolders = useMediaFolders(workspaceId);
+  const mediaAssets = useMediaAssets(workspaceId, {
+    folderId: mediaFolder === "all" ? undefined : mediaFolder === "root" ? null : mediaFolder,
+  });
   const allMediaAssets = useMediaAssets(workspaceId);
-  const uploadMedia=useUploadAsset(workspaceId);
+  const brandReadiness = useQuery({
+    queryKey: ["campaign-readiness", "brand", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("brand_profiles")
+        .select("workspace_id,updated_at")
+        .eq("workspace_id", workspaceId!)
+        .maybeSingle();
+      if (error) throw error;
+      return Boolean(data);
+    },
+  });
+  const socialReadiness = useQuery({
+    queryKey: ["campaign-readiness", "social", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("social_connections")
+        .select("connected,connection_state")
+        .eq("workspace_id", workspaceId!);
+      if (error) throw error;
+      const rows = data ?? [];
+      return {
+        connected: rows.filter(
+          (row: { connected: boolean; connection_state: string }) =>
+            row.connected && row.connection_state !== "needs_reconnect",
+        ).length,
+        reconnect: rows.filter(
+          (row: { connected: boolean; connection_state: string }) =>
+            row.connection_state === "needs_reconnect",
+        ).length,
+      };
+    },
+  });
+  const analyticsReadiness = useQuery({
+    queryKey: ["campaign-readiness", "analytics", workspaceId],
+    enabled: Boolean(workspaceId),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("social_intelligence_profiles")
+        .select("sync_state,last_success_at,safe_error_code")
+        .eq("workspace_id", workspaceId!)
+        .order("last_success_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data as {
+        sync_state: string;
+        last_success_at: string | null;
+        safe_error_code: string | null;
+      } | null;
+    },
+  });
+  const transcriptReadiness = useQuery({
+    queryKey: ["campaign-readiness", "transcripts", workspaceId, selectedMediaIds],
+    enabled: Boolean(workspaceId && selectedMediaIds.length),
+    queryFn: async () => {
+      const { data, error } = await db
+        .from("media_transcripts")
+        .select("media_asset_id,status")
+        .eq("workspace_id", workspaceId!)
+        .in("media_asset_id", selectedMediaIds)
+        .eq("status", "completed");
+      if (error) throw error;
+      return new Set((data ?? []).map((row: { media_asset_id: string }) => row.media_asset_id))
+        .size;
+    },
+  });
+  const uploadMedia = useUploadAsset(workspaceId);
   const [directionBusy, setDirectionBusy] = useState(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null);
   const [mediaSectionOpen, setMediaSectionOpen] = useState(false);
@@ -173,11 +268,30 @@ export function useCampaignManager() {
   const [captionBusyId, setCaptionBusyId] = useState<string | null>(null);
   const [campaignCaptionDrafts, setCampaignCaptionDrafts] = useState<Record<string, string>>({});
   const [continuedFrom, setContinuedFrom] = useState<string | null>(null);
-  const [savedNotice, setSavedNotice] = useState<{ name: string; contentLinked: boolean } | null>(null);
+  const [savedNotice, setSavedNotice] = useState<{ name: string; contentLinked: boolean } | null>(
+    null,
+  );
   type BuilderDraft = CampaignPlanningInput & {
-    builder?: { selectedMediaIds: string[]; confirmedMediaIds: string[]; campaignDirection: CampaignDirection | null; preview: CampaignPlanningItem[]; campaignCaptionDrafts: Record<string, string>; continuedFrom: string | null };
+    builder?: {
+      selectedMediaIds: string[];
+      confirmedMediaIds: string[];
+      campaignDirection: CampaignDirection | null;
+      preview: CampaignPlanningItem[];
+      campaignCaptionDrafts: Record<string, string>;
+      continuedFrom: string | null;
+    };
   };
-  const draftPayload: BuilderDraft = { ...input, builder: { selectedMediaIds, confirmedMediaIds, campaignDirection, preview, campaignCaptionDrafts, continuedFrom } };
+  const draftPayload: BuilderDraft = {
+    ...input,
+    builder: {
+      selectedMediaIds,
+      confirmedMediaIds,
+      campaignDirection,
+      preview,
+      campaignCaptionDrafts,
+      continuedFrom,
+    },
+  };
   const workflowDraft = useWorkflowDraft<BuilderDraft>({
     workspaceId,
     workflowKey: "campaign-manager",
@@ -189,13 +303,26 @@ export function useCampaignManager() {
     const revision = editRevisionRef.current;
     setAutoSaveState("saving");
     const timer = window.setTimeout(() => {
-      void autoSaveDraft(draftPayload).then(() => {
-        if (editRevisionRef.current === revision) setDirty(false);
-        setAutoSaveState("saved");
-      }).catch(() => setAutoSaveState("error"));
+      void autoSaveDraft(draftPayload)
+        .then(() => {
+          if (editRevisionRef.current === revision) setDirty(false);
+          setAutoSaveState("saved");
+        })
+        .catch(() => setAutoSaveState("error"));
     }, 900);
     return () => window.clearTimeout(timer);
-  }, [autoSaveDraft, dirty, input, workspaceId, selectedMediaIds, confirmedMediaIds, campaignDirection, preview, campaignCaptionDrafts, continuedFrom]);
+  }, [
+    autoSaveDraft,
+    dirty,
+    input,
+    workspaceId,
+    selectedMediaIds,
+    confirmedMediaIds,
+    campaignDirection,
+    preview,
+    campaignCaptionDrafts,
+    continuedFrom,
+  ]);
 
   const campaigns = useQuery({
     queryKey: ["campaign-plans", workspaceId],
@@ -203,7 +330,9 @@ export function useCampaignManager() {
     queryFn: async () => {
       const base = db
         .from("campaign_plans")
-        .select("id,name,goal,start_date,end_date,platforms,max_posts,posting_hours,excluded_days,approval_required,optimization_mode,status,created_at")
+        .select(
+          "id,name,goal,start_date,end_date,platforms,max_posts,posting_hours,excluded_days,approval_required,optimization_mode,status,created_at",
+        )
         .eq("workspace_id", workspaceId!)
         .order("created_at", { ascending: false })
         .limit(12);
@@ -214,7 +343,9 @@ export function useCampaignManager() {
       if (/optimization_mode|schema cache|column/i.test(message)) {
         const fallback = await db
           .from("campaign_plans")
-          .select("id,name,goal,start_date,end_date,platforms,max_posts,posting_hours,excluded_days,approval_required,status,created_at")
+          .select(
+            "id,name,goal,start_date,end_date,platforms,max_posts,posting_hours,excluded_days,approval_required,status,created_at",
+          )
           .eq("workspace_id", workspaceId!)
           .order("created_at", { ascending: false })
           .limit(12);
@@ -245,10 +376,22 @@ export function useCampaignManager() {
   });
 
   useEffect(() => {
-    if (!selectedCampaignId && campaigns.data?.[0]?.id) {
-      setSelectedCampaignId(campaigns.data[0].id);
+    if (!campaigns.data?.length) return;
+    const openKey = workspaceId ? `waveos.campaign.open.${workspaceId}` : null;
+    const requestedId = openKey ? sessionStorage.getItem(openKey) : null;
+    if (requestedId && campaigns.data.some((campaign) => campaign.id === requestedId)) {
+      setSelectedCampaignId(requestedId);
+      setMediaSectionOpen(true);
+      sessionStorage.removeItem(openKey!);
+      window.requestAnimationFrame(() =>
+        document
+          .getElementById("campaign-command-detail")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      );
+      return;
     }
-  }, [campaigns.data, selectedCampaignId]);
+    if (!selectedCampaignId) setSelectedCampaignId(campaigns.data[0].id);
+  }, [campaigns.data, selectedCampaignId, workspaceId]);
 
   const assetLookup = useMemo(() => {
     const map = new Map<string, MediaAsset>();
@@ -256,6 +399,39 @@ export function useCampaignManager() {
     for (const asset of mediaAssets.data ?? []) map.set(asset.id, asset);
     return map;
   }, [allMediaAssets.data, mediaAssets.data]);
+
+  const readiness = useMemo(
+    () =>
+      buildCampaignReadiness({
+        workspaceReady: Boolean(workspaceId),
+        brandProfileReady: brandReadiness.data === true,
+        connectedPlatforms: socialReadiness.data?.connected ?? 0,
+        reconnectPlatforms: socialReadiness.data?.reconnect ?? 0,
+        analyticsState: analyticsReadiness.data?.safe_error_code
+          ? "error"
+          : analyticsReadiness.data?.sync_state === "ready"
+            ? "ready"
+            : (analyticsReadiness.data?.sync_state ?? null),
+        analyticsLastSuccessAt: analyticsReadiness.data?.last_success_at ?? null,
+        selectedMediaCount: selectedMediaIds.length,
+        readableMediaCount: selectedMediaIds.filter((id) => assetLookup.has(id)).length,
+        transcriptReadyCount: transcriptReadiness.data ?? 0,
+        folderSelected: mediaFolder !== "all",
+        folderListingComplete: !mediaAssets.isLoading && !mediaAssets.isError,
+      }),
+    [
+      workspaceId,
+      brandReadiness.data,
+      socialReadiness.data,
+      analyticsReadiness.data,
+      selectedMediaIds,
+      assetLookup,
+      transcriptReadiness.data,
+      mediaFolder,
+      mediaAssets.isLoading,
+      mediaAssets.isError,
+    ],
+  );
 
   const campaignContentByPlan = useMemo(() => {
     const grouped = new Map<string, CampaignLinkedContentRow[]>();
@@ -274,7 +450,7 @@ export function useCampaignManager() {
   const selectedCampaign =
     (campaigns.data ?? []).find((campaign) => campaign.id === selectedCampaignId) ?? null;
   const selectedCampaignContent = selectedCampaignId
-    ? campaignContentByPlan.get(selectedCampaignId) ?? []
+    ? (campaignContentByPlan.get(selectedCampaignId) ?? [])
     : [];
   useEffect(() => {
     setCampaignCaptionDrafts((current) => {
@@ -317,7 +493,9 @@ export function useCampaignManager() {
     selectedMediaCount: selectedMediaIds.length,
     recommendationCount: campaignDirection?.mediaRecommendations.length ?? 0,
     confirmedCount: campaignDirection
-      ? campaignDirection.mediaRecommendations.filter((rec) => confirmedMediaIds.includes(rec.mediaId)).length
+      ? campaignDirection.mediaRecommendations.filter((rec) =>
+          confirmedMediaIds.includes(rec.mediaId),
+        ).length
       : 0,
     planSlotCount: preview.length,
     saved: Boolean(savedNotice),
@@ -390,9 +568,15 @@ export function useCampaignManager() {
       const linkedRows = selectedAssets.map((asset, index) => {
         const plannedItem = plannedItems[index % plannedItems.length];
         // A caption the user reviewed in the Plan step; never the internal brief.
-        const reviewed = campaignDirection?.mediaRecommendations.find((rec) => rec.mediaId === asset.id);
+        const reviewed = campaignDirection?.mediaRecommendations.find(
+          (rec) => rec.mediaId === asset.id,
+        );
         const contentFormat =
-          reviewed?.placement === "story" ? "story" : reviewed?.placement === "feed" ? "feed" : plannedItem?.contentFormat ?? null;
+          reviewed?.placement === "story"
+            ? "story"
+            : reviewed?.placement === "feed"
+              ? "feed"
+              : (plannedItem?.contentFormat ?? null);
         return {
           workspace_id: workspaceId,
           created_by: auth.user.id,
@@ -441,15 +625,16 @@ export function useCampaignManager() {
           content.metadata && typeof content.metadata === "object" ? content.metadata : {};
         const platform = typeof metadata.platform === "string" ? metadata.platform : null;
         if (!platform || !PLATFORM_OPTIONS.includes(platform)) return [];
-        return [{
-          content_item_id: content.id,
-          workspace_id: workspaceId,
-          platform,
-          enabled: true,
-          caption: typeof content.primary_caption === "string" ? content.primary_caption : "",
-          platform_options:
-            metadata.contentFormat === "story" ? { contentType: "story" } : {},
-        }];
+        return [
+          {
+            content_item_id: content.id,
+            workspace_id: workspaceId,
+            platform,
+            enabled: true,
+            caption: typeof content.primary_caption === "string" ? content.primary_caption : "",
+            platform_options: metadata.contentFormat === "story" ? { contentType: "story" } : {},
+          },
+        ];
       });
       if (variantRows.length) {
         const { error: variantError } = await db.from("post_variants").insert(variantRows);
@@ -499,7 +684,9 @@ export function useCampaignManager() {
       if (result.contentLinked) {
         toast.success("Campaign saved. Continue below in the campaign workspace.");
       } else {
-        toast.warning("Campaign saved, but its content could not be linked yet. Reopen the campaign and reconnect the media.");
+        toast.warning(
+          "Campaign saved, but its content could not be linked yet. Reopen the campaign and reconnect the media.",
+        );
       }
     },
     onError: (error) =>
@@ -518,7 +705,9 @@ export function useCampaignManager() {
     const values = input[key] as readonly string[];
     update(
       key,
-      (values.includes(value) ? values.filter((item) => item !== value) : [...values, value]) as CampaignPlanningInput[typeof key],
+      (values.includes(value)
+        ? values.filter((item) => item !== value)
+        : [...values, value]) as CampaignPlanningInput[typeof key],
     );
   }
 
@@ -579,20 +768,25 @@ export function useCampaignManager() {
           finish();
           return;
         }
-        points = [0.15,0.5,0.85].map((ratio)=>Math.max(0.05,Math.min(video.duration-0.05,video.duration*ratio)));
+        points = [0.15, 0.5, 0.85].map((ratio) =>
+          Math.max(0.05, Math.min(video.duration - 0.05, video.duration * ratio)),
+        );
         video.currentTime = points[index]!;
       };
       video.onseeked = () => {
         try {
           const maxEdge = 480;
-          const scale = Math.min(1, maxEdge / Math.max(video.videoWidth || 1, video.videoHeight || 1));
+          const scale = Math.min(
+            1,
+            maxEdge / Math.max(video.videoWidth || 1, video.videoHeight || 1),
+          );
           const canvas = document.createElement("canvas");
           canvas.width = Math.max(1, Math.round((video.videoWidth || 1) * scale));
           canvas.height = Math.max(1, Math.round((video.videoHeight || 1) * scale));
           const ctx = canvas.getContext("2d");
           if (ctx) {
-            ctx.drawImage(video,0,0,canvas.width,canvas.height);
-            const frame = canvas.toDataURL("image/jpeg",0.6);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const frame = canvas.toDataURL("image/jpeg", 0.6);
             if (frame.length <= 350000) frames.push(frame);
           }
         } catch {
@@ -616,8 +810,7 @@ export function useCampaignManager() {
       toast.error("Add or generate a caption first.");
       return;
     }
-    const metadata =
-      item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+    const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
     const plannedPlatform =
       typeof metadata.platform === "string" && PLATFORM_OPTIONS.includes(metadata.platform)
         ? metadata.platform
@@ -655,8 +848,7 @@ export function useCampaignManager() {
           platform: plannedPlatform,
           enabled: true,
           caption: nextCaption,
-          platform_options:
-            metadata.contentFormat === "story" ? { contentType: "story" } : {},
+          platform_options: metadata.contentFormat === "story" ? { contentType: "story" } : {},
         });
         if (error) throw error;
       }
@@ -676,17 +868,12 @@ export function useCampaignManager() {
 
   async function generateCampaignCaption(item: CampaignLinkedContentRow) {
     if (!workspaceId || captionBusyId) return;
-    const metadata =
-      item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+    const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
     const plannedPlatform =
       typeof metadata.platform === "string" && PLATFORM_OPTIONS.includes(metadata.platform)
         ? metadata.platform
         : "instagram";
-    const brief =
-      (typeof metadata.campaignBrief === "string" ? metadata.campaignBrief.trim() : "") ||
-      (typeof metadata.contentPillar === "string" ? metadata.contentPillar : "") ||
-      item.title ||
-      "Create an organic social caption for this campaign post.";
+    const brief = campaignCaptionBrief(item);
 
     setCaptionBusyId(item.id);
     try {
@@ -736,8 +923,7 @@ export function useCampaignManager() {
           platform: plannedPlatform,
           enabled: true,
           caption: platformCaption,
-          platform_options:
-            metadata.contentFormat === "story" ? { contentType: "story" } : {},
+          platform_options: metadata.contentFormat === "story" ? { contentType: "story" } : {},
         });
         if (error) throw error;
       }
@@ -760,80 +946,87 @@ export function useCampaignManager() {
     }
     setBulkCaptionBusy(true);
     let completed = 0;
+    let failed = 0;
+    const generatedCaptions: string[] = [];
     try {
       for (const item of missing) {
-        const metadata =
-          item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+        const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata : {};
         const plannedPlatform =
           typeof metadata.platform === "string" && PLATFORM_OPTIONS.includes(metadata.platform)
             ? metadata.platform
             : "instagram";
-        const brief =
-          (typeof metadata.campaignBrief === "string" ? metadata.campaignBrief.trim() : "") ||
-          (typeof metadata.contentPillar === "string" ? metadata.contentPillar : "") ||
-          item.title ||
-          "Create an organic social caption for this campaign post.";
-
-        const generated = await captionAssistFn({
-          data: {
-            mode: "caption_suite",
-            input: brief,
-            workspaceId,
-            platforms: [plannedPlatform],
-          },
-        });
-        const primaryCaption = generated.primaryCaption ?? generated.suggestion;
-        const { error: contentError } = await db
-          .from("content_items")
-          .update({
-            primary_caption: primaryCaption,
-            metadata: { ...metadata, captionState: "generated_for_review" },
-          })
-          .eq("id", item.id)
-          .eq("workspace_id", workspaceId);
-        if (contentError) throw contentError;
-
-        const { data: existingVariants, error: variantReadError } = await db
-          .from("post_variants")
-          .select("id,platform")
-          .eq("content_item_id", item.id)
-          .eq("workspace_id", workspaceId);
-        if (variantReadError) throw variantReadError;
-        const variant = (existingVariants ?? []).find(
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (row: any) => row.platform === plannedPlatform,
-        );
-        const platformCaption =
-          generated.variants?.find((row) => row.platform === plannedPlatform)?.caption ??
-          primaryCaption;
-        if (variant?.id) {
-          const { error } = await db
-            .from("post_variants")
-            .update({ caption: platformCaption, enabled: true })
-            .eq("id", variant.id);
-          if (error) throw error;
-        } else {
-          const { error } = await db.from("post_variants").insert({
-            content_item_id: item.id,
-            workspace_id: workspaceId,
-            platform: plannedPlatform,
-            enabled: true,
-            caption: platformCaption,
-            platform_options:
-              metadata.contentFormat === "story" ? { contentType: "story" } : {},
+        try {
+          const generated = await captionAssistFn({
+            data: {
+              mode: "caption_suite",
+              input: campaignCaptionBrief(item),
+              workspaceId,
+              platforms: [plannedPlatform],
+              mediaAssetIds: item.media_asset_ids ?? [],
+              context: generatedCaptions.length
+                ? `Captions already used in this campaign. Write a materially different hook and structure:\n${generatedCaptions.slice(-8).join("\n---\n")}`
+                : undefined,
+            },
           });
-          if (error) throw error;
+          const primaryCaption = generated.primaryCaption ?? generated.suggestion;
+          const { error: contentError } = await db
+            .from("content_items")
+            .update({
+              primary_caption: primaryCaption,
+              metadata: { ...metadata, captionState: "generated_for_review" },
+            })
+            .eq("id", item.id)
+            .eq("workspace_id", workspaceId);
+          if (contentError) throw contentError;
+
+          const { data: existingVariants, error: variantReadError } = await db
+            .from("post_variants")
+            .select("id,platform")
+            .eq("content_item_id", item.id)
+            .eq("workspace_id", workspaceId);
+          if (variantReadError) throw variantReadError;
+          const variant = (existingVariants ?? []).find(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (row: any) => row.platform === plannedPlatform,
+          );
+          const platformCaption =
+            generated.variants?.find((row) => row.platform === plannedPlatform)?.caption ??
+            primaryCaption;
+          if (variant?.id) {
+            const { error } = await db
+              .from("post_variants")
+              .update({ caption: platformCaption, enabled: true })
+              .eq("id", variant.id);
+            if (error) throw error;
+          } else {
+            const { error } = await db.from("post_variants").insert({
+              content_item_id: item.id,
+              workspace_id: workspaceId,
+              platform: plannedPlatform,
+              enabled: true,
+              caption: platformCaption,
+              platform_options: metadata.contentFormat === "story" ? { contentType: "story" } : {},
+            });
+            if (error) throw error;
+          }
+          generatedCaptions.push(primaryCaption);
+          completed += 1;
+        } catch {
+          failed += 1;
         }
-        completed += 1;
       }
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["campaign-linked-content", workspaceId] }),
         queryClient.invalidateQueries({ queryKey: ["content-items", workspaceId] }),
       ]);
-      toast.success(
-        `Generated ${completed} campaign caption${completed === 1 ? "" : "s"} for review.`,
-      );
+      if (completed) {
+        toast.success(
+          `Generated ${completed} campaign caption${completed === 1 ? "" : "s"} for review${failed ? `; ${failed} need a retry` : ""}.`,
+        );
+      } else {
+        toast.error("Campaign captions could not be generated. Please retry.");
+      }
     } catch (error) {
       toast.error(
         error instanceof Error
@@ -906,7 +1099,7 @@ export function useCampaignManager() {
             return { mediaId: asset.id, frames };
           }),
         )
-      ).filter((entry)=>entry.frames.length>0);
+      ).filter((entry) => entry.frames.length > 0);
       setAnalysisProgress((current) => (current ? { ...current, phase: "ai" } : current));
       const direction = await campaignDirectionFn({
         data: {
@@ -924,7 +1117,9 @@ export function useCampaignManager() {
       setConfirmedMediaIds([]);
       toast.success("Organic campaign direction is ready.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Campaign direction could not be generated.");
+      toast.error(
+        error instanceof Error ? error.message : "Campaign direction could not be generated.",
+      );
     } finally {
       setDirectionBusy(false);
       setAnalysisProgress(null);
@@ -934,15 +1129,21 @@ export function useCampaignManager() {
   function updateMediaRecommendation(index: number, patch: Partial<MediaRecommendation>) {
     editRevisionRef.current += 1;
     setDirty(true);
-    setCampaignDirection((current) => current ? {
-      ...current,
-      mediaRecommendations: current.mediaRecommendations.map((recommendation, itemIndex) =>
-        itemIndex === index ? { ...recommendation, ...patch } : recommendation,
-      ),
-    } : current);
+    setCampaignDirection((current) =>
+      current
+        ? {
+            ...current,
+            mediaRecommendations: current.mediaRecommendations.map((recommendation, itemIndex) =>
+              itemIndex === index ? { ...recommendation, ...patch } : recommendation,
+            ),
+          }
+        : current,
+    );
     const mediaId = campaignDirection?.mediaRecommendations[index]?.mediaId;
-    const understandingChanged = "contentType" in patch || "visualSummary" in patch || "likelyPurpose" in patch;
-    if (mediaId && understandingChanged) setConfirmedMediaIds((current) => current.filter((id) => id !== mediaId));
+    const understandingChanged =
+      "contentType" in patch || "visualSummary" in patch || "likelyPurpose" in patch;
+    if (mediaId && understandingChanged)
+      setConfirmedMediaIds((current) => current.filter((id) => id !== mediaId));
     setDraftsCreated(false);
     setSavedNotice(null);
   }
@@ -954,8 +1155,26 @@ export function useCampaignManager() {
         mediaRecommendations: moveListItem(campaignDirection.mediaRecommendations, index, delta),
       });
     } else {
-      changeSelectedMedia((current) => moveListItem(orderCampaignMedia(current, null), index, delta));
+      changeSelectedMedia((current) =>
+        moveListItem(orderCampaignMedia(current, null), index, delta),
+      );
     }
+    setSavedNotice(null);
+  }
+
+  function removeMediaRecommendation(index: number) {
+    if (!campaignDirection) return;
+    const removed = campaignDirection.mediaRecommendations[index];
+    setCampaignDirection({
+      ...campaignDirection,
+      mediaRecommendations: campaignDirection.mediaRecommendations.filter(
+        (_recommendation, itemIndex) => itemIndex !== index,
+      ),
+    });
+    if (removed) {
+      setConfirmedMediaIds((current) => current.filter((id) => id !== removed.mediaId));
+    }
+    setDirty(true);
     setSavedNotice(null);
   }
 
@@ -1000,7 +1219,9 @@ export function useCampaignManager() {
   function goToStep(index: number) {
     setMobileStep(index);
     if (window.matchMedia("(min-width: 640px)").matches) {
-      document.getElementById(`campaign-step-${index}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById(`campaign-step-${index}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
 
@@ -1015,14 +1236,21 @@ export function useCampaignManager() {
     setSavedNotice(null);
     setMobileStep(0);
     window.requestAnimationFrame(() =>
-      document.getElementById("campaign-builder-workflow")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      document
+        .getElementById("campaign-builder-workflow")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
   }
 
-
   /** Unlinked AI drafts kept for the desktop layout's existing "Create feed & story drafts" action. */
   async function createPostDrafts() {
-    if (!workspaceId || !campaignDirection?.mediaRecommendations.length || draftsBusy || draftsCreated) return;
+    if (
+      !workspaceId ||
+      !campaignDirection?.mediaRecommendations.length ||
+      draftsBusy ||
+      draftsCreated
+    )
+      return;
     if (confirmedMediaIds.length !== campaignDirection.mediaRecommendations.length) {
       toast.error("Confirm or correct what WaveOS understood about every asset first.");
       return;
@@ -1110,6 +1338,7 @@ export function useCampaignManager() {
     campaigns,
     linkedCampaignContent,
     assetLookup,
+    readiness,
     campaignContentByPlan,
     selectedCampaign,
     selectedCampaignContent,
@@ -1131,6 +1360,7 @@ export function useCampaignManager() {
     generateDirection,
     updateMediaRecommendation,
     moveSequenceItem,
+    removeMediaRecommendation,
     saveServerDraft,
     restoreServerDraft,
     generatePlan,

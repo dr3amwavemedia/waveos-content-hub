@@ -12,7 +12,10 @@ const hasDrive = (s) => (s ?? "").split(/\s+/).includes(DRIVE);
 
 test("only the existing drive.file scope is requested", () => {
   assert.match(server, /GOOGLE_DRIVE_SCOPE = "https:\/\/www\.googleapis\.com\/auth\/drive\.file"/);
-  assert.match(status, /scope: `openid email profile \$\{GOOGLE_DRIVE_SCOPE\}`/);
+  assert.match(
+    status,
+    /scope: mobilePicker \? GOOGLE_DRIVE_SCOPE : `openid email profile \$\{GOOGLE_DRIVE_SCOPE\}`/,
+  );
   assert.doesNotMatch(status, /auth\/drive"|drive\.readonly/);
 });
 

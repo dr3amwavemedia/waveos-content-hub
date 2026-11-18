@@ -9,6 +9,7 @@ import {
   Cloud,
   ExternalLink,
   Image,
+  KeyRound,
   Loader2,
   Palette,
   Settings as SettingsIcon,
@@ -52,6 +53,7 @@ import {
   createSocialBillingPortal,
   createSocialSubscriptionCheckout,
   getSocialSubscription,
+  redeemComplimentaryAccessCode,
 } from "@/lib/social-subscriptions.functions";
 import { publicSubscriptionActive, usePermissions } from "@/hooks/use-permissions";
 import { subscriptionDisplayState } from "@/lib/subscription-display";
@@ -239,10 +241,7 @@ function SettingsPage() {
             <Row label="Name" value={activeWorkspace?.name ?? "—"} />
             <Row label="Industry" value={activeWorkspace?.industry ?? "Not set"} />
             <Row label="Timezone" value={activeWorkspace?.timezone ?? "—"} />
-            <Row
-              label="Your access"
-              value={activeWorkspaceAccess}
-            />
+            <Row label="Your access" value={activeWorkspaceAccess} />
           </dl>
         </div>
       </div>
@@ -396,6 +395,7 @@ function SocialPlanSettings({
   canManage: boolean;
 }) {
   const [annualBilling, setAnnualBilling] = useState(false);
+  const [complimentaryCode, setComplimentaryCode] = useState("");
   const [checkoutConfirmation, setCheckoutConfirmation] = useState<
     "idle" | "confirming" | "confirmed" | "error"
   >(() => {
@@ -410,6 +410,7 @@ function SocialPlanSettings({
   const checkout = useServerFn(createSocialSubscriptionCheckout);
   const confirmCheckout = useServerFn(confirmSocialSubscriptionCheckout);
   const billingPortal = useServerFn(createSocialBillingPortal);
+  const redeemCode = useServerFn(redeemComplimentaryAccessCode);
   const query = useQuery({
     queryKey: ["social-subscription", workspaceId],
     queryFn: () => getPlan({ data: { workspaceId } }),
@@ -465,6 +466,21 @@ function SocialPlanSettings({
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Could not open billing settings."),
   });
+  const complimentaryRedemption = useMutation({
+    mutationFn: () => redeemCode({ data: { workspaceId, code: complimentaryCode } }),
+    onSuccess: async (result) => {
+      setComplimentaryCode("");
+      await Promise.all([
+        query.refetch(),
+        qc.invalidateQueries({ queryKey: ["workspace-social-subscription-access", workspaceId] }),
+      ]);
+      const label =
+        result.plan === "standard" ? "Ripple" : result.plan === "full" ? "Current" : "Tidal";
+      toast.success(`Complimentary ${label} access is ready.`);
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "The code could not be applied."),
+  });
   const subscription = query.data?.subscription;
   const billingState =
     query.isPending || query.isError
@@ -477,6 +493,8 @@ function SocialPlanSettings({
                 currentPeriodEnd: subscription.current_period_end,
                 trialEndsAt: subscription.trial_ends_at,
                 internalTestAccess: subscription.internal_test_access,
+                entitlementSource: subscription.entitlement_source,
+                complimentaryAccessEndsAt: subscription.complimentary_access_ends_at,
               }
             : null,
         );
@@ -511,10 +529,10 @@ function SocialPlanSettings({
           </span>
           <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${billingTone}`}>
             {query.isPending
-              ? "Stripe status: loading…"
+              ? "Access status: loading…"
               : query.isError
-                ? "Stripe status: unavailable"
-                : `Stripe status: ${billingState?.label ?? "Unavailable"}`}
+                ? "Access status: unavailable"
+                : `Access status: ${billingState?.label ?? "Unavailable"}`}
           </span>
         </div>
       </div>
@@ -570,18 +588,77 @@ function SocialPlanSettings({
           </p>
         </div>
       )}
-      {canManage && !subscription?.internal_test_access && subscription?.stripe_customer_id && (
-        <button
-          type="button"
-          disabled={manageBilling.isPending}
-          onClick={() => manageBilling.mutate()}
-          className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-elevated px-4 text-sm font-semibold text-foreground hover:border-primary/40 disabled:opacity-50"
-        >
-          {manageBilling.isPending ? "Opening Stripe…" : "Manage payment method"}
-        </button>
+      {subscription?.entitlement_source === "complimentary_code" && (
+        <div className="mt-4 rounded-xl border border-emerald-400/30 bg-emerald-500/10 p-4 text-sm text-foreground">
+          <strong>Complimentary WaveOS access</strong>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Your {query.data?.plans[subscription.plan]?.name ?? subscription.plan} plan was granted
+            by Dream Wave
+            {query.data?.complimentaryGrant?.granted_at
+              ? ` on ${new Date(query.data.complimentaryGrant.granted_at).toLocaleDateString()}`
+              : ""}
+            {query.data?.complimentaryGrant?.access_ends_at
+              ? ` through ${new Date(query.data.complimentaryGrant.access_ends_at).toLocaleDateString()}`
+              : ""}
+            . No Stripe subscription, payment method, or trial is attached.
+          </p>
+        </div>
       )}
       {canManage &&
         !subscription?.internal_test_access &&
+        subscription?.entitlement_source !== "complimentary_code" &&
+        !subscription?.stripe_customer_id && (
+          <form
+            className="mt-4 rounded-xl border border-emerald-400/25 bg-emerald-500/5 p-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (complimentaryCode.trim()) complimentaryRedemption.mutate();
+            }}
+          >
+            <p className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <KeyRound className="h-4 w-4 text-emerald-300" /> Have complimentary access?
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Enter the secure code Dream Wave gave you. A valid code skips checkout entirely—it is
+              not a trial and will not create a Stripe subscription.
+            </p>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <input
+                value={complimentaryCode}
+                onChange={(event) => setComplimentaryCode(event.target.value.toUpperCase())}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="WAVE-…"
+                aria-label="Complimentary access code"
+                className="min-h-11 flex-1 rounded-xl border border-border bg-background px-3 font-mono text-sm uppercase outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
+              />
+              <button
+                type="submit"
+                disabled={complimentaryRedemption.isPending || !complimentaryCode.trim()}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+              >
+                {complimentaryRedemption.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Apply code
+              </button>
+            </div>
+          </form>
+        )}
+      {canManage &&
+        !subscription?.internal_test_access &&
+        subscription?.entitlement_source !== "complimentary_code" &&
+        subscription?.stripe_customer_id && (
+          <button
+            type="button"
+            disabled={manageBilling.isPending}
+            onClick={() => manageBilling.mutate()}
+            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-elevated px-4 text-sm font-semibold text-foreground hover:border-primary/40 disabled:opacity-50"
+          >
+            {manageBilling.isPending ? "Opening Stripe…" : "Manage payment method"}
+          </button>
+        )}
+      {canManage &&
+        !subscription?.internal_test_access &&
+        subscription?.entitlement_source !== "complimentary_code" &&
         !subscriptionReady &&
         checkoutConfirmation !== "confirming" && (
           <div className="mt-5">

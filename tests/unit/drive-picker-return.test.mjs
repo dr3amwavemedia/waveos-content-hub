@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { driveBrowserReturnUrl, prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safariOpenUrl } from "../../src/lib/drive-picker-return.ts";
+import { driveBrowserReturnUrl, driveMobilePickerResultPath, prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, requiresExternalSafariForDrive, safeDrivePickerReturnPath, safariOpenUrl } from "../../src/lib/drive-picker-return.ts";
 
 test("standalone wording recognizes installed iOS without classifying regular Safari as embedded", () => {
   assert.equal(isIosHomeScreen({ userAgent: "iPhone", standalone: true }, false), true);
@@ -8,6 +8,15 @@ test("standalone wording recognizes installed iOS without classifying regular Sa
   assert.equal(isIosHomeScreen({ userAgent: "Macintosh", platform: "MacIntel", maxTouchPoints: 5 }, true), true);
   assert.equal(isIosHomeScreen({ userAgent: "Macintosh", platform: "MacIntel", maxTouchPoints: 0 }, true), false);
   assert.equal(isIosHomeScreen({ userAgent: "Android" }, true), false);
+});
+
+test("iPhone embedded previews use Safari while regular Safari keeps the inline Picker", () => {
+  const safari = { userAgent: "Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1" };
+  const chatgpt = { userAgent: "Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 ChatGPT/1.2026.301" };
+  assert.equal(requiresExternalSafariForDrive(safari, false, false), false);
+  assert.equal(requiresExternalSafariForDrive(safari, false, true), true);
+  assert.equal(requiresExternalSafariForDrive(chatgpt, false, false), true);
+  assert.equal(requiresExternalSafariForDrive({ userAgent: "Android" }, false, true), false);
 });
 
 test("Safari handoff waits for the explicit save and uses its returned saved draft only", async () => {
@@ -53,4 +62,21 @@ test("return checkpoints cannot collide between workspaces or saved/new posts", 
   assert.notEqual(driveCheckpointKey("workspace-a", null), driveCheckpointKey("workspace-b", null));
   assert.notEqual(driveCheckpointKey("workspace-a", null), driveCheckpointKey("workspace-a", "post-1"));
   assert.notEqual(driveCheckpointKey("workspace-a", "post-1"), driveCheckpointKey("workspace-a", "post-2"));
+});
+
+test("mobile Picker return is restricted to one saved Create Post UUID", () => {
+  const id = "123e4567-e89b-42d3-a456-426614174000";
+  assert.equal(safeDrivePickerReturnPath(`/create?id=${id}`), `/create?id=${id}`);
+  assert.equal(
+    driveMobilePickerResultPath(`/create?id=${id}`, { mediaIds: [id] }),
+    `/create?id=${id}&drive_media=${id}`,
+  );
+  for (const path of [
+    "/settings?id=123e4567-e89b-42d3-a456-426614174000",
+    "/create?id=not-a-uuid",
+    `/create?id=${id}&next=https://evil.test`,
+    "https://evil.test/create?id=123e4567-e89b-42d3-a456-426614174000",
+  ]) {
+    assert.throws(() => safeDrivePickerReturnPath(path));
+  }
 });

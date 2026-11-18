@@ -2,7 +2,7 @@ import { RequireFeature } from "@/components/app/require-feature";
 import { Button } from "@/components/ui/button";
 import { DriveAuthorizedBrowser } from "@/components/media/drive-authorized-browser";
 import { studioPostKey,studioReturnedMedia,type StudioPostSnapshot } from "@/lib/studio-post-handoff";
-import { prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, safariOpenUrl } from "@/lib/drive-picker-return";
+import { prepareDriveBrowserReturn, driveCheckpointKey, drivePickerOutcome, isIosHomeScreen, requiresExternalSafariForDrive, safariOpenUrl } from "@/lib/drive-picker-return";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -57,6 +57,7 @@ import {
   getGooglePickerToken,
   importExternalMedia,
   listExternalMedia,
+  startGoogleDriveMobilePicker,
   startExternalMediaConnection,
   type ExternalMediaProvider,
   type ExternalProviderFile,
@@ -102,12 +103,18 @@ export const Route = createFileRoute("/_authenticated/create")({
   ),
   validateSearch: (
     s: Record<string, unknown>,
-  ): { id?: string; media?: string; studio?:string; destination?: "feed" | "story"; brief?: string; briefWorkspace?: string } => ({
+  ): { id?: string; media?: string; driveMedia?: string; driveError?: string; studio?:string; destination?: "feed" | "story"; brief?: string; briefWorkspace?: string } => ({
     ...(typeof s.studio === "string" ? {studio:s.studio}:{}),
     ...(typeof s.brief === "string" && s.brief.length <= 6000 ? { brief: s.brief } : {}),
     ...(typeof s.briefWorkspace === "string" ? { briefWorkspace: s.briefWorkspace } : {}),
     ...(typeof s.id === "string" ? { id: s.id } : {}),
     ...(typeof s.media === "string" ? { media: s.media } : {}),
+    ...(typeof s.drive_media === "string" && s.drive_media.length <= 800
+      ? { driveMedia: s.drive_media }
+      : {}),
+    ...(typeof s.drive_error === "string" && s.drive_error.length <= 80
+      ? { driveError: s.drive_error }
+      : {}),
     ...(s.destination === "feed" || s.destination === "story"
       ? { destination: s.destination }
       : {}),
@@ -167,7 +174,8 @@ function CreatePost() {
   const [showLibrary, setShowLibrary] = useState(false);
   const restoredStudio=useRef<string|null>(null);
   const restoredDrive = useRef<string | null>(null);
-  const [driveReturnNotice, setDriveReturnNotice] = useState(false);
+  const [driveReturnNotice, setDriveReturnNotice] = useState<string | null>(null);
+  const restoredMobileDrive = useRef<string | null>(null);
 
   useEffect(() => {
     if (
@@ -369,9 +377,33 @@ function CreatePost() {
       setDraftPlatformOptions(snapshot.platformOptions);
       restoredDrive.current = key;
       sessionStorage.removeItem(key);
-      setDriveReturnNotice(true);
-    } catch { setDriveReturnNotice(true); }
+      setDriveReturnNotice("Your post was restored after leaving Google Drive. No files were added by that return.");
+    } catch { setDriveReturnNotice("Your post was restored after leaving Google Drive. No files were added by that return."); }
   }, [workspaceId, editingId, existing.data?.item?.id, search.studio]);
+  useEffect(() => {
+    if (!editingId || !existing.data?.item || (!search.driveMedia && !search.driveError)) return;
+    const key = `${editingId}:${search.driveMedia ?? ""}:${search.driveError ?? ""}`;
+    if (restoredMobileDrive.current === key) return;
+    restoredMobileDrive.current = key;
+    if (search.driveMedia) {
+      const ids = search.driveMedia
+        .split(",")
+        .filter((id) => /^[0-9a-f-]{36}$/i.test(id))
+        .slice(0, 20);
+      setPickedMedia((current) => [...new Set([...current, ...ids])]);
+      setDriveReturnNotice(
+        ids.length
+          ? `${ids.length} Google Drive item${ids.length === 1 ? " was" : "s were"} added to this saved draft. Review and save when ready.`
+          : "Google Drive returned without a supported file.",
+      );
+    } else {
+      setDriveReturnNotice(
+        search.driveError === "google_account_mismatch"
+          ? "Google Drive used a different account than the one connected to this workspace. No files were added."
+          : "Google Drive closed without adding files. Your saved draft is unchanged.",
+      );
+    }
+  }, [editingId, existing.data?.item, search.driveError, search.driveMedia]);
   useEffect(() => {
     if (!search.studio || !workspaceId || restoredStudio.current === search.studio) return;
 
@@ -1185,7 +1217,7 @@ function CreatePost() {
           }}
         />
       )}
-      {driveReturnNotice && <div role="status" className="border border-border bg-elevated p-3 text-sm text-foreground">Your post was restored after leaving Google Drive. No files were added by that return. <Button variant="outline" onClick={() => { setDriveReturnNotice(false); setShowLibrary(true); }}>Choose media again</Button></div>}
+      {driveReturnNotice && <div role="status" className="border border-border bg-elevated p-3 text-sm text-foreground">{driveReturnNotice} <Button variant="outline" onClick={() => { setDriveReturnNotice(null); setShowLibrary(true); }}>Choose media again</Button></div>}
     </div>
   );
 }
@@ -1985,15 +2017,24 @@ export function MediaPicker({
               {deviceUploading ? "Adding…" : "Camera roll / Photos"}
             </button>
           </div>
-          <div className="mb-3 rounded-lg border border-border bg-elevated/50 px-3 py-2 text-[11px] text-muted-foreground">
-            Temporary media: {formatFileSize(storageUsage.data?.usedBytes ?? 0)} of 500 MB used ·{" "}
-            {formatFileSize(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available.
-            Published camera-roll media is removed after every destination confirms the post.
-          </div>
-          <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
-            Have Google Drive or Dropbox? Choose that source to browse your existing files without first saving them to your phone.
-            Camera roll and device uploads use WaveOS's limited temporary storage (currently 500 MB per workspace).
-          </p>
+          {source === "waveos" && (
+            <div className="mb-3 rounded-lg border border-border bg-elevated/50 px-3 py-2 text-[11px] text-muted-foreground">
+              <span className="sm:hidden">
+                Temporary storage: {formatFileSize(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available.
+              </span>
+              <span className="hidden sm:inline">
+                Temporary media: {formatFileSize(storageUsage.data?.usedBytes ?? 0)} of 500 MB used ·{" "}
+                {formatFileSize(storageUsage.data?.remainingBytes ?? 500 * 1024 * 1024)} available.
+                Published camera-roll media is removed after every destination confirms the post.
+              </span>
+            </div>
+          )}
+          {source === "waveos" && (
+            <p className="mb-3 hidden text-xs leading-relaxed text-muted-foreground sm:block">
+              Choose Google Drive or Dropbox to use existing files without saving them to your device.
+              Camera roll and device uploads use WaveOS temporary storage.
+            </p>
+          )}
           {(assets.data ?? []).filter((asset) => selected.includes(asset.id) && preflightMediaAsset({ name: asset.name, mimeType: asset.mime_type, sizeBytes: asset.size_bytes, sourceProvider: asset.source_provider }).status === "warning").length > 0 && (
             <div role="status" className="mb-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-xs leading-relaxed text-foreground">
               <strong>Large video selected.</strong> Some social platforms and posting connections have file-size or encoding limits.
@@ -2002,12 +2043,14 @@ export function MediaPicker({
               An automatic quality-comparison and compression preview is planned, but is not available yet.
             </div>
           )}
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or tag"
-            className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm outline-none focus:border-primary/60"
-          />
+          {source !== "google_drive" && (
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or tag"
+              className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm outline-none focus:border-primary/60"
+            />
+          )}
         </div>
         <div className="p-4 sm:max-h-[60vh] sm:overflow-y-auto">
           {source === "frameio" ? (
@@ -2627,14 +2670,22 @@ function GoogleDrivePicker({
   const [openError, setOpenError] = useState<string | null>(null);
   const pickerRef = useRef<GooglePickerInstance | null>(null);
   const [isStandaloneIos, setStandaloneIos] = useState(false);
+  const [useSafariHandoff, setUseSafariHandoff] = useState(false);
   const [showSafariHelp, setShowSafariHelp] = useState(false);
   const [browserUrl, setBrowserUrl] = useState<string | null>(null);
   const [safariError, setSafariError] = useState<string | null>(null);
   const [savingBrowser, setSavingBrowser] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [authorizedBrowser, setAuthorizedBrowser] = useState(false);
+  const [mobileStarting, setMobileStarting] = useState(false);
   const attempt = useRef(0);
-  useEffect(() => { setStandaloneIos(isIosHomeScreen(window.navigator, window.matchMedia("(display-mode: standalone)").matches)); }, []);
+  useEffect(() => {
+    const standalone = window.matchMedia("(display-mode: standalone)").matches;
+    setStandaloneIos(isIosHomeScreen(window.navigator, standalone));
+    setUseSafariHandoff(
+      requiresExternalSafariForDrive(window.navigator, standalone, window.self !== window.top),
+    );
+  }, []);
 
   function closePicker() {
     attempt.current += 1;
@@ -2786,10 +2837,33 @@ function GoogleDrivePicker({
     }
   }
 
+  async function openMobilePicker() {
+    if (!driveReturn || mobileStarting) return;
+    const browserTab = useSafariHandoff ? null : window.open("about:blank", "_blank");
+    setMobileStarting(true);
+    setOpenError(null);
+    try {
+      const savedUrl = new URL(await driveReturn.prepareBrowser(selected));
+      const result = await startGoogleDriveMobilePicker(
+        workspaceId,
+        `${savedUrl.pathname}${savedUrl.search}`,
+      );
+      if (useSafariHandoff) window.location.assign(safariOpenUrl(result.url));
+      else if (browserTab) browserTab.location.replace(result.url);
+      else window.location.assign(result.url);
+    } catch (reason) {
+      browserTab?.close();
+      setOpenError(
+        reason instanceof Error ? reason.message : "Google Drive could not open in Safari.",
+      );
+      setMobileStarting(false);
+    }
+  }
+
   if (authorizedBrowser) return <DriveAuthorizedBrowser workspaceId={workspaceId} selected={selected} onImported={onImported} onBack={() => setAuthorizedBrowser(false)} />;
 
   return (
-    <div className="flex min-w-0 flex-col items-center justify-center gap-3 py-6 text-center sm:py-14 [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:h-auto [&_button]:min-h-10">
+    <div className="flex min-w-0 flex-col items-center justify-center gap-3 py-4 text-center sm:py-14 [&_button]:h-auto [&_button]:min-h-10 [&_button]:max-w-full [&_button]:whitespace-normal">
       {pickerOpen &&
         createPortal(
           <Button
@@ -2804,8 +2878,8 @@ function GoogleDrivePicker({
           </Button>,
           document.body,
         )}
-      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-        <Cloud className="h-6 w-6" />
+      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary sm:h-12 sm:w-12 sm:rounded-2xl">
+        <Cloud className="h-5 w-5 sm:h-6 sm:w-6" />
       </div>
       <div>
         <p className="font-semibold text-foreground">
@@ -2815,20 +2889,28 @@ function GoogleDrivePicker({
               ? "Google Drive is open"
               : openError
                 ? "Google Drive could not open"
-                : "Choose files from Google Drive"}
+                : "Google Drive"}
         </p>
-        <p className="mt-1 max-w-md text-xs text-muted-foreground">
-          Browse My Drive, folders shared with you and Shared drives without leaving WaveOS. WaveOS
-          only receives the JPG, PNG, MP4 or MOV files you select.
+        <p className="mt-1 max-w-md text-xs text-muted-foreground sm:hidden">
+          {useSafariHandoff ? "Google sign-in needs Safari. Your draft stays saved." : "Choose photos or videos from Drive."}
+        </p>
+        <p className="mt-1 hidden max-w-md text-xs text-muted-foreground sm:block">
+          Browse My Drive, shared folders and Shared drives. WaveOS only receives the photos or videos you select.
         </p>
         {openError && <p role="alert" className="mt-2 max-w-md text-xs text-destructive">{openError}</p>}
         {notice && <p role="status" className="mt-2 max-w-md text-xs text-muted-foreground">{notice}</p>}
       </div>
-      {!pickerOpen && !opening && !isStandaloneIos && !showSafariHelp && <Button variant="outline" onClick={() => setShowSafariHelp(true)}>Continue in Safari <ExternalLink className="size-4" /></Button>}
-      {(isStandaloneIos || showSafariHelp) && !pickerOpen && !opening && (
+      {useSafariHandoff && !pickerOpen && !opening && (
+        <Button disabled={!driveReturn || mobileStarting} onClick={() => void openMobilePicker()}>
+          {mobileStarting ? <Loader2 className="animate-spin" /> : <ExternalLink className="size-4" />}
+          {mobileStarting ? "Opening Safari…" : "Continue in Safari"}
+        </Button>
+      )}
+      {showSafariHelp && !useSafariHandoff && !pickerOpen && !opening && (
         <div className="max-w-sm space-y-2 border-t border-border pt-3 text-left text-xs text-muted-foreground">
           <p className="font-semibold text-foreground">{isStandaloneIos ? "Continue from the Home Screen app in Safari" : "Continue in Safari"}</p>
-          <p>If Google shows an account or cookie error inside another app, exit Google Drive and open the same saved post in regular Safari. You may need to sign in to WaveOS there. After adding files, confirm your selection and save the draft in Safari, then reopen that saved draft in WaveOS.</p>
+          <p className="sm:hidden">Save this post, then continue in Safari.</p>
+          <p className="hidden sm:block">If this browser blocks Google, save the post and open the same draft in Safari. After choosing files, save the draft in Safari and reopen it in WaveOS.</p>
           {driveReturn && !browserUrl && <Button variant="outline" disabled={savingBrowser || opening || pickerOpen} onClick={async () => {
             setSavingBrowser(true);
             setSafariError(null);
@@ -2848,7 +2930,7 @@ function GoogleDrivePicker({
       )}
       {opening ? (
         <Loader2 className="h-5 w-5 animate-spin text-primary" />
-      ) : !pickerOpen ? (
+      ) : !pickerOpen && !useSafariHandoff ? (
         <Button
           type="button"
           onClick={openPicker}
@@ -2857,9 +2939,17 @@ function GoogleDrivePicker({
           {openError ? "Try Google Drive again" : "Browse Google Drive"}
         </Button>
       ) : null}
+      {!pickerOpen && !opening && !useSafariHandoff && !showSafariHelp && (
+        <Button variant="ghost" className="text-xs text-muted-foreground" onClick={() => setShowSafariHelp(true)}>
+          Open in Safari <ExternalLink className="size-3.5" />
+        </Button>
+      )}
       {!opening && !pickerOpen && <>
-        <Button variant="outline" onClick={() => setAuthorizedBrowser(true)}>Browse previously authorized files</Button>
-        <p className="max-w-md text-xs text-muted-foreground">If Google shows an account or cookie error, exit Google Drive and try previously authorized files. This cannot allow access to new files.</p>
+        <Button variant="outline" onClick={() => setAuthorizedBrowser(true)}>
+          <span className="sm:hidden">Previously authorized</span>
+          <span className="hidden sm:inline">Browse previously authorized files</span>
+        </Button>
+        <p className="hidden max-w-md text-xs text-muted-foreground sm:block">Use this only when Google cannot open. It cannot grant access to new files.</p>
       </>}
     </div>
   );

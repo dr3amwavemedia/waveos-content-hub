@@ -38,6 +38,7 @@ export type FrameioProviderFile = {
   width: number | null;
   height: number | null;
   durationSeconds: number | null;
+  folderPath: string[];
 };
 
 export const getFrameioWorkspaceStatus = (workspaceId: string) =>
