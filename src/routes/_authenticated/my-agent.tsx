@@ -337,6 +337,7 @@ function MyAgentPage() {
   const [toolBusy, setToolBusy] = useState(false);
   const [toolError, setToolError] = useState<string | null>(null);
   const [performance, setPerformance] = useState<AgentPerformanceSnapshot | null>(null);
+  const [performanceAnchorMessageId, setPerformanceAnchorMessageId] = useState<string | null>(null);
   const [campaignReview, setCampaignReview] = useState<AgentCampaignReview | null>(null);
   const [performanceFocus, setPerformanceFocus] = useState<string | null>(null);
   const [campaignStep, setCampaignStep] = useState(0);
@@ -471,9 +472,9 @@ function MyAgentPage() {
   );
 
   function addUserMessage(content: string, inputMode: AgentMessage["inputMode"] = "text") {
-    setMessages((current) =>
-      [...current, newAgentMessage("user", content, inputMode)].slice(-MAX_VISIBLE_MESSAGES),
-    );
+    const message = newAgentMessage("user", content, inputMode);
+    setMessages((current) => [...current, message].slice(-MAX_VISIBLE_MESSAGES));
+    return message;
   }
 
   function startCampaignBuilder(prompt?: string) {
@@ -724,7 +725,8 @@ function MyAgentPage() {
 
   async function openPerformanceSnapshot(prompt?: string) {
     if (!workspaceId || toolBusy) return;
-    if (prompt) addUserMessage(prompt);
+    const requestMessage = prompt ? addUserMessage(prompt) : messages.at(-1);
+    setPerformanceAnchorMessageId(requestMessage?.id ?? null);
     setDraft("");
     setToolError(null);
     setActiveTool("performance");
@@ -1000,7 +1002,17 @@ function MyAgentPage() {
                         ? "shares"
                         : metric,
       );
-      addUserMessage(input);
+      const focusLabel = metricFocus[1].replace(/s$/, "");
+      setMessages((current) =>
+        [
+          ...current,
+          newAgentMessage("user", input, speakReply ? "voice" : "text"),
+          newAgentMessage(
+            "assistant",
+            `Absolutely—I narrowed the snapshot to ${focusLabel}. Ask me what changed, why it matters, or what to try next.`,
+          ),
+        ].slice(-MAX_VISIBLE_MESSAGES),
+      );
       setDraft("");
       return;
     }
@@ -1159,6 +1171,93 @@ function MyAgentPage() {
     recognition.start();
   }
 
+  function PerformanceSnapshotPanel() {
+    return (
+      <section className="mr-auto w-full max-w-xl rounded-2xl border border-cyan-300/20 bg-cyan-300/[.05] p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
+          <BarChart3 className="h-4 w-4" /> Performance Snapshot
+        </div>
+        {toolBusy ? (
+          <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
+            <Loader2 className="h-4 w-4 animate-spin" /> Loading connected analytics…
+          </div>
+        ) : performance?.metrics.length ? (
+          <>
+            <p className="mt-1 text-[11px] text-slate-400">
+              {performance.rangeStart} to {performance.rangeEnd} · as of {performance.asOf}
+            </p>
+            <p className="mt-1 flex items-center gap-1 text-[10px] text-cyan-200/70">
+              <Cloud className="h-3 w-3" /> Combined connected sources
+              {performance.capturedAt
+                ? ` · synced ${new Date(performance.capturedAt).toLocaleString()}`
+                : ""}
+            </p>
+            {performanceFocus && (
+              <button
+                type="button"
+                className="mt-2 text-xs text-cyan-200 underline"
+                onClick={() => setPerformanceFocus(null)}
+              >
+                Show all available metrics
+              </button>
+            )}
+            {performanceFocus &&
+              !performance.metrics.some((metric) => metric.key === performanceFocus) && (
+                <p className="mt-2 text-sm text-slate-400">
+                  This metric is not available in the current connected snapshot. No estimate is
+                  being substituted.
+                </p>
+              )}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {performance.metrics
+                .filter((metric) => !performanceFocus || metric.key === performanceFocus)
+                .map((metric) => (
+                  <div
+                    key={metric.key}
+                    className="rounded-xl border border-cyan-200/10 bg-black/10 p-3"
+                  >
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                      {metric.label}
+                    </p>
+                    <p className="mt-1 text-xl font-semibold">
+                      {Intl.NumberFormat().format(metric.value)}
+                    </p>
+                    <p className="mt-1 truncate text-[9px] capitalize text-cyan-200/60">
+                      {metric.coverage} coverage · {metric.sourceReference}
+                    </p>
+                    <p
+                      className={cn(
+                        "mt-1 text-[11px]",
+                        metric.changePercent === null
+                          ? "text-slate-500"
+                          : metric.changePercent >= 0
+                            ? "text-slate-300"
+                            : "text-rose-300",
+                      )}
+                    >
+                      {metric.changePercent === null
+                        ? "No equal prior period"
+                        : `${metric.changePercent >= 0 ? "+" : ""}${metric.changePercent.toFixed(1)}% vs prior period (${Intl.NumberFormat().format(metric.previousValue ?? 0)} → ${Intl.NumberFormat().format(metric.value)})`}
+                    </p>
+                  </div>
+                ))}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Button variant="outline" onClick={() => void navigate({ to: "/analytics" })}>
+                Open Analytics
+              </Button>
+              <Button onClick={() => startCampaignBuilder()}>Build a campaign</Button>
+            </div>
+          </>
+        ) : (
+          <p className="mt-4 text-sm text-slate-400">
+            {performance?.message ?? toolError ?? "No performance data is available yet."}
+          </p>
+        )}
+      </section>
+    );
+  }
+
   const latestAnswer = [...messages]
     .reverse()
     .find((message) => message.role === "assistant")?.content;
@@ -1223,6 +1322,7 @@ function MyAgentPage() {
               setError(null);
               setActiveTool(null);
               setPerformance(null);
+              setPerformanceAnchorMessageId(null);
               setCampaignReview(null);
               setToolError(null);
               setCampaignSaved(null);
@@ -1303,27 +1403,31 @@ function MyAgentPage() {
         ) : (
           <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-end gap-4">
             {messages.map((message) => (
-              <article
-                key={message.id}
-                className={cn(
-                  "max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6",
-                  message.role === "assistant"
-                    ? "mr-auto border border-cyan-200/10 bg-cyan-200/[.06] text-slate-200"
-                    : "ml-auto bg-violet-400/15 text-violet-50",
+              <div key={message.id} className="contents">
+                <article
+                  className={cn(
+                    "max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6",
+                    message.role === "assistant"
+                      ? "mr-auto border border-cyan-200/10 bg-cyan-200/[.06] text-slate-200"
+                      : "ml-auto bg-violet-400/15 text-violet-50",
+                  )}
+                >
+                  {message.role === "assistant" && (
+                    <span className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.15em] text-cyan-200/70">
+                      <Sparkles className="h-3 w-3" /> My Agent
+                    </span>
+                  )}
+                  <AgentMessageContent content={message.content} />
+                  {message.inputMode === "voice" && (
+                    <span className="mt-1 block text-[9px] uppercase tracking-wide text-slate-500">
+                      Voice turn
+                    </span>
+                  )}
+                </article>
+                {activeTool === "performance" && performanceAnchorMessageId === message.id && (
+                  <PerformanceSnapshotPanel />
                 )}
-              >
-                {message.role === "assistant" && (
-                  <span className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.15em] text-cyan-200/70">
-                    <Sparkles className="h-3 w-3" /> My Agent
-                  </span>
-                )}
-                <AgentMessageContent content={message.content} />
-                {message.inputMode === "voice" && (
-                  <span className="mt-1 block text-[9px] uppercase tracking-wide text-slate-500">
-                    Voice turn
-                  </span>
-                )}
-              </article>
+              </div>
             ))}
             {activeTool === "campaign_review" && campaignReview?.campaign && (
               <section className="mr-auto w-full max-w-xl rounded-2xl border border-cyan-300/20 bg-cyan-300/[.05] p-4">
@@ -1603,90 +1707,6 @@ function MyAgentPage() {
                   </div>
                 )}
                 {toolError && <p className="mt-3 text-xs text-amber-200">{toolError}</p>}
-              </section>
-            )}
-            {activeTool === "performance" && (
-              <section className="mr-auto w-full max-w-xl rounded-2xl border border-cyan-300/20 bg-cyan-300/[.05] p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
-                  <BarChart3 className="h-4 w-4" /> Performance Snapshot
-                </div>
-                {toolBusy ? (
-                  <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Loading connected analytics…
-                  </div>
-                ) : performance?.metrics.length ? (
-                  <>
-                    <p className="mt-1 text-[11px] text-slate-400">
-                      {performance.rangeStart} to {performance.rangeEnd} · as of {performance.asOf}
-                    </p>
-                    <p className="mt-1 flex items-center gap-1 text-[10px] text-cyan-200/70">
-                      <Cloud className="h-3 w-3" /> Combined connected sources
-                      {performance.capturedAt
-                        ? ` · synced ${new Date(performance.capturedAt).toLocaleString()}`
-                        : ""}
-                    </p>
-                    {performanceFocus && (
-                      <button
-                        type="button"
-                        className="mt-2 text-xs text-cyan-200 underline"
-                        onClick={() => setPerformanceFocus(null)}
-                      >
-                        Show all available metrics
-                      </button>
-                    )}
-                    {performanceFocus &&
-                      !performance.metrics.some((metric) => metric.key === performanceFocus) && (
-                        <p className="mt-2 text-sm text-slate-400">
-                          This metric is not available in the current connected snapshot. No
-                          estimate is being substituted.
-                        </p>
-                      )}
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      {performance.metrics
-                        .filter((metric) => !performanceFocus || metric.key === performanceFocus)
-                        .map((metric) => (
-                          <div
-                            key={metric.key}
-                            className="rounded-xl border border-cyan-200/10 bg-black/10 p-3"
-                          >
-                            <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                              {metric.label}
-                            </p>
-                            <p className="mt-1 text-xl font-semibold">
-                              {Intl.NumberFormat().format(metric.value)}
-                            </p>
-                            <p className="mt-1 truncate text-[9px] capitalize text-cyan-200/60">
-                              {metric.coverage} coverage · {metric.sourceReference}
-                            </p>
-                            <p
-                              className={cn(
-                                "mt-1 text-[11px]",
-                                metric.changePercent === null
-                                  ? "text-slate-500"
-                                  : metric.changePercent >= 0
-                                    ? "text-slate-300"
-                                    : "text-rose-300",
-                              )}
-                            >
-                              {metric.changePercent === null
-                                ? "No equal prior period"
-                                : `${metric.changePercent >= 0 ? "+" : ""}${metric.changePercent.toFixed(1)}% vs prior period (${Intl.NumberFormat().format(metric.previousValue ?? 0)} → ${Intl.NumberFormat().format(metric.value)})`}
-                            </p>
-                          </div>
-                        ))}
-                    </div>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button variant="outline" onClick={() => void navigate({ to: "/analytics" })}>
-                        Open Analytics
-                      </Button>
-                      <Button onClick={() => startCampaignBuilder()}>Build a campaign</Button>
-                    </div>
-                  </>
-                ) : (
-                  <p className="mt-4 text-sm text-slate-400">
-                    {performance?.message ?? toolError ?? "No performance data is available yet."}
-                  </p>
-                )}
               </section>
             )}
             {activeTool === "post" && (

@@ -27,3 +27,11 @@ test("the shared AI indicator is an accessible circular surfer animation", () =>
   assert.match(indicator, /🏄/);
   assert.match(indicator, /motion-safe:animate-spin/);
 });
+
+test("My Agent continues a natural conversation without internal report labels", () => {
+  assert.match(assist, /one ongoing conversation/);
+  assert.match(assist, /Do not repeat the full performance snapshot/);
+  assert.match(assist, /Never begin with \"Context\"/);
+  assert.match(assist, /cleanAdvisorReply/);
+  assert.match(assist, /data\.mode === \"advisor\" \? cleanAdvisorReply\(out\) : out/);
+});
