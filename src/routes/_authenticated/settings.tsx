@@ -55,6 +55,7 @@ import {
   createSocialSubscriptionCheckout,
   getSocialSubscription,
   redeemComplimentaryAccessCode,
+  updateSocialSubscriptionCancellation,
 } from "@/lib/social-subscriptions.functions";
 import { publicSubscriptionActive, usePermissions } from "@/hooks/use-permissions";
 import { subscriptionDisplayState } from "@/lib/subscription-display";
@@ -397,6 +398,7 @@ function SocialPlanSettings({
 }) {
   const [annualBilling, setAnnualBilling] = useState(false);
   const [complimentaryCode, setComplimentaryCode] = useState("");
+  const [showCancellationConfirmation, setShowCancellationConfirmation] = useState(false);
   const [checkoutConfirmation, setCheckoutConfirmation] = useState<
     "idle" | "confirming" | "confirmed" | "error"
   >(() => {
@@ -412,6 +414,7 @@ function SocialPlanSettings({
   const confirmCheckout = useServerFn(confirmSocialSubscriptionCheckout);
   const billingPortal = useServerFn(createSocialBillingPortal);
   const redeemCode = useServerFn(redeemComplimentaryAccessCode);
+  const updateCancellation = useServerFn(updateSocialSubscriptionCancellation);
   const query = useQuery({
     queryKey: ["social-subscription", workspaceId],
     queryFn: () => getPlan({ data: { workspaceId } }),
@@ -466,6 +469,24 @@ function SocialPlanSettings({
     onSuccess: (result) => window.location.assign(result.url),
     onError: (error) =>
       toast.error(error instanceof Error ? error.message : "Could not open billing settings."),
+  });
+  const cancellation = useMutation({
+    mutationFn: (cancelAtPeriodEnd: boolean) =>
+      updateCancellation({ data: { workspaceId, cancelAtPeriodEnd } }),
+    onSuccess: async (result) => {
+      setShowCancellationConfirmation(false);
+      await Promise.all([
+        query.refetch(),
+        qc.invalidateQueries({ queryKey: ["workspace-social-subscription-access", workspaceId] }),
+      ]);
+      toast.success(
+        result.cancelAtPeriodEnd
+          ? "Cancellation is scheduled in Stripe. Access continues through the paid period."
+          : "Stripe will keep this subscription active.",
+      );
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Could not update the subscription."),
   });
   const complimentaryRedemption = useMutation({
     mutationFn: () => redeemCode({ data: { workspaceId, code: complimentaryCode } }),
@@ -648,15 +669,69 @@ function SocialPlanSettings({
         !subscription?.internal_test_access &&
         subscription?.entitlement_source !== "complimentary_code" &&
         subscription?.stripe_customer_id && (
-          <button
-            type="button"
-            disabled={manageBilling.isPending}
-            onClick={() => manageBilling.mutate()}
-            className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-elevated px-4 text-sm font-semibold text-foreground hover:border-primary/40 disabled:opacity-50"
-          >
-            {manageBilling.isPending ? "Opening Stripe…" : "Manage payment method"}
-          </button>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={manageBilling.isPending}
+              onClick={() => manageBilling.mutate()}
+              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-elevated px-4 text-sm font-semibold text-foreground hover:border-primary/40 disabled:opacity-50"
+            >
+              {manageBilling.isPending ? "Opening Stripe…" : "Manage payment method in Stripe"}
+            </button>
+            {subscriptionReady &&
+              (subscription.cancel_at_period_end ? (
+                <button
+                  type="button"
+                  disabled={cancellation.isPending}
+                  onClick={() => cancellation.mutate(false)}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-200 hover:border-emerald-300/60 disabled:opacity-50"
+                >
+                  {cancellation.isPending ? "Updating Stripe…" : "Keep subscription active"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={cancellation.isPending}
+                  onClick={() => setShowCancellationConfirmation(true)}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 text-sm font-semibold text-rose-200 hover:border-rose-300/60 disabled:opacity-50"
+                >
+                  Cancel at period end
+                </button>
+              ))}
+          </div>
         )}
+      {showCancellationConfirmation && subscriptionReady && !subscription?.cancel_at_period_end && (
+        <div className="mt-3 rounded-xl border border-rose-400/30 bg-rose-500/10 p-4 text-sm text-foreground">
+          <strong>Schedule this cancellation in Stripe?</strong>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            WaveOS access continues through{" "}
+            {subscription.current_period_end
+              ? new Date(subscription.current_period_end).toLocaleDateString()
+              : "the end of the current paid period"}
+            . This does not issue a refund or delete workspace data, and you can undo it before the
+            period ends.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={cancellation.isPending}
+              onClick={() => setShowCancellationConfirmation(false)}
+              className="min-h-10 rounded-lg border border-border bg-background px-3 text-xs font-semibold text-foreground disabled:opacity-50"
+            >
+              Keep subscription
+            </button>
+            <button
+              type="button"
+              disabled={cancellation.isPending}
+              onClick={() => cancellation.mutate(true)}
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-rose-500 px-3 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              {cancellation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Schedule cancellation
+            </button>
+          </div>
+        </div>
+      )}
       {canManage &&
         !subscription?.internal_test_access &&
         subscription?.entitlement_source !== "complimentary_code" &&

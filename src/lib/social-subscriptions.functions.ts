@@ -515,3 +515,96 @@ export const createSocialBillingPortal = createServerFn({ method: "POST" })
     if (!portal.url) throw new Error("Stripe did not return a billing portal link.");
     return { url: portal.url };
   });
+
+type StripeSubscriptionUpdate = {
+  id: string;
+  customer?: string | null;
+  status?: string;
+  current_period_end?: number;
+  trial_start?: number;
+  trial_end?: number;
+  cancel_at_period_end?: boolean;
+  metadata?: Record<string, string>;
+  livemode?: boolean;
+};
+
+/**
+ * Schedule or undo a public WaveOS subscription cancellation in Stripe first.
+ * The returned Stripe subscription is then applied through the same
+ * authoritative reconciliation path used by subscription webhooks.
+ */
+export const updateSocialSubscriptionCancellation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((data: { workspaceId: string; cancelAtPeriodEnd: boolean }) => data)
+  .handler(async ({ data, context }) => {
+    await requireWorkspaceAdmin(context.supabase, context.userId, data.workspaceId);
+    await requirePublicOsWorkspace(data.workspaceId);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const result = await supabaseAdmin
+      .from("workspace_social_subscriptions" as never)
+      .select(
+        "stripe_subscription_id,stripe_customer_id,status,internal_test_access,entitlement_source",
+      )
+      .eq("workspace_id", data.workspaceId)
+      .maybeSingle();
+    if (result.error) throw result.error;
+    const subscription = result.data as {
+      stripe_subscription_id?: string | null;
+      stripe_customer_id?: string | null;
+      status?: string;
+      internal_test_access?: boolean;
+      entitlement_source?: string;
+    } | null;
+
+    if (subscription?.internal_test_access)
+      throw new Error("Internal test access does not have a Stripe subscription.");
+    if (subscription?.entitlement_source === "complimentary_code")
+      throw new Error("Complimentary access does not have a Stripe subscription.");
+    if (!subscription?.stripe_subscription_id || !subscription.stripe_customer_id)
+      throw new Error("No Stripe subscription is connected yet.");
+    if (!["active", "trialing", "past_due"].includes(subscription.status ?? ""))
+      throw new Error("This subscription cannot be changed in its current state.");
+
+    const { stripeModeMatches, stripeRequest } = await import("@/lib/stripe.server");
+    const stripePath = `/subscriptions/${encodeURIComponent(subscription.stripe_subscription_id)}`;
+    const current = await stripeRequest<StripeSubscriptionUpdate>(stripePath, { method: "GET" });
+    const currentCustomerId = typeof current.customer === "string" ? current.customer : null;
+    if (
+      current.id !== subscription.stripe_subscription_id ||
+      currentCustomerId !== subscription.stripe_customer_id ||
+      !stripeModeMatches(current.livemode) ||
+      current.metadata?.workspace_id !== data.workspaceId
+    ) {
+      throw new Error(
+        "WaveOS could not safely match this Stripe subscription. Contact support before trying again.",
+      );
+    }
+    const updated = await stripeRequest<StripeSubscriptionUpdate>(stripePath, {
+      body: { cancel_at_period_end: data.cancelAtPeriodEnd },
+    });
+    const customerId = typeof updated.customer === "string" ? updated.customer : null;
+    if (
+      updated.id !== subscription.stripe_subscription_id ||
+      customerId !== subscription.stripe_customer_id ||
+      !stripeModeMatches(updated.livemode) ||
+      updated.metadata?.workspace_id !== data.workspaceId
+    ) {
+      throw new Error(
+        "Stripe updated a subscription that WaveOS could not safely match. Contact support before trying again.",
+      );
+    }
+
+    const { applySocialSubscriptionEvent } =
+      await import("@/lib/social-subscription-webhook.server");
+    const applied = await applySocialSubscriptionEvent(
+      "customer.subscription.updated",
+      updated as unknown as Record<string, unknown>,
+    );
+    if (!applied) {
+      throw new Error(
+        "Stripe updated the subscription, but WaveOS has not refreshed yet. Refresh shortly; do not repeat the change.",
+      );
+    }
+    return { cancelAtPeriodEnd: updated.cancel_at_period_end === true };
+  });
