@@ -3,6 +3,10 @@ import { z } from "zod";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
+  selectAgentAnalyticsObservations,
+  type AgentAnalyticsObservation,
+} from "@/lib/my-agent-analytics";
+import {
   buildCampaignPlan,
   validateCampaignPlanningInput,
   type CampaignGoal,
@@ -87,7 +91,7 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
     const { data: rows, error } = await (context.supabase as any)
       .from("social_intelligence_snapshots")
       .select(
-        "metric_key,value,unit,range_start,range_end,availability,provider,source_reference,calculation_version",
+        "metric_key,value,unit,range_start,range_end,availability,provider,source_reference,calculation_version,captured_at,evidence",
       )
       .eq("workspace_id", data.workspaceId)
       .in("availability", ["available", "true_zero"])
@@ -96,12 +100,9 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
       .limit(240);
     if (error) throw new Error("Performance history could not be loaded.");
 
-    const observations = (rows ?? []).filter(
-      (row: any) =>
-        typeof row.metric_key === "string" &&
-        typeof row.range_start === "string" &&
-        typeof row.range_end === "string" &&
-        Number.isFinite(Number(row.value)),
+    const observations = selectAgentAnalyticsObservations(
+      (rows ?? []) as AgentAnalyticsObservation[],
+      240,
     );
 
     if (!observations.length) {

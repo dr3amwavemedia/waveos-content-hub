@@ -8,6 +8,7 @@ const assist = fs.readFileSync("src/lib/wave-assist.functions.ts", "utf8");
 const authenticatedRoute = fs.readFileSync("src/routes/_authenticated/route.tsx", "utf8");
 const shell = fs.readFileSync("src/components/app/app-shell.tsx", "utf8");
 const socialAccess = fs.readFileSync("src/lib/zernio.server.ts", "utf8");
+const analyticsSelection = fs.readFileSync("src/lib/my-agent-analytics.ts", "utf8");
 
 test("My Agent launches interactive WaveOS tools from natural prompts", () => {
   assert.match(agent, /Campaign Builder/);
@@ -42,6 +43,16 @@ test("My Agent performance snapshot is sourced and local-date bounded", () => {
   assert.match(actions, /changePercent/);
   assert.match(assist, /advisorLocalDate/);
   assert.match(assist, /never describe an analytics range as ending after that date/);
+});
+
+test("My Agent prefers combined analytics and never repeats a metric", () => {
+  assert.match(actions, /captured_at,evidence/);
+  assert.match(actions, /selectAgentAnalyticsObservations/);
+  assert.match(assist, /selectAgentAnalyticsObservations/);
+  assert.match(analyticsSelection, /evidenceMode\(row\.evidence\) === "combined"/);
+  assert.match(analyticsSelection, /seenMetrics\.has\(row\.metric_key\)/);
+  assert.match(assist, /use the newest combined observation/);
+  assert.match(assist, /never repeat a metric/);
 });
 
 test("My Agent composer reserves space above mobile navigation", () => {
