@@ -9,6 +9,11 @@ const authenticatedRoute = fs.readFileSync("src/routes/_authenticated/route.tsx"
 const shell = fs.readFileSync("src/components/app/app-shell.tsx", "utf8");
 const socialAccess = fs.readFileSync("src/lib/zernio.server.ts", "utf8");
 const analyticsSelection = fs.readFileSync("src/lib/my-agent-analytics.ts", "utf8");
+const conversations = fs.readFileSync("src/lib/my-agent-conversations.functions.ts", "utf8");
+const conversationMigration = fs.readFileSync(
+  "supabase/migrations/20261118120000_my_agent_conversations.sql",
+  "utf8",
+);
 
 test("My Agent launches interactive WaveOS tools from natural prompts", () => {
   assert.match(agent, /Campaign Builder/);
@@ -76,6 +81,27 @@ test("My Agent post action saves a real WaveOS content draft", () => {
   assert.match(actions, /source: "my_agent"/);
   assert.match(actions, /can_create_content/);
   assert.match(actions, /status: "draft"/);
+  assert.match(actions, /media_asset_ids: uniqueMediaIds/);
+  assert.match(actions, /scheduled_at: data\.timing === "schedule"/);
+  assert.match(actions, /from\("post_variants"\)/);
+  assert.match(agent, /Drop a photo or video/);
+  assert.match(agent, /Which platforms should this use/);
+  assert.match(agent, /When should this post go out/);
+  assert.match(agent, /press the final Post or Schedule button in Create Post/);
+});
+
+test("My Agent keeps one private cloud conversation across text and voice", () => {
+  assert.match(agent, /getAgentConversation/);
+  assert.match(agent, /syncAgentConversation/);
+  assert.match(agent, /Synced across devices/);
+  assert.match(agent, /inputMode: "text" \| "voice"/);
+  assert.match(conversations, /my_agent_threads/);
+  assert.match(conversations, /my_agent_messages/);
+  assert.match(conversations, /can_use_ai_tools/);
+  assert.match(conversationMigration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(conversationMigration, /\(SELECT auth\.uid\(\)\) = user_id/);
+  assert.match(conversationMigration, /FOREIGN KEY \(thread_id, workspace_id, user_id\)/);
+  assert.doesNotMatch(conversationMigration, /TO anon/);
 });
 
 test("My Agent connects the remaining intelligence and workflow tools", () => {

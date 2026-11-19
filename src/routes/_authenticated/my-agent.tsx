@@ -7,6 +7,8 @@ import {
   BriefcaseBusiness,
   CheckCircle2,
   CalendarClock,
+  Cloud,
+  CloudOff,
   FileText,
   FolderOpen,
   Globe2,
@@ -40,29 +42,40 @@ import {
   getAgentCampaignReview,
   getAgentPerformanceSnapshot,
 } from "@/lib/my-agent-actions.functions";
+import {
+  getAgentConversation,
+  syncAgentConversation,
+} from "@/lib/my-agent-conversations.functions";
 import { campaignIntent } from "@/lib/my-agent-intent";
 import { discoverTrends } from "@/lib/trending-now.functions";
 import { researchCompetitor } from "@/lib/competitive-research.functions";
 import { analyzeSeoGrowth } from "@/lib/seo-growth.functions";
-import { useMediaAssets, useMediaFolders } from "@/hooks/use-media";
+import { useMediaAssets, useMediaFolders, useUploadAsset } from "@/hooks/use-media";
 import { cn } from "@/lib/utils";
 import { usePermissions } from "@/hooks/use-permissions";
+import { zonedDateTimeToIso } from "@/lib/date-time";
 
 type AgentMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   createdAt: number;
+  inputMode: "text" | "voice";
 };
 
 const MAX_VISIBLE_MESSAGES = 24;
 
-function newAgentMessage(role: AgentMessage["role"], content: string): AgentMessage {
+function newAgentMessage(
+  role: AgentMessage["role"],
+  content: string,
+  inputMode: AgentMessage["inputMode"] = "text",
+): AgentMessage {
   return {
     id: globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     role,
     content,
     createdAt: Date.now(),
+    inputMode,
   };
 }
 
@@ -86,6 +99,7 @@ function restoreAgentMessages(value: unknown): AgentMessage[] {
         typeof message.createdAt === "number" && Number.isFinite(message.createdAt)
           ? message.createdAt
           : baseTime + index,
+      inputMode: (message.inputMode === "voice" ? "voice" : "text") as AgentMessage["inputMode"],
     }))
     .sort((a, b) => a.createdAt - b.createdAt)
     .slice(-MAX_VISIBLE_MESSAGES);
@@ -95,6 +109,7 @@ type AgentPerformanceSnapshot = {
   asOf: string;
   rangeStart: string | null;
   rangeEnd: string | null;
+  capturedAt: string | null;
   metrics: Array<{
     key: string;
     label: string;
@@ -102,6 +117,8 @@ type AgentPerformanceSnapshot = {
     unit: string;
     previousValue: number | null;
     changePercent: number | null;
+    coverage: string;
+    sourceReference: string;
   }>;
   message: string | null;
 };
@@ -139,11 +156,17 @@ type AgentCampaignReview = {
   findings: string[];
 };
 
+type AgentPostPlatform = "instagram" | "facebook" | "linkedin" | "tiktok" | "youtube" | "x";
+
 type AgentPostDraft = {
   idea: string;
-  platform: "instagram" | "facebook" | "linkedin" | "tiktok" | "youtube" | "x";
-  placement: "feed" | "story";
+  platforms: AgentPostPlatform[];
+  placement: "feed" | "story" | "reel";
   caption: string;
+  variants: Array<{ platform: AgentPostPlatform; caption: string }>;
+  mediaAssetIds: string[];
+  timing: "now" | "schedule" | "later";
+  scheduledAt: string;
 };
 
 type AgentTrend = {
@@ -270,6 +293,8 @@ function MyAgentPage() {
   const permissions = usePermissions();
   const navigate = useNavigate();
   const assist = useServerFn(waveAssist);
+  const loadConversation = useServerFn(getAgentConversation);
+  const saveConversation = useServerFn(syncAgentConversation);
   const getPerformance = useServerFn(getAgentPerformanceSnapshot);
   const reviewCampaign = useServerFn(getAgentCampaignReview);
   const saveAgentCampaign = useServerFn(createAgentCampaign);
@@ -278,6 +303,7 @@ function MyAgentPage() {
   const researchBusiness = useServerFn(researchCompetitor);
   const runSeoAudit = useServerFn(analyzeSeoGrowth);
   const workspaceId = activeWorkspace?.id ?? null;
+  const workspaceTimeZone = activeWorkspace?.timezone ?? "UTC";
   const [campaignMediaFolderId, setCampaignMediaFolderId] = useState<string | null>(null);
   const [campaignMediaIds, setCampaignMediaIds] = useState<string[]>([]);
   const campaignFolders = useMediaFolders(workspaceId);
@@ -287,6 +313,8 @@ function MyAgentPage() {
   );
   const storageKey = workspaceId ? `waveos.assist.${workspaceId}` : null;
   const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const [threadId, setThreadId] = useState<string | null>(null);
+  const [historyState, setHistoryState] = useState<"loading" | "synced" | "local">("loading");
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -329,9 +357,13 @@ function MyAgentPage() {
   const [postStep, setPostStep] = useState(0);
   const [postDraft, setPostDraft] = useState<AgentPostDraft>({
     idea: "",
-    platform: "instagram",
+    platforms: ["instagram"],
     placement: "feed",
     caption: "",
+    variants: [],
+    mediaAssetIds: [],
+    timing: "later",
+    scheduledAt: "",
   });
   const [postSaved, setPostSaved] = useState<null | { id: string; title: string }>(null);
   const [trendQuery, setTrendQuery] = useState("");
@@ -343,6 +375,7 @@ function MyAgentPage() {
   const [seoReport, setSeoReport] = useState<AgentSeoReport | null>(null);
   const [showAgentMediaPicker, setShowAgentMediaPicker] = useState(false);
   const [agentPickedMedia, setAgentPickedMedia] = useState<string[]>([]);
+  const uploadAgentMedia = useUploadAsset(workspaceId);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const [loadedStorageKey, setLoadedStorageKey] = useState<string | null>(null);
@@ -350,24 +383,84 @@ function MyAgentPage() {
   useEffect(() => {
     if (!storageKey) {
       setMessages([]);
+      setThreadId(null);
+      setHistoryState("local");
       setLoadedStorageKey(null);
       return;
     }
-    try {
-      const stored = sessionStorage.getItem(storageKey);
-      setMessages(restoreAgentMessages(stored ? JSON.parse(stored) : []));
-    } catch {
-      setMessages([]);
-    }
-    setLoadedStorageKey(storageKey);
-  }, [storageKey]);
+    let cancelled = false;
+    setHistoryState("loading");
+    void loadConversation({ data: { workspaceId: workspaceId! } })
+      .then((result) => {
+        if (cancelled) return;
+        const cloudMessages = restoreAgentMessages(result.messages);
+        let localMessages: AgentMessage[] = [];
+        try {
+          const stored = sessionStorage.getItem(storageKey);
+          localMessages = restoreAgentMessages(stored ? JSON.parse(stored) : []);
+        } catch {
+          localMessages = [];
+        }
+        setMessages(cloudMessages.length ? cloudMessages : localMessages);
+        setThreadId(result.threadId ?? crypto.randomUUID());
+        setHistoryState(result.cloudAvailable ? "synced" : "local");
+        setLoadedStorageKey(storageKey);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        try {
+          const stored = sessionStorage.getItem(storageKey);
+          setMessages(restoreAgentMessages(stored ? JSON.parse(stored) : []));
+        } catch {
+          setMessages([]);
+        }
+        setThreadId(crypto.randomUUID());
+        setHistoryState("local");
+        setLoadedStorageKey(storageKey);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadConversation, storageKey, workspaceId]);
 
   useEffect(() => {
     if (storageKey && loadedStorageKey === storageKey) {
       sessionStorage.setItem(storageKey, JSON.stringify(messages.slice(-MAX_VISIBLE_MESSAGES)));
     }
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [loadedStorageKey, messages, storageKey]);
+    if (
+      !workspaceId ||
+      !threadId ||
+      !messages.length ||
+      loadedStorageKey !== storageKey ||
+      historyState !== "synced"
+    )
+      return;
+    const timer = window.setTimeout(() => {
+      const firstUserMessage = messages.find((message) => message.role === "user")?.content.trim();
+      void saveConversation({
+        data: {
+          workspaceId,
+          threadId,
+          title: (firstUserMessage || "New conversation").slice(0, 120),
+          messages: messages.slice(-MAX_VISIBLE_MESSAGES),
+        },
+      })
+        .then((result) => {
+          if (!result.cloudAvailable) setHistoryState("local");
+        })
+        .catch(() => setHistoryState("local"));
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [
+    historyState,
+    loadedStorageKey,
+    messages,
+    saveConversation,
+    storageKey,
+    threadId,
+    workspaceId,
+  ]);
 
   useEffect(
     () => () => {
@@ -377,9 +470,9 @@ function MyAgentPage() {
     [],
   );
 
-  function addUserMessage(content: string) {
+  function addUserMessage(content: string, inputMode: AgentMessage["inputMode"] = "text") {
     setMessages((current) =>
-      [...current, newAgentMessage("user", content)].slice(-MAX_VISIBLE_MESSAGES),
+      [...current, newAgentMessage("user", content, inputMode)].slice(-MAX_VISIBLE_MESSAGES),
     );
   }
 
@@ -401,7 +494,7 @@ function MyAgentPage() {
     setActiveTool("campaign");
   }
 
-  function startPostBuilder(prompt?: string) {
+  function startPostBuilder(prompt?: string, mediaAssetIds = agentPickedMedia) {
     if (prompt) addUserMessage(prompt);
     setDraft("");
     setToolError(null);
@@ -409,9 +502,13 @@ function MyAgentPage() {
     setPostStep(0);
     setPostDraft({
       idea: "",
-      platform: "instagram",
+      platforms: ["instagram"],
       placement: "feed",
       caption: "",
+      variants: [],
+      mediaAssetIds,
+      timing: "later",
+      scheduledAt: "",
     });
     setActiveTool("post");
   }
@@ -430,10 +527,11 @@ function MyAgentPage() {
     try {
       const result = await assist({
         data: {
-          mode: "caption",
+          mode: "caption_suite",
           input: postDraft.idea,
           workspaceId,
-          platform: postDraft.platform,
+          platforms: postDraft.platforms,
+          mediaAssetIds: postDraft.mediaAssetIds,
           conversation: messages.slice(-6).map((message) => ({ ...message, content: message.content.slice(0, 2000) })),
           context: JSON.stringify({
             workspace: activeWorkspace?.name ?? "WaveOS",
@@ -442,7 +540,18 @@ function MyAgentPage() {
           }),
         },
       });
-      setPostDraft((current) => ({ ...current, caption: result.suggestion }));
+      setPostDraft((current) => ({
+        ...current,
+        caption: result.primaryCaption ?? result.suggestion,
+        variants: result.variants
+          .filter((variant) =>
+            postDraft.platforms.includes(variant.platform as AgentPostPlatform),
+          )
+          .map((variant) => ({
+            platform: variant.platform as AgentPostPlatform,
+            caption: variant.caption,
+          })),
+      }));
       setPostStep(3);
     } catch (caught) {
       setToolError(caught instanceof Error ? caught.message : "Caption could not be generated.");
@@ -462,16 +571,54 @@ function MyAgentPage() {
           localDate: localDateKey(),
           idea: postDraft.idea,
           caption: postDraft.caption,
-          platform: postDraft.platform,
+          platforms: postDraft.platforms,
           placement: postDraft.placement,
+          mediaAssetIds: postDraft.mediaAssetIds,
+          timing: postDraft.timing,
+          scheduledAt:
+            postDraft.timing === "schedule" && postDraft.scheduledAt
+              ? zonedDateTimeToIso(postDraft.scheduledAt, workspaceTimeZone)
+              : null,
+          variants: postDraft.variants,
         },
       });
       setPostSaved({ id: result.id, title: result.title });
-      setPostStep(4);
+      setPostStep(5);
     } catch (caught) {
       setToolError(caught instanceof Error ? caught.message : "Post draft could not be saved.");
     } finally {
       setToolBusy(false);
+    }
+  }
+
+  async function addDroppedPostMedia(files: FileList | File[]) {
+    if (!workspaceId || uploadAgentMedia.isPending) return;
+    setToolError(null);
+    try {
+      const ids: string[] = [];
+      for (const file of Array.from(files)) {
+        if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) continue;
+        const asset = await uploadAgentMedia.mutateAsync({
+          file,
+          folderId: null,
+          tags: ["my-agent"],
+          temporary: true,
+        });
+        ids.push(asset.id);
+      }
+      if (!ids.length) throw new Error("Drop a photo or video file to continue.");
+      const combined = Array.from(new Set([...agentPickedMedia, ...ids]));
+      setAgentPickedMedia(combined);
+      if (activeTool !== "post") {
+        startPostBuilder("Create a post from this media", combined);
+      } else {
+        setPostDraft((current) => ({
+          ...current,
+          mediaAssetIds: Array.from(new Set([...current.mediaAssetIds, ...ids])),
+        }));
+      }
+    } catch (caught) {
+      setToolError(caught instanceof Error ? caught.message : "Media could not be added.");
     }
   }
 
@@ -526,9 +673,13 @@ function MyAgentPage() {
     setPostSaved(null);
     setPostDraft({
       idea: idea.slice(0, 500),
-      platform: "instagram",
+      platforms: ["instagram"],
       placement: "feed",
       caption: "",
+      variants: [],
+      mediaAssetIds: agentPickedMedia,
+      timing: "later",
+      scheduledAt: "",
     });
     setPostStep(1);
     setToolError(null);
@@ -816,7 +967,7 @@ function MyAgentPage() {
       return;
     }
     if (activeTool === "post" && postStep === 0 && !postDraft.idea.trim()) {
-      addUserMessage(input);
+      addUserMessage(input, speakReply ? "voice" : "text");
       setPostDraft((current) => ({ ...current, idea: input.slice(0, 500) }));
       setPostStep(1);
       setDraft("");
@@ -875,9 +1026,9 @@ function MyAgentPage() {
     // Refinements such as "make the captions shorter", "rewrite that reel",
     // or "let's draft shorter captions" belong in the ongoing conversation.
     const explicitNewPostRequest =
-      /\b(?:create|make|start|build|draft|write)\s+(?:(?:me|us)\s+)?(?:(?:a|an|another|new|some|one|two|three)\s+)?(?:social\s+media\s+)?(?:post|reel|story|caption)(?:s)?\b/.test(
+      /\b(?:create|make|start|build|draft|write)\s+(?:(?:me|us)\s+)?(?:(?:a|an|another|new|some|one|two|three)\s+)?(?:social\s+media\s+)?(?:post|video|reel|story|caption)(?:s)?\b/.test(
         normalized,
-      ) || /\b(?:new|another)\s+(?:post|reel|story|caption)\b/.test(normalized);
+      ) || /\b(?:new|another)\s+(?:post|video|reel|story|caption)\b/.test(normalized);
     const isRevision =
       /\b(?:shorter|longer|short|brief|concise|rewrite|revise|adjust|change|edit|improve|tweak|less|more|instead|those|these|them|that|existing|already)\b/.test(
         normalized,
@@ -929,7 +1080,9 @@ function MyAgentPage() {
       .slice(-8)
       .map(({ role, content }) => ({ role, content: content.slice(0, 2000) }));
     setMessages((current) =>
-      [...current, newAgentMessage("user", input)].slice(-MAX_VISIBLE_MESSAGES),
+      [...current, newAgentMessage("user", input, speakReply ? "voice" : "text")].slice(
+        -MAX_VISIBLE_MESSAGES,
+      ),
     );
     setDraft("");
     setBusy(true);
@@ -950,7 +1103,10 @@ function MyAgentPage() {
         },
       });
       setMessages((current) =>
-        [...current, newAgentMessage("assistant", result.suggestion)].slice(-MAX_VISIBLE_MESSAGES),
+        [
+          ...current,
+          newAgentMessage("assistant", result.suggestion, speakReply ? "voice" : "text"),
+        ].slice(-MAX_VISIBLE_MESSAGES),
       );
       if (speakReply && voiceReplies && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
@@ -1024,6 +1180,25 @@ function MyAgentPage() {
             <p className="truncate text-xs text-slate-400">
               One conversation for text and voice · {activeWorkspace?.name ?? "WaveOS"}
             </p>
+            <p
+              className={cn(
+                "mt-1 flex items-center gap-1 text-[10px]",
+                historyState === "synced" ? "text-emerald-300/80" : "text-slate-500",
+              )}
+            >
+              {historyState === "synced" ? (
+                <Cloud className="h-3 w-3" />
+              ) : historyState === "local" ? (
+                <CloudOff className="h-3 w-3" />
+              ) : (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              )}
+              {historyState === "synced"
+                ? "Synced across devices"
+                : historyState === "local"
+                  ? "Saved on this device"
+                  : "Loading conversation"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1044,6 +1219,7 @@ function MyAgentPage() {
             size="sm"
             onClick={() => {
               setMessages([]);
+              setThreadId(crypto.randomUUID());
               setError(null);
               setActiveTool(null);
               setPerformance(null);
@@ -1142,6 +1318,11 @@ function MyAgentPage() {
                   </span>
                 )}
                 <AgentMessageContent content={message.content} />
+                {message.inputMode === "voice" && (
+                  <span className="mt-1 block text-[9px] uppercase tracking-wide text-slate-500">
+                    Voice turn
+                  </span>
+                )}
               </article>
             ))}
             {activeTool === "campaign_review" && campaignReview?.campaign && (
@@ -1438,6 +1619,12 @@ function MyAgentPage() {
                     <p className="mt-1 text-[11px] text-slate-400">
                       {performance.rangeStart} to {performance.rangeEnd} · as of {performance.asOf}
                     </p>
+                    <p className="mt-1 flex items-center gap-1 text-[10px] text-cyan-200/70">
+                      <Cloud className="h-3 w-3" /> Combined connected sources
+                      {performance.capturedAt
+                        ? ` · synced ${new Date(performance.capturedAt).toLocaleString()}`
+                        : ""}
+                    </p>
                     {performanceFocus && (
                       <button
                         type="button"
@@ -1467,6 +1654,9 @@ function MyAgentPage() {
                             </p>
                             <p className="mt-1 text-xl font-semibold">
                               {Intl.NumberFormat().format(metric.value)}
+                            </p>
+                            <p className="mt-1 truncate text-[9px] capitalize text-cyan-200/60">
+                              {metric.coverage} coverage · {metric.sourceReference}
                             </p>
                             <p
                               className={cn(
@@ -1505,10 +1695,33 @@ function MyAgentPage() {
                   <FileText className="h-4 w-4" /> Create Post
                 </div>
                 {postStep === 0 && (
-                  <div className="mt-4 space-y-3">
+                  <div
+                    className="mt-4 space-y-3"
+                    onDragOver={(event) => event.preventDefault()}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      void addDroppedPostMedia(event.dataTransfer.files);
+                    }}
+                  >
                     <p className="text-sm text-slate-300">
-                      What do you want this post to be about?
+                      Drop a photo or video, then tell me what you want to create.
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowAgentMediaPicker(true)}
+                      className="flex min-h-20 w-full items-center justify-center gap-3 rounded-2xl border border-dashed border-fuchsia-200/30 bg-fuchsia-200/[.04] px-4 text-sm text-fuchsia-100 hover:bg-fuchsia-200/[.08]"
+                    >
+                      {uploadAgentMedia.isPending ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : postDraft.mediaAssetIds.length ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                      ) : (
+                        <ImageIcon className="h-5 w-5" />
+                      )}
+                      {postDraft.mediaAssetIds.length
+                        ? `${postDraft.mediaAssetIds.length} media item${postDraft.mediaAssetIds.length === 1 ? "" : "s"} selected`
+                        : "Drop media here or choose from your library"}
+                    </button>
                     <div className="flex gap-2">
                       <input
                         value={postDraft.idea}
@@ -1518,7 +1731,7 @@ function MyAgentPage() {
                         onKeyDown={(event) => {
                           if (event.key === "Enter" && postDraft.idea.trim()) setPostStep(1);
                         }}
-                        placeholder="Describe the post"
+                        placeholder="Example: Announce our new service with a friendly caption"
                         maxLength={500}
                         className="min-h-11 min-w-0 flex-1 rounded-xl border border-fuchsia-200/20 bg-[#06182d] px-3 text-sm outline-none focus:border-fuchsia-300/60"
                       />
@@ -1534,7 +1747,7 @@ function MyAgentPage() {
                 )}
                 {postStep === 1 && (
                   <div className="mt-4">
-                    <p className="text-sm text-slate-300">Which platform?</p>
+                    <p className="text-sm text-slate-300">Which platforms should this use?</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {(
                         ["instagram", "facebook", "tiktok", "linkedin", "youtube", "x"] as const
@@ -1542,24 +1755,36 @@ function MyAgentPage() {
                         <Button
                           key={platform}
                           size="sm"
-                          variant={postDraft.platform === platform ? "secondary" : "outline"}
+                          variant={postDraft.platforms.includes(platform) ? "secondary" : "outline"}
                           className="capitalize"
                           onClick={() => {
-                            setPostDraft((current) => ({ ...current, platform }));
-                            setPostStep(2);
+                            setPostDraft((current) => ({
+                              ...current,
+                              platforms: current.platforms.includes(platform)
+                                ? current.platforms.filter((item) => item !== platform)
+                                : [...current.platforms, platform],
+                            }));
                           }}
                         >
                           {platform}
                         </Button>
                       ))}
                     </div>
+                    <Button
+                      className="mt-3 w-full"
+                      disabled={!postDraft.platforms.length}
+                      onClick={() => setPostStep(2)}
+                    >
+                      Continue with {postDraft.platforms.length} platform
+                      {postDraft.platforms.length === 1 ? "" : "s"} <ArrowRight />
+                    </Button>
                   </div>
                 )}
                 {postStep === 2 && (
                   <div className="mt-4">
-                    <p className="text-sm text-slate-300">Feed post or story?</p>
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      {(["feed", "story"] as const).map((placement) => (
+                    <p className="text-sm text-slate-300">What format are we creating?</p>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {(["feed", "story", "reel"] as const).map((placement) => (
                         <Button
                           key={placement}
                           variant={postDraft.placement === placement ? "secondary" : "outline"}
@@ -1594,6 +1819,18 @@ function MyAgentPage() {
                         rows={6}
                         className="mt-2 w-full resize-y bg-transparent text-sm leading-6 text-slate-200 outline-none"
                       />
+                      {postDraft.variants.length > 1 && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {postDraft.variants.map((variant) => (
+                            <span
+                              key={variant.platform}
+                              className="rounded-full border border-fuchsia-200/15 px-2 py-1 text-[10px] capitalize text-fuchsia-100"
+                            >
+                              {variant.platform} adaptation ready
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <Button
@@ -1605,15 +1842,68 @@ function MyAgentPage() {
                       </Button>
                       <Button
                         disabled={!postDraft.caption.trim() || toolBusy}
-                        onClick={() => void finishPostDraft()}
+                        onClick={() => setPostStep(4)}
                       >
-                        {toolBusy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} Save
-                        draft
+                        Continue <ArrowRight />
                       </Button>
                     </div>
                   </div>
                 )}
-                {postStep === 4 && postSaved && (
+                {postStep === 4 && (
+                  <div className="mt-4 space-y-3">
+                    <p className="text-sm text-slate-300">When should this post go out?</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        [
+                          ["now", "Post now"],
+                          ["schedule", "Schedule"],
+                          ["later", "Save for later"],
+                        ] as const
+                      ).map(([timing, label]) => (
+                        <Button
+                          key={timing}
+                          size="sm"
+                          variant={postDraft.timing === timing ? "secondary" : "outline"}
+                          onClick={() => setPostDraft((current) => ({ ...current, timing }))}
+                        >
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                    {postDraft.timing === "schedule" && (
+                      <label className="block text-xs text-slate-300">
+                        Date and time · {workspaceTimeZone}
+                        <input
+                          type="datetime-local"
+                          value={postDraft.scheduledAt}
+                          onChange={(event) =>
+                            setPostDraft((current) => ({
+                              ...current,
+                              scheduledAt: event.target.value,
+                            }))
+                          }
+                          className="mt-2 min-h-11 w-full rounded-xl border border-fuchsia-200/20 bg-[#06182d] px-3 text-sm text-slate-100"
+                        />
+                      </label>
+                    )}
+                    <div className="rounded-xl border border-amber-200/15 bg-amber-200/[.05] p-3 text-xs leading-5 text-slate-300">
+                      My Agent prepares the draft and timing. You will review the selected accounts
+                      and press the final Post or Schedule button in Create Post.
+                    </div>
+                    <Button
+                      className="w-full"
+                      disabled={
+                        toolBusy ||
+                        (postDraft.timing === "schedule" && !postDraft.scheduledAt)
+                      }
+                      onClick={() => void finishPostDraft()}
+                    >
+                      {toolBusy ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}
+                      Prepare reviewable post
+                    </Button>
+                  </div>
+                )}
+                {postStep === 5 && postSaved && (
                   <div className="mt-4 space-y-3">
                     <div className="rounded-xl border border-emerald-300/20 bg-emerald-300/10 p-3">
                       <div className="flex items-center gap-2 font-semibold text-emerald-100">
@@ -2030,6 +2320,16 @@ function MyAgentPage() {
           <div className="flex items-end gap-2 rounded-2xl border border-cyan-300/30 bg-[#06182d] p-2 focus-within:ring-2 focus-within:ring-cyan-300/35">
             <button
               type="button"
+              onClick={() => setShowAgentMediaPicker(true)}
+              disabled={busy}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-fuchsia-200 transition-colors hover:bg-fuchsia-300/10"
+              aria-label="Add photo or video"
+              title="Add photo or video"
+            >
+              <ImageIcon />
+            </button>
+            <button
+              type="button"
               onClick={startVoice}
               disabled={busy}
               className={cn(
@@ -2094,6 +2394,11 @@ function MyAgentPage() {
               setCampaignMediaIds(ids.slice(0, campaignDraft.maxPosts));
             } else {
               setAgentPickedMedia(ids);
+              if (activeTool === "post") {
+                setPostDraft((current) => ({ ...current, mediaAssetIds: ids }));
+              } else if (ids.length) {
+                startPostBuilder("Create a post from this media", ids);
+              }
             }
             setShowAgentMediaPicker(false);
           }}

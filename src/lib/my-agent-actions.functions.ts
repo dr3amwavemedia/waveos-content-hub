@@ -23,8 +23,23 @@ const workspaceInput = z.object({
 const createPostInput = workspaceInput.extend({
   idea: z.string().trim().min(1).max(500),
   caption: z.string().trim().min(1).max(6000),
-  platform: z.enum(["instagram", "facebook", "linkedin", "tiktok", "youtube", "x"]),
-  placement: z.enum(["feed", "story"]),
+  platforms: z
+    .array(z.enum(["instagram", "facebook", "linkedin", "tiktok", "youtube", "x"]))
+    .min(1)
+    .max(6),
+  placement: z.enum(["feed", "story", "reel"]),
+  mediaAssetIds: z.array(z.string().uuid()).max(20).default([]),
+  scheduledAt: z.string().datetime().nullable().default(null),
+  timing: z.enum(["now", "schedule", "later"]).default("later"),
+  variants: z
+    .array(
+      z.object({
+        platform: z.enum(["instagram", "facebook", "linkedin", "tiktok", "youtube", "x"]),
+        caption: z.string().trim().min(1).max(6000),
+      }),
+    )
+    .max(6)
+    .default([]),
 });
 
 const createCampaignInput = workspaceInput.extend({
@@ -110,6 +125,7 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
         asOf: data.localDate,
         rangeStart: null,
         rangeEnd: null,
+        capturedAt: null,
         metrics: [],
         message: "No connected performance history is available yet.",
       };
@@ -161,6 +177,10 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
     const previousEnd = previousEndDate.toISOString().slice(0, 10);
 
     const metrics = ordered.slice(0, 6).map((row: any) => {
+      const evidence =
+        row.evidence && typeof row.evidence === "object"
+          ? (row.evidence as Record<string, unknown>)
+          : {};
       const previous = observations.find(
         (candidate: any) =>
           candidate.metric_key === row.metric_key &&
@@ -184,6 +204,8 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
         unit: row.unit || "count",
         previousValue,
         changePercent,
+        coverage: typeof evidence.coverage === "string" ? evidence.coverage : "reported",
+        sourceReference: row.source_reference || row.provider || "connected provider",
       };
     });
 
@@ -191,6 +213,11 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
       asOf: data.localDate,
       rangeStart: latestStart,
       rangeEnd: latestEnd,
+      capturedAt: sameWindow
+        .map((row: any) => row.captured_at)
+        .filter(Boolean)
+        .sort()
+        .at(-1) ?? null,
       metrics,
       message: null,
     };
@@ -507,6 +534,17 @@ export const createAgentPostDraft = createServerFn({ method: "POST" })
     await requireWorkspaceAccess(context as any, data.workspaceId, "can_create_content");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const uniqueMediaIds = Array.from(new Set(data.mediaAssetIds));
+    if (uniqueMediaIds.length) {
+      const { data: authorizedMedia, error: mediaError } = await context.supabase
+        .from("media_assets")
+        .select("id")
+        .eq("workspace_id", data.workspaceId)
+        .in("id", uniqueMediaIds);
+      if (mediaError || (authorizedMedia ?? []).length !== uniqueMediaIds.length) {
+        throw new Error("One or more selected media items are not available in this workspace.");
+      }
+    }
     const titleBase = data.idea.replace(/\s+/g, " ").trim();
     const title = titleBase.length > 90 ? `${titleBase.slice(0, 87)}…` : titleBase;
     const { data: created, error } = await supabaseAdmin
@@ -517,12 +555,14 @@ export const createAgentPostDraft = createServerFn({ method: "POST" })
         title,
         primary_caption: data.caption,
         hashtags: [],
-        media_asset_ids: [],
+        media_asset_ids: uniqueMediaIds,
         status: "draft",
+        scheduled_at: data.timing === "schedule" ? data.scheduledAt : null,
         metadata: {
           source: "my_agent",
-          platforms: [data.platform],
+          platforms: data.platforms,
           placement: data.placement,
+          timing: data.timing,
           localDate: data.localDate,
         },
       })
@@ -530,11 +570,36 @@ export const createAgentPostDraft = createServerFn({ method: "POST" })
       .single();
 
     if (error || !created?.id) throw new Error("Post draft could not be saved.");
+    const captions = new Map(data.variants.map((variant) => [variant.platform, variant.caption]));
+    const { error: variantsError } = await (supabaseAdmin as any).from("post_variants").insert(
+      data.platforms.map((platform) => ({
+        content_item_id: created.id,
+        workspace_id: data.workspaceId,
+        platform,
+        enabled: true,
+        caption: captions.get(platform) ?? data.caption,
+        platform_options:
+          data.placement === "story"
+            ? { contentType: "story" }
+            : data.placement === "reel"
+              ? { contentType: "reel" }
+              : {},
+      })),
+    );
+    if (variantsError) {
+      console.error("My Agent post saved but platform captions could not be created", {
+        contentItemId: created.id,
+        message: variantsError.message ?? "variant insert failed",
+      });
+    }
     return {
       id: created.id as string,
       title,
       caption: data.caption,
-      platform: data.platform,
+      platforms: data.platforms,
       placement: data.placement,
+      mediaCount: uniqueMediaIds.length,
+      scheduledAt: data.timing === "schedule" ? data.scheduledAt : null,
+      variantsSaved: !variantsError,
     };
   });
