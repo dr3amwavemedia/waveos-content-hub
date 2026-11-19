@@ -110,7 +110,7 @@ function record(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function numericMetric(row: Record<string, unknown>, key: AnalyticsMetricKey) {
+export function numericMetric(row: Record<string, unknown>, key: AnalyticsMetricKey) {
   for (const alias of METRIC_ALIASES[key]) {
     if (!(alias in row)) continue;
     const raw = row[alias];

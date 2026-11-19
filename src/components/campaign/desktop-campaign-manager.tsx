@@ -1,3 +1,4 @@
+import { CampaignPerformancePanel } from "@/components/performance/campaign-performance-panel";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
@@ -199,6 +200,13 @@ export function DesktopCampaignManager({ controller }: { controller: CampaignMan
       </header>
 
       <CampaignReadinessPanel checks={readiness.checks} />
+
+      <CampaignPerformancePanel
+        workspaceId={controller.workspaceId}
+        campaignPlanId={controller.selectedCampaignId}
+        campaignName={controller.selectedCampaign?.name ?? null}
+        compact={false}
+      />
 
       {analysisProgress && (
         <AiProcessingIndicator

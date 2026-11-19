@@ -4,6 +4,7 @@ import type { Database, Json } from "@/integrations/supabase/types";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { zernioRequest } from "@/lib/zernio.server";
 import { isZernioTimeoutError } from "@/lib/zernio-timeout";
+import { recordAccountMetricsFailure, storeAccountPostMetrics } from "@/lib/social-post-metrics.server";
 import {
   applyProviderVetoes,
   applyRemovalLog,
@@ -158,6 +159,18 @@ export async function loadLivePostsPage(input: {
           // Keep the first failure; a reconnect message beats a retry hint.
           if (!error || (!error.reconnect && failure.reconnect)) error = failure;
         }
+      }
+      // Store per-post performance from the same account-scoped analytics read
+      // (best effort; it never creates, keeps or hides a published card).
+      if (analytics.status === "fulfilled") {
+        await storeAccountPostMetrics({
+          workspaceId: input.workspaceId,
+          account,
+          payload: analytics.value,
+          hasMore: hasMorePages(analytics.value, input.page),
+        });
+      } else {
+        await recordAccountMetricsFailure(input.workspaceId, account, analytics.reason);
       }
       // Without Zernio's own records nothing on this account can be checked
       // against cancellations, so show the account error instead of cards.
@@ -361,4 +374,17 @@ export async function removeExactLivePost(input: {
   }
 
   return { key: livePostKey(platform, input.account.accountId, input.platformPostId), removedAt };
+}
+
+/** Bounded scheduled refresh: first analytics page (newest posts) for one account. */
+export async function refreshAccountPostMetrics(workspaceId: string, account: LivePostAccount) {
+  try {
+    const payload = await zernioRequest<unknown>(analyticsPath(account.accountId, 1), {
+      signal: AbortSignal.timeout(LIVE_POSTS_TIMEOUT_MS),
+    });
+    return await storeAccountPostMetrics({ workspaceId, account, payload, hasMore: hasMorePages(payload, 1) });
+  } catch (reason) {
+    await recordAccountMetricsFailure(workspaceId, account, reason);
+    return { stored: 0, skippedWithoutId: 0 };
+  }
 }

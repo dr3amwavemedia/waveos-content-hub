@@ -1,3 +1,4 @@
+import { CampaignPerformancePanel } from "@/components/performance/campaign-performance-panel";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
@@ -242,6 +243,13 @@ export function MobileCampaignManager({ controller }: { controller: CampaignMana
       </header>
 
       <CampaignReadinessPanel checks={readiness.checks} />
+
+      <CampaignPerformancePanel
+        workspaceId={controller.workspaceId}
+        campaignPlanId={controller.selectedCampaignId}
+        campaignName={controller.selectedCampaign?.name ?? null}
+        compact={true}
+      />
 
       {workflowDraft.data?.payload && (
         <div className="flex flex-col gap-3 rounded-xl border border-primary/30 bg-primary/10 p-4 text-sm sm:flex-row sm:items-center sm:justify-between">

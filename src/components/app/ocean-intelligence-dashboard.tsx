@@ -1,3 +1,4 @@
+import { OverviewPerformanceSummary } from "@/components/performance/overview-performance-summary";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
@@ -227,6 +228,8 @@ export function OceanIntelligenceDashboard() {
               loading={content.isPending}
             />
           </section>
+
+          {canSeeAnalytics && <OverviewPerformanceSummary workspaceId={workspaceId} variant="ocean" />}
 
           <section className="ocean-panel p-3 sm:p-4" aria-labelledby="today-timeline-title">
             <div className="flex items-center justify-between gap-3">

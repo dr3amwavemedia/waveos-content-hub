@@ -223,6 +223,23 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
     };
   });
 
+const postPerformanceInput = z.object({
+  workspaceId: z.string().uuid(),
+  days: z.union([z.literal(7), z.literal(30), z.literal(90), z.literal(180), z.literal(365)]).default(30),
+  platform: z.string().max(40).nullish(),
+  contentType: z.enum(["post", "reel", "story", "video", "carousel", "short", "stories_reels"]).nullish(),
+});
+
+/** My Agent's per-post answers read the exact selector Analytics uses. */
+export const getAgentPostPerformance = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .validator((input) => postPerformanceInput.parse(input))
+  .handler(async ({ data, context }) => {
+    await requireWorkspaceAccess(context as any, data.workspaceId, "can_use_ai_tools");
+    const { loadSocialPerformance } = await import("@/lib/social-performance-loader");
+    return loadSocialPerformance(context.supabase as any, { ...data, includePrevious: true });
+  });
+
 export const getAgentCampaignReview = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .validator((input) => campaignReviewInput.parse(input))
