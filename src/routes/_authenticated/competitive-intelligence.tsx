@@ -168,6 +168,11 @@ function ResearchScorecard({ report }: { report: ResearchReport }) {
               {category.coverage}% evidence coverage · {category.sourceCount} source
               {category.sourceCount === 1 ? "" : "s"} · {category.confidence} confidence
             </p>
+            {(category.automationRisks[0] ?? category.gaps[0]) && (
+              <p className="mt-2 line-clamp-2 text-[10px] leading-4 text-amber-300/90">
+                Watch: {category.automationRisks[0] ?? category.gaps[0]}
+              </p>
+            )}
           </article>
         ))}
       </div>

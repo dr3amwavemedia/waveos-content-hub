@@ -10,6 +10,7 @@ export type CompetitiveScoreCategory = {
   evidenceCount: number;
   strengths: string[];
   gaps: string[];
+  automationRisks: string[];
 };
 
 const RUBRIC = [
@@ -27,7 +28,7 @@ const RUBRIC = [
   },
   {
     key: "messaging",
-    label: "Messaging Clarity",
+    label: "Positioning & Audience Clarity",
     patterns: /brand|messaging|position|audience|overview/i,
     weight: 1.1,
   },
@@ -59,7 +60,11 @@ const RUBRIC = [
 ] as const;
 
 const GAP_LANGUAGE =
-  /\b(gap|missing|unclear|inconsistent|limited|not observed|not found|weak|friction|could not|unavailable)\b/i;
+  /\b(gap|missing|unclear|inconsistent|limited|not observed|not found|weak|generic|repetitive|templated|friction|could not|unavailable)\b/i;
+const STRENGTH_LANGUAGE =
+  /\b(clear|consistent|distinct|specific|strong|effective|prominent|credible|active|well-defined|optimized|easy to|visible|trust signal|differentiated)\b/i;
+const AUTOMATION_RISK_LANGUAGE =
+  /\b(over-automat(?:ed|ion)|automation risk|repetitive posting|repetitive captions|templated captions|generic captions|volume over quality)\b/i;
 
 export function scoreResearchReport(report: ResearchReport) {
   const categories: CompetitiveScoreCategory[] = RUBRIC.map((rubric) => {
@@ -67,8 +72,17 @@ export function scoreResearchReport(report: ResearchReport) {
     const findings = sections.flatMap((section) => section.findings);
     const supported = findings.filter((finding) => finding.sources.length > 0);
     const sources = [...new Set(supported.flatMap((finding) => finding.sources))];
+    const automationRisks =
+      rubric.key === "content"
+        ? supported.filter((finding) => AUTOMATION_RISK_LANGUAGE.test(finding.text))
+        : [];
     const gaps = supported.filter((finding) => GAP_LANGUAGE.test(finding.text));
-    const strengths = supported.filter((finding) => !GAP_LANGUAGE.test(finding.text));
+    const strengths = supported.filter(
+      (finding) =>
+        STRENGTH_LANGUAGE.test(finding.text) &&
+        !GAP_LANGUAGE.test(finding.text) &&
+        !AUTOMATION_RISK_LANGUAGE.test(finding.text),
+    );
     const evidenceCount = supported.length;
     const coverage = Math.min(
       100,
@@ -77,13 +91,19 @@ export function scoreResearchReport(report: ResearchReport) {
     const eligible = evidenceCount > 0 && sources.length > 0;
     // The percentage is deterministic from cited rubric inputs. It is an
     // evidence assessment, never private engagement or measured awareness.
+    const evidenceCeiling = evidenceCount === 1 ? 55 : evidenceCount === 2 ? 70 : 100;
     const score = eligible
       ? Math.max(
           0,
           Math.min(
-            100,
+            evidenceCeiling,
             Math.round(
-              50 + strengths.length * 10 - gaps.length * 12 + Math.min(10, sources.length * 3),
+              40 +
+                strengths.length * 8 -
+                gaps.length * 14 -
+                automationRisks.length * 16 +
+                Math.min(6, sources.length * 2) +
+                Math.min(6, evidenceCount * 2),
             ),
           ),
         )
@@ -98,6 +118,7 @@ export function scoreResearchReport(report: ResearchReport) {
       evidenceCount,
       strengths: strengths.slice(0, 2).map((finding) => finding.text),
       gaps: gaps.slice(0, 2).map((finding) => finding.text),
+      automationRisks: automationRisks.slice(0, 2).map((finding) => finding.text),
     };
   });
   const eligible = categories
@@ -117,7 +138,7 @@ export function scoreResearchReport(report: ResearchReport) {
     categories,
     eligibleCategories: eligible.length,
     methodology:
-      "WaveOS converts cited findings into eight published rubric categories. Supported positive observations add to the assessment; explicit gaps reduce it. Missing categories stay unavailable instead of becoming zero.",
+      "WaveOS converts cited findings into eight evidence-bound rubric categories. Neutral facts do not raise a score, explicit gaps reduce it, and one or two findings cannot produce a high rating. Repetitive or over-automated social patterns reduce Content & Social Presence only when cited public evidence supports that concern. Missing categories stay unavailable instead of becoming zero.",
   };
 }
 
