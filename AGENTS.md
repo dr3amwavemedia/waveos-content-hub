@@ -20,6 +20,7 @@ Competitor report URL fields share pre-validation sanitation and consulted-sourc
 Research results are scoped to the active workspace in session storage and included only in explicit existing workflow-draft saves, so navigation does not authorize live-record writes.
 Analytics historical comparisons require matching provider, calculation, coverage and non-overlapping equal-length periods; unsupported observations remain unavailable.
 Content lead attribution counts provider-reported post clicks plus DM/message starts as lead actions, deduplicates repeated provider post records, and never presents actions as unique people or confirmed sales.
+Per-post analytics use the shared social metric contract, capability resolver and platform + provider-account + provider-post identity; Social Posts, Analytics, Campaign Manager, Overview and My Agent must not introduce parallel metric enums, availability rules or cross-post dedupe logic.
 Wave Assist uses one current premium text model across contextual advice, captions, campaigns, and SEO; conversation history stays session-scoped, workspace context is bounded, and every response remains review-only with no automatic record changes or publishing.
 
 Creative Studio templates produce native document layers and share one artwork renderer with editor, thumbnails and export, so previews never diverge from editable artwork.
