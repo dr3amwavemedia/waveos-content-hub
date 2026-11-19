@@ -193,6 +193,10 @@ test("My Agent keeps chat history chronological and anchored above the composer"
   assert.match(agent, /setPerformanceAnchorMessageId\(requestMessage\?\.id \?\? null\)/);
   assert.match(agent, /className="contents"/);
   assert.match(agent, /Absolutely—I narrowed the snapshot/);
+  assert.match(agent, /performanceExpanded/);
+  assert.match(agent, /setPerformanceExpanded\(false\)/);
+  assert.match(agent, /Performance snapshot/);
+  assert.match(agent, />Show</);
 });
 
 test("Campaign Manager continues after save with a working command center", () => {

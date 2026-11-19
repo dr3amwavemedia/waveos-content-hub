@@ -338,6 +338,7 @@ function MyAgentPage() {
   const [toolError, setToolError] = useState<string | null>(null);
   const [performance, setPerformance] = useState<AgentPerformanceSnapshot | null>(null);
   const [performanceAnchorMessageId, setPerformanceAnchorMessageId] = useState<string | null>(null);
+  const [performanceExpanded, setPerformanceExpanded] = useState(true);
   const [campaignReview, setCampaignReview] = useState<AgentCampaignReview | null>(null);
   const [performanceFocus, setPerformanceFocus] = useState<string | null>(null);
   const [campaignStep, setCampaignStep] = useState(0);
@@ -533,7 +534,9 @@ function MyAgentPage() {
           workspaceId,
           platforms: postDraft.platforms,
           mediaAssetIds: postDraft.mediaAssetIds,
-          conversation: messages.slice(-6).map((message) => ({ ...message, content: message.content.slice(0, 2000) })),
+          conversation: messages
+            .slice(-6)
+            .map((message) => ({ ...message, content: message.content.slice(0, 2000) })),
           context: JSON.stringify({
             workspace: activeWorkspace?.name ?? "WaveOS",
             surface: "My Agent Post Builder",
@@ -545,9 +548,7 @@ function MyAgentPage() {
         ...current,
         caption: result.primaryCaption ?? result.suggestion,
         variants: result.variants
-          .filter((variant) =>
-            postDraft.platforms.includes(variant.platform as AgentPostPlatform),
-          )
+          .filter((variant) => postDraft.platforms.includes(variant.platform as AgentPostPlatform))
           .map((variant) => ({
             platform: variant.platform as AgentPostPlatform,
             caption: variant.caption,
@@ -731,6 +732,7 @@ function MyAgentPage() {
     setToolError(null);
     setActiveTool("performance");
     setPerformanceFocus(null);
+    setPerformanceExpanded(true);
     setToolBusy(true);
     try {
       const result = await getPerformance({
@@ -844,7 +846,7 @@ function MyAgentPage() {
     const normalized = input.toLowerCase();
     let handled = false;
     let nextStep = campaignStep;
-    let nextDraft = { ...campaignDraft };
+    const nextDraft = { ...campaignDraft };
 
     const nameMatch = input.match(
       /(?:call|name)(?:\s+the campaign)?\s+(?:it\s+)?["“]?(.+?)["”]?$/i,
@@ -1002,6 +1004,7 @@ function MyAgentPage() {
                         ? "shares"
                         : metric,
       );
+      setPerformanceExpanded(true);
       const focusLabel = metricFocus[1].replace(/s$/, "");
       setMessages((current) =>
         [
@@ -1015,6 +1018,9 @@ function MyAgentPage() {
       );
       setDraft("");
       return;
+    }
+    if (activeTool === "performance" && performance) {
+      setPerformanceExpanded(false);
     }
     const requestedCampaignIntent = campaignIntent(input);
     if (requestedCampaignIntent === "review_existing") {
@@ -1174,8 +1180,17 @@ function MyAgentPage() {
   function PerformanceSnapshotPanel() {
     return (
       <section className="mr-auto w-full max-w-xl rounded-2xl border border-cyan-300/20 bg-cyan-300/[.05] p-4">
-        <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
-          <BarChart3 className="h-4 w-4" /> Performance Snapshot
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-cyan-100">
+            <BarChart3 className="h-4 w-4" /> Performance Snapshot
+          </div>
+          <button
+            type="button"
+            className="text-[11px] font-semibold text-cyan-200/75 hover:text-cyan-100"
+            onClick={() => setPerformanceExpanded(false)}
+          >
+            Collapse
+          </button>
         </div>
         {toolBusy ? (
           <div className="mt-4 flex items-center gap-2 text-sm text-slate-400">
@@ -1323,6 +1338,7 @@ function MyAgentPage() {
               setActiveTool(null);
               setPerformance(null);
               setPerformanceAnchorMessageId(null);
+              setPerformanceExpanded(true);
               setCampaignReview(null);
               setToolError(null);
               setCampaignSaved(null);
@@ -1424,9 +1440,22 @@ function MyAgentPage() {
                     </span>
                   )}
                 </article>
-                {activeTool === "performance" && performanceAnchorMessageId === message.id && (
-                  <PerformanceSnapshotPanel />
-                )}
+                {activeTool === "performance" &&
+                  performanceAnchorMessageId === message.id &&
+                  (performanceExpanded ? (
+                    <PerformanceSnapshotPanel />
+                  ) : (
+                    <button
+                      type="button"
+                      className="mr-auto flex w-full max-w-xl items-center justify-between rounded-2xl border border-cyan-300/15 bg-cyan-300/[.04] px-4 py-3 text-left text-sm text-cyan-100 hover:bg-cyan-300/[.08]"
+                      onClick={() => setPerformanceExpanded(true)}
+                    >
+                      <span className="flex items-center gap-2 font-semibold">
+                        <BarChart3 className="h-4 w-4" /> Performance snapshot
+                      </span>
+                      <span className="text-xs text-cyan-200/70">Show</span>
+                    </button>
+                  ))}
               </div>
             ))}
             {activeTool === "campaign_review" && campaignReview?.campaign && (
@@ -1913,8 +1942,7 @@ function MyAgentPage() {
                     <Button
                       className="w-full"
                       disabled={
-                        toolBusy ||
-                        (postDraft.timing === "schedule" && !postDraft.scheduledAt)
+                        toolBusy || (postDraft.timing === "schedule" && !postDraft.scheduledAt)
                       }
                       onClick={() => void finishPostDraft()}
                     >
