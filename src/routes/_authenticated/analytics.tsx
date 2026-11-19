@@ -8,6 +8,7 @@ import { RequireFeature } from "@/components/app/require-feature";
 import { useWorkspace } from "@/components/app/workspace-context";
 import { AnalyticsCheckup, type ObservedCount } from "@/components/social/analytics-checkup";
 import { SeoGrowthPanel } from "@/components/social/seo-growth-panel";
+import { SocialPerformancePanel } from "@/components/performance/social-performance-panel";
 import { Button } from "@/components/ui/button";
 import { useContentItems, useSocialConnections } from "@/hooks/use-content";
 
@@ -150,11 +151,14 @@ function AnalyticsPage() {
           </OceanPanel>
         )}
       {view === "social" ? (
-        <AnalyticsCheckup
-          workspaceId={activeWorkspace.id}
-          publishedPosts={publishedPosts}
-          connectedChannels={connectedChannels}
-        />
+        <>
+          <AnalyticsCheckup
+            workspaceId={activeWorkspace.id}
+            publishedPosts={publishedPosts}
+            connectedChannels={connectedChannels}
+          />
+          <SocialPerformancePanel workspaceId={activeWorkspace.id} />
+        </>
       ) : (
         <SeoGrowthPanel workspaceId={activeWorkspace.id} workspaceName={activeWorkspace.name} />
       )}

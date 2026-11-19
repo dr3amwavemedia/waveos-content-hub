@@ -5,6 +5,8 @@ import type { Database } from "@/integrations/supabase/types";
 
 export type ExternalMediaProvider = "google_drive" | "dropbox";
 export const GOOGLE_DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+export const GOOGLE_DRIVE_READONLY_SCOPE = "https://www.googleapis.com/auth/drive.readonly";
+export type GoogleDriveAccessMode = "none" | "selected_files" | "full_drive";
 
 type ExternalConnection = {
   id: string;
@@ -167,8 +169,15 @@ export async function getExternalConnection(workspaceId: string, provider: Exter
   return data as unknown as ExternalConnection | null;
 }
 
+export function googleDriveAccessMode(scopes: string | null | undefined): GoogleDriveAccessMode {
+  const granted = new Set((scopes ?? "").split(/\s+/).filter(Boolean));
+  if (granted.has(GOOGLE_DRIVE_READONLY_SCOPE)) return "full_drive";
+  if (granted.has(GOOGLE_DRIVE_SCOPE)) return "selected_files";
+  return "none";
+}
+
 export function hasGoogleDriveScope(scopes: string | null | undefined) {
-  return (scopes ?? "").split(/\s+/).includes(GOOGLE_DRIVE_SCOPE);
+  return googleDriveAccessMode(scopes) !== "none";
 }
 
 export async function revokeExternalConnection(connection: ExternalConnection) {
@@ -232,7 +241,9 @@ export async function externalAccessToken(connection: ExternalConnection) {
     await updateExternalConnection(connection.id, {
       ...(outcome.scopes !== null ? { scopes: outcome.scopes } : {}),
       access_token_encrypted: await encryptExternalToken(outcome.accessToken),
-      token_expires_at: new Date(Date.now() + Number(body?.expires_in ?? 3600) * 1000).toISOString(),
+      token_expires_at: new Date(
+        Date.now() + Number(body?.expires_in ?? 3600) * 1000,
+      ).toISOString(),
       updated_at: new Date().toISOString(),
     });
     return outcome.accessToken;

@@ -1,3 +1,4 @@
+import { PostPerformanceDetails } from "@/components/performance/post-performance-details";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
@@ -409,6 +410,8 @@ function LivePostDialog({
             {post.caption || "No caption"}
           </p>
         </div>
+
+        <PostPerformanceDetails post={post} workspaceId={workspaceId} />
 
         {removal.kind === "removed" && (
           <div className="mt-4 rounded-xl border border-border bg-elevated/60 p-4">

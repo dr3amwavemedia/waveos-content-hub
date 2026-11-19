@@ -27,7 +27,16 @@ type ZernioProfileRow = {
 
 const workspaceAnalyticsInput = z.object({
   workspaceId: z.string().uuid(),
-  days: z.union([z.literal(7), z.literal(30), z.literal(90), z.literal(180), z.literal(365)]).default(30),
+  days: z
+    .union([
+      z.literal(1),
+      z.literal(7),
+      z.literal(30),
+      z.literal(90),
+      z.literal(180),
+      z.literal(365),
+    ])
+    .default(30),
   refresh: z.boolean().default(false),
 });
 
@@ -257,8 +266,8 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
         historicalRangeEnd = previousBackfill?.availableRangeEnd ?? null;
         historicalRecordCount = Number(previousBackfill?.dailyRecords ?? 0);
 
-        // Initial onboarding backfill: request two provider-supported windows so
-        // a newly connected workspace can analyze up to ~2 years immediately.
+        // Initial onboarding backfill: request up to 365 days of provider-supported
+        // history so a newly connected workspace can analyze one year immediately.
         const previousAttempt = previousBackfill?.attemptedAt
           ? Date.parse(previousBackfill.attemptedAt)
           : Number.NaN;
@@ -289,18 +298,10 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
           const end = new Date();
           const newestEnd = end.toISOString().slice(0, 10);
           const newestStartDate = new Date(end);
-          newestStartDate.setUTCDate(newestStartDate.getUTCDate() - 365);
+          newestStartDate.setUTCDate(newestStartDate.getUTCDate() - 364);
           const newestStart = newestStartDate.toISOString().slice(0, 10);
-          const olderEndDate = new Date(newestStartDate);
-          olderEndDate.setUTCDate(olderEndDate.getUTCDate() - 1);
-          const olderEnd = olderEndDate.toISOString().slice(0, 10);
-          const olderStartDate = new Date(olderEndDate);
-          olderStartDate.setUTCDate(olderStartDate.getUTCDate() - 365);
-          const olderStart = olderStartDate.toISOString().slice(0, 10);
-          const windows = [
-            { fromDate: olderStart, toDate: olderEnd },
-            { fromDate: newestStart, toDate: newestEnd },
-          ];
+          // History is capped at the 365 days analytics supports (one window).
+          const windows = [{ fromDate: newestStart, toDate: newestEnd }];
 
           const dashboardResults: DashboardPayload[] = [];
           for (const window of windows) {
@@ -390,7 +391,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
               historicalBackfill: {
                 attemptedAt: now,
                 completedAt: now,
-                requestedRangeStart: olderStart,
+                requestedRangeStart: newestStart,
                 requestedRangeEnd: newestEnd,
                 availableRangeStart: historicalRangeStart,
                 availableRangeEnd: historicalRangeEnd,
@@ -415,7 +416,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
               historicalBackfill: {
                 ...previousBackfill,
                 attemptedAt: now,
-                requestedRangeStart: olderStart,
+                requestedRangeStart: newestStart,
                 requestedRangeEnd: newestEnd,
                 availableRangeStart: previousBackfill?.availableRangeStart ?? null,
                 availableRangeEnd: previousBackfill?.availableRangeEnd ?? null,

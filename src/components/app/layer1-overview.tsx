@@ -443,9 +443,12 @@ export function Layer1Overview() {
                 Frame.io
               </p>
               <h2 className="mt-1 text-lg font-semibold text-foreground">{frameioQ.data.label}</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Previewing {Math.min(6, frameioQ.data.files.length)} of {frameioQ.data.files.length} files
+              </p>
             </div>
-            <Link to="/create" className="text-sm font-medium text-primary hover:underline">
-              Create a post
+            <Link to="/deliveries" className="text-sm font-medium text-primary hover:underline">
+              View complete delivery
             </Link>
           </div>
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">

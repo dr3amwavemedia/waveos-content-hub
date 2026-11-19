@@ -208,15 +208,24 @@ test("publisher runs the invariant before claim and immediately before create, k
 
 test("editor publishes the saved selection it showed and shows the destination above Publish", () => {
   const editor = readFileSync("src/routes/_authenticated/create.tsx", "utf8");
-  assert.match(editor, /sameDestinations\(\(savedVariants \?\? \[\]\)\.map\(\(row\) => row\.platform\), shownPlatforms\)/);
-  assert.match(editor, /publishFn\(\{ data: \{ contentId: id, allowDuplicate, expectedPlatforms \} \}\)/);
+  assert.match(
+    editor,
+    /sameDestinations\(\s*\(savedVariants \?\? \[\]\)\.map\(\(row\) => row\.platform\),\s*shownPlatforms,?\s*\)/,
+  );
+  assert.match(
+    editor,
+    /publishFn\(\{\s*data: \{ contentId: id, allowDuplicate, expectedPlatforms \},?\s*\}\)/,
+  );
   // Both the desktop Post now and mobile Publish have the destination block before them.
-  const desktop = editor.indexOf("<PublishDestinations\n              title={destinationTitle}");
+  const desktop = editor.indexOf("<PublishDestinations title={destinationTitle}");
   assert.ok(desktop > 0 && desktop < editor.indexOf("Post now", desktop));
-  const mobile = editor.indexOf("<PublishDestinations\n          compact");
-  assert.ok(mobile > 0 && mobile < editor.indexOf("onClick={handlePublishNow}><Send", mobile));
+  const mobile = editor.indexOf("<PublishDestinations compact");
+  assert.ok(mobile > 0 && mobile < editor.indexOf("onClick={handlePublishNow}", mobile));
   assert.doesNotMatch(editor, /metaWarning=\{metaSharingWarning\}/);
   assert.match(editor, /useState<SocialPlatform\[]>\(\[\]\)/);
   assert.match(editor, /WaveOS will not add a linked Meta account automatically/);
-  assert.match(editor, /if \(draftStorageKey\) window\.localStorage\.removeItem\(draftStorageKey\);\s*return item\.id;/);
+  assert.match(
+    editor,
+    /if \(draftStorageKey\) window\.localStorage\.removeItem\(draftStorageKey\);\s*return item\.id;/,
+  );
 });

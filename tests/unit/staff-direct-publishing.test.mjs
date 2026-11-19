@@ -8,7 +8,7 @@ test("Create Post uses direct Post now and Post later actions", async () => {
   const page = await read("src/routes/_authenticated/create.tsx");
   assert.match(page, /Post now/);
   assert.match(page, /Post later/);
-  assert.match(page, /!scheduledAt \|\| !canSchedule/);
+  assert.match(page, /!scheduledAt\s*\|\|\s*!canSchedule/);
   assert.doesNotMatch(page, /Send for approval/);
   assert.doesNotMatch(page, /Send schedule for approval/);
   assert.match(page, /Camera roll/);

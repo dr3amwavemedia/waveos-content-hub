@@ -6,6 +6,8 @@ export type SubscriptionDisplayInput = {
   currentPeriodEnd?: string | null;
   trialEndsAt?: string | null;
   internalTestAccess?: boolean | null;
+  entitlementSource?: string | null;
+  complimentaryAccessEndsAt?: string | null;
 };
 
 export type SubscriptionDisplayState = {
@@ -18,6 +20,7 @@ export type SubscriptionDisplayState = {
     | "past_due"
     | "pending"
     | "internal_test"
+    | "complimentary"
     | "unknown";
   label: string;
   detail: string;
@@ -58,6 +61,25 @@ export function subscriptionDisplayState(
       label: "Internal test access",
       detail: "Access is provided without a Stripe subscription or payment.",
       tone: "info",
+    };
+  }
+
+  if (input.entitlementSource === "complimentary_code") {
+    const accessEnd = validDateLabel(input.complimentaryAccessEndsAt);
+    const accessEnded = Boolean(
+      input.status?.trim().toLowerCase() === "expired" ||
+      (input.complimentaryAccessEndsAt &&
+        new Date(input.complimentaryAccessEndsAt).getTime() <= Date.now()),
+    );
+    return {
+      key: "complimentary",
+      label: accessEnded ? "Complimentary access ended" : "Complimentary access",
+      detail: accessEnded
+        ? `The complimentary grant${accessEnd ? ` ended ${accessEnd}` : " has ended"}. Your workspace data remains saved.`
+        : accessEnd
+          ? `Dream Wave has provided plan access through ${accessEnd}. No payment is due.`
+          : "Dream Wave has provided plan access with no payment or trial attached.",
+      tone: accessEnded ? "neutral" : "positive",
     };
   }
 

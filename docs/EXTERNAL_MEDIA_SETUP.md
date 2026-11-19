@@ -36,7 +36,9 @@ encryption, but a separate external-media key is preferred.
 1. Create or choose one Google Cloud project for WaveOS.
 2. Enable Google Drive API and Google Picker API.
 3. Configure the OAuth consent screen for Dream Wave Media.
-4. Add the non-sensitive `drive.file` scope.
+4. Add both scopes to the OAuth consent screen:
+   - `https://www.googleapis.com/auth/drive.file` for the limited Picker fallback.
+   - `https://www.googleapis.com/auth/drive.readonly` for WaveOS's in-app folder browser.
 5. Create a Web application OAuth client.
 6. Add this authorized redirect URI:
 
@@ -44,9 +46,45 @@ encryption, but a separate external-media key is preferred.
 https://waveos.dreamwavemedia.co/api/external-media/google_drive/callback
 ```
 
+When validating the Lovable preview before production, also add its exact
+callback URI temporarily:
+
+```text
+https://id-preview--5e51f033-dba6-4b7a-acb2-008cdd739997.lovable.app/api/external-media/google_drive/callback
+```
+
 7. Create a browser API key restricted to `https://waveos.dreamwavemedia.co`.
 8. Copy the Google Cloud project number for `GOOGLE_DRIVE_APP_ID`.
 9. Add the client ID, secret, API key, and app ID to the protected deployment variables.
+
+### Google review required for in-app full Drive browsing
+
+`drive.readonly` is a restricted Google scope. Before making the full-browser
+connection generally available:
+
+1. Verify ownership of every OAuth authorized domain in Google Search Console.
+2. Complete the OAuth branding screen with WaveOS name, logo, support email,
+   homepage, privacy policy, terms, and user-data deletion instructions.
+3. Add `drive.readonly`, write the narrow use-case justification, and submit a
+   short review video showing: connect Drive, browse folders inside WaveOS,
+   select a file, import it, disconnect, and delete the WaveOS account/data.
+4. Keep the app in Testing while the implementation is validated, and add only
+   named Dream Wave Media test accounts. Google testing-mode refresh tokens can
+   expire quickly, so this is not the production configuration.
+5. Move the consent screen to Production and submit OAuth verification.
+6. Because WaveOS stores refresh tokens and transmits restricted Drive content
+   through its server for publishing, expect Google to require a CASA security
+   assessment from an approved assessor and periodic reassessment.
+
+The first Google authorization or a later reconnect must use Google's secure
+system-browser/OS authentication session. After that return, folder browsing,
+search, selection, import, and normal reuse stay inside WaveOS on web, iPhone
+Home Screen, Android Home Screen, and future native builds.
+
+For future App Store and Play Store packages, create separate iOS and Android
+OAuth clients in the same Google Cloud project (bundle ID for iOS; package name
+and signing-certificate SHA-1 for Android). Continue using a system
+authentication session rather than an embedded webview.
 
 This setup is done once. Every client signs into their own Google account from
 WaveOS and gets a separate workspace-scoped connection.
@@ -80,6 +118,8 @@ the protected variables, and deploy the GitHub branch. Then test this sequence:
 
 - Only image and video files are shown.
 - A maximum of 20 external files can be imported per request.
-- Provider tokens never enter the browser or the media metadata table.
+- Full-browser provider tokens remain server-side and never enter the media
+  metadata table. The legacy Google Picker fallback receives a short-lived
+  access token in the browser because Google's web Picker requires it.
 - Disconnecting a provider does not delete its file references, but publishing
   those references will require reconnection.

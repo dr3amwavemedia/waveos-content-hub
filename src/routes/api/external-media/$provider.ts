@@ -15,6 +15,8 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           externalMediaRequestOrigin,
           externalMediaRedirectUri,
           getExternalConnection,
+          googleDriveAccessMode,
+          GOOGLE_DRIVE_READONLY_SCOPE,
           GOOGLE_DRIVE_SCOPE,
           pkceChallenge,
           randomHex,
@@ -31,16 +33,16 @@ export const Route = createFileRoute("/api/external-media/$provider")({
         if (!workspaceId) return json({ error: "workspace_required" }, 400);
         const action = typeof body.action === "string" ? body.action : "";
         const auth =
-          action === "status"
+          action === "status" || action === "mobile_picker"
             ? await requireExternalMediaWorkspace(request, workspaceId)
             : await requireExternalMediaWorkspaceManager(request, workspaceId);
         if (!auth) return json({ error: "not_authorized" }, 403);
 
         if (action === "status") {
           const connection = await getExternalConnection(workspaceId, provider);
-          const hasRequiredDriveScope =
-            provider !== "google_drive" ||
-            connection?.scopes.split(/\s+/).includes(GOOGLE_DRIVE_SCOPE) === true;
+          const driveAccessMode =
+            provider === "google_drive" ? googleDriveAccessMode(connection?.scopes) : null;
+          const hasRequiredDriveScope = provider !== "google_drive" || driveAccessMode !== "none";
           const tokenExpired =
             Boolean(connection?.token_expires_at) &&
             Date.parse(connection!.token_expires_at as string) <= Date.now();
@@ -56,6 +58,7 @@ export const Route = createFileRoute("/api/external-media/$provider")({
                 : Boolean(process.env.DROPBOX_APP_KEY && process.env.DROPBOX_APP_SECRET),
             connected: Boolean(connection) && !reconnectRequired,
             reconnectRequired,
+            accessMode: driveAccessMode,
             // Safe, read-only diagnosis for My Agent and the connection picker.
             // Never return OAuth tokens, granted scope strings, or account secrets.
             diagnosis: !connection
@@ -65,9 +68,10 @@ export const Route = createFileRoute("/api/external-media/$provider")({
                 : tokenExpired && !connection.refresh_token_encrypted
                   ? "expired_authorization"
                   : "connection_record_present",
-            suggestedAction: !connection || reconnectRequired
-              ? "reconnect_with_provider_consent"
-              : "check_picker_or_provider_api",
+            suggestedAction:
+              !connection || reconnectRequired
+                ? "reconnect_with_provider_consent"
+                : "check_picker_or_provider_api",
             account: connection
               ? {
                   email: connection.account_email,
@@ -92,7 +96,28 @@ export const Route = createFileRoute("/api/external-media/$provider")({
           return json({ connected: false, revoked });
         }
 
-        if (action !== "connect") return json({ error: "invalid_action" }, 400);
+        if (action !== "connect" && action !== "connect_full" && action !== "mobile_picker")
+          return json({ error: "invalid_action" }, 400);
+
+        const mobilePicker = action === "mobile_picker";
+        const fullDrive = action === "connect_full";
+        if (mobilePicker && provider !== "google_drive")
+          return json({ error: "invalid_action" }, 400);
+        if (fullDrive && provider !== "google_drive") return json({ error: "invalid_action" }, 400);
+        let returnPath: string | null = null;
+        if (mobilePicker) {
+          const { safeDrivePickerReturnPath } = await import("@/lib/drive-picker-return");
+          try {
+            returnPath = safeDrivePickerReturnPath(
+              typeof body.returnPath === "string" ? body.returnPath : "",
+            );
+          } catch {
+            return json({ error: "saved_draft_required" }, 400);
+          }
+          const connection = await getExternalConnection(workspaceId, "google_drive");
+          if (!connection?.account_email)
+            return json({ error: "google_drive_reconnect_required" }, 409);
+        }
 
         const verifier = randomHex(48);
         const state = randomHex(32);
@@ -112,9 +137,19 @@ export const Route = createFileRoute("/api/external-media/$provider")({
             user_id: auth.user.id,
             provider,
             code_verifier: verifier,
+            flow_kind: mobilePicker ? "mobile_picker" : "connect",
+            return_path: returnPath,
             expires_at: new Date(Date.now() + 10 * 60_000).toISOString(),
           } as never);
-        if (stateError) return json({ error: "oauth_state_failed" }, 500);
+        if (stateError) {
+          console.error("external_media_oauth_state_insert_failed", {
+            action,
+            provider,
+            code: stateError.code,
+            message: stateError.message,
+          });
+          return json({ error: "oauth_state_failed" }, 500);
+        }
 
         if (provider === "google_drive") {
           const authorize = new URL("https://accounts.google.com/o/oauth2/v2/auth");
@@ -122,7 +157,9 @@ export const Route = createFileRoute("/api/external-media/$provider")({
             client_id: externalMediaEnv("GOOGLE_DRIVE_CLIENT_ID"),
             redirect_uri: externalMediaRedirectUri(provider, requestOrigin),
             response_type: "code",
-            scope: `openid email profile ${GOOGLE_DRIVE_SCOPE}`,
+            scope: mobilePicker
+              ? GOOGLE_DRIVE_SCOPE
+              : `openid email profile ${fullDrive ? GOOGLE_DRIVE_READONLY_SCOPE : GOOGLE_DRIVE_SCOPE}`,
             access_type: "offline",
             include_granted_scopes: "false",
             prompt: "consent select_account",
@@ -130,6 +167,14 @@ export const Route = createFileRoute("/api/external-media/$provider")({
             code_challenge: challenge,
             code_challenge_method: "S256",
           }).toString();
+          if (mobilePicker) {
+            authorize.searchParams.set("trigger_onepick", "true");
+            authorize.searchParams.set("allow_multiple", "true");
+            authorize.searchParams.set(
+              "mimetypes",
+              "image/jpeg,image/png,video/mp4,video/quicktime",
+            );
+          }
           return json({ url: authorize.toString() });
         }
 

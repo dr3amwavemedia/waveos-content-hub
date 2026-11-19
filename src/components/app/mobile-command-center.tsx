@@ -1,3 +1,4 @@
+import { OverviewPerformanceSummary } from "@/components/performance/overview-performance-summary";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -86,6 +87,7 @@ export function MobileCommandCenter({
   stats,
   loading,
   approvalsTo,
+  workspaceId,
 }: {
   can: (feature: FeatureKey) => boolean;
   workspaceName?: string;
@@ -99,6 +101,7 @@ export function MobileCommandCenter({
   };
   loading: boolean;
   approvalsTo: string;
+  workspaceId?: string | null;
 }) {
   const actions = ACTIONS.filter((a) => can(a.feature));
   const showCalendar = can("can_view_calendar_preview");
@@ -187,6 +190,10 @@ export function MobileCommandCenter({
           </div>
         )}
       </section>
+
+      {workspaceId && can("can_view_analytics_checkup") && (
+        <OverviewPerformanceSummary workspaceId={workspaceId} variant="mobile" />
+      )}
 
       {attention.length > 0 && (
         <section className="space-y-2">

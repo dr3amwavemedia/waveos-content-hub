@@ -295,7 +295,7 @@ function buildCard(
   ];
 }
 
-const entriesOf = (row: Record<string, unknown>) =>
+export const entriesOf = (row: Record<string, unknown>) =>
   (Array.isArray(row.platforms)
     ? row.platforms
     : Array.isArray(row.platformAnalytics)
@@ -305,7 +305,7 @@ const entriesOf = (row: Record<string, unknown>) =>
     .map(record)
     .filter((entry): entry is Record<string, unknown> => Boolean(entry));
 
-const isAccountTarget = (entry: Record<string, unknown>, account: LivePostAccount) =>
+export const isAccountTarget = (entry: Record<string, unknown>, account: LivePostAccount) =>
   zernioAccountId(entry.accountId) === account.accountId &&
   toProviderPlatform(str(entry.platform) ?? "") === toProviderPlatform(account.platform);
 

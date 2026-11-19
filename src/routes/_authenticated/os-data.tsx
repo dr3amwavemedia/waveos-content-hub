@@ -2,12 +2,30 @@ import { useState } from "react";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Database, Gift, Loader2, Mail, PauseCircle, PlayCircle, Search, ShieldCheck, X } from "lucide-react";
+import {
+  Copy,
+  Database,
+  Gift,
+  Loader2,
+  PauseCircle,
+  PlayCircle,
+  Search,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { OsDataPanel } from "@/routes/_authenticated/clients";
 import { supabase } from "@/integrations/supabase/client";
-import { getOsOperationsStatus, inviteComplimentaryOsAccount, setGlobalPublishingPause } from "@/lib/os-accounts.functions";
+import {
+  createComplimentaryAccessCode,
+  getOsOperationsStatus,
+  listComplimentaryAccessCodes,
+  revokeComplimentaryAccessGrant,
+  setComplimentaryAccessCodeActive,
+  setGlobalPublishingPause,
+  type ComplimentaryPlan,
+} from "@/lib/os-accounts.functions";
 
 export const Route = createFileRoute("/_authenticated/os-data")({
   beforeLoad: async () => {
@@ -83,28 +101,72 @@ function OsDataPage() {
 }
 
 function ComplimentaryAccessPanel() {
-  const inviteFn = useServerFn(inviteComplimentaryOsAccount);
+  const listCodes = useServerFn(listComplimentaryAccessCodes);
+  const createCode = useServerFn(createComplimentaryAccessCode);
+  const setCodeActive = useServerFn(setComplimentaryAccessCodeActive);
+  const revokeGrant = useServerFn(revokeComplimentaryAccessGrant);
   const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [workspaceName, setWorkspaceName] = useState("");
-  const [plan, setPlan] = useState<"standard" | "full" | "expanded">("standard");
-  const invite = useMutation({
+  const [label, setLabel] = useState("");
+  const [plan, setPlan] = useState<ComplimentaryPlan>("standard");
+  const [maxRedemptions, setMaxRedemptions] = useState(1);
+  const [expiresAt, setExpiresAt] = useState("");
+  const [accessEndsAt, setAccessEndsAt] = useState("");
+  const [eligibleEmail, setEligibleEmail] = useState("");
+  const [eligibleDomain, setEligibleDomain] = useState("");
+  const [newCode, setNewCode] = useState<string | null>(null);
+  const codes = useQuery({
+    queryKey: ["complimentary-access-codes"],
+    queryFn: () => listCodes({ data: {} }),
+    enabled: open,
+  });
+  const create = useMutation({
     mutationFn: () =>
-      inviteFn({ data: { email, firstName, lastName, workspaceName, plan } }),
+      createCode({
+        data: {
+          label,
+          plan,
+          maxRedemptions,
+          expiresAt: expiresAt || null,
+          accessEndsAt: accessEndsAt || null,
+          eligibleEmail: eligibleEmail || null,
+          eligibleEmailDomain: eligibleDomain || null,
+        },
+      }),
     onSuccess: (result) => {
-      toast.success(`Complimentary ${result.plan === "standard" ? "Ripple" : result.plan === "full" ? "Current" : "Tidal"} invitation sent to ${result.email}.`);
-      setEmail("");
-      setFirstName("");
-      setLastName("");
-      setWorkspaceName("");
+      setNewCode(result.code);
+      setLabel("");
       setPlan("standard");
-      setOpen(false);
+      setMaxRedemptions(1);
+      setExpiresAt("");
+      setAccessEndsAt("");
+      setEligibleEmail("");
+      setEligibleDomain("");
+      void codes.refetch();
+      toast.success("Complimentary access code created. Copy it now—it is shown once.");
     },
     onError: (error) =>
-      toast.error(error instanceof Error ? error.message : "Complimentary invite could not be sent."),
+      toast.error(
+        error instanceof Error ? error.message : "Complimentary code could not be created.",
+      ),
   });
+  const toggle = useMutation({
+    mutationFn: (input: { codeId: string; active: boolean }) => setCodeActive({ data: input }),
+    onSuccess: () => void codes.refetch(),
+    onError: (error) => toast.error(error instanceof Error ? error.message : "Code update failed."),
+  });
+  const revoke = useMutation({
+    mutationFn: (grantId: string) =>
+      revokeGrant({ data: { grantId, reason: "Revoked by owner from OS Data." } }),
+    onSuccess: () => {
+      void codes.refetch();
+      toast.success("Complimentary access revoked. The workspace data remains saved.");
+    },
+    onError: (error) =>
+      toast.error(error instanceof Error ? error.message : "Grant revocation failed."),
+  });
+
+  const planLabel = (value: ComplimentaryPlan) =>
+    value === "standard" ? "Ripple" : value === "full" ? "Current" : "Tidal";
 
   return (
     <section className="rounded-2xl border border-emerald-400/25 bg-emerald-500/5 p-4 sm:p-5">
@@ -119,7 +181,8 @@ function ComplimentaryAccessPanel() {
             <Gift className="h-4 w-4 text-emerald-300" /> Complimentary WaveOS access
           </span>
           <span className="mt-1 block text-xs text-muted-foreground">
-            Invite a new user with a selected tier and no card requirement. Existing paid accounts are protected from this flow.
+            Create secure payment-waiver codes, control future use, and review every grant. This is
+            not a trial or Stripe coupon.
           </span>
         </span>
         <span className="shrink-0 rounded-full border border-emerald-400/30 px-3 py-1 text-[10px] font-bold uppercase text-emerald-300">
@@ -127,59 +190,196 @@ function ComplimentaryAccessPanel() {
         </span>
       </button>
       {open && (
-        <form
-          className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!email.trim()) return;
-            invite.mutate();
-          }}
-        >
-          <label className="sm:col-span-2">
-            <span className="text-xs font-medium text-muted-foreground">Email</span>
-            <div className="relative mt-1">
-              <Mail className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+        <div className="mt-4 space-y-4 border-t border-border pt-4">
+          {newCode && (
+            <div className="rounded-xl border border-emerald-400/35 bg-emerald-500/10 p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-200">
+                Copy this code now — it will not be shown again
+              </p>
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <code className="flex-1 break-all rounded-lg bg-background px-3 py-2 text-sm text-foreground">
+                  {newCode}
+                </code>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(newCode);
+                    toast.success("Code copied.");
+                  }}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-400/30 px-4 text-sm font-semibold"
+                >
+                  <Copy className="h-4 w-4" /> Copy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewCode(null)}
+                  className="min-h-11 rounded-xl border border-border px-4 text-sm font-semibold"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+          <form
+            className="grid gap-3 sm:grid-cols-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (label.trim()) create.mutate();
+            }}
+          >
+            <label className="sm:col-span-2">
+              <span className="text-xs font-medium text-muted-foreground">Internal label</span>
               <input
                 required
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="person@company.com"
-                className="min-h-11 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
+                value={label}
+                onChange={(event) => setLabel(event.target.value)}
+                placeholder="Creator partner access"
+                className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
               />
+            </label>
+            <label>
+              <span className="text-xs font-medium text-muted-foreground">WaveOS tier</span>
+              <select
+                value={plan}
+                onChange={(event) => setPlan(event.target.value as ComplimentaryPlan)}
+                className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+              >
+                <option value="standard">Ripple</option>
+                <option value="full">Current</option>
+                <option value="expanded">Tidal</option>
+              </select>
+            </label>
+            <label>
+              <span className="text-xs font-medium text-muted-foreground">Maximum redemptions</span>
+              <input
+                type="number"
+                min={1}
+                max={100000}
+                value={maxRedemptions}
+                onChange={(event) => setMaxRedemptions(Number(event.target.value))}
+                className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+              />
+            </label>
+            <label>
+              <span className="text-xs font-medium text-muted-foreground">
+                Code expires (optional)
+              </span>
+              <input
+                type="datetime-local"
+                value={expiresAt}
+                onChange={(event) => setExpiresAt(event.target.value)}
+                className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+              />
+            </label>
+            <label>
+              <span className="text-xs font-medium text-muted-foreground">
+                Access ends (optional)
+              </span>
+              <input
+                type="datetime-local"
+                value={accessEndsAt}
+                onChange={(event) => setAccessEndsAt(event.target.value)}
+                className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm"
+              />
+            </label>
+            <label>
+              <span className="text-xs font-medium text-muted-foreground">
+                Eligible email (optional)
+              </span>
+              <input
+                type="email"
+                value={eligibleEmail}
+                onChange={(event) => setEligibleEmail(event.target.value)}
+                disabled={Boolean(eligibleDomain)}
+                placeholder="person@company.com"
+                className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm disabled:opacity-50"
+              />
+            </label>
+            <label>
+              <span className="text-xs font-medium text-muted-foreground">
+                Eligible domain (optional)
+              </span>
+              <input
+                value={eligibleDomain}
+                onChange={(event) => setEligibleDomain(event.target.value)}
+                disabled={Boolean(eligibleEmail)}
+                placeholder="company.com"
+                className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm disabled:opacity-50"
+              />
+            </label>
+            <div className="flex items-center justify-between gap-3 sm:col-span-2">
+              <p className="text-xs text-muted-foreground">
+                Codes are securely generated and stored only as a hash.
+              </p>
+              <button
+                type="submit"
+                disabled={create.isPending || !label.trim()}
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-slate-950 disabled:opacity-50"
+              >
+                {create.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                Create code
+              </button>
             </div>
-          </label>
-          <label>
-            <span className="text-xs font-medium text-muted-foreground">First name</span>
-            <input value={firstName} onChange={(event)=>setFirstName(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" />
-          </label>
-          <label>
-            <span className="text-xs font-medium text-muted-foreground">Last name</span>
-            <input value={lastName} onChange={(event)=>setLastName(event.target.value)} className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" />
-          </label>
-          <label>
-            <span className="text-xs font-medium text-muted-foreground">Workspace / business name</span>
-            <input value={workspaceName} onChange={(event)=>setWorkspaceName(event.target.value)} placeholder="Optional" className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm" />
-          </label>
-          <label>
-            <span className="text-xs font-medium text-muted-foreground">Complimentary tier</span>
-            <select value={plan} onChange={(event)=>setPlan(event.target.value as "standard"|"full"|"expanded")} className="mt-1 min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm">
-              <option value="standard">Ripple</option>
-              <option value="full">Current</option>
-              <option value="expanded">Tidal</option>
-            </select>
-          </label>
-          <div className="sm:col-span-2 rounded-xl border border-emerald-400/20 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
-            <strong className="text-foreground">No credit card:</strong> this invitation uses WaveOS internal complimentary access and does not create a Stripe subscription. The user receives an email invite and sets their password/profile on their end.
+          </form>
+
+          <div className="space-y-3 border-t border-border pt-4">
+            {codes.isLoading ? (
+              <p className="text-xs text-muted-foreground">Loading complimentary codes…</p>
+            ) : (codes.data ?? []).length === 0 ? (
+              <p className="text-xs text-muted-foreground">No complimentary codes created yet.</p>
+            ) : (
+              codes.data!.map((code) => (
+                <article
+                  key={code.id}
+                  className="rounded-xl border border-border bg-background/60 p-4"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-foreground">{code.label}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {planLabel(code.plan)} · ends in …{code.code_hint} · {code.redemption_count}
+                        /{code.max_redemptions} used
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={toggle.isPending}
+                      onClick={() => toggle.mutate({ codeId: code.id, active: !code.is_active })}
+                      className="min-h-9 rounded-lg border border-border px-3 text-xs font-semibold"
+                    >
+                      {code.is_active ? "Pause future use" : "Resume code"}
+                    </button>
+                  </div>
+                  {code.grants.length > 0 && (
+                    <div className="mt-3 space-y-2 border-t border-border pt-3">
+                      {code.grants.map((grant) => (
+                        <div
+                          key={grant.id}
+                          className="flex flex-wrap items-center justify-between gap-2 text-xs"
+                        >
+                          <span className="text-muted-foreground">
+                            <strong className="text-foreground">{grant.email}</strong> ·{" "}
+                            {grant.status} · {new Date(grant.granted_at).toLocaleDateString()}
+                          </span>
+                          {grant.status === "active" && (
+                            <button
+                              type="button"
+                              disabled={revoke.isPending}
+                              onClick={() => revoke.mutate(grant.id)}
+                              className="min-h-9 rounded-lg border border-rose-400/30 px-3 font-semibold text-rose-200"
+                            >
+                              Revoke access
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </article>
+              ))
+            )}
           </div>
-          <div className="flex gap-2 sm:col-span-2">
-            <button type="button" onClick={()=>setOpen(false)} className="min-h-11 rounded-xl border border-border px-4 text-sm font-semibold">Cancel</button>
-            <button type="submit" disabled={invite.isPending || !email.trim()} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-slate-950 disabled:opacity-50">
-              {invite.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              Send complimentary invite
-            </button>
-          </div>
-        </form>
+        </div>
       )}
     </section>
   );

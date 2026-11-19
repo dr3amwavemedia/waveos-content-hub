@@ -8,12 +8,22 @@ const callback = read("src/routes/api/external-media/$provider.callback.ts");
 const status = read("src/routes/api/external-media/$provider.ts");
 
 const DRIVE = "https://www.googleapis.com/auth/drive.file";
-const hasDrive = (s) => (s ?? "").split(/\s+/).includes(DRIVE);
+const DRIVE_READONLY = "https://www.googleapis.com/auth/drive.readonly";
+const hasDrive = (s) => {
+  const scopes = (s ?? "").split(/\s+/);
+  return scopes.includes(DRIVE) || scopes.includes(DRIVE_READONLY);
+};
 
-test("only the existing drive.file scope is requested", () => {
+test("limited Picker and full in-app Drive modes request the correct scopes", () => {
   assert.match(server, /GOOGLE_DRIVE_SCOPE = "https:\/\/www\.googleapis\.com\/auth\/drive\.file"/);
-  assert.match(status, /scope: `openid email profile \$\{GOOGLE_DRIVE_SCOPE\}`/);
-  assert.doesNotMatch(status, /auth\/drive"|drive\.readonly/);
+  assert.match(
+    server,
+    /GOOGLE_DRIVE_READONLY_SCOPE = "https:\/\/www\.googleapis\.com\/auth\/drive\.readonly"/,
+  );
+  assert.match(status, /action !== "connect_full"/);
+  assert.match(status, /fullDrive \? GOOGLE_DRIVE_READONLY_SCOPE : GOOGLE_DRIVE_SCOPE/);
+  assert.equal(hasDrive(DRIVE), true);
+  assert.equal(hasDrive(DRIVE_READONLY), true);
 });
 
 test("partial consent without Drive access is rejected, not saved as connected", () => {

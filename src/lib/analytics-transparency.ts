@@ -5,6 +5,7 @@ export const ANALYTICS_METRIC_KEYS = [
   "likes",
   "comments",
   "shares",
+  "reposts",
   "saves",
   "clicks",
   "messages",
@@ -65,6 +66,7 @@ const METRIC_ALIASES: Record<AnalyticsMetricKey, readonly string[]> = {
   likes: ["likes", "like_count", "likeCount"],
   comments: ["comments", "comment_count", "commentCount"],
   shares: ["shares", "share_count", "shareCount"],
+  reposts: ["reposts", "repost_count", "repostCount", "reposts_count", "repostsCount"],
   saves: ["saves", "save_count", "saveCount"],
   clicks: ["clicks", "click_count", "clickCount", "link_clicks", "linkClicks"],
   messages: [
@@ -110,7 +112,7 @@ function record(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function numericMetric(row: Record<string, unknown>, key: AnalyticsMetricKey) {
+export function numericMetric(row: Record<string, unknown>, key: AnalyticsMetricKey) {
   for (const alias of METRIC_ALIASES[key]) {
     if (!(alias in row)) continue;
     const raw = row[alias];

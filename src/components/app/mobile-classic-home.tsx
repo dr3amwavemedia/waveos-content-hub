@@ -111,6 +111,7 @@ export function MobileClassicHome() {
         stats={stats.data}
         loading={stats.isPending}
         approvalsTo={isPublicOs ? "/social" : "/approvals"}
+        workspaceId={activeWorkspace?.id ?? null}
       />
       {stats.isError && (
         <button

@@ -26,9 +26,33 @@ type ProviderFolder = {
   name: string;
   parentId: string | null;
   path: string | null;
+  driveId?: string | null;
+  kind?: "folder" | "shared_drive" | "shared_with_me";
 };
 
 const SUPPORTED_MEDIA_TYPES = new Set(["image/jpeg", "image/png", "video/mp4", "video/quicktime"]);
+const GOOGLE_FILE_FIELDS =
+  "id,name,mimeType,size,thumbnailLink,webViewLink,parents,driveId,modifiedTime,videoMediaMetadata,imageMediaMetadata";
+
+function googleProviderFile(file: Record<string, unknown>): ProviderFile {
+  const parents = Array.isArray(file.parents) ? file.parents : [];
+  const imageMetadata = recordOrEmpty(file.imageMediaMetadata);
+  const videoMetadata = recordOrEmpty(file.videoMediaMetadata);
+  return {
+    id: String(file.id ?? ""),
+    name: String(file.name ?? "Untitled"),
+    mimeType: String(file.mimeType ?? "application/octet-stream"),
+    sizeBytes: Number(file.size ?? 0),
+    thumbnailUrl: typeof file.thumbnailLink === "string" ? file.thumbnailLink : null,
+    webUrl: typeof file.webViewLink === "string" ? file.webViewLink : null,
+    parentId: typeof parents[0] === "string" ? parents[0] : null,
+    path: null,
+    modifiedAt: typeof file.modifiedTime === "string" ? file.modifiedTime : null,
+    width: positiveNumberOrNull(imageMetadata.width ?? videoMetadata.width),
+    height: positiveNumberOrNull(imageMetadata.height ?? videoMetadata.height),
+    durationSeconds: millisecondsToSeconds(videoMetadata.durationMillis),
+  };
+}
 
 export const Route = createFileRoute("/api/external-media/$provider/files")({
   server: {
@@ -190,7 +214,35 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
         if (body.action === "import") {
           const files = Array.isArray(body.files) ? body.files : [];
           if (!files.length || files.length > 20) return json({ error: "invalid_files" }, 400);
-          const rows = files.map((entry) => {
+          let verifiedFiles = files as Partial<ProviderFile>[];
+          if (provider === "google_drive") {
+            const requestedIds = verifiedFiles.map((file) => file.id ?? "");
+            if (requestedIds.some((id) => !/^[A-Za-z0-9_-]{10,200}$/.test(id)))
+              return json({ error: "invalid_external_file" }, 400);
+            const verified = await Promise.all(
+              requestedIds.map(async (id) => {
+                const endpoint = new URL(
+                  `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}`,
+                );
+                endpoint.search = new URLSearchParams({
+                  supportsAllDrives: "true",
+                  fields: GOOGLE_FILE_FIELDS,
+                }).toString();
+                const response = await fetch(endpoint, {
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                });
+                const result = (await response.json().catch(() => null)) as Record<
+                  string,
+                  unknown
+                > | null;
+                return response.ok && result ? googleProviderFile(result) : null;
+              }),
+            );
+            if (verified.some((file) => !file))
+              return json({ error: "google_drive_file_unavailable" }, 409);
+            verifiedFiles = verified as ProviderFile[];
+          }
+          const rows = verifiedFiles.map((entry) => {
             const file = entry as Partial<ProviderFile>;
             if (!file.id || !file.name || !file.mimeType) throw new Error("invalid_external_file");
             const mimeType = externalMediaMimeType(file.name, file.mimeType);
@@ -253,29 +305,50 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
         if (body.action !== "list") return json({ error: "invalid_action" }, 400);
         const query = typeof body.query === "string" ? body.query.trim() : "";
         const folderId = typeof body.folderId === "string" ? body.folderId : null;
+        const driveId = typeof body.driveId === "string" ? body.driveId : null;
 
         if (provider === "google_drive") {
           const filters = ["trashed = false"];
           if (query) filters.push(`name contains '${query.replaceAll("'", "\\'")}'`);
-          else if (folderId) filters.push(`'${folderId.replaceAll("'", "\\'")}' in parents`);
-          const endpoint = new URL("https://www.googleapis.com/drive/v3/files");
-          endpoint.search = new URLSearchParams({
-            q: filters.join(" and "),
-            pageSize: "100",
-            orderBy: "modifiedTime desc",
-            supportsAllDrives: "true",
-            includeItemsFromAllDrives: "true",
-            fields:
-              "files(id,name,mimeType,size,thumbnailLink,webViewLink,parents,modifiedTime,videoMediaMetadata,imageMediaMetadata)",
-          }).toString();
-          const response = await fetch(endpoint, {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
-          const result = (await response.json()) as Record<string, unknown>;
-          if (!response.ok)
-            return json({ error: "google_drive_list_failed", details: result }, 502);
-          const entries = Array.isArray(result.files) ? result.files : [];
-          const folders = entries
+          else if (folderId === "__shared_with_me__") filters.push("sharedWithMe = true");
+          else filters.push(`'${(folderId ?? "root").replaceAll("'", "\\'")}' in parents`);
+
+          const entries: unknown[] = [];
+          let nextPageToken: string | null = null;
+          let pages = 0;
+          do {
+            const endpoint = new URL("https://www.googleapis.com/drive/v3/files");
+            const params = new URLSearchParams({
+              q: filters.join(" and "),
+              pageSize: "100",
+              orderBy: "folder,name_natural",
+              spaces: "drive",
+              supportsAllDrives: "true",
+              includeItemsFromAllDrives: "true",
+              fields: `nextPageToken,files(${GOOGLE_FILE_FIELDS})`,
+            });
+            if (driveId) {
+              params.set("corpora", "drive");
+              params.set("driveId", driveId);
+            } else {
+              params.set("corpora", "user");
+            }
+            if (nextPageToken) params.set("pageToken", nextPageToken);
+            endpoint.search = params.toString();
+            const response = await fetch(endpoint, {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            const result = (await response.json().catch(() => null)) as Record<
+              string,
+              unknown
+            > | null;
+            if (!response.ok || !result) return json({ error: "google_drive_list_failed" }, 502);
+            entries.push(...(Array.isArray(result.files) ? result.files : []));
+            nextPageToken = typeof result.nextPageToken === "string" ? result.nextPageToken : null;
+            pages += 1;
+          } while (nextPageToken && pages < 10);
+
+          const folders: ProviderFolder[] = entries
             .filter(
               (entry) =>
                 (entry as Record<string, unknown>).mimeType ===
@@ -289,31 +362,58 @@ export const Route = createFileRoute("/api/external-media/$provider/files")({
                 name: String(folder.name ?? "Untitled folder"),
                 parentId: typeof parents[0] === "string" ? parents[0] : null,
                 path: null,
+                driveId: typeof folder.driveId === "string" ? folder.driveId : driveId,
+                kind: "folder",
               } satisfies ProviderFolder;
             });
+          if (!query && !folderId && !driveId) {
+            folders.unshift({
+              id: "__shared_with_me__",
+              name: "Shared with me",
+              parentId: null,
+              path: "Google Drive",
+              driveId: null,
+              kind: "shared_with_me",
+            });
+            let drivePageToken: string | null = null;
+            let drivePages = 0;
+            do {
+              const endpoint = new URL("https://www.googleapis.com/drive/v3/drives");
+              const params = new URLSearchParams({
+                pageSize: "100",
+                fields: "nextPageToken,drives(id,name)",
+              });
+              if (drivePageToken) params.set("pageToken", drivePageToken);
+              endpoint.search = params.toString();
+              const response = await fetch(endpoint, {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              });
+              const result = (await response.json().catch(() => null)) as Record<
+                string,
+                unknown
+              > | null;
+              if (!response.ok || !result) break;
+              for (const entry of Array.isArray(result.drives) ? result.drives : []) {
+                const sharedDrive = entry as Record<string, unknown>;
+                if (typeof sharedDrive.id !== "string") continue;
+                folders.push({
+                  id: sharedDrive.id,
+                  name: String(sharedDrive.name ?? "Shared drive"),
+                  parentId: null,
+                  path: "Shared drive",
+                  driveId: sharedDrive.id,
+                  kind: "shared_drive",
+                });
+              }
+              drivePageToken =
+                typeof result.nextPageToken === "string" ? result.nextPageToken : null;
+              drivePages += 1;
+            } while (drivePageToken && drivePages < 5);
+          }
           const files = entries
-            .map((entry) => {
-              const file = entry as Record<string, unknown>;
-              const parents = Array.isArray(file.parents) ? file.parents : [];
-              const imageMetadata = recordOrEmpty(file.imageMediaMetadata);
-              const videoMetadata = recordOrEmpty(file.videoMediaMetadata);
-              return {
-                id: String(file.id ?? ""),
-                name: String(file.name ?? "Untitled"),
-                mimeType: String(file.mimeType ?? "application/octet-stream"),
-                sizeBytes: Number(file.size ?? 0),
-                thumbnailUrl: typeof file.thumbnailLink === "string" ? file.thumbnailLink : null,
-                webUrl: typeof file.webViewLink === "string" ? file.webViewLink : null,
-                parentId: typeof parents[0] === "string" ? parents[0] : null,
-                path: null,
-                modifiedAt: typeof file.modifiedTime === "string" ? file.modifiedTime : null,
-                width: positiveNumberOrNull(imageMetadata.width ?? videoMetadata.width),
-                height: positiveNumberOrNull(imageMetadata.height ?? videoMetadata.height),
-                durationSeconds: millisecondsToSeconds(videoMetadata.durationMillis),
-              } satisfies ProviderFile;
-            })
+            .map((entry) => googleProviderFile(entry as Record<string, unknown>))
             .filter((file) => SUPPORTED_MEDIA_TYPES.has(file.mimeType.toLowerCase()));
-          return json({ files, folders });
+          return json({ files, folders, complete: nextPageToken === null });
         }
 
         const response = await fetch(

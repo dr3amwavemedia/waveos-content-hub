@@ -1,5 +1,17 @@
 # Google Picker Safari investigation — November 7, 2026
 
+## November 9 owner regression report
+
+The owner confirmed that Google Drive is still not working properly from the installed iPhone Home Screen app and that this flow worked before the recent changes. Treat this as a P0 regression, not as an accepted iOS limitation. The current embedded web Picker and undocumented `x-safari-https` handoff are not an end-to-end repair. Preserve the existing connection, scopes and credentials while locating the first breaking change. Completion requires a physical-iPhone Home Screen test that selects a new Drive file, returns to the same saved WaveOS draft, attaches the file and saves without publishing.
+
+Google's current desktop/mobile Picker guidance uses a top-level default-browser OAuth redirect with `trigger_onepick=true` and returns `picked_file_ids` to a registered callback. That is the supported candidate for iOS standalone mode; it must be implemented with verified state, account binding and server-side file validation rather than by broadening Drive scopes or replacing the existing workspace connection.
+
+## November 9 code repair (not deployed)
+
+Installed iPhone Home Screen mode now avoids the embedded web Picker. The user explicitly saves the current post, WaveOS creates a short-lived PKCE/state record tied to that workspace and saved `/create?id=…` return, and Google's top-level mobile OAuth/Picker opens with only `drive.file`, `trigger_onepick=true`, multiple selection and the existing supported media filter. The callback exchanges the code, confirms the Google email matches the workspace's existing Drive connection, validates every returned file ID and metadata against Drive, imports only supported selected files, and returns their WaveOS asset IDs to the same saved post.
+
+The shared Drive connection is not disconnected or replaced by this selection flow. Regular desktop/mobile Safari retains the existing embedded web Picker. The migration `20261109090000_google_drive_mobile_picker_state.sql` is required before runtime verification. Local validation covers signed return paths, cancellation, account mismatch guards, server validation, TypeScript and production build; a physical iPhone selection/import remains required before this P0 can be closed.
+
 ## Proven evidence
 
 - Release-blocking layout follow-up at `2727a615fd582d554444b06b7cda885493f6a5a0`: a real Picker opened in an authenticated 390×844 browser. Its Google backdrop used absolute document geometry (390×1603, y=-759), while the dialog was 366×680 and the unbounded underlying media dialog competed for viewport space. The Exit control reserved no space. `c0d90ab` and current commit have identical global Picker CSS; neither lifecycle correction repaired geometry. Google documents a 566px minimum preferred width for `setSize`, so calling it with phone dimensions is not a supported fix.

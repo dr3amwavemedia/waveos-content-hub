@@ -5,6 +5,15 @@ import test from "node:test";
 const agent = fs.readFileSync("src/routes/_authenticated/my-agent.tsx", "utf8");
 const actions = fs.readFileSync("src/lib/my-agent-actions.functions.ts", "utf8");
 const assist = fs.readFileSync("src/lib/wave-assist.functions.ts", "utf8");
+const authenticatedRoute = fs.readFileSync("src/routes/_authenticated/route.tsx", "utf8");
+const shell = fs.readFileSync("src/components/app/app-shell.tsx", "utf8");
+const socialAccess = fs.readFileSync("src/lib/zernio.server.ts", "utf8");
+const analyticsSelection = fs.readFileSync("src/lib/my-agent-analytics.ts", "utf8");
+const conversations = fs.readFileSync("src/lib/my-agent-conversations.functions.ts", "utf8");
+const conversationMigration = fs.readFileSync(
+  "supabase/migrations/20261118120000_my_agent_conversations.sql",
+  "utf8",
+);
 
 test("My Agent launches interactive WaveOS tools from natural prompts", () => {
   assert.match(agent, /Campaign Builder/);
@@ -21,7 +30,7 @@ test("My Agent launches interactive WaveOS tools from natural prompts", () => {
   assert.match(agent, /Photo/);
   assert.match(agent, /Video/);
   assert.match(agent, /createAgentPostDraft/);
-  assert.match(agent, /\(campaign\)/);
+  assert.match(agent, /campaignIntent/);
   assert.match(agent, /performance\|analytics\|growth\|results/);
 });
 
@@ -41,12 +50,30 @@ test("My Agent performance snapshot is sourced and local-date bounded", () => {
   assert.match(assist, /never describe an analytics range as ending after that date/);
 });
 
+test("My Agent prefers combined analytics and never repeats a metric", () => {
+  assert.match(actions, /captured_at,evidence/);
+  assert.match(actions, /selectAgentAnalyticsObservations/);
+  assert.match(assist, /selectAgentAnalyticsObservations/);
+  assert.match(analyticsSelection, /evidenceMode\(row\.evidence\) === "combined"/);
+  assert.match(analyticsSelection, /seenMetrics\.has\(row\.metric_key\)/);
+  assert.match(assist, /use the newest combined observation/);
+  assert.match(assist, /never repeat a metric/);
+});
+
 test("My Agent composer reserves space above mobile navigation", () => {
   assert.match(agent, /mb-24/);
   assert.match(agent, /100dvh/);
   assert.match(agent, /shrink-0 border-t/);
 });
 
+test("every staff role can open My Agent within its existing workspace limits", () => {
+  assert.match(authenticatedRoute, /TEAM_ALLOWED_ROUTES = \[[\s\S]*"\/my-agent"/);
+  assert.match(authenticatedRoute, /CREW_ALLOWED_ROUTES = \[[\s\S]*"\/my-agent"/);
+  assert.match(shell, /TEAM_NAV: NavItem\[\] = \[[\s\S]*"\/my-agent"/);
+  assert.match(actions, /staffIdentity && workspaceId === STAFF_WORKSPACE_ID/);
+  assert.match(assist, /staffIdentity && data\.workspaceId === STAFF_WORKSPACE_ID/);
+  assert.match(socialAccess, /staffWorkspaceAccess/);
+});
 
 test("My Agent post action saves a real WaveOS content draft", () => {
   assert.match(actions, /createAgentPostDraft/);
@@ -54,8 +81,28 @@ test("My Agent post action saves a real WaveOS content draft", () => {
   assert.match(actions, /source: "my_agent"/);
   assert.match(actions, /can_create_content/);
   assert.match(actions, /status: "draft"/);
+  assert.match(actions, /media_asset_ids: uniqueMediaIds/);
+  assert.match(actions, /scheduled_at: data\.timing === "schedule"/);
+  assert.match(actions, /from\("post_variants"\)/);
+  assert.match(agent, /Drop a photo or video/);
+  assert.match(agent, /Which platforms should this use/);
+  assert.match(agent, /When should this post go out/);
+  assert.match(agent, /press the final Post or Schedule button in Create Post/);
 });
 
+test("My Agent keeps one private cloud conversation across text and voice", () => {
+  assert.match(agent, /getAgentConversation/);
+  assert.match(agent, /syncAgentConversation/);
+  assert.match(agent, /Synced across devices/);
+  assert.match(agent, /inputMode: "text" \| "voice"/);
+  assert.match(conversations, /my_agent_threads/);
+  assert.match(conversations, /my_agent_messages/);
+  assert.match(conversations, /can_use_ai_tools/);
+  assert.match(conversationMigration, /ENABLE ROW LEVEL SECURITY/);
+  assert.match(conversationMigration, /\(SELECT auth\.uid\(\)\) = user_id/);
+  assert.match(conversationMigration, /FOREIGN KEY \(thread_id, workspace_id, user_id\)/);
+  assert.doesNotMatch(conversationMigration, /TO anon/);
+});
 
 test("My Agent connects the remaining intelligence and workflow tools", () => {
   assert.match(agent, /Trending Now/);
@@ -71,7 +118,6 @@ test("My Agent connects the remaining intelligence and workflow tools", () => {
   assert.match(agent, /publishing stays review-first/);
 });
 
-
 test("Campaign Builder keeps typed corrections inside the active tool", () => {
   assert.match(agent, /applyCampaignConversationInput/);
   assert.match(agent, /\(\\d\{1,2\}\)\\s\*\(\?:post\|posts\)/);
@@ -79,7 +125,6 @@ test("Campaign Builder keeps typed corrections inside the active tool", () => {
   assert.match(agent, /mentionedPlatforms/);
   assert.match(agent, /activeTool === "campaign" && applyCampaignConversationInput\(input\)/);
 });
-
 
 test("My Agent media flow exposes all connected and device media sources", () => {
   assert.match(agent, /MediaPicker/);
@@ -99,7 +144,6 @@ test("Shared media picker separates Files from Camera Roll and keeps cloud provi
   assert.match(createPost, /startExternalMediaConnection/);
 });
 
-
 test("My Agent campaign save uses an authorized server write and schema fallback", () => {
   assert.match(actions, /supabaseAdmin/);
   assert.match(actions, /campaign_plans/);
@@ -108,9 +152,13 @@ test("My Agent campaign save uses an authorized server write and schema fallback
   assert.match(actions, /campaign_plan_items/);
 });
 
-
 test("campaign builders require content selection and persist linked drafts", () => {
-  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
+  const campaigns = [
+    fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"),
+    ...fs
+      .readdirSync("src/components/campaign")
+      .map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8")),
+  ].join("\n");
   assert.match(agent, /Choose campaign content/);
   assert.match(agent, /Use this entire folder/);
   assert.match(agent, /Pick individual media/);
@@ -124,14 +172,36 @@ test("campaign builders require content selection and persist linked drafts", ()
   assert.match(campaigns, /media_asset_ids: \[asset\.id\]/);
 });
 
-
 test("My Agent does not treat campaign status questions as new campaign creation", () => {
-  assert.match(agent, /\(create\|build\|start\|make\|new\)/);
-  assert.doesNotMatch(agent, /\(create\|build\|start\|make\|new\|plan\)/);
+  assert.match(agent, /campaignIntent\(input\)/);
+  assert.match(agent, /requestedCampaignIntent === "review_existing"/);
+  assert.match(agent, /openCampaignReview\(input, speakReply\)/);
+  assert.match(actions, /getAgentCampaignReview/);
+  assert.match(actions, /campaign_plan_items/);
+  assert.match(actions, /contains\("metadata", \{ campaignPlanId: campaign\.id \}\)/);
+  assert.match(agent, /Review fixes in this campaign/);
+});
+
+test("My Agent keeps chat history chronological and anchored above the composer", () => {
+  assert.match(agent, /MAX_VISIBLE_MESSAGES = 24/);
+  assert.match(agent, /restoreAgentMessages/);
+  assert.match(agent, /sort\(\(a, b\) => a\.createdAt - b\.createdAt\)/);
+  assert.match(agent, /key=\{message\.id\}/);
+  assert.match(agent, /min-h-full max-w-3xl flex-col justify-end/);
+  assert.match(agent, /loadedStorageKey === storageKey/);
+  assert.match(agent, /performanceAnchorMessageId === message\.id/);
+  assert.match(agent, /setPerformanceAnchorMessageId\(requestMessage\?\.id \?\? null\)/);
+  assert.match(agent, /className="contents"/);
+  assert.match(agent, /Absolutely—I narrowed the snapshot/);
 });
 
 test("Campaign Manager continues after save with a working command center", () => {
-  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
+  const campaigns = [
+    fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"),
+    ...fs
+      .readdirSync("src/components/campaign")
+      .map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8")),
+  ].join("\n");
   assert.match(campaigns, /Campaign command center/);
   assert.match(campaigns, /Continue building/);
   assert.match(campaigns, /campaign-linked-content/);
@@ -143,18 +213,26 @@ test("Campaign Manager continues after save with a working command center", () =
   assert.doesNotMatch(campaigns, /contentFormats: input\.contentFormats/);
 });
 
-
 test("Video Maker has an automatic local playback fallback", () => {
-  const videoMaker = [fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"), ...fs.readdirSync("src/components/video-maker").map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8"))].join("\n");
+  const videoMaker = [
+    fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"),
+    ...fs
+      .readdirSync("src/components/video-maker")
+      .map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8")),
+  ].join("\n");
   assert.match(videoMaker, /prepareLocalPreview/);
   assert.match(videoMaker, /URL\.createObjectURL/);
   assert.match(videoMaker, /Prepare local preview/);
   assert.match(videoMaker, /temporary on-device preview/);
 });
 
-
 test("Campaign Manager keeps media compact and saved campaigns tappable", () => {
-  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
+  const campaigns = [
+    fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"),
+    ...fs
+      .readdirSync("src/components/campaign")
+      .map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8")),
+  ].join("\n");
   assert.match(campaigns, /Campaign content/);
   assert.match(campaigns, /mediaSectionOpen/);
   assert.match(campaigns, /ChevronDown/);
@@ -163,9 +241,13 @@ test("Campaign Manager keeps media compact and saved campaigns tappable", () => 
   assert.match(campaigns, /max-h-\[28rem\]/);
 });
 
-
 test("Campaign persistence never deletes a saved plan just because content linking fails", () => {
-  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
+  const campaigns = [
+    fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"),
+    ...fs
+      .readdirSync("src/components/campaign")
+      .map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8")),
+  ].join("\n");
   assert.match(campaigns, /Campaign saved, but its content could not be linked yet/);
   assert.match(campaigns, /Your campaigns were not deleted/);
   assert.match(campaigns, /optimization_mode\|schema cache\|column/);
@@ -173,9 +255,13 @@ test("Campaign persistence never deletes a saved plan just because content linki
   assert.doesNotMatch(actions, /linked campaign content insert failed[\s\S]{0,400}\.delete\(\)/);
 });
 
-
 test("Campaign drafts keep briefs internal, restore platforms, and appear on Calendar", () => {
-  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
+  const campaigns = [
+    fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"),
+    ...fs
+      .readdirSync("src/components/campaign")
+      .map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8")),
+  ].join("\n");
   const createPost = fs.readFileSync("src/routes/_authenticated/create.tsx", "utf8");
   const calendar = fs.readFileSync("src/routes/_authenticated/calendar.tsx", "utf8");
   assert.match(campaigns, /campaignBrief: plannedItem\?\.copyBrief/);
@@ -190,9 +276,13 @@ test("Campaign drafts keep briefs internal, restore platforms, and appear on Cal
   assert.match(calendar, /campaign-planned drafts/);
 });
 
-
 test("Video Maker exposes real non-destructive editing controls", () => {
-  const videoMaker = [fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"), ...fs.readdirSync("src/components/video-maker").map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8"))].join("\n");
+  const videoMaker = [
+    fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"),
+    ...fs
+      .readdirSync("src/components/video-maker")
+      .map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8")),
+  ].join("\n");
   assert.match(videoMaker, /"Trim"/);
   assert.match(videoMaker, /Size & framing/);
   assert.match(videoMaker, /Brightness/);
@@ -203,9 +293,13 @@ test("Video Maker exposes real non-destructive editing controls", () => {
   assert.match(videoMaker, /Continue to Feed/);
 });
 
-
 test("Campaign Manager exposes captions as part of the campaign workspace", () => {
-  const campaigns = [fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"), ...fs.readdirSync("src/components/campaign").map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8"))].join("\n");
+  const campaigns = [
+    fs.readFileSync("src/routes/_authenticated/campaigns.tsx", "utf8"),
+    ...fs
+      .readdirSync("src/components/campaign")
+      .map((f) => fs.readFileSync(`src/components/campaign/${f}`, "utf8")),
+  ].join("\n");
   assert.match(campaigns, /Campaign captions/);
   assert.match(campaigns, /Generate caption/);
   assert.match(campaigns, /Rewrite/);
@@ -214,7 +308,12 @@ test("Campaign Manager exposes captions as part of the campaign workspace", () =
 });
 
 test("Video Maker uses mobile-friendly controls instead of raw timing fields", () => {
-  const videoMaker = [fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"), ...fs.readdirSync("src/components/video-maker").map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8"))].join("\n");
+  const videoMaker = [
+    fs.readFileSync("src/routes/_authenticated/video-maker.tsx", "utf8"),
+    ...fs
+      .readdirSync("src/components/video-maker")
+      .map((f) => fs.readFileSync(`src/components/video-maker/${f}`, "utf8")),
+  ].join("\n");
   assert.match(videoMaker, /Reel \/ Story/);
   assert.match(videoMaker, /Show full video/);
   assert.match(videoMaker, /Fill screen/);
@@ -222,7 +321,6 @@ test("Video Maker uses mobile-friendly controls instead of raw timing fields", (
   assert.match(videoMaker, /selected/);
   assert.doesNotMatch(videoMaker, /type="number" min=\{0\} max=\{recipe\.trimEnd/);
 });
-
 
 test("My Agent and Campaign Manager share reusable media intelligence", () => {
   const assist = fs.readFileSync("src/lib/wave-assist.functions.ts", "utf8");

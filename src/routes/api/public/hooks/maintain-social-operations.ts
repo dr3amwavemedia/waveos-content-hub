@@ -162,7 +162,47 @@ export const Route = createFileRoute("/api/public/hooks/maintain-social-operatio
           stats.archived += 1;
         }
 
-        return Response.json(stats);
+        // Bounded, non-destructive per-post analytics refresh: a few connected
+        // accounts per run, each at most once a day, read-only at the provider.
+        let metricsRefreshed = 0;
+        try {
+          const { refreshAccountPostMetrics } = await import("@/lib/live-posts.server");
+          const { toProviderPlatform } = await import("@/lib/live-posts");
+          const dayAgo = new Date(now.getTime() - 24 * 3_600_000).toISOString();
+          const { data: recent } = await supabaseAdmin
+            .from("social_metric_backfill_runs" as never)
+            .select("workspace_id,provider_account_id,last_attempt_at,next_retry_at")
+            .gte("last_attempt_at", dayAgo)
+            .limit(1000);
+          const skip = new Set(
+            ((recent ?? []) as Array<{ workspace_id: string; provider_account_id: string }>).map(
+              (row) => `${row.workspace_id}:${row.provider_account_id}`,
+            ),
+          );
+          const { data: connections } = await supabaseAdmin
+            .from("social_connections")
+            .select("workspace_id,platform,provider_account_id,display_name,connection_state")
+            .eq("provider", "zernio")
+            .eq("connected", true)
+            .not("provider_account_id", "is", null)
+            .limit(200);
+          for (const row of connections ?? []) {
+            if (metricsRefreshed >= 10) break;
+            if (!row.provider_account_id || row.connection_state !== "connected") continue;
+            if (skip.has(`${row.workspace_id}:${row.provider_account_id}`)) continue;
+            await refreshAccountPostMetrics(row.workspace_id, {
+              accountId: row.provider_account_id,
+              platform: toProviderPlatform(row.platform),
+              name: row.display_name ?? row.platform,
+            });
+            metricsRefreshed += 1;
+          }
+        } catch (error) {
+          stats.errors += 1;
+          console.error("[social maintenance] post metrics refresh failed", error);
+        }
+
+        return Response.json({ ...stats, metricsRefreshed });
       },
     },
   },
