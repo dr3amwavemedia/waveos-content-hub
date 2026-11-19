@@ -4278,141 +4278,6 @@ export type Database = {
         }
         Relationships: []
       }
-      waveos_complimentary_code_attempts: {
-        Row: {
-          attempted_at: string
-          id: number
-          succeeded: boolean
-          user_id: string
-        }
-        Insert: {
-          attempted_at?: string
-          id?: never
-          succeeded?: boolean
-          user_id: string
-        }
-        Update: {
-          attempted_at?: string
-          id?: never
-          succeeded?: boolean
-          user_id?: string
-        }
-        Relationships: []
-      }
-      waveos_complimentary_codes: {
-        Row: {
-          access_ends_at: string | null
-          code_hash: string
-          code_hint: string
-          created_at: string
-          created_by: string
-          eligible_email: string | null
-          eligible_email_domain: string | null
-          expires_at: string | null
-          id: string
-          is_active: boolean
-          label: string
-          max_redemptions: number
-          plan: string
-          redemption_count: number
-          starts_at: string
-          updated_at: string
-        }
-        Insert: {
-          access_ends_at?: string | null
-          code_hash: string
-          code_hint: string
-          created_at?: string
-          created_by: string
-          eligible_email?: string | null
-          eligible_email_domain?: string | null
-          expires_at?: string | null
-          id?: string
-          is_active?: boolean
-          label: string
-          max_redemptions?: number
-          plan: string
-          redemption_count?: number
-          starts_at?: string
-          updated_at?: string
-        }
-        Update: {
-          access_ends_at?: string | null
-          code_hash?: string
-          code_hint?: string
-          created_at?: string
-          created_by?: string
-          eligible_email?: string | null
-          eligible_email_domain?: string | null
-          expires_at?: string | null
-          id?: string
-          is_active?: boolean
-          label?: string
-          max_redemptions?: number
-          plan?: string
-          redemption_count?: number
-          starts_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
-      waveos_complimentary_grants: {
-        Row: {
-          access_ends_at: string | null
-          code_id: string
-          granted_at: string
-          id: string
-          plan: string
-          revoke_reason: string | null
-          revoked_at: string | null
-          revoked_by: string | null
-          status: string
-          user_id: string
-          workspace_id: string
-        }
-        Insert: {
-          access_ends_at?: string | null
-          code_id: string
-          granted_at?: string
-          id?: string
-          plan: string
-          revoke_reason?: string | null
-          revoked_at?: string | null
-          revoked_by?: string | null
-          status?: string
-          user_id: string
-          workspace_id: string
-        }
-        Update: {
-          access_ends_at?: string | null
-          code_id?: string
-          granted_at?: string
-          id?: string
-          plan?: string
-          revoke_reason?: string | null
-          revoked_at?: string | null
-          revoked_by?: string | null
-          status?: string
-          user_id?: string
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "waveos_complimentary_grants_code_id_fkey"
-            columns: ["code_id"]
-            isOneToOne: false
-            referencedRelation: "waveos_complimentary_codes"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "waveos_complimentary_grants_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       webhook_events: {
         Row: {
           content_item_id: string | null
@@ -4718,9 +4583,9 @@ export type Database = {
           account_limit: number
           billing_interval: string | null
           cancel_at_period_end: boolean
+          created_at: string
           complimentary_access_ends_at: string | null
           complimentary_grant_id: string | null
-          created_at: string
           current_period_end: string | null
           entitlement_source: string
           internal_test_access: boolean
@@ -4741,9 +4606,9 @@ export type Database = {
           account_limit: number
           billing_interval?: string | null
           cancel_at_period_end?: boolean
+          created_at?: string
           complimentary_access_ends_at?: string | null
           complimentary_grant_id?: string | null
-          created_at?: string
           current_period_end?: string | null
           entitlement_source?: string
           internal_test_access?: boolean
@@ -4764,9 +4629,9 @@ export type Database = {
           account_limit?: number
           billing_interval?: string | null
           cancel_at_period_end?: boolean
+          created_at?: string
           complimentary_access_ends_at?: string | null
           complimentary_grant_id?: string | null
-          created_at?: string
           current_period_end?: string | null
           entitlement_source?: string
           internal_test_access?: boolean
@@ -4784,13 +4649,6 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "workspace_social_subscriptions_complimentary_grant_id_fkey"
-            columns: ["complimentary_grant_id"]
-            isOneToOne: false
-            referencedRelation: "waveos_complimentary_grants"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "workspace_social_subscriptions_workspace_id_fkey"
             columns: ["workspace_id"]
@@ -5645,10 +5503,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      redeem_waveos_complimentary_code: {
-        Args: { _code: string; _workspace_id: string }
-        Returns: Json
-      }
       resend_invite: {
         Args: { _extend_days?: number; _invite_id: string }
         Returns: {
@@ -5662,10 +5516,6 @@ export type Database = {
           _target_user: string
         }
         Returns: undefined
-      }
-      revoke_waveos_complimentary_grant: {
-        Args: { _actor_user_id: string; _grant_id: string; _reason?: string }
-        Returns: boolean
       }
       set_staff_position: {
         Args: { _position: string; _target_user: string }
@@ -5687,6 +5537,10 @@ export type Database = {
         Args: { _workspace_id: string }
         Returns: boolean
       }
+      redeem_waveos_complimentary_code: {
+        Args: { _code: string; _workspace_id: string }
+        Returns: Json
+      }
       staff_release_content: {
         Args: {
           _content_id: string
@@ -5702,11 +5556,8 @@ export type Database = {
           account_limit: number
           billing_interval: string | null
           cancel_at_period_end: boolean
-          complimentary_access_ends_at: string | null
-          complimentary_grant_id: string | null
           created_at: string
           current_period_end: string | null
-          entitlement_source: string
           internal_test_access: boolean
           last_payment_failed_at: string | null
           payment_failure_count: number
