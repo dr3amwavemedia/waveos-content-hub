@@ -382,7 +382,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
               historicalBackfill: {
                 attemptedAt: now,
                 completedAt: now,
-                requestedRangeStart: olderStart,
+                requestedRangeStart: newestStart,
                 requestedRangeEnd: newestEnd,
                 availableRangeStart: historicalRangeStart,
                 availableRangeEnd: historicalRangeEnd,
@@ -407,7 +407,7 @@ export const getZernioAnalytics = createServerFn({ method: "POST" })
               historicalBackfill: {
                 ...previousBackfill,
                 attemptedAt: now,
-                requestedRangeStart: olderStart,
+                requestedRangeStart: newestStart,
                 requestedRangeEnd: newestEnd,
                 availableRangeStart: previousBackfill?.availableRangeStart ?? null,
                 availableRangeEnd: previousBackfill?.availableRangeEnd ?? null,
