@@ -40,6 +40,11 @@ import {
 import { chartHistorySeries, historySeries, comparePeriods } from "@/lib/analytics-history";
 import { Button } from "@/components/ui/button";
 import { OceanDisclosure, OceanPanel, OceanStatus } from "@/components/app/ocean-ui";
+import {
+  SOCIAL_ANALYTICS_RANGES,
+  SOCIAL_ANALYTICS_RANGE_LABELS,
+  type SocialAnalyticsRangeDays,
+} from "@/lib/social-metrics-contract";
 
 type AnalyticsMode = "combined" | "organic" | "paid";
 
@@ -128,7 +133,7 @@ export function AnalyticsCheckup({
 }) {
   const analyticsFn = useServerFn(getZernioAnalytics);
   const intelligenceFn = useServerFn(getSocialIntelligenceProfile);
-  const [days, setDays] = useState<7 | 30 | 90 | 180 | 365>(30);
+  const [days, setDays] = useState<SocialAnalyticsRangeDays>(30);
   const [graphMetric, setGraphMetric] = useState("reach");
   const [mode, setMode] = useState<AnalyticsMode>("combined");
   const [refreshing, setRefreshing] = useState(false);
@@ -211,15 +216,13 @@ export function AnalyticsCheckup({
               aria-label="Performance period"
               className="ocean-control px-3"
               value={days}
-              onChange={(event) => setDays(Number(event.target.value) as 7 | 30 | 90 | 180 | 365)}
+              onChange={(event) => setDays(Number(event.target.value) as SocialAnalyticsRangeDays)}
             >
-              {[7, 30, 90, 180, 365].map((value) => (
+              {SOCIAL_ANALYTICS_RANGES.map((value) => (
                 <option key={value} value={value}>
-                  {value === 365
-                    ? "Last 12 months"
-                    : value === 180
-                      ? "Last 6 months"
-                      : `Last ${value} days`}
+                  {value === 1
+                    ? "Today"
+                    : `Last ${SOCIAL_ANALYTICS_RANGE_LABELS[value].toLowerCase()}`}
                 </option>
               ))}
             </select>

@@ -27,7 +27,16 @@ type ZernioProfileRow = {
 
 const workspaceAnalyticsInput = z.object({
   workspaceId: z.string().uuid(),
-  days: z.union([z.literal(7), z.literal(30), z.literal(90), z.literal(180), z.literal(365)]).default(30),
+  days: z
+    .union([
+      z.literal(1),
+      z.literal(7),
+      z.literal(30),
+      z.literal(90),
+      z.literal(180),
+      z.literal(365),
+    ])
+    .default(30),
   refresh: z.boolean().default(false),
 });
 

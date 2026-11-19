@@ -8,10 +8,18 @@ import { OceanDisclosure, OceanPanel, OceanStatus } from "@/components/app/ocean
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSocialConnections } from "@/hooks/use-content";
-import { formatAnalyticsPlatform } from "@/lib/analytics-transparency";
+import { formatAnalyticsPlatform, type AnalyticsMetricKey } from "@/lib/analytics-transparency";
 import { livePlatformLabel, toProviderPlatform } from "@/lib/live-posts";
-import { SOCIAL_ANALYTICS_RANGES, type SocialAnalyticsRangeDays } from "@/lib/social-metrics-contract";
-import { ENGAGEMENT_COMPONENTS, type CopyPerformance } from "@/lib/social-performance";
+import {
+  SOCIAL_ANALYTICS_RANGES,
+  SOCIAL_ANALYTICS_RANGE_LABELS,
+  type SocialAnalyticsRangeDays,
+} from "@/lib/social-metrics-contract";
+import {
+  ENGAGEMENT_COMPONENTS,
+  type CopyPerformance,
+  type GroupRollup,
+} from "@/lib/social-performance";
 import { confirmSocialLead, listSocialLeads } from "@/lib/social-performance.functions";
 import { formatFreshness, METRIC_LABELS, MetricValue, RollupTile } from "./metric-value";
 import { useSocialPerformance } from "./use-social-performance";
@@ -26,14 +34,87 @@ const CONTENT_FILTERS = [
   { value: "video", label: "Videos" },
 ] as const;
 
-const selectClass = "min-h-11 rounded-xl border border-border bg-background px-3 text-sm text-foreground";
+const selectClass =
+  "min-h-11 rounded-xl border border-border bg-background px-3 text-sm text-foreground";
 
-export function RangeSelector({ value, onChange }: { value: SocialAnalyticsRangeDays; onChange: (d: SocialAnalyticsRangeDays) => void }) {
+const PLATFORM_METRICS: Record<string, readonly AnalyticsMetricKey[]> = {
+  instagram: ["reach", "impressions", "views", "likes", "reposts", "comments"],
+  facebook: ["clicks", "likes", "comments", "shares"],
+  tiktok: ["reposts", "views", "likes", "comments"],
+  youtube: ["impressions", "views", "likes", "comments", "shares"],
+  linkedin: ["impressions", "reach", "clicks", "likes", "comments", "shares"],
+};
+
+const FALLBACK_PLATFORM_METRICS: readonly AnalyticsMetricKey[] = [
+  "views",
+  "reach",
+  "impressions",
+  "likes",
+  "comments",
+  "shares",
+  "clicks",
+];
+
+function platformFamily(platform: string) {
+  const normalized = platform.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return Object.keys(PLATFORM_METRICS).find((key) => normalized.includes(key)) ?? "other";
+}
+
+function PlatformAnalytics({ group }: { group: GroupRollup }) {
+  const family = platformFamily(group.key);
+  const metrics = PLATFORM_METRICS[family] ?? FALLBACK_PLATFORM_METRICS;
   return (
-    <div role="group" aria-label="Time range" className="grid grid-cols-5 gap-1 rounded-xl border border-border/70 p-1 sm:w-fit">
+    <OceanDisclosure
+      summary={
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <span>{formatAnalyticsPlatform(group.key)}</span>
+          <span className="text-xs font-normal text-muted-foreground">
+            {group.copies} published {group.copies === 1 ? "copy" : "copies"}
+          </span>
+        </span>
+      }
+    >
+      <p className="mb-3 text-xs leading-5 text-muted-foreground">
+        Provider-reported metrics for this network. A missing metric stays unavailable and is never
+        treated as zero.
+      </p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+        {metrics.map((metric) => (
+          <RollupTile
+            key={metric}
+            label={METRIC_LABELS[metric] ?? metric}
+            rollup={group.metrics[metric]!}
+          />
+        ))}
+      </div>
+    </OceanDisclosure>
+  );
+}
+
+export function RangeSelector({
+  value,
+  onChange,
+}: {
+  value: SocialAnalyticsRangeDays;
+  onChange: (d: SocialAnalyticsRangeDays) => void;
+}) {
+  return (
+    <div
+      role="group"
+      aria-label="Time range"
+      className="grid grid-cols-3 gap-1 rounded-xl border border-border/70 p-1 sm:grid-cols-6 sm:w-fit"
+    >
       {SOCIAL_ANALYTICS_RANGES.map((d) => (
-        <Button key={d} type="button" size="sm" variant={value === d ? "secondary" : "ghost"} className="min-h-10" aria-pressed={value === d} onClick={() => onChange(d)}>
-          {d === 365 ? "1y" : `${d}d`}
+        <Button
+          key={d}
+          type="button"
+          size="sm"
+          variant={value === d ? "secondary" : "ghost"}
+          className="min-h-10"
+          aria-pressed={value === d}
+          onClick={() => onChange(d)}
+        >
+          {SOCIAL_ANALYTICS_RANGE_LABELS[d]}
         </Button>
       ))}
     </div>
@@ -85,33 +166,63 @@ export function SocialPerformancePanel({ workspaceId }: { workspaceId: string })
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <RangeSelector value={days} onChange={setDays} />
-        <select aria-label="Connected account" className={selectClass} value={account} onChange={(e) => setAccount(e.target.value)}>
+        <select
+          aria-label="Connected account"
+          className={selectClass}
+          value={account}
+          onChange={(e) => setAccount(e.target.value)}
+        >
           <option value="">All accounts</option>
           {accounts.map((a) => (
-            <option key={a.key} value={a.key}>{a.label}</option>
+            <option key={a.key} value={a.key}>
+              {a.label}
+            </option>
           ))}
         </select>
-        <select aria-label="Content type" className={selectClass} value={contentType} onChange={(e) => setContentType(e.target.value)}>
+        <select
+          aria-label="Content type"
+          className={selectClass}
+          value={contentType}
+          onChange={(e) => setContentType(e.target.value)}
+        >
           {CONTENT_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>{f.label}</option>
+            <option key={f.value} value={f.value}>
+              {f.label}
+            </option>
           ))}
         </select>
       </div>
 
-      {perf.isPending && <p className="mt-4 text-sm text-muted-foreground">Loading stored performance…</p>}
-      {perf.error && <p className="mt-4 text-sm text-muted-foreground">Stored performance couldn't be loaded. The live view above is still current.</p>}
+      {perf.isPending && (
+        <p className="mt-4 text-sm text-muted-foreground">Loading stored performance…</p>
+      )}
+      {perf.error && (
+        <p className="mt-4 text-sm text-muted-foreground">
+          Stored performance couldn't be loaded. The live view above is still current.
+        </p>
+      )}
       {p && (
         <div className="mt-4 space-y-5">
           <p className="text-xs text-muted-foreground">
-            {p.period.start} – {p.period.end} · Source: {p.sourceReferences.join(", ") || "none yet"} · Last sync {formatFreshness(p.freshestCapture)} · {p.copyCount} post copies
+            {p.period.start} – {p.period.end} · Source:{" "}
+            {p.sourceReferences.join(", ") || "none yet"} · Last sync{" "}
+            {formatFreshness(p.freshestCapture)} · {p.copyCount} post copies
           </p>
           {!perf.data?.storageReady || !p.hasStoredData ? (
             <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">No stored post history for this period yet.</p>
-              <p className="mt-1">
-                Numbers are saved each time Published Posts loads from your connected accounts. Until then, the live provider view above stays the source.
+              <p className="font-medium text-foreground">
+                No stored post history for this period yet.
               </p>
-              <Link to="/social" className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary">Open Published Posts</Link>
+              <p className="mt-1">
+                Numbers are saved each time Published Posts loads from your connected accounts.
+                Until then, the live provider view above stays the source.
+              </p>
+              <Link
+                to="/social"
+                className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary"
+              >
+                Open Published Posts
+              </Link>
             </div>
           ) : (
             <>
@@ -121,9 +232,43 @@ export function SocialPerformancePanel({ workspaceId }: { workspaceId: string })
                 ))}
               </div>
               <div className="rounded-xl border border-border/70 p-3">
-                <p className="text-xs font-medium text-muted-foreground">Engagement ({p.engagement.components.join(" + ") || ENGAGEMENT_COMPONENTS.join(" + ")})</p>
-                <MetricValue value={p.engagement.value} availability={p.engagement.availability} className="mt-1 block" />
+                <p className="text-xs font-medium text-muted-foreground">
+                  Engagement (
+                  {p.engagement.components.join(" + ") || ENGAGEMENT_COMPONENTS.join(" + ")})
+                </p>
+                <MetricValue
+                  value={p.engagement.value}
+                  availability={p.engagement.availability}
+                  className="mt-1 block"
+                />
               </div>
+
+              {p.breakdown.platform.length > 0 && (
+                <section aria-labelledby="platform-analytics-title" className="space-y-2">
+                  <div>
+                    <h3
+                      id="platform-analytics-title"
+                      className="text-sm font-semibold text-foreground"
+                    >
+                      Analytics by platform
+                    </h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Open one network at a time to see the metrics that matter there.
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    {[...p.breakdown.platform]
+                      .sort((left, right) =>
+                        formatAnalyticsPlatform(left.key).localeCompare(
+                          formatAnalyticsPlatform(right.key),
+                        ),
+                      )
+                      .map((group) => (
+                        <PlatformAnalytics key={group.key} group={group} />
+                      ))}
+                  </div>
+                </section>
+              )}
 
               <section aria-label="Lead actions" className="space-y-2">
                 <h3 className="text-sm font-semibold text-foreground">Lead actions</h3>
@@ -131,8 +276,14 @@ export function SocialPerformancePanel({ workspaceId }: { workspaceId: string })
                   <RollupTile label="Link clicks" rollup={p.leadActions.clicks} />
                   <RollupTile label="DM / message starts" rollup={p.leadActions.messages} />
                   <div className="rounded-xl border border-border/70 bg-card/40 p-3">
-                    <p className="text-xs font-medium text-muted-foreground">Combined interactions</p>
-                    <MetricValue value={p.leadActions.combined} availability={p.leadActions.clicks.availability} className="mt-1 block" />
+                    <p className="text-xs font-medium text-muted-foreground">
+                      Combined interactions
+                    </p>
+                    <MetricValue
+                      value={p.leadActions.combined}
+                      availability={p.leadActions.clicks.availability}
+                      className="mt-1 block"
+                    />
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">{p.leadActions.note}</p>
@@ -141,9 +292,15 @@ export function SocialPerformancePanel({ workspaceId }: { workspaceId: string })
               {(p.best.length > 0 || p.evidenceGaps.length > 0) && (
                 <div className="grid gap-4 lg:grid-cols-2">
                   <div>
-                    <h3 className="text-sm font-semibold text-foreground">Best-performing by {p.rankingMetric ?? "—"}</h3>
+                    <h3 className="text-sm font-semibold text-foreground">
+                      Best-performing by {p.rankingMetric ?? "—"}
+                    </h3>
                     {p.best.length ? (
-                      <ul className="mt-2 space-y-1">{p.best.map((c) => <CopyRow key={c.copyKey} copy={c} metric={p.rankingMetric} />)}</ul>
+                      <ul className="mt-2 space-y-1">
+                        {p.best.map((c) => (
+                          <CopyRow key={c.copyKey} copy={c} metric={p.rankingMetric} />
+                        ))}
+                      </ul>
                     ) : (
                       <p className="mt-2 text-sm text-muted-foreground">{p.evidenceGaps[0]}</p>
                     )}
@@ -151,36 +308,77 @@ export function SocialPerformancePanel({ workspaceId }: { workspaceId: string })
                   {p.needsAttention.length > 0 && (
                     <div>
                       <h3 className="text-sm font-semibold text-foreground">Needs attention</h3>
-                      <p className="text-xs text-muted-foreground">Lowest {p.rankingMetric} among comparable copies; this doesn't explain why.</p>
-                      <ul className="mt-2 space-y-1">{p.needsAttention.map((c) => <CopyRow key={c.copyKey} copy={c} metric={p.rankingMetric} />)}</ul>
+                      <p className="text-xs text-muted-foreground">
+                        Lowest {p.rankingMetric} among comparable copies; this doesn't explain why.
+                      </p>
+                      <ul className="mt-2 space-y-1">
+                        {p.needsAttention.map((c) => (
+                          <CopyRow key={c.copyKey} copy={c} metric={p.rankingMetric} />
+                        ))}
+                      </ul>
                     </div>
                   )}
                 </div>
               )}
               {p.recommendations.map((r) => (
-                <p key={r} className="rounded-xl border border-border/70 p-3 text-sm text-foreground">{r}</p>
+                <p
+                  key={r}
+                  className="rounded-xl border border-border/70 p-3 text-sm text-foreground"
+                >
+                  {r}
+                </p>
               ))}
             </>
           )}
 
-          <ConfirmedLeads workspaceId={workspaceId} count={p.confirmedLeads.count} note={p.confirmedLeads.note} />
+          <ConfirmedLeads
+            workspaceId={workspaceId}
+            count={p.confirmedLeads.count}
+            note={p.confirmedLeads.note}
+          />
 
-          <OceanDisclosure summary={`History & sync health${p.backfill.problems.length ? ` · ${p.backfill.problems.length} need attention` : ""}`}>
+          <OceanDisclosure
+            summary={`History & sync health${p.backfill.problems.length ? ` · ${p.backfill.problems.length} need attention` : ""}`}
+          >
             <p className="text-sm text-muted-foreground">
-              Up to 365 days of provider-supported history. Available from {p.backfill.availableRangeStart ?? "—"} · last success {formatFreshness(p.backfill.lastSuccessAt)}.
+              Up to 365 days of provider-supported history. Available from{" "}
+              {p.backfill.availableRangeStart ?? "—"} · last success{" "}
+              {formatFreshness(p.backfill.lastSuccessAt)}.
             </p>
             <ul className="mt-3 space-y-2">
               {p.backfill.accounts.map((run) => (
-                <li key={`${run.platform}:${run.provider_account_id}`} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <li
+                  key={`${run.platform}:${run.provider_account_id}`}
+                  className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                >
                   <span>{livePlatformLabel(run.platform)}</span>
-                  <OceanStatus tone={run.status === "complete" ? "positive" : run.status === "partial" ? "neutral" : "warning"}>{run.status}</OceanStatus>
-                  {run.safe_message && <span className="w-full text-xs text-muted-foreground">{run.safe_message}</span>}
+                  <OceanStatus
+                    tone={
+                      run.status === "complete"
+                        ? "positive"
+                        : run.status === "partial"
+                          ? "neutral"
+                          : "warning"
+                    }
+                  >
+                    {run.status}
+                  </OceanStatus>
+                  {run.safe_message && (
+                    <span className="w-full text-xs text-muted-foreground">{run.safe_message}</span>
+                  )}
                 </li>
               ))}
-              {!p.backfill.accounts.length && <li className="text-sm text-muted-foreground">No history has been loaded yet.</li>}
+              {!p.backfill.accounts.length && (
+                <li className="text-sm text-muted-foreground">No history has been loaded yet.</li>
+              )}
             </ul>
             {p.backfill.problems.length > 0 && (
-              <Link to="/social-accounts" className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary">Reconnect accounts</Link>
+              <Link
+                to="/social-accounts"
+                className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary"
+              >
+                Reconnect accounts
+              </Link>
             )}
           </OceanDisclosure>
         </div>
@@ -189,16 +387,37 @@ export function SocialPerformancePanel({ workspaceId }: { workspaceId: string })
   );
 }
 
-function ConfirmedLeads({ workspaceId, count, note }: { workspaceId: string; count: number; note: string }) {
+function ConfirmedLeads({
+  workspaceId,
+  count,
+  note,
+}: {
+  workspaceId: string;
+  count: number;
+  note: string;
+}) {
   const queryClient = useQueryClient();
   const listFn = useServerFn(listSocialLeads);
   const confirmFn = useServerFn(confirmSocialLead);
-  const leads = useQuery({ queryKey: ["social-leads", workspaceId], queryFn: () => listFn({ data: { workspaceId } }) });
+  const leads = useQuery({
+    queryKey: ["social-leads", workspaceId],
+    queryFn: () => listFn({ data: { workspaceId } }),
+  });
   const [form, setForm] = useState({ name: "", email: "", phone: "" });
   const save = useMutation({
-    mutationFn: () => confirmFn({ data: { workspaceId, name: form.name || undefined, email: form.email || undefined, phone: form.phone || undefined } }),
+    mutationFn: () =>
+      confirmFn({
+        data: {
+          workspaceId,
+          name: form.name || undefined,
+          email: form.email || undefined,
+          phone: form.phone || undefined,
+        },
+      }),
     onSuccess: (r) => {
-      toast.success(r.duplicate ? "This person was already confirmed — counted once." : "Lead confirmed.");
+      toast.success(
+        r.duplicate ? "This person was already confirmed — counted once." : "Lead confirmed.",
+      );
       setForm({ name: "", email: "", phone: "" });
       void queryClient.invalidateQueries({ queryKey: ["social-leads", workspaceId] });
       void queryClient.invalidateQueries({ queryKey: ["social-performance", workspaceId] });
@@ -207,7 +426,9 @@ function ConfirmedLeads({ workspaceId, count, note }: { workspaceId: string; cou
   });
   return (
     <OceanDisclosure summary={`Confirmed leads · ${count} in this period`}>
-      <p className="text-sm text-muted-foreground">{note} Workspace managers can add one when a real person becomes a lead.</p>
+      <p className="text-sm text-muted-foreground">
+        {note} Workspace managers can add one when a real person becomes a lead.
+      </p>
       <form
         className="mt-3 grid gap-2 sm:grid-cols-4"
         onSubmit={(e) => {
@@ -215,19 +436,49 @@ function ConfirmedLeads({ workspaceId, count, note }: { workspaceId: string; cou
           save.mutate();
         }}
       >
-        <Input aria-label="Lead name" placeholder="Name (optional)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="min-h-11" />
-        <Input aria-label="Lead email" type="email" placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="min-h-11" />
-        <Input aria-label="Lead phone" placeholder="Phone" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="min-h-11" />
-        <Button type="submit" className="min-h-11" disabled={save.isPending || (!form.email && !form.phone)}>Confirm lead</Button>
+        <Input
+          aria-label="Lead name"
+          placeholder="Name (optional)"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          className="min-h-11"
+        />
+        <Input
+          aria-label="Lead email"
+          type="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+          className="min-h-11"
+        />
+        <Input
+          aria-label="Lead phone"
+          placeholder="Phone"
+          value={form.phone}
+          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          className="min-h-11"
+        />
+        <Button
+          type="submit"
+          className="min-h-11"
+          disabled={save.isPending || (!form.email && !form.phone)}
+        >
+          Confirm lead
+        </Button>
       </form>
       <ul className="mt-3 space-y-1 text-sm">
         {(leads.data?.leads ?? []).slice(0, 10).map((l) => (
           <li key={l.id} className="flex justify-between gap-2 text-muted-foreground">
-            <span>{l.metadata?.name || "Confirmed lead"}{l.platform ? ` · ${livePlatformLabel(l.platform)}` : ""}</span>
+            <span>
+              {l.metadata?.name || "Confirmed lead"}
+              {l.platform ? ` · ${livePlatformLabel(l.platform)}` : ""}
+            </span>
             <span>{new Date(l.confirmed_at).toLocaleDateString()}</span>
           </li>
         ))}
-        {leads.data && !leads.data.storageReady && <li className="text-muted-foreground">Lead storage isn't set up yet.</li>}
+        {leads.data && !leads.data.storageReady && (
+          <li className="text-muted-foreground">Lead storage isn't set up yet.</li>
+        )}
       </ul>
     </OceanDisclosure>
   );

@@ -213,11 +213,12 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
       asOf: data.localDate,
       rangeStart: latestStart,
       rangeEnd: latestEnd,
-      capturedAt: sameWindow
-        .map((row: any) => row.captured_at)
-        .filter(Boolean)
-        .sort()
-        .at(-1) ?? null,
+      capturedAt:
+        sameWindow
+          .map((row: any) => row.captured_at)
+          .filter(Boolean)
+          .sort()
+          .at(-1) ?? null,
       metrics,
       message: null,
     };
@@ -225,9 +226,20 @@ export const getAgentPerformanceSnapshot = createServerFn({ method: "POST" })
 
 const postPerformanceInput = z.object({
   workspaceId: z.string().uuid(),
-  days: z.union([z.literal(7), z.literal(30), z.literal(90), z.literal(180), z.literal(365)]).default(30),
+  days: z
+    .union([
+      z.literal(1),
+      z.literal(7),
+      z.literal(30),
+      z.literal(90),
+      z.literal(180),
+      z.literal(365),
+    ])
+    .default(30),
   platform: z.string().max(40).nullish(),
-  contentType: z.enum(["post", "reel", "story", "video", "carousel", "short", "stories_reels"]).nullish(),
+  contentType: z
+    .enum(["post", "reel", "story", "video", "carousel", "short", "stories_reels"])
+    .nullish(),
 });
 
 /** My Agent's per-post answers read the exact selector Analytics uses. */

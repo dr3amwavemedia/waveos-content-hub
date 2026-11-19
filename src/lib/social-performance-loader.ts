@@ -2,7 +2,11 @@ import { z } from "zod";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { socialAnalyticsRangeStart, type ConfirmedSocialLead, type SocialAnalyticsRangeDays } from "@/lib/social-metrics-contract";
+import {
+  socialAnalyticsRangeStart,
+  type ConfirmedSocialLead,
+  type SocialAnalyticsRangeDays,
+} from "@/lib/social-metrics-contract";
 import { rowToObservation, type ObservationRow } from "@/lib/social-post-metrics";
 import {
   buildSocialPerformance,
@@ -14,10 +18,21 @@ import {
 
 export const filtersInput = z.object({
   workspaceId: z.string().uuid(),
-  days: z.union([z.literal(7), z.literal(30), z.literal(90), z.literal(180), z.literal(365)]).default(30),
+  days: z
+    .union([
+      z.literal(1),
+      z.literal(7),
+      z.literal(30),
+      z.literal(90),
+      z.literal(180),
+      z.literal(365),
+    ])
+    .default(30),
   platform: z.string().max(40).nullish(),
   accountId: z.string().max(200).nullish(),
-  contentType: z.enum(["post", "reel", "story", "video", "carousel", "short", "stories_reels"]).nullish(),
+  contentType: z
+    .enum(["post", "reel", "story", "video", "carousel", "short", "stories_reels"])
+    .nullish(),
   campaignPlanId: z.string().uuid().nullish(),
   includePrevious: z.boolean().optional(),
 });
@@ -31,7 +46,11 @@ export type Client = SupabaseClient<Database>;
 export async function loadSocialPerformance(
   supabase: Client,
   input: z.infer<typeof filtersInput>,
-): Promise<{ current: SocialPerformance; previous: SocialPerformance | null; storageReady: boolean }> {
+): Promise<{
+  current: SocialPerformance;
+  previous: SocialPerformance | null;
+  storageReady: boolean;
+}> {
   const days = input.days as SocialAnalyticsRangeDays;
   const end = new Date().toISOString().slice(0, 10);
   const start = socialAnalyticsRangeStart(end, days);
@@ -80,10 +99,14 @@ export async function loadSocialPerformance(
       .limit(5000),
     supabase
       .from("social_metric_backfill_runs" as never)
-      .select("provider_account_id,platform,status,covered_range_start,covered_range_end,last_success_at,last_attempt_at,safe_message")
+      .select(
+        "provider_account_id,platform,status,covered_range_start,covered_range_end,last_success_at,last_attempt_at,safe_message",
+      )
       .eq("workspace_id", input.workspaceId),
   ]);
-  const leads: ConfirmedSocialLead[] = ((leadsResult.data ?? []) as Array<Record<string, string | null>>).map((row) => ({
+  const leads: ConfirmedSocialLead[] = (
+    (leadsResult.data ?? []) as Array<Record<string, string | null>>
+  ).map((row) => ({
     workspaceId: String(row.workspace_id),
     dedupeKey: String(row.dedupe_key),
     source: row.source as ConfirmedSocialLead["source"],
@@ -99,10 +122,16 @@ export async function loadSocialPerformance(
     contentType: input.contentType ?? null,
     contentItemIds,
   };
-  const current = buildSocialPerformance({ observations, leads, backfillRuns, days, endDate: end, filters });
+  const current = buildSocialPerformance({
+    observations,
+    leads,
+    backfillRuns,
+    days,
+    endDate: end,
+    filters,
+  });
   const previous = input.includePrevious
     ? buildSocialPerformance({ observations, leads, backfillRuns, days, endDate: prevEnd, filters })
     : null;
   return { current, previous, storageReady };
 }
-

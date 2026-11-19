@@ -10,6 +10,7 @@ export const METRIC_LABELS: Record<string, string> = {
   likes: "Likes",
   comments: "Comments",
   shares: "Shares",
+  reposts: "Reposts",
   saves: "Saves",
   clicks: "Link clicks",
   messages: "DM / message starts",
@@ -18,14 +19,35 @@ export const METRIC_LABELS: Record<string, string> = {
 
 export function formatFreshness(iso: string | null) {
   if (!iso) return "never synced";
-  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
 }
 
 /** A value, or the exact reason it is missing. Missing is never rendered as 0. */
-export function MetricValue({ value, availability, className }: { value: number | null; availability: AnalyticsAvailability; className?: string }) {
+export function MetricValue({
+  value,
+  availability,
+  className,
+}: {
+  value: number | null;
+  availability: AnalyticsAvailability;
+  className?: string;
+}) {
   if (value === null)
-    return <span className={cn("text-sm font-medium text-muted-foreground", className)}>{availabilityText(availability)}</span>;
-  return <span className={cn("text-xl font-semibold tabular-nums text-foreground", className)}>{value.toLocaleString()}</span>;
+    return (
+      <span className={cn("text-sm font-medium text-muted-foreground", className)}>
+        {availabilityText(availability)}
+      </span>
+    );
+  return (
+    <span className={cn("text-xl font-semibold tabular-nums text-foreground", className)}>
+      {value.toLocaleString()}
+    </span>
+  );
 }
 
 export function RollupTile({ label, rollup }: { label: string; rollup: SocialMetricRollup }) {
@@ -35,7 +57,8 @@ export function RollupTile({ label, rollup }: { label: string; rollup: SocialMet
       <MetricValue value={rollup.value} availability={rollup.availability} className="mt-1 block" />
       {rollup.value !== null && (
         <p className="mt-1 text-[11px] text-muted-foreground">
-          {rollup.coverage === "complete" ? "Complete" : "Partial"} · {rollup.contributingCopies}/{rollup.expectedCopies} copies
+          {rollup.coverage === "complete" ? "Complete" : "Partial"} · {rollup.contributingCopies}/
+          {rollup.expectedCopies} copies
         </p>
       )}
     </div>

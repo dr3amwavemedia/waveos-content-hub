@@ -7,6 +7,8 @@ import {
   socialAnalyticsRangeStart,
   socialMetricObservationKey,
   socialPostCopyKey,
+  SOCIAL_ANALYTICS_RANGES,
+  SOCIAL_ANALYTICS_RANGE_LABELS,
 } from "../../src/lib/social-metrics-contract.ts";
 import { resolveMetricAvailability } from "../../src/lib/social-provider-capabilities.ts";
 import {
@@ -31,6 +33,13 @@ const base = {
   sourceReference: "provider post analytics",
   calculationVersion: "direct-v1",
 };
+
+test("analytics ranges cover day through twelve months with approachable labels", () => {
+  assert.deepEqual(SOCIAL_ANALYTICS_RANGES, [1, 7, 30, 90, 180, 365]);
+  assert.equal(SOCIAL_ANALYTICS_RANGE_LABELS[1], "Day");
+  assert.equal(SOCIAL_ANALYTICS_RANGE_LABELS[30], "Month");
+  assert.equal(SOCIAL_ANALYTICS_RANGE_LABELS[365], "12 months");
+});
 
 test("post identity separates cross-posted accounts and platforms", () => {
   const first = socialPostCopyKey(base);

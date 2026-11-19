@@ -1,6 +1,15 @@
 import type { AnalyticsAvailability, AnalyticsMetricKey } from "./analytics-transparency.ts";
 
-export const SOCIAL_ANALYTICS_RANGES = [7, 30, 90, 180, 365] as const;
+export const SOCIAL_ANALYTICS_RANGES = [1, 7, 30, 90, 180, 365] as const;
+
+export const SOCIAL_ANALYTICS_RANGE_LABELS: Record<SocialAnalyticsRangeDays, string> = {
+  1: "Day",
+  7: "Week",
+  30: "Month",
+  90: "3 months",
+  180: "6 months",
+  365: "12 months",
+};
 
 export type SocialAnalyticsRangeDays = (typeof SOCIAL_ANALYTICS_RANGES)[number];
 export type SocialContentType = "post" | "reel" | "story" | "video" | "carousel" | "short";
